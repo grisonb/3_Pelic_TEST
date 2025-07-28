@@ -26,11 +26,6 @@ const resultsList = document.getElementById('results-list');
 const clearSearchBtn = document.getElementById('clear-search');
 const airportCountInput = document.getElementById('airport-count');
 const offlineStatus = document.getElementById('offline-status');
-const versionDisplay = document.querySelector('.version-display');
-if (versionDisplay) {
-    versionDisplay.textContent = `v${APP_CACHE_NAME.split('-v')[1]}`;
-}
-
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 },
     { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 },
@@ -369,6 +364,10 @@ function addSearchToggleControl() {
             this._button = L.DomUtil.create('a', 'search-toggle-button', container);
             this._communeDisplay = L.DomUtil.create('div', 'commune-display-control', container);
             
+            // AJOUTÉ : Création de l'élément pour la version et affichage du texte
+            const versionDisplay = L.DomUtil.create('div', 'version-display', container);
+            versionDisplay.textContent = 'v1.2 beta';
+
             this._button.innerHTML = '🔍';
             this._button.href = '#';
             this._button.setAttribute('role', 'button');
