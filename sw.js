@@ -1,8 +1,8 @@
 // --- NOUVEAU CONTENU COMPLET ET CORRIGÉ POUR sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v26'; // Version incrémentée
-const TILE_CACHE_NAME = 'communes-tile-cache-v9';
-const DATA_CACHE_NAME = 'communes-data-cache-v5'; // Version incrémentée
+const APP_CACHE_NAME = 'communes-app-cache-v1.1 beta'; // Version incrémentée
+const TILE_CACHE_NAME = 'communes-tile-cache-v1.1 beta';
+const DATA_CACHE_NAME = 'communes-data-cache-v1.1 beta'; // Version incrémentée
 
 // On utilise des chemins relatifs pour que ça fonctionne partout
 const APP_SHELL_URLS = [
