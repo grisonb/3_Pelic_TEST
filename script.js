@@ -73,22 +73,17 @@ const calculateDistanceInNm = (lat1, lon1, lat2, lon2) => {
     return (R * c) / 1.852;
 };
 
-// --- NOUVEAU : Fonction pour calculer le cap initial (route vraie) ---
 const calculateBearing = (lat1, lon1, lat2, lon2) => {
     const lat1Rad = toRad(lat1);
     const lon1Rad = toRad(lon1);
     const lat2Rad = toRad(lat2);
     const lon2Rad = toRad(lon2);
-
     const dLon = lon2Rad - lon1Rad;
-
     const y = Math.sin(dLon) * Math.cos(lat2Rad);
     const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-
     let bearingRad = Math.atan2(y, x);
     let bearingDeg = toDeg(bearingRad);
-
-    return (bearingDeg + 360) % 360; // Normalise le résultat entre 0 et 360
+    return (bearingDeg + 360) % 360;
 };
 
 
@@ -120,7 +115,7 @@ const levenshteinDistance = (a, b) => {
 async function initializeApp() {
     const statusMessage = document.getElementById('status-message');
     const searchSection = document.getElementById('search-section');
-    loadState();
+    loadState(); // Charge l'état des aéroports
     try {
         const response = await fetch('./communes.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -138,6 +133,22 @@ async function initializeApp() {
         searchSection.style.display = 'block';
         initMap();
         setupEventListeners();
+
+        // --- NOUVEAU : Restauration de la commune sélectionnée au chargement ---
+        const savedCommuneJSON = localStorage.getItem('currentCommune');
+        if (savedCommuneJSON) {
+            const savedCommune = JSON.parse(savedCommuneJSON);
+            currentCommune = savedCommune;
+            displayCommuneDetails(savedCommune, true); // Affiche la commune restaurée
+            
+            // Met à jour l'interface
+            document.getElementById('ui-overlay').style.display = 'none';
+            if (searchToggleControl) {
+                searchToggleControl.setName(savedCommune.nom_standard);
+                searchToggleControl.communeDisplay.style.display = 'block';
+            }
+        }
+
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
     }
@@ -239,6 +250,8 @@ function setupEventListeners() {
         clearSearchBtn.style.display = 'none';
         routesLayer.clearLayers();
         currentCommune = null;
+        // --- NOUVEAU : On supprime la commune sauvegardée ---
+        localStorage.removeItem('currentCommune');
         map.setView([46.6, 2.2], 5.5);
     });
 
@@ -269,6 +282,9 @@ function displayResults(results) {
             li.textContent = `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
             li.addEventListener('click', () => {
                 currentCommune = c;
+                // --- NOUVEAU : Sauvegarde de la commune sélectionnée ---
+                localStorage.setItem('currentCommune', JSON.stringify(c));
+                
                 displayCommuneDetails(c);
                 document.getElementById('ui-overlay').style.display = 'none';
                 if (searchToggleControl) {
@@ -304,11 +320,9 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
-        // --- MODIFIÉ : Utilisation de la nouvelle signature pour drawRoute ---
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
     
-    // <<<=== BLOC DE GÉOLOCALISATION MODIFIÉ CI-DESSOUS ===>>>
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
@@ -317,34 +331,30 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
                 const userIcon = L.divIcon({ className: 'custom-marker-icon user-marker', html: '👤' });
                 L.marker([userLat, userLon], { icon: userIcon }).bindPopup('Votre position').addTo(routesLayer);
 
-                // --- NOUVEAU : Calcul du cap vrai et magnétique ---
                 const trueBearing = calculateBearing(userLat, userLon, lat, lon);
-                // La déclinaison Est est soustraite du cap vrai
                 const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360; 
 
-                // --- MODIFIÉ : Appel de drawRoute avec le cap magnétique ---
-                drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing }); // Le fameux trait rouge
+                drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
 
                 if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
             },
-            () => { // En cas de refus ou d'erreur de géolocalisation
+            () => { 
                 if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
             }
         );
-    } else { // Si le navigateur ne supporte pas la géolocalisation
+    } else { 
         if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
     }
 }
 
-// --- MODIFIÉ : La fonction `drawRoute` accepte maintenant un objet d'options ---
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     
     let labelText;
     if (isUser) {
-        // --- MODIFIÉ : Affichage du cap magnétique et de la distance ---
-        labelText = `${Math.round(magneticBearing)}°M / ${Math.round(distance)} Nm`;
+        // --- MODIFIÉ : Le "M" a été retiré ---
+        labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
     } else if (oaci) {
         labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
     } else {
@@ -352,19 +362,17 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     }
 
     const polyline = L.polyline([startLatLng, endLatLng], {
-        // --- MODIFIÉ : Utilisation de `isUser` pour déterminer la couleur et le style ---
         color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)',
         weight: 3,
         opacity: 0.8,
         dashArray: isUser ? '5, 10' : ''
     }).addTo(routesLayer);
 
-    // --- MODIFIÉ : Logique de l'infobulle (tooltip) ---
     if (isUser) {
         polyline.bindTooltip(labelText, {
             permanent: true,
             direction: 'center',
-            className: 'route-tooltip route-tooltip-user', // Classe CSS ajoutée pour personnalisation si besoin
+            className: 'route-tooltip route-tooltip-user',
             sticky: true
         });
     } else if (oaci) {
