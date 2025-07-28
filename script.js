@@ -1,3 +1,5 @@
+// script.js
+
 // =========================================================================
 // INITIALISATION DE L'APPLICATION
 // =========================================================================
@@ -26,6 +28,7 @@ const resultsList = document.getElementById('results-list');
 const clearSearchBtn = document.getElementById('clear-search');
 const airportCountInput = document.getElementById('airport-count');
 const offlineStatus = document.getElementById('offline-status');
+
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 },
     { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 },
@@ -57,9 +60,9 @@ async function initializeApp() {
     loadState(); // Charge l'état des aéroports (activé/désactivé)
 
     try {
-        // MODIFIÉ : Utilisation du proxy pour contourner le problème de CORS
+        // MODIFIÉ : Utilisation d'un proxy fiable pour contourner le problème de CORS
         const originalUrl = 'https://map-assets.s3.amazonaws.com/communes.json';
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`;
+        const proxyUrl = `https://thingproxy.freeboard.io/fetch/${originalUrl}`;
         
         const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
@@ -79,7 +82,6 @@ async function initializeApp() {
         if (savedCommuneName) {
             const savedCommune = allCommunes.find(c => c.nom_standard === savedCommuneName);
             if (savedCommune) {
-                // Un petit délai pour s'assurer que la carte est prête
                 setTimeout(() => {
                     selectCommune(savedCommune);
                 }, 100);
@@ -144,7 +146,6 @@ function selectCommune(commune) {
     resultsList.style.display = 'none';
     clearSearchBtn.style.display = 'block';
 
-    // AJOUTÉ : Sauvegarde le nom de la commune dans le localStorage
     localStorage.setItem('selectedCommuneName', commune.nom_standard);
 
     updateMapWithSelection(commune);
@@ -160,12 +161,11 @@ function clearSearchInput() {
     resultsList.style.display = 'none';
     clearSearchBtn.style.display = 'none';
     
-    // AJOUTÉ : Efface la commune sauvegardée et réinitialise l'état
     localStorage.removeItem('selectedCommuneName');
     currentCommune = null;
 
-    removeDynamicElements(); // Enlève les marqueurs et les lignes
-    searchToggleControl.updateCommuneDisplay(null); // Met à jour le contrôle sur la carte
+    removeDynamicElements();
+    searchToggleControl.updateCommuneDisplay(null);
 }
 
 function updateMapWithSelection(commune) {
@@ -293,7 +293,6 @@ function onAirportClick(airport) {
     const buttonsContainer = document.createElement('div');
     buttonsContainer.className = 'popup-buttons';
 
-    // Bouton Eau/Pélican
     const waterBtn = document.createElement('button');
     waterBtn.className = 'water-btn';
     waterBtn.textContent = waterAirports.has(airport.oaci) ? 'Pélic.' : 'Eau';
@@ -302,7 +301,6 @@ function onAirportClick(airport) {
         map.closePopup();
     };
 
-    // Bouton Activer/Désactiver
     const toggleBtn = document.createElement('button');
     if (disabledAirports.has(airport.oaci)) {
         toggleBtn.textContent = 'Activer';
@@ -332,7 +330,6 @@ function toggleAirportState(oaci, type) {
         stateSet.delete(oaci);
     } else {
         stateSet.add(oaci);
-        // Un aéroport ne peut pas être à la fois désactivé et sur l'eau
         if (type === 'water') disabledAirports.delete(oaci);
         if (type === 'disabled') waterAirports.delete(oaci);
     }
@@ -368,7 +365,6 @@ function addSearchToggleControl() {
             this._button = L.DomUtil.create('a', 'search-toggle-button', container);
             this._communeDisplay = L.DomUtil.create('div', 'commune-display-control', container);
             
-            // AJOUTÉ : Création de l'élément pour la version et affichage du texte
             const versionDisplay = L.DomUtil.create('div', 'version-display', container);
             versionDisplay.textContent = 'v1.2 beta';
 
