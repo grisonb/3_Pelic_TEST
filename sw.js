@@ -1,18 +1,18 @@
-const APP_CACHE_NAME = 'communes-app-cache-v1.1 beta'; // Version incrémentée
-const VECTOR_TILE_CACHE_NAME = 'communes-vector-tile-cache-v1.1 beta'; // Version incrémentée
+// sw.js
+
+const APP_CACHE_NAME = 'communes-app-cache-v31'; // Version incrémentée
+const VECTOR_TILE_CACHE_NAME = 'communes-vector-tile-cache-v4'; // Version incrémentée
 
 const APP_SHELL_URLS = [
     './', 
     './index.html', 
     './style.css', 
     './script.js',
-    './maplibre-gl.js',
-    './maplibre-gl.css',
-    './protomaps.min.js',
-    './style.json',
+    './leaflet.min.js',
+    './leaflet.css',
     './manifest.json',
-    // MODIFIÉ : Utilisation du proxy pour la mise en cache par le Service Worker
-    `https://api.allorigins.win/raw?url=${encodeURIComponent('https://map-assets.s3.amazonaws.com/communes.json')}`
+    // MODIFIÉ : Utilisation du nouveau proxy pour la mise en cache
+    'https://thingproxy.freeboard.io/fetch/https://map-assets.s3.amazonaws.com/communes.json'
 ];
 
 const VECTOR_TILE_URLS = [
@@ -51,10 +51,13 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+    // Stratégie "Cache First"
     event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                return response || fetch(event.request);
-            })
+        caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            return fetch(event.request);
+        })
     );
 });
