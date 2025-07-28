@@ -20,7 +20,7 @@ let currentCommune = null;
 let disabledAirports = new Set();
 let waterAirports = new Set();
 let searchToggleControl;
-const MAGNETIC_DECLINATION = 1.0;
+const MAGNETIC_DECLINATION = 1.0; // Déclinaison Est de 1.0 degré pour la France
 
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 },
@@ -72,6 +72,25 @@ const calculateDistanceInNm = (lat1, lon1, lat2, lon2) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return (R * c) / 1.852;
 };
+
+// --- NOUVEAU : Fonction pour calculer le cap initial (route vraie) ---
+const calculateBearing = (lat1, lon1, lat2, lon2) => {
+    const lat1Rad = toRad(lat1);
+    const lon1Rad = toRad(lon1);
+    const lat2Rad = toRad(lat2);
+    const lon2Rad = toRad(lon2);
+
+    const dLon = lon2Rad - lon1Rad;
+
+    const y = Math.sin(dLon) * Math.cos(lat2Rad);
+    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+
+    let bearingRad = Math.atan2(y, x);
+    let bearingDeg = toDeg(bearingRad);
+
+    return (bearingDeg + 360) % 360; // Normalise le résultat entre 0 et 360
+};
+
 
 const convertToDMM = (deg, type) => {
     if (deg === null || isNaN(deg)) return 'N/A';
@@ -285,10 +304,11 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
-        drawRoute([lat, lon], [ap.lat, ap.lon], ap.oaci);
+        // --- MODIFIÉ : Utilisation de la nouvelle signature pour drawRoute ---
+        drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
     
-    // <<<=== BLOC DE GÉOLOCALISATION RESTAURÉ CI-DESSOUS ===>>>
+    // <<<=== BLOC DE GÉOLOCALISATION MODIFIÉ CI-DESSOUS ===>>>
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
@@ -296,7 +316,15 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
                 allPoints.push([userLat, userLon]);
                 const userIcon = L.divIcon({ className: 'custom-marker-icon user-marker', html: '👤' });
                 L.marker([userLat, userLon], { icon: userIcon }).bindPopup('Votre position').addTo(routesLayer);
-                drawRoute([userLat, userLon], [lat, lon], null, true); // Le fameux trait rouge
+
+                // --- NOUVEAU : Calcul du cap vrai et magnétique ---
+                const trueBearing = calculateBearing(userLat, userLon, lat, lon);
+                // La déclinaison Est est soustraite du cap vrai
+                const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360; 
+
+                // --- MODIFIÉ : Appel de drawRoute avec le cap magnétique ---
+                drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing }); // Le fameux trait rouge
+
                 if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
             },
             () => { // En cas de refus ou d'erreur de géolocalisation
@@ -308,22 +336,35 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     }
 }
 
-function drawRoute(startLatLng, endLatLng, oaci = null, isUserRoute = false) {
+// --- MODIFIÉ : La fonction `drawRoute` accepte maintenant un objet d'options ---
+function drawRoute(startLatLng, endLatLng, options = {}) {
+    const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
-    const labelText = oaci ? `<b>${oaci}</b><br>${Math.round(distance)} Nm` : `${Math.round(distance)} Nm`;
+    
+    let labelText;
+    if (isUser) {
+        // --- MODIFIÉ : Affichage du cap magnétique et de la distance ---
+        labelText = `${Math.round(magneticBearing)}°M / ${Math.round(distance)} Nm`;
+    } else if (oaci) {
+        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
+    } else {
+        labelText = `${Math.round(distance)} Nm`;
+    }
 
     const polyline = L.polyline([startLatLng, endLatLng], {
-        color: isUserRoute ? 'var(--secondary-color)' : 'var(--primary-color)',
+        // --- MODIFIÉ : Utilisation de `isUser` pour déterminer la couleur et le style ---
+        color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)',
         weight: 3,
         opacity: 0.8,
-        dashArray: isUserRoute ? '5, 10' : ''
+        dashArray: isUser ? '5, 10' : ''
     }).addTo(routesLayer);
 
-    if (isUserRoute) {
+    // --- MODIFIÉ : Logique de l'infobulle (tooltip) ---
+    if (isUser) {
         polyline.bindTooltip(labelText, {
             permanent: true,
             direction: 'center',
-            className: 'route-tooltip',
+            className: 'route-tooltip route-tooltip-user', // Classe CSS ajoutée pour personnalisation si besoin
             sticky: true
         });
     } else if (oaci) {
@@ -420,7 +461,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v1.0'; // <<<=== VERSION MISE À JOUR ICI ===>>>
+        versionDisplay.innerText = 'v1.0';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
