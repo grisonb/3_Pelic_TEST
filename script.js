@@ -57,7 +57,11 @@ async function initializeApp() {
     loadState(); // Charge l'état des aéroports (activé/désactivé)
 
     try {
-        const response = await fetch('https://map-assets.s3.amazonaws.com/communes.json');
+        // MODIFIÉ : Utilisation du proxy pour contourner le problème de CORS
+        const originalUrl = 'https://map-assets.s3.amazonaws.com/communes.json';
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(originalUrl)}`;
+        
+        const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error(`HTTP ${response.status} - ${response.statusText}`);
         const data = await response.json();
         if (!data || !data.data) throw new Error("Format JSON invalide.");
@@ -70,7 +74,7 @@ async function initializeApp() {
         initMap();
         setupEventListeners();
 
-        // AJOUTÉ : Vérifier s'il y a une commune sauvegardée dans le localStorage
+        // Vérifier s'il y a une commune sauvegardée dans le localStorage
         const savedCommuneName = localStorage.getItem('selectedCommuneName');
         if (savedCommuneName) {
             const savedCommune = allCommunes.find(c => c.nom_standard === savedCommuneName);
