@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =========================================================================
-// VARIABLES GLOBALES (inchangées)
+// VARIABLES GLOBALES
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
@@ -31,7 +31,7 @@ const airports = [
 ];
 
 // =========================================================================
-// FONCTIONS UTILITAIRES (inchangées)
+// FONCTIONS UTILITAIRES
 // =========================================================================
 const toRad = deg => deg * Math.PI / 180, toDeg = rad => rad * 180 / Math.PI;
 const simplifyString = str => typeof str !== 'string' ? '' : str.toLowerCase().replace(/\bst\b/g, 'saint').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
@@ -95,11 +95,57 @@ function setupEventListeners() {
     const clearSearchBtn = document.getElementById('clear-search');
     const airportCountInput = document.getElementById('airport-count');
     const resultsList = document.getElementById('results-list');
-    const gpsFeuButton = document.getElementById('gps-feu-button'); // NOUVEAU
+    const gpsFeuButton = document.getElementById('gps-feu-button');
 
-    searchInput.addEventListener('input', () => { /* ... code de recherche inchangé ... */ });
+    // =====================================================================
+    // LOGIQUE DE RECHERCHE ENTIÈREMENT RESTAURÉE
+    // =====================================================================
+    searchInput.addEventListener('input', () => {
+        const rawSearch = searchInput.value;
+        clearSearchBtn.style.display = rawSearch.length > 0 ? 'block' : 'none';
+        let departmentFilter = null;
+        let searchTerm = rawSearch;
+        const depRegex = /\s(\d{1,3}|2A|2B)$/i;
+        const match = rawSearch.match(depRegex);
+        if (match) {
+            departmentFilter = match[1].length === 1 ? '0' + match[1] : match[1].toUpperCase();
+            searchTerm = rawSearch.substring(0, match.index).trim();
+        }
+        const simplifiedSearch = simplifyString(searchTerm);
+        if (simplifiedSearch.length < 2) {
+            resultsList.style.display = 'none';
+            return;
+        }
+        const searchWords = simplifiedSearch.split(' ').filter(Boolean);
+        const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
+        const scoredResults = communesToSearch.map(c => {
+            let totalScore = 0;
+            let wordsFound = 0;
+            for (const word of searchWords) {
+                let bestWordScore = 999;
+                const wordSoundex = soundex(word);
+                for (let i = 0; i < c.search_parts.length; i++) {
+                    const communePart = c.search_parts[i];
+                    const communeSoundex = c.soundex_parts[i];
+                    let currentScore = 999;
+                    if (communePart.startsWith(word)) { currentScore = 0; }
+                    else if (communeSoundex === wordSoundex) { currentScore = 1; }
+                    else {
+                        const dist = levenshteinDistance(word, communePart);
+                        if (dist <= Math.floor(word.length / 3) + 1) { currentScore = 2 + dist; }
+                    }
+                    if (currentScore < bestWordScore) { bestWordScore = currentScore; }
+                }
+                if (bestWordScore < 999) { wordsFound++; totalScore += bestWordScore; }
+            }
+            const finalScore = (wordsFound === searchWords.length) ? totalScore : 999;
+            return { ...c, score: finalScore };
+        }).filter(c => c.score < 999);
+        scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
+        displayResults(scoredResults.slice(0, 10));
+    });
 
-    // CORRECTION : Le bug du nom persistant est corrigé ici
+    // Logique du bouton "Effacer" (corrigée)
     clearSearchBtn.addEventListener('click', () => {
         searchInput.value = '';
         resultsList.style.display = 'none';
@@ -114,11 +160,12 @@ function setupEventListeners() {
         map.setView([46.6, 2.2], 5.5);
     });
 
+    // Logique du compteur de pélicandromes
     airportCountInput.addEventListener('input', () => {
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
 
-    // NOUVEAU : Logique pour le bouton de feu GPS
+    // Logique du bouton de feu GPS
     gpsFeuButton.addEventListener('click', () => {
         if (!navigator.geolocation) {
             alert("La géolocalisation n'est pas supportée par votre navigateur.");
@@ -138,16 +185,37 @@ function setupEventListeners() {
                     searchToggleControl.communeDisplay.style.display = 'block';
                 }
             },
-            () => {
-                alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations.");
-            },
+            () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
             { enableHighAccuracy: true }
         );
     });
 }
 
-// ... Le reste du fichier est identique, je le recopie pour la simplicité et la sécurité
-function displayResults(results){const resultsList=document.getElementById("results-list");resultsList.innerHTML="",results.length>0?(resultsList.style.display="block",results.forEach(c=>{const e=document.createElement("li");e.textContent=`${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`,e.addEventListener("click",()=>{currentCommune=c,localStorage.setItem("currentCommune",JSON.stringify(c)),displayCommuneDetails(c),document.getElementById("ui-overlay").style.display="none",searchToggleControl&&(searchToggleControl.setName(c.nom_standard),searchToggleControl.communeDisplay.style.display="block")}),resultsList.appendChild(e)})):resultsList.style.display="none"}
+function displayResults(results) {
+    const resultsList = document.getElementById('results-list');
+    resultsList.innerHTML = '';
+    if (results.length > 0) {
+        resultsList.style.display = 'block';
+        results.forEach(c => {
+            const li = document.createElement('li');
+            li.textContent = `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
+            li.addEventListener('click', () => {
+                currentCommune = c;
+                localStorage.setItem('currentCommune', JSON.stringify(c));
+                displayCommuneDetails(c);
+                document.getElementById('ui-overlay').style.display = 'none';
+                if (searchToggleControl) {
+                    searchToggleControl.setName(c.nom_standard);
+                    searchToggleControl.communeDisplay.style.display = 'block';
+                }
+            });
+            resultsList.appendChild(li);
+        });
+    } else {
+        resultsList.style.display = 'none';
+    }
+}
+
 function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
@@ -179,13 +247,25 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         );
     } else { if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3)); }
 }
-function drawRoute(startLatLng,endLatLng,options={}){const{oaci,isUser,magneticBearing}=options,distance=calculateDistanceInNm(startLatLng[0],startLatLng[1],endLatLng[0],endLatLng[1]);let labelText;if(isUser)labelText=`${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;else if(oaci)labelText=`<b>${oaci}</b><br>${Math.round(distance)} Nm`;else labelText=`${Math.round(distance)} Nm`;const polyline=L.polyline([startLatLng,endLatLng],{color:isUser?"var(--secondary-color)":"var(--primary-color)",weight:3,opacity:.8,dashArray:isUser?"5, 10":""}).addTo(routesLayer);isUser?polyline.bindTooltip(labelText,{permanent:!0,direction:"center",className:"route-tooltip route-tooltip-user",sticky:!0}):oaci&&L.tooltip({permanent:!0,direction:"right",offset:[10,0],className:"route-tooltip"}).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer)}
+
+function drawRoute(startLatLng, endLatLng, options = {}) {
+    const { oaci, isUser, magneticBearing } = options;
+    const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
+    let labelText;
+    if (isUser) { labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`; }
+    else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
+    else { labelText = `${Math.round(distance)} Nm`; }
+    const polyline = L.polyline([startLatLng, endLatLng], { color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)', weight: 3, opacity: 0.8, dashArray: isUser ? '5, 10' : '' }).addTo(routesLayer);
+    if (isUser) { polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true }); }
+    else if (oaci) { L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer); }
+}
+
 function getClosestAirports(lat, lon, count) { return airports.filter(ap => !disabledAirports.has(ap.oaci)).map(ap => ({ ...ap, distance: calculateDistanceInNm(lat, lon, ap.lat, ap.lon) })).sort((a, b) => a.distance - b.distance).slice(0, count); }
 function refreshUI() { drawPermanentAirportMarkers(); if (currentCommune) displayCommuneDetails(currentCommune, false); }
-function drawPermanentAirportMarkers() { permanentAirportLayer.clearLayers(); airports.forEach(airport => { const isDisabled = disabledAirports.has(airport.oaci), isWater = waterAirports.has(airport.oaci); let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️"; isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active"; const icon = L.divIcon({ className: iconClass, html: iconHTML }), marker = L.marker([airport.lat, airport.lon], { icon: icon }), disableButtonText = isDisabled ? "Activer" : "Désactiver", disableButtonClass = isDisabled ? "enable-btn" : "disable-btn"; marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="water-btn" onclick="window.toggleWater('${airport.oaci}')">Eau</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button></div></div>`), marker.addTo(permanentAirportLayer) }) }
+function drawPermanentAirportMarkers() { permanentAirportLayer.clearLayers(); airports.forEach(airport => { const isDisabled = disabledAirports.has(airport.oaci); const isWater = waterAirports.has(airport.oaci); let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️"; isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active"; const icon = L.divIcon({ className: iconClass, html: iconHTML }); const marker = L.marker([airport.lat, airport.lon], { icon: icon }); const disableButtonText = isDisabled ? "Activer" : "Désactiver"; const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn"; marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="water-btn" onclick="window.toggleWater('${airport.oaci}')">Eau</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button></div></div>`).addTo(permanentAirportLayer); }); }
 const loadState = () => { const savedDisabled = localStorage.getItem('disabled_airports'); if (savedDisabled) disabledAirports = new Set(JSON.parse(savedDisabled)); const savedWater = localStorage.getItem('water_airports'); if (savedWater) waterAirports = new Set(JSON.parse(savedWater)); };
 const saveState = () => { localStorage.setItem('disabled_airports', JSON.stringify([...disabledAirports])); localStorage.setItem('water_airports', JSON.stringify([...waterAirports])); };
 window.toggleAirport = oaci => { disabledAirports.has(oaci) ? disabledAirports.delete(oaci) : (disabledAirports.add(oaci), waterAirports.delete(oaci)), saveState(), refreshUI() };
 window.toggleWater = oaci => { waterAirports.has(oaci) ? waterAirports.delete(oaci) : (waterAirports.add(oaci), disabledAirports.delete(oaci)), saveState(), refreshUI() };
-const SearchToggleControl = L.Control.extend({ options: { position: 'topleft' }, onAdd: function (map) { const mainContainer = L.DomUtil.create('div', 'leaflet-control'), topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer); this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar), this.toggleButton.innerHTML = '🔍', this.toggleButton.href = '#', this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar); const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer); return versionDisplay.innerText = 'v1.6', L.DomEvent.disableClickPropagation(mainContainer), L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop), L.DomEvent.on(this.toggleButton, 'click', () => { const uiOverlay = document.getElementById('ui-overlay'); uiOverlay.style.display === 'none' ? (uiOverlay.style.display = 'block', this.communeDisplay.style.display = 'none') : (uiOverlay.style.display = 'none', this.communeDisplay.textContent && (this.communeDisplay.style.display = 'block')) }), mainContainer }, setName: function (name) { this.communeDisplay.textContent = name } });
-function soundex(s){if(!s)return"";const a=s.toLowerCase().split(""),f=a.shift();if(!f)return"";let r="";const codes={a:"",e:"",i:"",o:"",u:"",b:1,f:1,p:1,v:1,c:2,g:2,j:2,k:2,q:2,s:2,x:2,z:2,d:3,t:3,l:4,m:5,n:5,r:6};return r=f+a.map(v=>codes[v]).filter((v,i,a)=>0===i?v!==codes[f]:v!==a[i-1]).join(""),(r+"000").slice(0,4).toUpperCase()}
+const SearchToggleControl = L.Control.extend({ options: { position: 'topleft' }, onAdd: function (map) { const mainContainer = L.DomUtil.create('div', 'leaflet-control'), topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer); this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar), this.toggleButton.innerHTML = '🔍', this.toggleButton.href = '#', this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar); const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer); return versionDisplay.innerText = 'v1.7', L.DomEvent.disableClickPropagation(mainContainer), L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop), L.DomEvent.on(this.toggleButton, 'click', () => { const uiOverlay = document.getElementById('ui-overlay'); uiOverlay.style.display === 'none' ? (uiOverlay.style.display = 'block', this.communeDisplay.style.display = 'none') : (uiOverlay.style.display = 'none', this.communeDisplay.textContent && (this.communeDisplay.style.display = 'block')) }), mainContainer }, setName: function (name) { this.communeDisplay.textContent = name } });
+function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
