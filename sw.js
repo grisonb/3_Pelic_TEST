@@ -1,6 +1,6 @@
 // --- NOUVEAU CONTENU COMPLET ET CORRIGÉ POUR sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v32'; // Version incrémentée
+const APP_CACHE_NAME = 'communes-app-cache-v33'; // Version incrémentée
 const TILE_CACHE_NAME = 'communes-tile-cache-v9';
 const DATA_CACHE_NAME = 'communes-data-cache-v5';
 
