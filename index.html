@@ -9,49 +9,36 @@
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-   <!-- COLLEZ CECI À LA PLACE -->
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').then(reg => {
-                console.log('Service Worker enregistré:', reg);
-                
-                // Logique améliorée pour le premier lancement
-                const offlineStatus = document.getElementById('offline-status');
-                
-                // Si la page est déjà contrôlée par un SW, on ne fait rien,
-                // le message sera géré par script.js (qui le cachera).
-                if (!navigator.serviceWorker.controller) {
-                    // Si la page n'est PAS contrôlée, c'est un premier lancement.
-                    // On informe l'utilisateur que l'installation a réussi
-                    // et qu'un redémarrage est nécessaire.
-                    if (offlineStatus) {
-                        offlineStatus.textContent = '✅ Mode hors ligne activé. Veuillez relancer l\'application.';
-                        offlineStatus.classList.add('ready'); // Pour le style vert
-                        offlineStatus.style.display = 'block'; // S'assurer qu'il est visible
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    console.log('Service Worker enregistré:', reg);
+                    const offlineStatus = document.getElementById('offline-status');
+                    if (!navigator.serviceWorker.controller) {
+                        if (offlineStatus) {
+                            offlineStatus.textContent = '✅ Mode hors ligne activé. Veuillez relancer l\'application.';
+                            offlineStatus.classList.add('ready');
+                            offlineStatus.style.display = 'block';
+                        }
                     }
-                }
-
-            }).catch(err => {
-                console.log('Erreur enregistrement Service Worker:', err);
+                }).catch(err => {
+                    console.log('Erreur enregistrement Service Worker:', err);
+                    const offlineStatus = document.getElementById('offline-status');
+                    if (offlineStatus) {
+                        offlineStatus.textContent = '❌ Échec de l\'initialisation du mode hors ligne.';
+                        offlineStatus.style.display = 'block';
+                    }
+                });
+            });
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
                 const offlineStatus = document.getElementById('offline-status');
                 if (offlineStatus) {
-                    offlineStatus.textContent = '❌ Échec de l\'initialisation du mode hors ligne.';
-                    offlineStatus.style.display = 'block';
+                    offlineStatus.style.display = 'none';
                 }
             });
-        });
-
-        // Ce listener est un bonus pour cacher le message si le SW prend le contrôle
-        // sans rechargement, ce qui peut arriver sur certains navigateurs (Android/Desktop).
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            const offlineStatus = document.getElementById('offline-status');
-            if (offlineStatus) {
-                offlineStatus.style.display = 'none';
-            }
-        });
-    }
-</script>
+        }
+    </script>
 </head>
 <body>
     <div id="map"></div>
@@ -63,6 +50,8 @@
                     <input type="text" id="search-input" placeholder="Rechercher une commune..." autocomplete="off">
                     <span id="clear-search">×</span>
                 </div>
+                <!-- NOUVEAU : Bouton pour le feu GPS -->
+                <button id="gps-feu-button" title="Créer un feu à ma position">🎯</button>
                 <div class="airport-controls">
                     <label for="airport-count">Nbr Pélic.</label>
                     <input type="number" id="airport-count" value="3" min="0" max="10">
