@@ -21,8 +21,6 @@ let disabledAirports = new Set();
 let waterAirports = new Set();
 let searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
-// NOUVEAU : Un compteur pour nommer les points manuels de manière unique
-let manualPointCounter = 0;
 
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 },
@@ -52,9 +50,8 @@ const airports = [
 ];
 
 // =========================================================================
-// FONCTIONS UTILITAIRES (inchangées)
+// FONCTIONS UTILITAIRES
 // =========================================================================
-// ... (Toutes les fonctions utilitaires restent identiques)
 const toRad = deg => deg * Math.PI / 180;
 const toDeg = rad => rad * 180 / Math.PI;
 const simplifyString = str => typeof str !== 'string' ? '' : str.toLowerCase().replace(/\bst\b/g, 'saint').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
@@ -66,7 +63,6 @@ const levenshteinDistance = (a, b) => { const matrix = Array(b.length + 1).fill(
 // =========================================================================
 // LOGIQUE PRINCIPALE DE L'APPLICATION
 // =========================================================================
-
 async function initializeApp() {
     const statusMessage = document.getElementById('status-message');
     const searchSection = document.getElementById('search-section');
@@ -76,36 +72,18 @@ async function initializeApp() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (!data || !data.data) throw new Error("Format JSON invalide.");
-
-        allCommunes = data.data.map(c => {
-            const normalized_name = simplifyString(c.nom_standard);
-            const search_parts = normalized_name.split(' ').filter(Boolean);
-            const soundex_parts = search_parts.map(part => soundex(part));
-            return { ...c, normalized_name, search_parts, soundex_parts };
-        });
-
+        allCommunes = data.data.map(c => { const normalized_name = simplifyString(c.nom_standard); const search_parts = normalized_name.split(' ').filter(Boolean); const soundex_parts = search_parts.map(part => soundex(part)); return { ...c, normalized_name, search_parts, soundex_parts }; });
         statusMessage.style.display = 'none';
         searchSection.style.display = 'block';
         initMap();
         setupEventListeners();
-
         const savedCommuneJSON = localStorage.getItem('currentCommune');
         if (savedCommuneJSON) {
-            const savedCommune = JSON.parse(savedCommuneJSON);
-            // NOUVEAU: Si le point sauvegardé est un point manuel, on récupère son compteur
-            if(savedCommune.isManual) {
-                const savedCounter = localStorage.getItem('manualPointCounter');
-                manualPointCounter = savedCounter ? parseInt(savedCounter, 10) : 0;
-            }
-            currentCommune = savedCommune;
-            displayCommuneDetails(savedCommune, true);
+            currentCommune = JSON.parse(savedCommuneJSON);
+            displayCommuneDetails(currentCommune, true);
             document.getElementById('ui-overlay').style.display = 'none';
-            if (searchToggleControl) {
-                searchToggleControl.setName(savedCommune.nom_standard);
-                searchToggleControl.communeDisplay.style.display = 'block';
-            }
+            if (searchToggleControl) { searchToggleControl.setName(currentCommune.nom_standard); searchToggleControl.communeDisplay.style.display = 'block'; }
         }
-
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
     }
@@ -120,34 +98,18 @@ function initMap() {
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
     drawPermanentAirportMarkers();
-    
-    // --- NOUVEAU BLOC : GESTION DE L'APPUI LONG SUR LA CARTE ---
     map.on('contextmenu', (e) => {
-        // Empêche le menu contextuel du navigateur (clic droit) de s'ouvrir
         L.DomEvent.preventDefault(e.originalEvent);
-
-        // Incrémente le compteur pour un nom unique
-        manualPointCounter++;
-        const pointName = `Feu Manuel #${manualPointCounter}`;
-
-        // Crée un objet "fausse commune" qui a la même structure que les vraies
+        const pointName = 'Feu manuel'; // CORRIGÉ : Nom statique
         const manualCommune = {
             nom_standard: pointName,
             latitude_mairie: e.latlng.lat,
             longitude_mairie: e.latlng.lng,
-            isManual: true // Un marqueur pour savoir que c'est un point manuel
+            isManual: true
         };
-
-        // Définit ce point comme la "commune" actuelle
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
-        localStorage.setItem('manualPointCounter', manualPointCounter);
-
-        // Affiche les détails (routes vers aéroports, etc.) comme pour une vraie commune
-        // Le `false` évite de dézoomer/rezoomer la carte
         displayCommuneDetails(manualCommune, false);
-        
-        // Met à jour l'interface utilisateur pour refléter ce nouveau point
         document.getElementById('ui-overlay').style.display = 'none';
         if (searchToggleControl) {
             searchToggleControl.setName(pointName);
@@ -156,14 +118,66 @@ function initMap() {
     });
 }
 
+// CORRIGÉ : Le code de la recherche est entièrement restauré ici
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
     const airportCountInput = document.getElementById('airport-count');
     const resultsList = document.getElementById('results-list');
 
-    // ... (la logique de recherche reste identique)
-    searchInput.addEventListener('input', () => { /* ... code inchangé ... */ });
+    searchInput.addEventListener('input', () => {
+        const rawSearch = searchInput.value;
+        clearSearchBtn.style.display = rawSearch.length > 0 ? 'block' : 'none';
+        let departmentFilter = null;
+        let searchTerm = rawSearch;
+        const depRegex = /\s(\d{1,3}|2A|2B)$/i;
+        const match = rawSearch.match(depRegex);
+        if (match) {
+            departmentFilter = match[1].length === 1 ? '0' + match[1] : match[1].toUpperCase();
+            searchTerm = rawSearch.substring(0, match.index).trim();
+        }
+        const simplifiedSearch = simplifyString(searchTerm);
+        if (simplifiedSearch.length < 2) {
+            resultsList.style.display = 'none';
+            return;
+        }
+        const searchWords = simplifiedSearch.split(' ').filter(Boolean);
+        const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
+        const scoredResults = communesToSearch.map(c => {
+            let totalScore = 0;
+            let wordsFound = 0;
+            for (const word of searchWords) {
+                let bestWordScore = 999;
+                const wordSoundex = soundex(word);
+                for (let i = 0; i < c.search_parts.length; i++) {
+                    const communePart = c.search_parts[i];
+                    const communeSoundex = c.soundex_parts[i];
+                    let currentScore = 999;
+                    if (communePart.startsWith(word)) {
+                        currentScore = 0;
+                    } else if (communeSoundex === wordSoundex) {
+                        currentScore = 1;
+                    } else {
+                        const dist = levenshteinDistance(word, communePart);
+                        if (dist <= Math.floor(word.length / 3) + 1) {
+                            currentScore = 2 + dist;
+                        }
+                    }
+                    if (currentScore < bestWordScore) {
+                        bestWordScore = currentScore;
+                    }
+                }
+                if (bestWordScore < 999) {
+                    wordsFound++;
+                    totalScore += bestWordScore;
+                }
+            }
+            const finalScore = (wordsFound === searchWords.length) ? totalScore : 999;
+            return { ...c, score: finalScore };
+        }).filter(c => c.score < 999);
+        scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
+        displayResults(scoredResults.slice(0, 10));
+    });
 
     clearSearchBtn.addEventListener('click', () => {
         searchInput.value = '';
@@ -171,9 +185,7 @@ function setupEventListeners() {
         clearSearchBtn.style.display = 'none';
         routesLayer.clearLayers();
         currentCommune = null;
-        // NOUVEAU : On supprime aussi le compteur de points manuels
         localStorage.removeItem('currentCommune');
-        localStorage.removeItem('manualPointCounter');
         map.setView([46.6, 2.2], 5.5);
     });
 
@@ -182,7 +194,6 @@ function setupEventListeners() {
     });
 }
 
-// ... Le reste du fichier est identique, je le recopie pour la simplicité
 function displayResults(results) {
     const resultsList = document.getElementById('results-list');
     resultsList.innerHTML = '';
@@ -207,6 +218,7 @@ function displayResults(results) {
         resultsList.style.display = 'none';
     }
 }
+
 function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
@@ -234,7 +246,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
                 const userIcon = L.divIcon({ className: 'custom-marker-icon user-marker', html: '👤' });
                 L.marker([userLat, userLon], { icon: userIcon }).bindPopup('Votre position').addTo(routesLayer);
                 const trueBearing = calculateBearing(userLat, userLon, lat, lon);
-                const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360; 
+                const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
                 drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
                 if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
             },
@@ -242,6 +254,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         );
     } else { if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3)); }
 }
+
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
@@ -253,6 +266,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     if (isUser) { polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true }); }
     else if (oaci) { L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer); }
 }
+
 function getClosestAirports(lat, lon, count) { return airports.filter(ap => !disabledAirports.has(ap.oaci)).map(ap => ({ ...ap, distance: calculateDistanceInNm(lat, lon, ap.lat, ap.lon) })).sort((a, b) => a.distance - b.distance).slice(0, count); }
 function refreshUI() { drawPermanentAirportMarkers(); if (currentCommune) displayCommuneDetails(currentCommune, false); }
 function drawPermanentAirportMarkers() { permanentAirportLayer.clearLayers(); airports.forEach(airport => { const isDisabled = disabledAirports.has(airport.oaci); const isWater = waterAirports.has(airport.oaci); let iconClass = 'custom-marker-icon airport-marker-base '; let iconHTML = '✈️'; if (isDisabled) { iconClass += 'airport-marker-disabled'; iconHTML = '<b>+</b>'; } else if (isWater) { iconClass += 'airport-marker-water'; iconHTML = '💧'; } else { iconClass += 'airport-marker-active'; } const icon = L.divIcon({ className: iconClass, html: iconHTML }); const marker = L.marker([airport.lat, airport.lon], { icon: icon }); const disableButtonText = isDisabled ? 'Activer' : 'Désactiver'; const disableButtonClass = isDisabled ? 'enable-btn' : 'disable-btn'; marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="water-btn" onclick="window.toggleWater('${airport.oaci}')">Eau</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button></div></div>`); marker.addTo(permanentAirportLayer); }); }
