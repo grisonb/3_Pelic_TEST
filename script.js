@@ -435,7 +435,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
-        this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay); // NOUVEAU
+        this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         versionDisplay.innerText = 'v2.6';
         L.DomEvent.disableClickPropagation(mainContainer);
@@ -447,7 +447,7 @@ const SearchToggleControl = L.Control.extend({
                 this.communeDisplay.style.display = 'none';
             } else {
                 uiOverlay.style.display = 'none';
-                if (this.communeDisplay.textContent) {
+                if (this.communeDisplay.firstChild.textContent) {
                     this.communeDisplay.style.display = 'flex';
                 }
             }
@@ -457,26 +457,24 @@ const SearchToggleControl = L.Control.extend({
     updateDisplay: function (commune) {
         if (!commune) {
             this.communeDisplay.style.display = 'none';
-            this.communeDisplay.firstChild.textContent = '';
+            if (this.communeNameSpan) this.communeNameSpan.textContent = '';
             this.sunsetDisplay.textContent = '';
             return;
         }
 
         this.communeDisplay.style.display = 'flex';
-        // Le nom de la commune est maintenant dans un span
         if (!this.communeNameSpan) {
             this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
             this.communeDisplay.insertBefore(this.communeNameSpan, this.sunsetDisplay);
         }
         this.communeNameSpan.textContent = commune.nom_standard;
         
-        let sunsetString = '';
         if (typeof SunCalc !== 'undefined') {
             try {
                 const now = new Date();
                 const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
-                sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                this.sunsetDisplay.innerHTML = `🌅 <b>${sunsetString}</b>`;
+                const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+                this.sunsetDisplay.innerHTML = `🌅 CS <b>${sunsetString}</b>`;
             } catch (e) {
                 this.sunsetDisplay.innerHTML = '';
             }
