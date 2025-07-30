@@ -217,7 +217,7 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
-/* --- STYLES CORRIGÉS POUR LA LOUPE / MAISON --- */
+/* --- STYLES CORRIGÉS POUR LA MAISON --- */
 .search-toggle-container {
     display: flex;
     align-items: center;
@@ -226,14 +226,14 @@ html, body {
 
 .search-toggle-button {
     background-color: white;
-    width: 48px;  /* TAILLE CORRIGÉE */
-    height: 48px; /* TAILLE CORRIGÉE */
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 2em; /* TAILLE DE L'ICÔNE AJUSTÉE */
-    line-height: 48px;
+    font-size: 2.8em; /* ICÔNE ENCORE PLUS GRANDE */
+    line-height: 48px; /* Ajustement pour le centrage */
     color: var(--primary-color);
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
     border-radius: var(--border-radius);
@@ -242,7 +242,7 @@ html, body {
 
 .commune-display-control {
     display: none;
-    height: 48px; /* TAILLE CORRIGÉE */
+    height: 48px;
     line-height: 48px;
     padding: 0 16px;
     background-color: white;
