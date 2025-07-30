@@ -217,7 +217,6 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
-/* --- STYLES MIS À JOUR --- */
 .search-toggle-container {
     display: flex;
     align-items: center;
@@ -238,7 +237,7 @@ html, body {
     width: 48px;
     justify-content: center;
     cursor: pointer;
-    font-size: 2.2em;
+    font-size: 2.5em; /* TAILLE DE L'ICÔNE CORRIGÉE */
     color: var(--primary-color);
 }
 
@@ -252,14 +251,13 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-color);
+    gap: 8px; /* ESPACEMENT ENTRE LE NOM ET LE CS */
 }
-/* --- FIN DES STYLES MIS À JOUR --- */
 
-/* NOUVEAU STYLE POUR LE COUCHER DE SOLEIL */
 .sunset-info {
     font-size: 14px;
     color: var(--light-text-color);
-    margin-left: auto; /* Pousse l'élément vers la droite */
+    margin-left: auto;
     padding-right: 16px;
 }
 
