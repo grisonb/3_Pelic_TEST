@@ -45,7 +45,7 @@ async function initializeApp() {
         searchSection.style.display = 'block';
         initMap();
         setupEventListeners();
-        checkOfflineMapStatus();
+        updateOfflineButtonsState();
         if (localStorage.getItem('liveGpsActive') === 'true') {
             toggleLiveGps();
         }
@@ -319,17 +319,24 @@ function updateUserPosition(pos) {
     }
 }
 
-async function checkOfflineMapStatus() {
+// =========================================================================
+// GESTION CARTE HORS LIGNE (MODIFIÉ)
+// =========================================================================
+async function updateOfflineButtonsState() {
+    const downloadButton = document.getElementById('download-map-button');
     const deleteButton = document.getElementById('delete-map-button');
     const cacheExists = await caches.has(TILE_CACHE_NAME);
     if (cacheExists) {
         const cache = await caches.open(TILE_CACHE_NAME);
         const keys = await cache.keys();
         if (keys.length > 50) {
-             document.getElementById('download-map-button').textContent = "Mettre à jour la carte hors ligne";
-             deleteButton.style.display = 'block';
+            downloadButton.textContent = "Mettre à jour la carte hors ligne";
+            deleteButton.style.display = 'block';
+            return;
         }
     }
+    downloadButton.textContent = "Télécharger la carte pour usage hors ligne";
+    deleteButton.style.display = 'none';
 }
 
 function latLonToTileCoords(lat, lon, zoom) {
@@ -342,7 +349,6 @@ function latLonToTileCoords(lat, lon, zoom) {
 
 async function downloadOfflineMap() {
     const downloadButton = document.getElementById('download-map-button');
-    const deleteButton = document.getElementById('delete-map-button');
     const progressContainer = document.getElementById('download-progress');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
@@ -394,18 +400,14 @@ async function downloadOfflineMap() {
         }
     }
     progressText.textContent = 'Carte hors ligne téléchargée !';
-    downloadButton.textContent = "Mettre à jour la carte hors ligne";
     downloadButton.disabled = false;
-    deleteButton.style.display = 'block';
+    await updateOfflineButtonsState();
 }
 
 async function deleteOfflineMap() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer toutes les données de la carte hors ligne ? Vous devrez les télécharger à nouveau pour un usage sans connexion.")) {
         return;
     }
-
-    const downloadButton = document.getElementById('download-map-button');
-    const deleteButton = document.getElementById('delete-map-button');
     const progressContainer = document.getElementById('download-progress');
     const progressText = document.getElementById('progress-text');
     const progressBar = document.getElementById('progress-bar');
@@ -421,9 +423,8 @@ async function deleteOfflineMap() {
     setTimeout(() => {
         progressContainer.style.display = 'none';
     }, 2000);
-
-    downloadButton.textContent = "Télécharger la carte pour usage hors ligne";
-    deleteButton.style.display = 'none';
+    
+    await updateOfflineButtonsState();
 }
 
 const SearchToggleControl = L.Control.extend({
@@ -435,9 +436,8 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
-        this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.6';
+        versionDisplay.innerText = 'v2.8';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
@@ -457,28 +457,10 @@ const SearchToggleControl = L.Control.extend({
     updateDisplay: function (commune) {
         if (!commune) {
             this.communeDisplay.style.display = 'none';
-            if (this.communeNameSpan) this.communeNameSpan.textContent = '';
-            this.sunsetDisplay.textContent = '';
             return;
         }
-
         this.communeDisplay.style.display = 'flex';
-        if (!this.communeNameSpan) {
-            this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
-            this.communeDisplay.insertBefore(this.communeNameSpan, this.sunsetDisplay);
-        }
-        this.communeNameSpan.textContent = commune.nom_standard;
-        
-        if (typeof SunCalc !== 'undefined') {
-            try {
-                const now = new Date();
-                const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
-                const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                this.sunsetDisplay.innerHTML = `🌅 CS <b>${sunsetString}</b>`;
-            } catch (e) {
-                this.sunsetDisplay.innerHTML = '';
-            }
-        }
+        this.communeDisplay.firstChild.textContent = commune.nom_standard;
     }
 });
 
