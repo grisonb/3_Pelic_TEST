@@ -58,7 +58,7 @@ html, body {
 .controls-container {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 10px;
 }
 
 .search-wrapper {
@@ -260,7 +260,7 @@ html, body {
     margin: -1px 2px 0 2px;
 }
 
-#gps-feu-button {
+#gps-feu-button, #live-gps-button {
     flex-shrink: 0;
     width: 48px;
     height: 48px;
@@ -275,10 +275,24 @@ html, body {
     align-items: center;
     justify-content: center;
     line-height: 1;
+    transition: background-color 0.2s, color 0.2s;
 }
 
-#gps-feu-button:hover {
+#gps-feu-button:hover, #live-gps-button:hover {
     background-color: #e9f5ff;
+}
+
+#live-gps-button.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 90, 156, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 90, 156, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 90, 156, 0); }
 }
 
 #offline-map-section {
