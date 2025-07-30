@@ -119,3 +119,43 @@ html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
 #gps-feu-button:hover {
     background-color: #e9f5ff;
 }
+/* --- AJOUTEZ CE BLOC À LA FIN DE style.css --- */
+
+#offline-map-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+#download-map-button {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+    background-color: var(--primary-color);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#download-map-button:hover {
+    background-color: #004494;
+}
+
+#download-progress {
+    margin-top: 10px;
+}
+
+#progress-text {
+    font-size: 12px;
+    color: var(--text-color);
+    display: block;
+    margin-bottom: 5px;
+}
+
+#progress-bar {
+    width: 100%;
+}
