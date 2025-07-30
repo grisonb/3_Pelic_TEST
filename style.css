@@ -233,19 +233,19 @@ html, body {
 }
 
 .search-toggle-button {
-    width: 52px; /* TAILLE AJUSTÉE */
-    height: 52px; /* TAILLE AJUSTÉE */
+    width: 52px;
+    height: 52px;
     justify-content: center;
     cursor: pointer;
-    font-size: 2.8em;
+    font-size: 2.8em !important; /* CORRECTION FINALE AVEC !important */
     color: var(--primary-color);
 }
 
 .commune-display-control {
     display: none;
-    height: 52px; /* TAILLE AJUSTÉE */
-    padding: 0 18px; /* ESPACEMENT AJUSTÉ */
-    font-size: 18px; /* POLICE AUGMENTÉE */
+    height: 52px;
+    padding: 0 18px;
+    font-size: 18px;
     font-weight: 500;
     white-space: nowrap;
     max-width: 250px;
@@ -256,10 +256,10 @@ html, body {
 }
 
 .sunset-info {
-    font-size: 15px; /* TAILLE AJUSTÉE */
+    font-size: 15px;
     color: var(--light-text-color);
     margin-left: auto;
-    white-space: nowrap; /* Empêche le retour à la ligne */
+    white-space: nowrap;
 }
 
 .version-display {
