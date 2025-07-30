@@ -221,32 +221,31 @@ html, body {
 .search-toggle-container {
     display: flex;
     align-items: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    border-radius: 28px;
-    background-color: white;
-    overflow: hidden;
+    gap: 8px; /* Ajoute un espace entre la loupe et le nom de la ville */
 }
 
 .search-toggle-button {
-    background-color: transparent;
+    background-color: white;
     width: 56px;
     height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 2.2em;
+    font-size: 2.5em; /* Loupe plus grande */
     line-height: 56px;
     color: var(--primary-color);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    border-radius: var(--border-radius); /* Coins arrondis */
+    border: 1px solid rgba(0,0,0,0.2);
 }
 
 .commune-display-control {
     display: none;
     height: 56px;
     line-height: 56px;
-    padding: 0 16px 0 0;
-    background-color: transparent;
-    border-left: 1px solid #eee;
+    padding: 0 16px;
+    background-color: white;
     font-size: 16px;
     font-weight: 500;
     white-space: nowrap;
@@ -254,6 +253,9 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-color);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    border-radius: var(--border-radius); /* Coins arrondis */
+    border: 1px solid rgba(0,0,0,0.2);
 }
 /* --- FIN DES STYLES MIS À JOUR --- */
 
