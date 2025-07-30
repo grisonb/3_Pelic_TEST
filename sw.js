@@ -1,6 +1,6 @@
 // --- FICHIER sw.js AVEC suncalc.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v38'; // Version pour suncalc
+const APP_CACHE_NAME = 'communes-app-cache-v39'; // Version pour suncalc
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 
