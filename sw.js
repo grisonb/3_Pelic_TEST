@@ -1,6 +1,6 @@
-// --- FICHIER sw.js COMPLET ET PROPRE ---
+// --- FICHIER sw.js CORRIGÉ ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v42'; // Version pour corriger les fichiers mélangés
+const APP_CACHE_NAME = 'communes-app-cache-v42'; // Nouvelle version pour le fix
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 
@@ -11,7 +11,8 @@ const APP_SHELL_URLS = [
     './script.js',
     './leaflet.min.js',
     './leaflet.css',
-    './manifest.json'
+    './manifest.json',
+    './suncalc.js' // LA LIGNE MANQUANTE EST AJOUTÉE ICI
 ];
 
 const DATA_URLS = [
