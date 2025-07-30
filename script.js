@@ -21,7 +21,7 @@ const airports = [
 // FONCTIONS UTILITAIRES
 // =========================================================================
 const toRad = deg => deg * Math.PI / 180, toDeg = rad => rad * 180 / Math.PI;
-const simplifyString = str => typeof str !== 'string' ? '' : str.toLowerCase().replace(/\bst\b/g, 'saint').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
+const simplifyString = str => typeof str !== 'string' ? '' : str.toLowerCase().replace(/\bst\b/g, 'saint').normalize("NFD").replace(/[\u300-\u36f]/g, "").replace(/[^a-z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
 const calculateDistanceInNm = (lat1, lon1, lat2, lon2) => { const R = 6371, dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1), a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2), c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return (R * c) / 1.852; };
 const calculateBearing = (lat1, lon1, lat2, lon2) => { const lat1Rad = toRad(lat1), lon1Rad = toRad(lon1), lat2Rad = toRad(lat2), lon2Rad = toRad(lon2), dLon = lon2Rad - lon1Rad, y = Math.sin(dLon) * Math.cos(lat2Rad), x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon); let bearingRad = Math.atan2(y, x), bearingDeg = toDeg(bearingRad); return (bearingDeg + 360) % 360; };
 const convertToDMM = (deg, type) => { if (deg === null || isNaN(deg)) return 'N/A'; const absDeg = Math.abs(deg), degrees = Math.floor(absDeg), minutesTotal = (absDeg - degrees) * 60, minutesFormatted = minutesTotal.toFixed(2).padStart(5, '0'); let direction = type === 'lat' ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W'); return `${degrees}° ${minutesFormatted}' ${direction}`; };
@@ -209,15 +209,40 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
     document.getElementById('clear-search').style.display = 'block';
+
+    let sunsetString = 'Erreur';
+    if (typeof SunCalc !== 'undefined') {
+        try {
+            const now = new Date();
+            const times = SunCalc.getTimes(now, lat, lon);
+            const sunsetTime = times.sunset;
+            sunsetString = sunsetTime.toLocaleTimeString('fr-FR', {
+                hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris'
+            });
+        } catch (e) {
+            console.error("Erreur lors du calcul du coucher de soleil:", e);
+        }
+    } else {
+        console.error("SunCalc n'est pas chargé.");
+    }
+
+    const popupContent = `<b>${name}</b><br>
+                          ${convertToDMM(lat, 'lat')}<br>
+                          ${convertToDMM(lon, 'lon')}<br>
+                          <hr style="margin: 5px 0;">
+                          🌅 Coucher: <b>${sunsetString}</b>`;
+
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(lat, lon, numAirports);
     const allPoints = [[lat, lon]];
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
-    L.marker([lat, lon], { icon: fireIcon }).bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`).addTo(routesLayer);
+    L.marker([lat, lon], { icon: fireIcon }).bindPopup(popupContent).addTo(routesLayer);
+    
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
+    
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
@@ -266,7 +291,7 @@ async function checkOfflineMapStatus() {
     if (cacheExists) {
         const cache = await caches.open(TILE_CACHE_NAME);
         const keys = await cache.keys();
-        if (keys.length > 50) { // Un seuil pour considérer que la carte est téléchargée
+        if (keys.length > 50) {
              document.getElementById('download-map-button').textContent = "Mettre à jour la carte hors ligne";
              deleteButton.style.display = 'block';
         }
@@ -377,7 +402,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.1';
+        versionDisplay.innerText = 'v2.2';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
