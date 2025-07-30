@@ -225,7 +225,6 @@ html, body {
 
 .search-toggle-button, .commune-display-control {
     background-color: white;
-    height: 48px;
     display: flex;
     align-items: center;
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
@@ -234,31 +233,33 @@ html, body {
 }
 
 .search-toggle-button {
-    width: 48px;
+    width: 52px; /* TAILLE AJUSTÉE */
+    height: 52px; /* TAILLE AJUSTÉE */
     justify-content: center;
     cursor: pointer;
-    font-size: 2.5em; /* TAILLE DE L'ICÔNE CORRIGÉE */
+    font-size: 2.8em;
     color: var(--primary-color);
 }
 
 .commune-display-control {
     display: none;
-    padding: 0 16px;
-    font-size: 16px;
+    height: 52px; /* TAILLE AJUSTÉE */
+    padding: 0 18px; /* ESPACEMENT AJUSTÉ */
+    font-size: 18px; /* POLICE AUGMENTÉE */
     font-weight: 500;
     white-space: nowrap;
     max-width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-color);
-    gap: 8px; /* ESPACEMENT ENTRE LE NOM ET LE CS */
+    gap: 12px;
 }
 
 .sunset-info {
-    font-size: 14px;
+    font-size: 15px; /* TAILLE AJUSTÉE */
     color: var(--light-text-color);
     margin-left: auto;
-    padding-right: 16px;
+    white-space: nowrap; /* Empêche le retour à la ligne */
 }
 
 .version-display {
