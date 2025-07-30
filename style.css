@@ -217,35 +217,34 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
-/* --- STYLES CORRIGÉS POUR LA MAISON --- */
+/* --- STYLES MIS À JOUR --- */
 .search-toggle-container {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.search-toggle-button {
+.search-toggle-button, .commune-display-control {
     background-color: white;
-    width: 48px;
     height: 48px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 2.8em; /* ICÔNE ENCORE PLUS GRANDE */
-    line-height: 48px; /* Ajustement pour le centrage */
-    color: var(--primary-color);
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
     border-radius: var(--border-radius);
     border: 1px solid rgba(0,0,0,0.2);
 }
 
+.search-toggle-button {
+    width: 48px;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 2.2em;
+    color: var(--primary-color);
+}
+
 .commune-display-control {
     display: none;
-    height: 48px;
-    line-height: 48px;
     padding: 0 16px;
-    background-color: white;
     font-size: 16px;
     font-weight: 500;
     white-space: nowrap;
@@ -253,11 +252,16 @@ html, body {
     overflow: hidden;
     text-overflow: ellipsis;
     color: var(--text-color);
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-    border-radius: var(--border-radius);
-    border: 1px solid rgba(0,0,0,0.2);
 }
-/* --- FIN DES STYLES CORRIGÉS --- */
+/* --- FIN DES STYLES MIS À JOUR --- */
+
+/* NOUVEAU STYLE POUR LE COUCHER DE SOLEIL */
+.sunset-info {
+    font-size: 14px;
+    color: var(--light-text-color);
+    margin-left: auto; /* Pousse l'élément vers la droite */
+    padding-right: 16px;
+}
 
 .version-display {
     font-size: 10px;
