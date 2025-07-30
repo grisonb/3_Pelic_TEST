@@ -14,18 +14,7 @@ let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl
 const MAGNETIC_DECLINATION = 1.0;
 const TILE_CACHE_NAME = 'communes-tile-cache-v1'; // Doit correspondre au nom dans sw.js
 const airports = [
-    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 },
-    { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 },
-    { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 },
-    { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 },
-    { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 },
-    { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 },
-    { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 },
-    { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 },
-    { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 },
-    { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 },
-    { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 },
-    { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
+    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
 
 // =========================================================================
@@ -55,6 +44,7 @@ async function initializeApp() {
         searchSection.style.display = 'block';
         initMap();
         setupEventListeners();
+        checkOfflineMapStatus();
         const savedCommuneJSON = localStorage.getItem('currentCommune');
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
@@ -95,6 +85,7 @@ function setupEventListeners() {
     const resultsList = document.getElementById('results-list');
     const gpsFeuButton = document.getElementById('gps-feu-button');
     const downloadMapButton = document.getElementById('download-map-button');
+    const deleteMapButton = document.getElementById('delete-map-button');
 
     searchInput.addEventListener('input', () => {
         const rawSearch = searchInput.value;
@@ -184,6 +175,7 @@ function setupEventListeners() {
     });
     
     downloadMapButton.addEventListener('click', downloadOfflineMap);
+    deleteMapButton.addEventListener('click', deleteOfflineMap);
 }
 
 function displayResults(results) {
@@ -266,8 +258,21 @@ window.toggleAirport = oaci => { disabledAirports.has(oaci) ? disabledAirports.d
 window.toggleWater = oaci => { waterAirports.has(oaci) ? waterAirports.delete(oaci) : (waterAirports.add(oaci), disabledAirports.delete(oaci)), saveState(), refreshUI() };
 
 // =========================================================================
-// NOUVELLES FONCTIONS POUR LE TÉLÉCHARGEMENT HORS LIGNE
+// FONCTIONS POUR LE TÉLÉCHARGEMENT ET LA SUPPRESSION HORS LIGNE
 // =========================================================================
+async function checkOfflineMapStatus() {
+    const deleteButton = document.getElementById('delete-map-button');
+    const cacheExists = await caches.has(TILE_CACHE_NAME);
+    if (cacheExists) {
+        const cache = await caches.open(TILE_CACHE_NAME);
+        const keys = await cache.keys();
+        if (keys.length > 50) { // Un seuil pour considérer que la carte est téléchargée
+             document.getElementById('download-map-button').textContent = "Mettre à jour la carte hors ligne";
+             deleteButton.style.display = 'block';
+        }
+    }
+}
+
 function latLonToTileCoords(lat, lon, zoom) {
     const latRad = toRad(lat);
     const n = Math.pow(2, zoom);
@@ -278,6 +283,7 @@ function latLonToTileCoords(lat, lon, zoom) {
 
 async function downloadOfflineMap() {
     const downloadButton = document.getElementById('download-map-button');
+    const deleteButton = document.getElementById('delete-map-button');
     const progressContainer = document.getElementById('download-progress');
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
@@ -312,9 +318,10 @@ async function downloadOfflineMap() {
         const cachedResponse = await tileCache.match(url);
         if (!cachedResponse) {
             try {
-                // On utilise fetch directement. Le SW interceptera et mettra en cache la réponse.
                 const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (response.ok) {
+                    await tileCache.put(url, response);
+                }
             } catch (error) {
                 console.warn(`Impossible de télécharger la tuile ${url}:`, error);
             }
@@ -330,6 +337,34 @@ async function downloadOfflineMap() {
     progressText.textContent = 'Carte hors ligne téléchargée !';
     downloadButton.textContent = "Mettre à jour la carte hors ligne";
     downloadButton.disabled = false;
+    deleteButton.style.display = 'block';
+}
+
+async function deleteOfflineMap() {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer toutes les données de la carte hors ligne ? Vous devrez les télécharger à nouveau pour un usage sans connexion.")) {
+        return;
+    }
+
+    const downloadButton = document.getElementById('download-map-button');
+    const deleteButton = document.getElementById('delete-map-button');
+    const progressContainer = document.getElementById('download-progress');
+    const progressText = document.getElementById('progress-text');
+    const progressBar = document.getElementById('progress-bar');
+
+    progressContainer.style.display = 'block';
+    progressText.textContent = 'Suppression des données de la carte...';
+    progressBar.value = 0;
+
+    await caches.delete(TILE_CACHE_NAME);
+
+    progressText.textContent = 'Données supprimées.';
+    progressBar.value = 100;
+    setTimeout(() => {
+        progressContainer.style.display = 'none';
+    }, 2000);
+
+    downloadButton.textContent = "Télécharger la carte pour usage hors ligne";
+    deleteButton.style.display = 'none';
 }
 
 const SearchToggleControl = L.Control.extend({
@@ -342,7 +377,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.0';
+        versionDisplay.innerText = 'v2.1';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
