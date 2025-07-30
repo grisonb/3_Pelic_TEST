@@ -266,7 +266,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     else { labelText = `${Math.round(distance)} Nm`; }
     const polyline = L.polyline([startLatLng, endLatLng], { color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)', weight: 3, opacity: 0.8, dashArray: isUser ? '5, 10' : '' }).addTo(routesLayer);
     if (isUser) {
-        userRoutePolyline = polyline; // Stocke la référence
+        userRoutePolyline = polyline;
         userRoutePolyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci) {
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer);
@@ -281,9 +281,6 @@ const saveState = () => { localStorage.setItem('disabled_airports', JSON.stringi
 window.toggleAirport = oaci => { disabledAirports.has(oaci) ? disabledAirports.delete(oaci) : (disabledAirports.add(oaci), waterAirports.delete(oaci)), saveState(), refreshUI() };
 window.toggleWater = oaci => { waterAirports.has(oaci) ? waterAirports.delete(oaci) : (waterAirports.add(oaci), disabledAirports.delete(oaci)), saveState(), refreshUI() };
 
-// =========================================================================
-// FONCTIONS GPS LIVE
-// =========================================================================
 function toggleLiveGps() {
     const liveGpsButton = document.getElementById('live-gps-button');
     if (watchId) {
@@ -329,14 +326,13 @@ function updateUserPosition(pos) {
     if (currentCommune) {
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
         if (lat.toFixed(6) !== userLat.toFixed(6) || lon.toFixed(6) !== userLon.toFixed(6)) {
-            drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: calculateBearing(userLat, userLon, lat, lon) - MAGNETIC_DECLINATION });
+            const trueBearing = calculateBearing(userLat, userLon, lat, lon);
+            const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
+            drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
         }
     }
 }
 
-// =========================================================================
-// FONCTIONS DE TÉLÉCHARGEMENT/SUPPRESSION HORS LIGNE
-// =========================================================================
 async function checkOfflineMapStatus() {
     const deleteButton = document.getElementById('delete-map-button');
     const cacheExists = await caches.has(TILE_CACHE_NAME);
@@ -450,11 +446,11 @@ const SearchToggleControl = L.Control.extend({
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
         const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
         this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
-        this.toggleButton.innerHTML = '🔍';
+        this.toggleButton.innerHTML = '🏠'; // MODIFIÉ ICI
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.3';
+        versionDisplay.innerText = 'v2.4'; // MODIFIÉ ICI
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
