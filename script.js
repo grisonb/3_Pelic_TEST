@@ -54,7 +54,6 @@ async function initializeApp() {
             currentCommune = JSON.parse(savedCommuneJSON);
             displayCommuneDetails(currentCommune, true);
             document.getElementById('ui-overlay').style.display = 'none';
-            if (searchToggleControl) { searchToggleControl.setName(currentCommune.nom_standard); searchToggleControl.communeDisplay.style.display = 'block'; }
         }
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
@@ -78,7 +77,6 @@ function initMap() {
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
         displayCommuneDetails(manualCommune, false);
         document.getElementById('ui-overlay').style.display = 'none';
-        if (searchToggleControl) { searchToggleControl.setName(pointName); searchToggleControl.communeDisplay.style.display = 'block'; }
     });
 }
 
@@ -146,8 +144,7 @@ function setupEventListeners() {
         currentCommune = null;
         localStorage.removeItem('currentCommune');
         if (searchToggleControl) {
-            searchToggleControl.setName('');
-            searchToggleControl.communeDisplay.style.display = 'none';
+            searchToggleControl.updateDisplay(null);
         }
         map.setView([46.6, 2.2], 5.5);
     });
@@ -170,10 +167,6 @@ function setupEventListeners() {
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
                 displayCommuneDetails(gpsCommune, false);
                 document.getElementById('ui-overlay').style.display = 'none';
-                if (searchToggleControl) {
-                    searchToggleControl.setName(pointName);
-                    searchToggleControl.communeDisplay.style.display = 'block';
-                }
             },
             () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
             { enableHighAccuracy: true }
@@ -198,10 +191,6 @@ function displayResults(results) {
                 localStorage.setItem('currentCommune', JSON.stringify(c));
                 displayCommuneDetails(c);
                 document.getElementById('ui-overlay').style.display = 'none';
-                if (searchToggleControl) {
-                    searchToggleControl.setName(c.nom_standard);
-                    searchToggleControl.communeDisplay.style.display = 'block';
-                }
             });
             resultsList.appendChild(li);
         });
@@ -213,22 +202,18 @@ function displayResults(results) {
 function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
     drawPermanentAirportMarkers();
+    
+    if (searchToggleControl) {
+        searchToggleControl.updateDisplay(commune);
+    }
+
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
     document.getElementById('clear-search').style.display = 'block';
 
-    let sunsetString = 'Erreur';
-    if (typeof SunCalc !== 'undefined') {
-        try {
-            const now = new Date();
-            const times = SunCalc.getTimes(now, lat, lon);
-            sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-        } catch (e) { console.error("Erreur SunCalc:", e); }
-    }
-
-    const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}<br><hr style="margin: 5px 0;">🌅 CS: <b>${sunsetString}</b>`;
-
+    const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`;
+    
     const allPoints = [[lat, lon]];
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
     L.marker([lat, lon], { icon: fireIcon }).bindPopup(popupContent).addTo(routesLayer);
@@ -450,8 +435,9 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
+        this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay); // NOUVEAU
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.5';
+        versionDisplay.innerText = 'v2.6';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
@@ -462,14 +448,39 @@ const SearchToggleControl = L.Control.extend({
             } else {
                 uiOverlay.style.display = 'none';
                 if (this.communeDisplay.textContent) {
-                    this.communeDisplay.style.display = 'block';
+                    this.communeDisplay.style.display = 'flex';
                 }
             }
         });
         return mainContainer;
     },
-    setName: function (name) {
-        this.communeDisplay.textContent = name;
+    updateDisplay: function (commune) {
+        if (!commune) {
+            this.communeDisplay.style.display = 'none';
+            this.communeDisplay.firstChild.textContent = '';
+            this.sunsetDisplay.textContent = '';
+            return;
+        }
+
+        this.communeDisplay.style.display = 'flex';
+        // Le nom de la commune est maintenant dans un span
+        if (!this.communeNameSpan) {
+            this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
+            this.communeDisplay.insertBefore(this.communeNameSpan, this.sunsetDisplay);
+        }
+        this.communeNameSpan.textContent = commune.nom_standard;
+        
+        let sunsetString = '';
+        if (typeof SunCalc !== 'undefined') {
+            try {
+                const now = new Date();
+                const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
+                sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+                this.sunsetDisplay.innerHTML = `🌅 <b>${sunsetString}</b>`;
+            } catch (e) {
+                this.sunsetDisplay.innerHTML = '';
+            }
+        }
     }
 });
 
