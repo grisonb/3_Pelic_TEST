@@ -226,7 +226,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
             sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
         } catch (e) { console.error("Erreur SunCalc:", e); }
     }
-    const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}<br><hr style="margin: 5px 0;">🌅 Coucher: <b>${sunsetString}</b>`;
+
+    const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}<br><hr style="margin: 5px 0;">🌅 CS: <b>${sunsetString}</b>`;
 
     const allPoints = [[lat, lon]];
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
@@ -446,11 +447,11 @@ const SearchToggleControl = L.Control.extend({
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
         const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
         this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
-        this.toggleButton.innerHTML = '🏠'; // MODIFIÉ ICI
+        this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.4'; // MODIFIÉ ICI
+        versionDisplay.innerText = 'v2.5';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
