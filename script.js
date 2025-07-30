@@ -2,10 +2,7 @@
 // INITIALISATION DE L'APPLICATION
 // =========================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof L === 'undefined') {
-        document.getElementById('status-message').textContent = "❌ ERREUR : leaflet.min.js non chargé.";
-        return;
-    }
+    if (typeof L === 'undefined') { document.getElementById('status-message').textContent = "❌ ERREUR : leaflet.min.js non chargé."; return; }
     initializeApp();
 });
 
@@ -216,15 +213,36 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
     document.getElementById('clear-search').style.display = 'block';
+
+    let sunsetString = 'N/A';
+    if (typeof SunCalc !== 'undefined') {
+        const now = new Date();
+        const times = SunCalc.getTimes(now, lat, lon);
+        const sunsetTime = times.sunset;
+        sunsetString = sunsetTime.toLocaleTimeString('fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Europe/Paris'
+        });
+    }
+
+    const popupContent = `<b>${name}</b><br>
+                          ${convertToDMM(lat, 'lat')}<br>
+                          ${convertToDMM(lon, 'lon')}<br>
+                          <hr style="margin: 5px 0;">
+                          🌅 Coucher: <b>${sunsetString}</b>`;
+
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(lat, lon, numAirports);
     const allPoints = [[lat, lon]];
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
-    L.marker([lat, lon], { icon: fireIcon }).bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`).addTo(routesLayer);
+    L.marker([lat, lon], { icon: fireIcon }).bindPopup(popupContent).addTo(routesLayer);
+    
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
+    
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             pos => {
@@ -232,13 +250,10 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
                 allPoints.push([userLat, userLon]);
                 const userIcon = L.divIcon({ className: 'custom-marker-icon user-marker', html: '👤' });
                 L.marker([userLat, userLon], { icon: userIcon }).bindPopup('Votre position').addTo(routesLayer);
-                const trueBearing = calculateBearing(userLat, userLon, lat, lon);
-                const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
 
-                // --- CORRECTION APPLIQUÉE ICI ---
-                // On ne dessine la route depuis la position de l'utilisateur que si la cible
-                // n'est pas exactement au même endroit (cas du "Feu GPS").
-                if (lat !== userLat || lon !== userLon) {
+                if (lat.toFixed(6) !== userLat.toFixed(6) || lon.toFixed(6) !== userLon.toFixed(6)) {
+                    const trueBearing = calculateBearing(userLat, userLon, lat, lon);
+                    const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
                     drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
                 }
                 
@@ -268,5 +283,5 @@ const loadState = () => { const savedDisabled = localStorage.getItem('disabled_a
 const saveState = () => { localStorage.setItem('disabled_airports', JSON.stringify([...disabledAirports])); localStorage.setItem('water_airports', JSON.stringify([...waterAirports])); };
 window.toggleAirport = oaci => { disabledAirports.has(oaci) ? disabledAirports.delete(oaci) : (disabledAirports.add(oaci), waterAirports.delete(oaci)), saveState(), refreshUI() };
 window.toggleWater = oaci => { waterAirports.has(oaci) ? waterAirports.delete(oaci) : (waterAirports.add(oaci), disabledAirports.delete(oaci)), saveState(), refreshUI() };
-const SearchToggleControl = L.Control.extend({ options: { position: 'topleft' }, onAdd: function (map) { const mainContainer = L.DomUtil.create('div', 'leaflet-control'), topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer); this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar), this.toggleButton.innerHTML = '🔍', this.toggleButton.href = '#', this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar); const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer); return versionDisplay.innerText = 'v1.8', L.DomEvent.disableClickPropagation(mainContainer), L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop), L.DomEvent.on(this.toggleButton, 'click', () => { const uiOverlay = document.getElementById('ui-overlay'); uiOverlay.style.display === 'none' ? (uiOverlay.style.display = 'block', this.communeDisplay.style.display = 'none') : (uiOverlay.style.display = 'none', this.communeDisplay.textContent && (this.communeDisplay.style.display = 'block')) }), mainContainer }, setName: function (name) { this.communeDisplay.textContent = name } });
+const SearchToggleControl = L.Control.extend({ options: { position: 'topleft' }, onAdd: function (map) { const mainContainer = L.DomUtil.create('div', 'leaflet-control'), topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer); this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar), this.toggleButton.innerHTML = '🔍', this.toggleButton.href = '#', this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar); const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer); return versionDisplay.innerText = 'v1.9', L.DomEvent.disableClickPropagation(mainContainer), L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop), L.DomEvent.on(this.toggleButton, 'click', () => { const uiOverlay = document.getElementById('ui-overlay'); uiOverlay.style.display === 'none' ? (uiOverlay.style.display = 'block', this.communeDisplay.style.display = 'none') : (uiOverlay.style.display = 'none', this.communeDisplay.textContent && (this.communeDisplay.style.display = 'block')) }), mainContainer }, setName: function (name) { this.communeDisplay.textContent = name } });
 function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
