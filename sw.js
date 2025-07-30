@@ -1,6 +1,6 @@
 // --- FICHIER sw.js CORRIGÉ ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v44'; // Nouvelle version pour le fix
+const APP_CACHE_NAME = 'communes-app-cache-v45'; // Nouvelle version pour le fix
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 
