@@ -12,7 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
-const TILE_CACHE_NAME = 'communes-tile-cache-v1'; // Doit correspondre au nom dans sw.js
+let userMarker = null, userRoutePolyline = null, watchId = null;
+const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -21,7 +22,7 @@ const airports = [
 // FONCTIONS UTILITAIRES
 // =========================================================================
 const toRad = deg => deg * Math.PI / 180, toDeg = rad => rad * 180 / Math.PI;
-const simplifyString = str => typeof str !== 'string' ? '' : str.toLowerCase().replace(/\bst\b/g, 'saint').normalize("NFD").replace(/[\u300-\u36f]/g, "").replace(/[^a-z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
+const simplifyString = str => typeof str !== 'string' ? '' : str.toLowerCase().replace(/\bst\b/g, 'saint').normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, ' ').trim().replace(/\s+/g, ' ');
 const calculateDistanceInNm = (lat1, lon1, lat2, lon2) => { const R = 6371, dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1), a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2), c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return (R * c) / 1.852; };
 const calculateBearing = (lat1, lon1, lat2, lon2) => { const lat1Rad = toRad(lat1), lon1Rad = toRad(lon1), lat2Rad = toRad(lat2), lon2Rad = toRad(lon2), dLon = lon2Rad - lon1Rad, y = Math.sin(dLon) * Math.cos(lat2Rad), x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon); let bearingRad = Math.atan2(y, x), bearingDeg = toDeg(bearingRad); return (bearingDeg + 360) % 360; };
 const convertToDMM = (deg, type) => { if (deg === null || isNaN(deg)) return 'N/A'; const absDeg = Math.abs(deg), degrees = Math.floor(absDeg), minutesTotal = (absDeg - degrees) * 60, minutesFormatted = minutesTotal.toFixed(2).padStart(5, '0'); let direction = type === 'lat' ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W'); return `${degrees}° ${minutesFormatted}' ${direction}`; };
@@ -45,6 +46,9 @@ async function initializeApp() {
         initMap();
         setupEventListeners();
         checkOfflineMapStatus();
+        if (localStorage.getItem('liveGpsActive') === 'true') {
+            toggleLiveGps();
+        }
         const savedCommuneJSON = localStorage.getItem('currentCommune');
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
@@ -86,6 +90,7 @@ function setupEventListeners() {
     const gpsFeuButton = document.getElementById('gps-feu-button');
     const downloadMapButton = document.getElementById('download-map-button');
     const deleteMapButton = document.getElementById('delete-map-button');
+    const liveGpsButton = document.getElementById('live-gps-button');
 
     searchInput.addEventListener('input', () => {
         const rawSearch = searchInput.value;
@@ -137,6 +142,7 @@ function setupEventListeners() {
         resultsList.style.display = 'none';
         clearSearchBtn.style.display = 'none';
         routesLayer.clearLayers();
+        drawPermanentAirportMarkers();
         currentCommune = null;
         localStorage.removeItem('currentCommune');
         if (searchToggleControl) {
@@ -176,6 +182,7 @@ function setupEventListeners() {
     
     downloadMapButton.addEventListener('click', downloadOfflineMap);
     deleteMapButton.addEventListener('click', deleteOfflineMap);
+    liveGpsButton.addEventListener('click', toggleLiveGps);
 }
 
 function displayResults(results) {
@@ -205,6 +212,7 @@ function displayResults(results) {
 
 function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
+    drawPermanentAirportMarkers();
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
@@ -215,51 +223,38 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         try {
             const now = new Date();
             const times = SunCalc.getTimes(now, lat, lon);
-            const sunsetTime = times.sunset;
-            sunsetString = sunsetTime.toLocaleTimeString('fr-FR', {
-                hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris'
-            });
-        } catch (e) {
-            console.error("Erreur lors du calcul du coucher de soleil:", e);
-        }
-    } else {
-        console.error("SunCalc n'est pas chargé.");
+            sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+        } catch (e) { console.error("Erreur SunCalc:", e); }
     }
+    const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}<br><hr style="margin: 5px 0;">🌅 Coucher: <b>${sunsetString}</b>`;
 
-    const popupContent = `<b>${name}</b><br>
-                          ${convertToDMM(lat, 'lat')}<br>
-                          ${convertToDMM(lon, 'lon')}<br>
-                          <hr style="margin: 5px 0;">
-                          🌅 Coucher: <b>${sunsetString}</b>`;
-
-    const numAirports = parseInt(document.getElementById('airport-count').value, 10);
-    const closestAirports = getClosestAirports(lat, lon, numAirports);
     const allPoints = [[lat, lon]];
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
     L.marker([lat, lon], { icon: fireIcon }).bindPopup(popupContent).addTo(routesLayer);
     
+    const numAirports = parseInt(document.getElementById('airport-count').value, 10);
+    const closestAirports = getClosestAirports(lat, lon, numAirports);
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
-    
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            pos => {
-                const { latitude: userLat, longitude: userLon } = pos.coords;
-                allPoints.push([userLat, userLon]);
-                const userIcon = L.divIcon({ className: 'custom-marker-icon user-marker', html: '👤' });
-                L.marker([userLat, userLon], { icon: userIcon }).bindPopup('Votre position').addTo(routesLayer);
-                if (lat.toFixed(6) !== userLat.toFixed(6) || lon.toFixed(6) !== userLon.toFixed(6)) {
-                    const trueBearing = calculateBearing(userLat, userLon, lat, lon);
-                    const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
-                    drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
-                }
-                if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
-            },
-            () => { if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3)); }
-        );
-    } else { if (shouldFitBounds) map.fitBounds(L.latLngBounds(allPoints).pad(0.3)); }
+
+    userMarker = null;
+    userRoutePolyline = null;
+    navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
+
+    if (shouldFitBounds) {
+        setTimeout(() => {
+            if (userMarker) {
+                allPoints.push(userMarker.getLatLng());
+            }
+            if (allPoints.length > 1) {
+                map.fitBounds(L.latLngBounds(allPoints).pad(0.3));
+            } else {
+                map.setView([lat, lon], 10);
+            }
+        }, 300);
+    }
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
@@ -270,8 +265,12 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
     else { labelText = `${Math.round(distance)} Nm`; }
     const polyline = L.polyline([startLatLng, endLatLng], { color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)', weight: 3, opacity: 0.8, dashArray: isUser ? '5, 10' : '' }).addTo(routesLayer);
-    if (isUser) { polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true }); }
-    else if (oaci) { L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer); }
+    if (isUser) {
+        userRoutePolyline = polyline; // Stocke la référence
+        userRoutePolyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
+    } else if (oaci) {
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer);
+    }
 }
 
 function getClosestAirports(lat, lon, count) { return airports.filter(ap => !disabledAirports.has(ap.oaci)).map(ap => ({ ...ap, distance: calculateDistanceInNm(lat, lon, ap.lat, ap.lon) })).sort((a, b) => a.distance - b.distance).slice(0, count); }
@@ -283,7 +282,60 @@ window.toggleAirport = oaci => { disabledAirports.has(oaci) ? disabledAirports.d
 window.toggleWater = oaci => { waterAirports.has(oaci) ? waterAirports.delete(oaci) : (waterAirports.add(oaci), disabledAirports.delete(oaci)), saveState(), refreshUI() };
 
 // =========================================================================
-// FONCTIONS POUR LE TÉLÉCHARGEMENT ET LA SUPPRESSION HORS LIGNE
+// FONCTIONS GPS LIVE
+// =========================================================================
+function toggleLiveGps() {
+    const liveGpsButton = document.getElementById('live-gps-button');
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        liveGpsButton.classList.remove('active');
+        localStorage.setItem('liveGpsActive', 'false');
+        console.log("Suivi GPS désactivé.");
+    } else {
+        if (!navigator.geolocation) {
+            alert("La géolocalisation n'est pas supportée.");
+            return;
+        }
+        watchId = navigator.geolocation.watchPosition(
+            updateUserPosition, 
+            (error) => {
+                console.error("Erreur de suivi GPS:", error);
+                alert("Impossible d'activer le suivi GPS. Vérifiez les autorisations.");
+                if (watchId) toggleLiveGps();
+            }, 
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+        liveGpsButton.classList.add('active');
+        localStorage.setItem('liveGpsActive', 'true');
+        console.log("Suivi GPS activé.");
+    }
+}
+
+function updateUserPosition(pos) {
+    const { latitude: userLat, longitude: userLon } = pos.coords;
+    if (!userMarker) {
+        const userIcon = L.divIcon({ className: 'custom-marker-icon user-marker', html: '👤' });
+        userMarker = L.marker([userLat, userLon], { icon: userIcon }).bindPopup('Votre position').addTo(routesLayer);
+    } else {
+        userMarker.setLatLng([userLat, userLon]);
+    }
+    
+    if (userRoutePolyline) {
+        routesLayer.removeLayer(userRoutePolyline);
+        userRoutePolyline = null;
+    }
+
+    if (currentCommune) {
+        const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
+        if (lat.toFixed(6) !== userLat.toFixed(6) || lon.toFixed(6) !== userLon.toFixed(6)) {
+            drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: calculateBearing(userLat, userLon, lat, lon) - MAGNETIC_DECLINATION });
+        }
+    }
+}
+
+// =========================================================================
+// FONCTIONS DE TÉLÉCHARGEMENT/SUPPRESSION HORS LIGNE
 // =========================================================================
 async function checkOfflineMapStatus() {
     const deleteButton = document.getElementById('delete-map-button');
@@ -402,7 +454,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.2';
+        versionDisplay.innerText = 'v2.3';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
