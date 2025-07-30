@@ -1,6 +1,6 @@
-// --- FICHIER sw.js FINAL ---
+// --- FICHIER sw.js COMPLET ET PROPRE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v41'; // Version pour la suppression de carte
+const APP_CACHE_NAME = 'communes-app-cache-v42'; // Version pour corriger les fichiers mélangés
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 
