@@ -217,33 +217,33 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
-/* --- STYLES MIS À JOUR POUR LA LOUPE --- */
+/* --- STYLES CORRIGÉS POUR LA LOUPE / MAISON --- */
 .search-toggle-container {
     display: flex;
     align-items: center;
-    gap: 8px; /* Ajoute un espace entre la loupe et le nom de la ville */
+    gap: 8px;
 }
 
 .search-toggle-button {
     background-color: white;
-    width: 56px;
-    height: 56px;
+    width: 48px;  /* TAILLE CORRIGÉE */
+    height: 48px; /* TAILLE CORRIGÉE */
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 2.5em; /* Loupe plus grande */
-    line-height: 56px;
+    font-size: 2em; /* TAILLE DE L'ICÔNE AJUSTÉE */
+    line-height: 48px;
     color: var(--primary-color);
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-    border-radius: var(--border-radius); /* Coins arrondis */
+    border-radius: var(--border-radius);
     border: 1px solid rgba(0,0,0,0.2);
 }
 
 .commune-display-control {
     display: none;
-    height: 56px;
-    line-height: 56px;
+    height: 48px; /* TAILLE CORRIGÉE */
+    line-height: 48px;
     padding: 0 16px;
     background-color: white;
     font-size: 16px;
@@ -254,10 +254,10 @@ html, body {
     text-overflow: ellipsis;
     color: var(--text-color);
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-    border-radius: var(--border-radius); /* Coins arrondis */
+    border-radius: var(--border-radius);
     border: 1px solid rgba(0,0,0,0.2);
 }
-/* --- FIN DES STYLES MIS À JOUR --- */
+/* --- FIN DES STYLES CORRIGÉS --- */
 
 .version-display {
     font-size: 10px;
