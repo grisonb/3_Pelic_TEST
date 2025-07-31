@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v58'; // Version pour le fix page blanche final
+const APP_CACHE_NAME = 'communes-app-cache-v59'; // Version pour le fix page blanche final
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 // Le cache des tuiles n'est plus géré par le cycle de vie du SW
 // const TILE_CACHE_NAME_PERSISTENT = 'communes-tile-persistent-v1';
