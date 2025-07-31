@@ -1,7 +1,8 @@
-// --- FICHIER sw.js FINAL ---
+// --- FICHIER sw.js AVEC STRATÉGIE HYBRIDE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v59'; // Version pour IndexedDB
+const APP_CACHE_NAME = 'communes-app-cache-v60'; // Version pour cache hybride
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
+const TILE_CACHE_API_NAME = 'communes-tile-api-cache-v1'; // Le cache rapide
 const DB_NAME = 'TileDatabase';
 const TILE_STORE_NAME = 'tiles';
 
@@ -34,7 +35,8 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => Promise.all(
             cacheNames.map(cacheName => {
-                if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME) {
+                // On nettoie les vieux caches de l'app, mais on garde les caches de données et de tuiles
+                if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_API_NAME) {
                     return caches.delete(cacheName);
                 }
             })
@@ -75,21 +77,44 @@ const idb = {
     }
 };
 
+// =========================================================================
+// GESTIONNAIRE FETCH AVEC STRATÉGIE HYBRIDE
+// =========================================================================
 self.addEventListener('fetch', event => {
     const requestUrl = new URL(event.request.url);
 
     if (requestUrl.hostname.includes('tile.openstreetmap.org')) {
         event.respondWith(
-            idb.get(TILE_STORE_NAME, event.request.url).then(cachedBlob => {
-                if (cachedBlob) {
-                    return new Response(cachedBlob);
+            caches.open(TILE_CACHE_API_NAME).then(async (cache) => {
+                // 1. On cherche d'abord dans le cache rapide (Cache API)
+                const cachedResponse = await cache.match(event.request);
+                if (cachedResponse) {
+                    return cachedResponse;
                 }
+
+                // 2. Si pas trouvé, on cherche dans le stockage long terme (IndexedDB)
+                try {
+                    const idbBlob = await idb.get(TILE_STORE_NAME, event.request.url);
+                    if (idbBlob) {
+                        // On a trouvé la tuile dans la base de données !
+                        const response = new Response(idbBlob);
+                        // On la met dans le cache rapide pour la prochaine fois
+                        await cache.put(event.request, response.clone());
+                        return response;
+                    }
+                } catch (error) {
+                    console.error("Erreur de lecture IndexedDB:", error);
+                }
+                
+                // 3. Si la tuile n'est nulle part (cas où on est en ligne et on explore une nouvelle zone)
+                // on va la chercher sur le réseau. Le SW de la page la mettra dans IndexedDB.
                 return fetch(event.request);
             })
         );
         return;
     }
     
+    // Stratégie pour le reste de l'application (inchangée)
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
