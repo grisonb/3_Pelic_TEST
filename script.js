@@ -380,7 +380,7 @@ async function downloadOfflineMap() {
     
     const tileCache = await caches.open(TILE_CACHE_NAME);
 
-    const chunkSize = 100;
+    const chunkSize = 50; // Traitement par lots de 50
     for (let i = 0; i < tilesToFetch.length; i += chunkSize) {
         const chunk = tilesToFetch.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async (url) => {
@@ -402,7 +402,7 @@ async function downloadOfflineMap() {
         progressBar.value = percent;
         progressText.textContent = `Vérification/Téléchargement: ${downloadedCount} / ${totalTiles} tuiles...`;
 
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise(resolve => setTimeout(resolve, 100)); // Pause plus longue
     }
 
     progressText.textContent = 'Carte hors ligne téléchargée !';
@@ -443,7 +443,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.9';
+        versionDisplay.innerText = 'v3.0';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
