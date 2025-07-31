@@ -319,21 +319,22 @@ function updateUserPosition(pos) {
     }
 }
 
-// =========================================================================
-// GESTION CARTE HORS LIGNE (MODIFIÉ)
-// =========================================================================
 async function updateOfflineButtonsState() {
     const downloadButton = document.getElementById('download-map-button');
     const deleteButton = document.getElementById('delete-map-button');
-    const cacheExists = await caches.has(TILE_CACHE_NAME);
-    if (cacheExists) {
-        const cache = await caches.open(TILE_CACHE_NAME);
-        const keys = await cache.keys();
-        if (keys.length > 50) {
-            downloadButton.textContent = "Mettre à jour la carte hors ligne";
-            deleteButton.style.display = 'block';
-            return;
+    try {
+        const cacheExists = await caches.has(TILE_CACHE_NAME);
+        if (cacheExists) {
+            const cache = await caches.open(TILE_CACHE_NAME);
+            const keys = await cache.keys();
+            if (keys.length > 50) {
+                downloadButton.textContent = "Mettre à jour la carte hors ligne";
+                deleteButton.style.display = 'block';
+                return;
+            }
         }
+    } catch (error) {
+        console.error("Erreur lors de la vérification du cache des tuiles:", error);
     }
     downloadButton.textContent = "Télécharger la carte pour usage hors ligne";
     deleteButton.style.display = 'none';
@@ -353,7 +354,7 @@ async function downloadOfflineMap() {
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
 
-    if (!confirm("Ceci va télécharger un volume important de données pour la carte (plusieurs dizaines de Mo). Êtes-vous sûr de vouloir continuer (recommandé en Wi-Fi) ?")) {
+    if (!confirm("Ceci va télécharger un volume important de données pour la carte (jusqu'à 1 Go). Êtes-vous sûr de vouloir continuer (recommandé en Wi-Fi) ?")) {
         return;
     }
 
@@ -379,26 +380,31 @@ async function downloadOfflineMap() {
     
     const tileCache = await caches.open(TILE_CACHE_NAME);
 
-    for (const url of tilesToFetch) {
-        const cachedResponse = await tileCache.match(url);
-        if (!cachedResponse) {
-            try {
-                const response = await fetch(url);
-                if (response.ok) {
-                    await tileCache.put(url, response);
+    const chunkSize = 100;
+    for (let i = 0; i < tilesToFetch.length; i += chunkSize) {
+        const chunk = tilesToFetch.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(async (url) => {
+            const cachedResponse = await tileCache.match(url);
+            if (!cachedResponse) {
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        await tileCache.put(url, response);
+                    }
+                } catch (error) {
+                    console.warn(`Impossible de télécharger la tuile ${url}:`, error);
                 }
-            } catch (error) {
-                console.warn(`Impossible de télécharger la tuile ${url}:`, error);
             }
-        }
-        downloadedCount++;
+        }));
+
+        downloadedCount += chunk.length;
         const percent = Math.round((downloadedCount / totalTiles) * 100);
         progressBar.value = percent;
         progressText.textContent = `Vérification/Téléchargement: ${downloadedCount} / ${totalTiles} tuiles...`;
-        if (downloadedCount % 50 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 20));
-        }
+
+        await new Promise(resolve => setTimeout(resolve, 50));
     }
+
     progressText.textContent = 'Carte hors ligne téléchargée !';
     downloadButton.disabled = false;
     await updateOfflineButtonsState();
@@ -437,7 +443,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v2.8';
+        versionDisplay.innerText = 'v2.9';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
@@ -447,7 +453,7 @@ const SearchToggleControl = L.Control.extend({
                 this.communeDisplay.style.display = 'none';
             } else {
                 uiOverlay.style.display = 'none';
-                if (this.communeDisplay.firstChild.textContent) {
+                if (this.communeDisplay.firstChild && this.communeDisplay.firstChild.textContent) {
                     this.communeDisplay.style.display = 'flex';
                 }
             }
