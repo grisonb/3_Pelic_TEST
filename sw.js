@@ -1,6 +1,6 @@
-// --- FICHIER sw.js CORRIGÉ ---
+// --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v54'; // Nouvelle version pour le fix
+const APP_CACHE_NAME = 'communes-app-cache-v55'; // Version pour DL optimisé et fix page blanche
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 
@@ -12,7 +12,7 @@ const APP_SHELL_URLS = [
     './leaflet.min.js',
     './leaflet.css',
     './manifest.json',
-    './suncalc.js' // LA LIGNE MANQUANTE EST AJOUTÉE ICI
+    './suncalc.js'
 ];
 
 const DATA_URLS = [
