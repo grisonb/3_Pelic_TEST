@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v55'; // Version pour DL optimisé et fix page blanche
+const APP_CACHE_NAME = 'communes-app-cache-v56'; // Version pour DL optimisé
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 
