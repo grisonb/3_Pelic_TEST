@@ -490,7 +490,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v3.2';
+        versionDisplay.innerText = 'v3.3';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
