@@ -7,71 +7,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =========================================================================
-// "MINI-BIBLIOTHÈQUE" POUR INDEXEDDB
-// =========================================================================
-const idb = {
-    db: null,
-    init(dbName, storeName) {
-        return new Promise((resolve, reject) => {
-            if (this.db) return resolve(this.db);
-            const request = indexedDB.open(dbName, 1);
-            request.onerror = (event) => reject("Erreur IndexedDB: " + event.target.errorCode);
-            request.onsuccess = (event) => {
-                this.db = event.target.result;
-                resolve(this.db);
-            };
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName);
-                }
-            };
-        });
-    },
-    get(storeName, key) {
-        return new Promise((resolve, reject) => {
-            this.init(DB_NAME, storeName).then(db => {
-                const transaction = db.transaction([storeName], "readonly");
-                const store = transaction.objectStore(storeName);
-                const request = store.get(key);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = (event) => reject(event.target.error);
-            }).catch(reject);
-        });
-    },
-    set(storeName, key, value) {
-        return new Promise((resolve, reject) => {
-            this.init(DB_NAME, storeName).then(db => {
-                const transaction = db.transaction([storeName], "readwrite");
-                const store = transaction.objectStore(storeName);
-                const request = store.put(value, key);
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = (event) => reject(event.target.error);
-            }).catch(reject);
-        });
-    },
-    clear(storeName) {
-        return new Promise((resolve, reject) => {
-            this.init(DB_NAME, storeName).then(db => {
-                const transaction = db.transaction([storeName], "readwrite");
-                const store = transaction.objectStore(storeName);
-                const request = store.clear();
-                request.onsuccess = () => resolve();
-                request.onerror = (event) => reject(event.target.error);
-            }).catch(reject);
-        });
-    }
-};
-
-// =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, userRoutePolyline = null, watchId = null;
-const DB_NAME = 'TileDatabase';
-const TILE_STORE_NAME = 'tiles';
+const TILE_CACHE_NAME_PERSISTENT = 'communes-tile-persistent-v1';
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -94,7 +36,6 @@ async function initializeApp() {
     const searchSection = document.getElementById('search-section');
     loadState();
     try {
-        await idb.init(DB_NAME, TILE_STORE_NAME);
         const response = await fetch('./communes.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
@@ -404,7 +345,7 @@ async function downloadOfflineMap() {
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
 
-    if (!confirm("Ceci va télécharger un volume important de données pour la carte (jusqu'à 1 Go). Êtes-vous sûr de vouloir continuer (recommandé en Wi-Fi) ?")) {
+    if (!confirm("Cette opération va télécharger environ 200-300 Mo de données. Continuer (recommandé en Wi-Fi) ?")) {
         return;
     }
 
@@ -413,7 +354,7 @@ async function downloadOfflineMap() {
     progressContainer.style.display = 'block';
 
     const bounds = { minLat: 42.1, maxLat: 51.2, minLon: -5.3, maxLon: 8.4 };
-    const zoomLevels = [5, 6, 7, 8, 9, 10, 11, 12, 13];
+    const zoomLevels = [5, 6, 7, 8, 9, 10, 11, 12]; // ZOOM MAX 12
     const tilesToFetch = [];
     zoomLevels.forEach(zoom => {
         const topLeft = latLonToTileCoords(bounds.maxLat, bounds.minLon, zoom);
@@ -428,17 +369,18 @@ async function downloadOfflineMap() {
     let downloadedCount = 0;
     progressText.textContent = `Vérification de 0 / ${totalTiles} tuiles...`;
     
-    const chunkSize = 50;
+    const tileCache = await caches.open(TILE_CACHE_NAME_PERSISTENT);
+
+    const chunkSize = 100;
     for (let i = 0; i < tilesToFetch.length; i += chunkSize) {
         const chunk = tilesToFetch.slice(i, i + chunkSize);
         await Promise.all(chunk.map(async (url) => {
-            const existing = await idb.get(TILE_STORE_NAME, url);
-            if (!existing) {
+            const cachedResponse = await tileCache.match(url);
+            if (!cachedResponse) {
                 try {
                     const response = await fetch(url);
                     if (response.ok) {
-                        const blob = await response.blob();
-                        await idb.set(TILE_STORE_NAME, url, blob);
+                        await tileCache.put(url, response);
                     }
                 } catch (error) {
                     console.warn(`Impossible de télécharger la tuile ${url}:`, error);
@@ -451,7 +393,7 @@ async function downloadOfflineMap() {
         progressBar.value = percent;
         progressText.textContent = `Vérification/Téléchargement: ${downloadedCount} / ${totalTiles} tuiles...`;
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     progressText.textContent = 'Carte hors ligne téléchargée !';
@@ -461,7 +403,7 @@ async function downloadOfflineMap() {
 }
 
 async function deleteOfflineMap() {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer toutes les données de la carte hors ligne ?")) {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer les données de la carte hors ligne ?")) {
         return;
     }
     const progressContainer = document.getElementById('download-progress');
@@ -472,8 +414,8 @@ async function deleteOfflineMap() {
     progressText.textContent = 'Suppression des données de la carte...';
     progressBar.value = 0;
 
-    await idb.clear(TILE_STORE_NAME);
-
+    await caches.delete(TILE_CACHE_NAME_PERSISTENT);
+    
     progressText.textContent = 'Données supprimées.';
     progressBar.value = 100;
     setTimeout(() => {
@@ -494,7 +436,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v3.2';
+        versionDisplay.innerText = 'v4.0';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
