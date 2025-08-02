@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v63'; // Version pour le fix du marqueur GPS
+const APP_CACHE_NAME = 'communes-app-cache-v64'; // Version pour route LFTW
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
