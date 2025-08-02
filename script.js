@@ -46,6 +46,9 @@ async function initializeApp() {
         setupEventListeners();
         if (localStorage.getItem('liveGpsActive') === 'true') {
             toggleLiveGps();
+        } else {
+            // Affiche la position une seule fois au démarrage si le suivi n'est pas actif
+            navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
         }
         const savedCommuneJSON = localStorage.getItem('currentCommune');
         if (savedCommuneJSON) {
@@ -142,6 +145,8 @@ function setupEventListeners() {
         if (searchToggleControl) {
             searchToggleControl.updateDisplay(null);
         }
+        // Affiche la position actuelle même après avoir effacé
+        navigator.geolocation.getCurrentPosition(updateUserPosition);
         map.setView([46.6, 2.2], 5.5);
     });
 
@@ -219,8 +224,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
 
-    userMarker = null;
-    userRoutePolyline = null;
+    // On force une mise à jour de la position de l'utilisateur pour afficher la route
     navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
 
     if (shouldFitBounds) {
@@ -246,6 +250,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     else { labelText = `${Math.round(distance)} Nm`; }
     const polyline = L.polyline([startLatLng, endLatLng], { color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)', weight: 3, opacity: 0.8, dashArray: isUser ? '5, 10' : '' }).addTo(routesLayer);
     if (isUser) {
+        if (userRoutePolyline) routesLayer.removeLayer(userRoutePolyline); // On supprime l'ancienne route avant d'en créer une nouvelle
         userRoutePolyline = polyline;
         userRoutePolyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci) {
@@ -325,7 +330,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v4.0';
+        versionDisplay.innerText = 'v4.1';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
