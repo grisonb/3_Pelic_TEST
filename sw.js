@@ -1,8 +1,8 @@
-// --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
+// --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v61'; // Version stable 4.0
+const APP_CACHE_NAME = 'communes-app-cache-v62'; // Version pour le fix GPS live
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
-const TILE_CACHE_NAME = 'communes-tile-cache-v1'; // Pour le cache de navigation normal
+const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
 const APP_SHELL_URLS = [
     './',
@@ -44,7 +44,6 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const requestUrl = new URL(event.request.url);
 
-    // Stratégie "Stale-While-Revalidate" pour les tuiles
     if (requestUrl.hostname.includes('tile.openstreetmap.org')) {
         event.respondWith(
             caches.open(TILE_CACHE_NAME).then(cache => {
@@ -62,7 +61,6 @@ self.addEventListener('fetch', event => {
         return;
     }
     
-    // Stratégie "Cache First" pour le reste de l'application
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
