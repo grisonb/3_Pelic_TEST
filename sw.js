@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v62'; // Version pour le fix GPS live
+const APP_CACHE_NAME = 'communes-app-cache-v63'; // Version pour le fix du marqueur GPS
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
