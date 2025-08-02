@@ -13,7 +13,8 @@ let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = 
 let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
-let userToTargetLayer = null;
+let userToTargetLayer = null, lftwRouteLayer = null;
+let showLftwRoute = true;
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -35,6 +36,8 @@ async function initializeApp() {
     const statusMessage = document.getElementById('status-message');
     const searchSection = document.getElementById('search-section');
     loadState();
+    const savedLftwState = localStorage.getItem('showLftwRoute');
+    showLftwRoute = savedLftwState === null ? true : (savedLftwState === 'true');
     try {
         const response = await fetch('./communes.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -70,6 +73,7 @@ function initMap() {
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
     userToTargetLayer = L.layerGroup().addTo(map);
+    lftwRouteLayer = L.layerGroup().addTo(map);
     drawPermanentAirportMarkers();
     map.on('contextmenu', (e) => {
         L.DomEvent.preventDefault(e.originalEvent);
@@ -89,6 +93,7 @@ function setupEventListeners() {
     const resultsList = document.getElementById('results-list');
     const gpsFeuButton = document.getElementById('gps-feu-button');
     const liveGpsButton = document.getElementById('live-gps-button');
+    const lftwRouteButton = document.getElementById('lftw-route-button');
 
     searchInput.addEventListener('input', () => {
         const rawSearch = searchInput.value;
@@ -141,6 +146,7 @@ function setupEventListeners() {
         clearSearchBtn.style.display = 'none';
         routesLayer.clearLayers();
         userToTargetLayer.clearLayers();
+        lftwRouteLayer.clearLayers();
         drawPermanentAirportMarkers();
         currentCommune = null;
         localStorage.removeItem('currentCommune');
@@ -150,11 +156,9 @@ function setupEventListeners() {
         navigator.geolocation.getCurrentPosition(updateUserPosition);
         map.setView([46.6, 2.2], 5.5);
     });
-
     airportCountInput.addEventListener('input', () => {
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
-
     gpsFeuButton.addEventListener('click', () => {
         if (!navigator.geolocation) {
             alert("La géolocalisation n'est pas supportée par votre navigateur.");
@@ -176,6 +180,8 @@ function setupEventListeners() {
     });
     
     liveGpsButton.addEventListener('click', toggleLiveGps);
+    lftwRouteButton.addEventListener('click', toggleLftwRoute);
+    updateLftwButtonState();
 }
 
 function displayResults(results) {
@@ -225,7 +231,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
-
+    
+    drawLftwRoute();
     navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
 
     if (shouldFitBounds) {
@@ -243,20 +250,29 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing } = options;
+    const { oaci, isUser, magneticBearing, color = 'var(--primary-color)', dashArray = '' } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     let labelText;
     if (isUser) { labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`; }
+    else if (oaci && oaci.startsWith('LFTW')) { labelText = oaci; }
     else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
     else { labelText = `${Math.round(distance)} Nm`; }
     
-    const layer = isUser ? userToTargetLayer : routesLayer;
-    const polyline = L.polyline([startLatLng, endLatLng], { color: isUser ? 'var(--secondary-color)' : 'var(--primary-color)', weight: 3, opacity: 0.8, dashArray: isUser ? '5, 10' : '' }).addTo(layer);
-    
+    let layer = routesLayer;
+    if (isUser) layer = userToTargetLayer;
+    if (oaci && oaci.startsWith('LFTW')) layer = lftwRouteLayer;
+
+    const polyline = L.polyline([startLatLng, endLatLng], { 
+        color: isUser ? 'var(--secondary-color)' : color, 
+        weight: 3, 
+        opacity: 0.8, 
+        dashArray: isUser ? '5, 10' : dashArray 
+    }).addTo(layer);
+
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci) {
-        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(routesLayer);
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
 
@@ -317,6 +333,42 @@ function updateUserPosition(pos) {
     }
 }
 
+function toggleLftwRoute() {
+    showLftwRoute = !showLftwRoute;
+    localStorage.setItem('showLftwRoute', showLftwRoute);
+    updateLftwButtonState();
+    drawLftwRoute();
+}
+
+function updateLftwButtonState() {
+    const lftwRouteButton = document.getElementById('lftw-route-button');
+    if (showLftwRoute) {
+        lftwRouteButton.classList.add('active');
+    } else {
+        lftwRouteButton.classList.remove('active');
+    }
+}
+
+function drawLftwRoute() {
+    lftwRouteLayer.clearLayers();
+    if (!showLftwRoute || !currentCommune) {
+        return;
+    }
+    const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
+    if (!lftwAirport) return;
+    const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
+    const { lat: lftwLat, lon: lftwLon } = lftwAirport;
+    const trueBearing = calculateBearing(lat, lon, lftwLat, lftwLon);
+    const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
+    const distanceNm = Math.round(calculateDistanceInNm(lat, lon, lftwLat, lftwLon));
+    
+    drawRoute([lat, lon], [lftwLat, lftwLon], {
+        oaci: `LFTW: ${Math.round(magneticBearing)}° / ${distanceNm} Nm`,
+        color: 'var(--success-color)',
+        dashArray: '5, 10'
+    });
+}
+
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
@@ -329,7 +381,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v4.2';
+        versionDisplay.innerText = 'v4.3';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
