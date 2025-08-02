@@ -1,8 +1,8 @@
-// --- FICHIER sw.js ---
+// --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v61'; // Version pour DL allégé
+const APP_CACHE_NAME = 'communes-app-cache-v61'; // Version stable 4.0
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
-const TILE_CACHE_NAME_PERSISTENT = 'communes-tile-persistent-v1';
+const TILE_CACHE_NAME = 'communes-tile-cache-v1'; // Pour le cache de navigation normal
 
 const APP_SHELL_URLS = [
     './',
@@ -33,8 +33,7 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => Promise.all(
             cacheNames.map(cacheName => {
-                // On ne supprime que les vieux caches de l'app et des données
-                if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME_PERSISTENT) {
+                if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME) {
                     return caches.delete(cacheName);
                 }
             })
@@ -45,20 +44,25 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const requestUrl = new URL(event.request.url);
 
+    // Stratégie "Stale-While-Revalidate" pour les tuiles
     if (requestUrl.hostname.includes('tile.openstreetmap.org')) {
         event.respondWith(
-            caches.open(TILE_CACHE_NAME_PERSISTENT).then(cache => {
+            caches.open(TILE_CACHE_NAME).then(cache => {
                 return cache.match(event.request).then(cachedResponse => {
-                    // Si la tuile est dans le cache, on la sert.
-                    // Sinon, on va sur le réseau (si connecté).
-                    return cachedResponse || fetch(event.request);
+                    const fetchPromise = fetch(event.request).then(networkResponse => {
+                        if (networkResponse.ok) {
+                            cache.put(event.request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    });
+                    return cachedResponse || fetchPromise;
                 });
             })
         );
         return;
     }
     
-    // Stratégie pour le reste de l'application
+    // Stratégie "Cache First" pour le reste de l'application
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
