@@ -13,7 +13,6 @@ let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = 
 let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, userRoutePolyline = null, watchId = null;
-const TILE_CACHE_NAME_PERSISTENT = 'communes-tile-persistent-v1';
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -45,7 +44,6 @@ async function initializeApp() {
         searchSection.style.display = 'block';
         initMap();
         setupEventListeners();
-        updateOfflineButtonsState();
         if (localStorage.getItem('liveGpsActive') === 'true') {
             toggleLiveGps();
         }
@@ -86,8 +84,6 @@ function setupEventListeners() {
     const airportCountInput = document.getElementById('airport-count');
     const resultsList = document.getElementById('results-list');
     const gpsFeuButton = document.getElementById('gps-feu-button');
-    const downloadMapButton = document.getElementById('download-map-button');
-    const deleteMapButton = document.getElementById('delete-map-button');
     const liveGpsButton = document.getElementById('live-gps-button');
 
     searchInput.addEventListener('input', () => {
@@ -173,8 +169,6 @@ function setupEventListeners() {
         );
     });
     
-    downloadMapButton.addEventListener('click', downloadOfflineMap);
-    deleteMapButton.addEventListener('click', deleteOfflineMap);
     liveGpsButton.addEventListener('click', toggleLiveGps);
 }
 
@@ -319,113 +313,6 @@ function updateUserPosition(pos) {
     }
 }
 
-async function updateOfflineButtonsState() {
-    const downloadButton = document.getElementById('download-map-button');
-    const deleteButton = document.getElementById('delete-map-button');
-    if (localStorage.getItem('offlineMapDownloaded') === 'true') {
-        downloadButton.textContent = "Mettre à jour la carte hors ligne";
-        deleteButton.style.display = 'block';
-    } else {
-        downloadButton.textContent = "Télécharger la carte pour usage hors ligne";
-        deleteButton.style.display = 'none';
-    }
-}
-
-function latLonToTileCoords(lat, lon, zoom) {
-    const latRad = toRad(lat);
-    const n = Math.pow(2, zoom);
-    const xtile = Math.floor(n * ((lon + 180) / 360));
-    const ytile = Math.floor(n * (1 - (Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI)) / 2);
-    return { x: xtile, y: ytile };
-}
-
-async function downloadOfflineMap() {
-    const downloadButton = document.getElementById('download-map-button');
-    const progressContainer = document.getElementById('download-progress');
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-
-    if (!confirm("Cette opération va télécharger environ 200-300 Mo de données. Continuer (recommandé en Wi-Fi) ?")) {
-        return;
-    }
-
-    downloadButton.disabled = true;
-    downloadButton.textContent = "Téléchargement en cours...";
-    progressContainer.style.display = 'block';
-
-    const bounds = { minLat: 42.1, maxLat: 51.2, minLon: -5.3, maxLon: 8.4 };
-    const zoomLevels = [5, 6, 7, 8, 9, 10, 11, 12]; // ZOOM MAX 12
-    const tilesToFetch = [];
-    zoomLevels.forEach(zoom => {
-        const topLeft = latLonToTileCoords(bounds.maxLat, bounds.minLon, zoom);
-        const bottomRight = latLonToTileCoords(bounds.minLat, bounds.maxLon, zoom);
-        for (let x = topLeft.x; x <= bottomRight.x; x++) {
-            for (let y = topLeft.y; y <= bottomRight.y; y++) {
-                tilesToFetch.push(`https://a.tile.openstreetmap.org/${zoom}/${x}/${y}.png`);
-            }
-        }
-    });
-    const totalTiles = tilesToFetch.length;
-    let downloadedCount = 0;
-    progressText.textContent = `Vérification de 0 / ${totalTiles} tuiles...`;
-    
-    const tileCache = await caches.open(TILE_CACHE_NAME_PERSISTENT);
-
-    const chunkSize = 100;
-    for (let i = 0; i < tilesToFetch.length; i += chunkSize) {
-        const chunk = tilesToFetch.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(async (url) => {
-            const cachedResponse = await tileCache.match(url);
-            if (!cachedResponse) {
-                try {
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        await tileCache.put(url, response);
-                    }
-                } catch (error) {
-                    console.warn(`Impossible de télécharger la tuile ${url}:`, error);
-                }
-            }
-        }));
-
-        downloadedCount += chunk.length;
-        const percent = Math.round((downloadedCount / totalTiles) * 100);
-        progressBar.value = percent;
-        progressText.textContent = `Vérification/Téléchargement: ${downloadedCount} / ${totalTiles} tuiles...`;
-
-        await new Promise(resolve => setTimeout(resolve, 50));
-    }
-
-    progressText.textContent = 'Carte hors ligne téléchargée !';
-    downloadButton.disabled = false;
-    localStorage.setItem('offlineMapDownloaded', 'true');
-    updateOfflineButtonsState();
-}
-
-async function deleteOfflineMap() {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer les données de la carte hors ligne ?")) {
-        return;
-    }
-    const progressContainer = document.getElementById('download-progress');
-    const progressText = document.getElementById('progress-text');
-    const progressBar = document.getElementById('progress-bar');
-
-    progressContainer.style.display = 'block';
-    progressText.textContent = 'Suppression des données de la carte...';
-    progressBar.value = 0;
-
-    await caches.delete(TILE_CACHE_NAME_PERSISTENT);
-    
-    progressText.textContent = 'Données supprimées.';
-    progressBar.value = 100;
-    setTimeout(() => {
-        progressContainer.style.display = 'none';
-    }, 2000);
-    
-    localStorage.removeItem('offlineMapDownloaded');
-    updateOfflineButtonsState();
-}
-
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
@@ -435,6 +322,8 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
+        this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
+        this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         versionDisplay.innerText = 'v4.0';
         L.DomEvent.disableClickPropagation(mainContainer);
@@ -446,7 +335,7 @@ const SearchToggleControl = L.Control.extend({
                 this.communeDisplay.style.display = 'none';
             } else {
                 uiOverlay.style.display = 'none';
-                if (this.communeDisplay.firstChild && this.communeDisplay.firstChild.textContent) {
+                if (this.communeNameSpan.textContent) {
                     this.communeDisplay.style.display = 'flex';
                 }
             }
@@ -456,10 +345,24 @@ const SearchToggleControl = L.Control.extend({
     updateDisplay: function (commune) {
         if (!commune) {
             this.communeDisplay.style.display = 'none';
+            this.communeNameSpan.textContent = '';
+            this.sunsetDisplay.textContent = '';
             return;
         }
+
         this.communeDisplay.style.display = 'flex';
-        this.communeDisplay.firstChild.textContent = commune.nom_standard;
+        this.communeNameSpan.textContent = commune.nom_standard;
+        
+        if (typeof SunCalc !== 'undefined') {
+            try {
+                const now = new Date();
+                const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
+                const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+                this.sunsetDisplay.innerHTML = `🌅 CS <b>${sunsetString}</b>`;
+            } catch (e) {
+                this.sunsetDisplay.innerHTML = '';
+            }
+        }
     }
 });
 
