@@ -1,9 +1,9 @@
-// --- FICHIER sw.js AVEC TÉLÉCHARGEMENT EN ARRIÈRE-PLAN ---
+// --- FICHIER sw.js AVEC LE FIX POUR LE CACHE DE DONNÉES ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v65'; // Version 5.0
+const APP_CACHE_NAME = 'communes-app-cache-v66'; // Version 5.1
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
-const TILE_CACHE_NAME_DYNAMIC = 'communes-tile-dynamic-v1'; // Pour la navigation normale
-const TILE_CACHE_NAME_OFFLINE = 'communes-tile-offline-v1'; // Pour les tuiles téléchargées
+const TILE_CACHE_NAME_DYNAMIC = 'communes-tile-dynamic-v1';
+const TILE_CACHE_NAME_OFFLINE = 'communes-tile-offline-v1';
 
 const APP_SHELL_URLS = [
     './', './index.html', './style.css', './script.js',
@@ -25,7 +25,9 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => Promise.all(
             cacheNames.map(cacheName => {
+                // CORRECTION : DATA_CACHE_NAME est maintenant dans la liste
                 if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME_DYNAMIC && cacheName !== TILE_CACHE_NAME_OFFLINE) {
+                    console.log(`[SW] Suppression de l'ancien cache: ${cacheName}`);
                     return caches.delete(cacheName);
                 }
             })
@@ -120,7 +122,7 @@ async function downloadTilesInBackground(client) {
         }));
         downloaded += chunk.length;
         client.postMessage({ type: 'download_progress', payload: { downloaded, total } });
-        await new Promise(r => setTimeout(r, 100)); // Pause
+        await new Promise(r => setTimeout(r, 100));
     }
 
     client.postMessage({ type: 'download_complete' });
