@@ -1,18 +1,24 @@
-// --- FICHIER sw.js AVEC LE FIX POUR LE CACHE DE DONNÉES ---
+// --- FICHIER sw.js COMPLET ET CORRIGÉ ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v66'; // Version 5.1
+const APP_CACHE_NAME = 'communes-app-cache-v67'; // Version pour le fix index.html
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME_DYNAMIC = 'communes-tile-dynamic-v1';
 const TILE_CACHE_NAME_OFFLINE = 'communes-tile-offline-v1';
 
 const APP_SHELL_URLS = [
-    './', './index.html', './style.css', './script.js',
-    './leaflet.min.js', './leaflet.css', './manifest.json',
+    './',
+    './index.html',
+    './style.css',
+    './script.js',
+    './leaflet.min.js',
+    './leaflet.css',
+    './manifest.json',
     './suncalc.js'
 ];
 const DATA_URLS = ['./communes.json'];
 
 self.addEventListener('install', event => {
+    console.log(`[SW] Installation ${APP_CACHE_NAME}`);
     event.waitUntil(
         Promise.all([
             caches.open(APP_CACHE_NAME).then(cache => cache.addAll(APP_SHELL_URLS)),
@@ -25,7 +31,7 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => Promise.all(
             cacheNames.map(cacheName => {
-                // CORRECTION : DATA_CACHE_NAME est maintenant dans la liste
+                // On conserve les caches de l'app, des données, et les deux caches de tuiles
                 if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME_DYNAMIC && cacheName !== TILE_CACHE_NAME_OFFLINE) {
                     console.log(`[SW] Suppression de l'ancien cache: ${cacheName}`);
                     return caches.delete(cacheName);
@@ -38,6 +44,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const requestUrl = new URL(event.request.url);
 
+    // Stratégie pour les tuiles : d'abord le cache hors ligne, puis le cache dynamique, puis le réseau
     if (requestUrl.hostname.includes('tile.openstreetmap.org')) {
         event.respondWith(
             caches.match(event.request, { cacheName: TILE_CACHE_NAME_OFFLINE }).then(response => {
@@ -57,6 +64,7 @@ self.addEventListener('fetch', event => {
         return;
     }
     
+    // Stratégie "Cache First" pour le reste de l'application
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
             return cachedResponse || fetch(event.request).catch(() => {
@@ -117,15 +125,19 @@ async function downloadTilesInBackground(client) {
                     if (response.ok) {
                         await tileCache.put(url, response);
                     }
-                } catch (e) { console.error(e); }
+                } catch (e) { console.error(`[SW] Échec du téléchargement de la tuile: ${url}`, e); }
             }
         }));
         downloaded += chunk.length;
-        client.postMessage({ type: 'download_progress', payload: { downloaded, total } });
+        if (client) {
+            client.postMessage({ type: 'download_progress', payload: { downloaded, total } });
+        }
         await new Promise(r => setTimeout(r, 100));
     }
 
-    client.postMessage({ type: 'download_complete' });
+    if (client) {
+        client.postMessage({ type: 'download_complete' });
+    }
     console.log('[SW] Téléchargement des tuiles terminé.');
 }
 
