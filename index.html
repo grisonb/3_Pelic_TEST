@@ -65,6 +65,16 @@
                 </button>
             </div>
 
+            <!-- SECTION DE TÉLÉCHARGEMENT QUI MANQUAIT -->
+            <div id="offline-map-section">
+                <button id="download-map-button">Télécharger la carte pour usage hors ligne</button>
+                <button id="delete-map-button" class="delete-button" style="display: none;">Supprimer la carte hors ligne</button>
+                <div id="download-progress" style="display: none;">
+                    <span id="progress-text"></span>
+                    <progress id="progress-bar" value="0" max="100"></progress>
+                </div>
+            </div>
+            
             <div id="offline-status"></div>
         </div>
     </div>
