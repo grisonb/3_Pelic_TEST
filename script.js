@@ -15,7 +15,7 @@ const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
 let showLftwRoute = true;
-const TILE_CACHE_NAME_OFFLINE = 'communes-tile-offline-v1'; // Le cache pour les tuiles téléchargées
+const TILE_CACHE_NAME_OFFLINE = 'communes-tile-offline-v1';
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -94,22 +94,21 @@ function setupEventListeners() {
     const airportCountInput = document.getElementById('airport-count');
     const resultsList = document.getElementById('results-list');
     const gpsFeuButton = document.getElementById('gps-feu-button');
-    const downloadMapButton = document.getElementById('download-map-button');
-    const deleteMapButton = document.getElementById('delete-map-button');
     const liveGpsButton = document.getElementById('live-gps-button');
     const lftwRouteButton = document.getElementById('lftw-route-button');
+    const downloadMapButton = document.getElementById('download-map-button');
+    const deleteMapButton = document.getElementById('delete-map-button');
 
     searchInput.addEventListener('input', () => { /* ... */ });
     clearSearchBtn.addEventListener('click', () => { /* ... */ });
     airportCountInput.addEventListener('input', () => { if (currentCommune) displayCommuneDetails(currentCommune, false); });
     gpsFeuButton.addEventListener('click', () => { /* ... */ });
-    downloadMapButton.addEventListener('click', downloadOfflineMap);
-    deleteMapButton.addEventListener('click', deleteOfflineMap);
     liveGpsButton.addEventListener('click', toggleLiveGps);
     lftwRouteButton.addEventListener('click', toggleLftwRoute);
     updateLftwButtonState();
+    downloadMapButton.addEventListener('click', downloadOfflineMap);
+    deleteMapButton.addEventListener('click', deleteOfflineMap);
 
-    // Écoute les messages venant du Service Worker
     navigator.serviceWorker.addEventListener('message', event => {
         const { type, payload } = event.data;
         if (type === 'download_progress') {
@@ -126,76 +125,4 @@ function setupEventListeners() {
     });
 }
 
-// ... (fonctions de la v4.3 jusqu'à la gestion de la carte)
-
-// =========================================================================
-// GESTION CARTE HORS LIGNE (LOGIQUE FIABILISÉE AVEC MESSAGES SW)
-// =========================================================================
-function updateOfflineButtonsState() {
-    const downloadButton = document.getElementById('download-map-button');
-    const deleteButton = document.getElementById('delete-map-button');
-    if (localStorage.getItem('offlineMapDownloaded') === 'true') {
-        downloadButton.textContent = "Mettre à jour la carte hors ligne";
-        deleteButton.style.display = 'block';
-    } else {
-        downloadButton.textContent = "Télécharger la carte pour usage hors ligne";
-        deleteButton.style.display = 'none';
-    }
-}
-
-function latLonToTileCoords(lat, lon, zoom) {
-    const latRad = toRad(lat);
-    const n = Math.pow(2, zoom);
-    const xtile = Math.floor(n * ((lon + 180) / 360));
-    const ytile = Math.floor(n * (1 - (Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI)) / 2);
-    return { x: xtile, y: ytile };
-}
-
-function downloadOfflineMap() {
-    if (!navigator.serviceWorker.controller) {
-        alert("Service Worker non actif. Veuillez recharger la page et réessayer.");
-        return;
-    }
-
-    if (!confirm("Ceci va télécharger un volume important de données pour la carte (jusqu'à 1 Go) en arrière-plan. Êtes-vous sûr de vouloir continuer (recommandé en Wi-Fi) ?")) {
-        return;
-    }
-
-    const downloadButton = document.getElementById('download-map-button');
-    const progressContainer = document.getElementById('download-progress');
-    
-    downloadButton.disabled = true;
-    downloadButton.textContent = "Préparation...";
-    progressContainer.style.display = 'block';
-
-    // Envoyer le message au Service Worker pour qu'IL fasse le travail
-    navigator.serviceWorker.controller.postMessage({ type: 'download_tiles' });
-}
-
-async function deleteOfflineMap() {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer toutes les données de la carte hors ligne ?")) {
-        return;
-    }
-    if (!navigator.serviceWorker.controller) {
-        alert("Service Worker non actif. Veuillez recharger la page et réessayer.");
-        return;
-    }
-    
-    // Envoyer le message au Service Worker pour qu'IL fasse le travail
-    navigator.serviceWorker.controller.postMessage({ type: 'delete_tiles' });
-    
-    localStorage.removeItem('offlineMapDownloaded');
-    updateOfflineButtonsState();
-    alert("La suppression des tuiles a commencé en arrière-plan.");
-}
-
-const SearchToggleControl = L.Control.extend({
-    // ...
-    onAdd: function (map) {
-        // ...
-        versionDisplay.innerText = 'v5.0';
-        // ...
-    }
-});
-
-// ... (coller le reste des fonctions de la v4.3 ici)
+// ... (le reste du fichier est identique à la v4.3)
