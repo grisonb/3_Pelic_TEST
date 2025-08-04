@@ -240,10 +240,12 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     if (searchToggleControl) {
         searchToggleControl.updateDisplay(commune);
     }
+
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
     document.getElementById('clear-search').style.display = 'block';
+
     const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`;
     
     const allPoints = [[lat, lon]];
@@ -279,7 +281,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing } = options;
+    const { oaci, isUser, magneticBearing, isLftwRoute } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     let labelText;
 
@@ -292,7 +294,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         color = 'var(--secondary-color)';
         dashArray = '5, 10';
         layer = userToTargetLayer;
-    } else if (options.isLftwRoute) {
+    } else if (isLftwRoute) {
         labelText = `LFTW: ${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
         color = 'var(--success-color)';
         dashArray = '5, 10';
@@ -303,16 +305,11 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         labelText = `${Math.round(distance)} Nm`;
     }
     
-    const polyline = L.polyline([startLatLng, endLatLng], { 
-        color, 
-        weight: 3, 
-        opacity: 0.8, 
-        dashArray
-    }).addTo(layer);
+    const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
 
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
-    } else if (oaci || options.isLftwRoute) {
+    } else if (oaci || isLftwRoute) {
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
@@ -395,7 +392,7 @@ function toggleLftwRoute() {
     showLftwRoute = !showLftwRoute;
     localStorage.setItem('showLftwRoute', showLftwRoute);
     updateLftwButtonState();
-    if(currentCommune) {
+    if (currentCommune) {
         displayCommuneDetails(currentCommune, false);
     }
 }
@@ -557,7 +554,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v4.9';
+        versionDisplay.innerText = 'v5.0';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
