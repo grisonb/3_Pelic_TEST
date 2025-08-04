@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v69'; // Version pour le téléchargement par ZIP
+const APP_CACHE_NAME = 'communes-app-cache-v70'; // Version pour le téléchargement par ZIP
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_DYNAMIC = 'communes-tile-dynamic-v1';
 const DB_NAME = 'TileDatabase';
