@@ -1,4 +1,6 @@
-const APP_CACHE_NAME = 'communes-app-cache-v71'; // Version stable de secours
+// --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
+
+const APP_CACHE_NAME = 'communes-app-cache-v73'; // Version GAAR
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
@@ -18,6 +20,7 @@ const DATA_URLS = [
 ];
 
 self.addEventListener('install', event => {
+    console.log(`[SW] Installation ${APP_CACHE_NAME}`);
     event.waitUntil(
         Promise.all([
             caches.open(APP_CACHE_NAME).then(cache => cache.addAll(APP_SHELL_URLS)),
@@ -61,7 +64,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
-                return cachedResponse || fetch(event.request).catch(() => {
+                return cachedResponse || fetch(event.request).catch(error => {
                     if (event.request.mode === 'navigate') {
                         return caches.match('./index.html');
                     }
