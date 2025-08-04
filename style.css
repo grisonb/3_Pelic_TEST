@@ -391,3 +391,19 @@ html, body {
     background-color: transparent;
     border: 1px solid var(--secondary-color);
 }
+/* --- AJOUTEZ CE BLOC À LA FIN DE style.css --- */
+
+#gaar-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+#gaar-controls .delete-button {
+    margin-top: 0;
+}
+#edit-circuits-button.active {
+    background-color: var(--secondary-color);
+    color: white;
+    border-color: var(--secondary-color);
+}
