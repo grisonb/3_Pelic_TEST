@@ -1,9 +1,6 @@
-// --- FICHIER sw.js ---
-
-const APP_CACHE_NAME = 'communes-app-cache-v72'; // Version avec JSZip depuis CDN
+const APP_CACHE_NAME = 'communes-app-cache-v70'; // Version stable de secours
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
-const TILE_CACHE_DYNAMIC = 'communes-tile-dynamic-v1';
-const TILE_CACHE_NAME_OFFLINE = 'communes-tile-offline-v1';
+const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
 const APP_SHELL_URLS = [
     './',
@@ -14,7 +11,6 @@ const APP_SHELL_URLS = [
     './leaflet.css',
     './manifest.json',
     './suncalc.js'
-    // jszip.min.js n'est plus dans cette liste
 ];
 
 const DATA_URLS = [
@@ -34,7 +30,7 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => Promise.all(
             cacheNames.map(cacheName => {
-                if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME_DYNAMIC && cacheName !== TILE_CACHE_NAME_OFFLINE) {
+                if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME) {
                     return caches.delete(cacheName);
                 }
             })
@@ -42,4 +38,34 @@ self.addEventListener('activate', event => {
     );
 });
 
-// ... (le reste du fichier sw.js est identique à la v6.0)
+self.addEventListener('fetch', event => {
+    const requestUrl = new URL(event.request.url);
+
+    if (requestUrl.hostname.includes('tile.openstreetmap.org')) {
+        event.respondWith(
+            caches.open(TILE_CACHE_NAME).then(cache => {
+                return cache.match(event.request).then(cachedResponse => {
+                    const fetchPromise = fetch(event.request).then(networkResponse => {
+                        if (networkResponse.ok) {
+                            cache.put(event.request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    });
+                    return cachedResponse || fetchPromise;
+                });
+            })
+        );
+        return;
+    }
+    
+    event.respondWith(
+        caches.match(event.request)
+            .then(cachedResponse => {
+                return cachedResponse || fetch(event.request).catch(() => {
+                    if (event.request.mode === 'navigate') {
+                        return caches.match('./index.html');
+                    }
+                });
+            })
+    );
+});
