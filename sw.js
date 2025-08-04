@@ -1,6 +1,6 @@
 // --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v75'; // Version GAAR
+const APP_CACHE_NAME = 'communes-app-cache-v76'; // Version GAAR
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
