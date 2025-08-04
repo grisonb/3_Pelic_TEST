@@ -279,21 +279,30 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing, color = 'var(--primary-color)', dashArray = '' } = options;
+    const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     let labelText;
-    if (isUser) { labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`; }
-    else if (options.isLftwRoute) { labelText = `LFTW: ${Math.round(magneticBearing)}° / ${distance} Nm`; }
-    else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
-    else { labelText = `${Math.round(distance)} Nm`; }
-    
+
+    let color = 'var(--primary-color)';
+    let dashArray = '';
     let layer = routesLayer;
+
     if (isUser) {
+        labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
+        color = 'var(--secondary-color)';
+        dashArray = '5, 10';
         layer = userToTargetLayer;
     } else if (options.isLftwRoute) {
+        labelText = `LFTW: ${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
+        color = 'var(--success-color)';
+        dashArray = '5, 10';
         layer = lftwRouteLayer;
+    } else if (oaci) {
+        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
+    } else {
+        labelText = `${Math.round(distance)} Nm`;
     }
-
+    
     const polyline = L.polyline([startLatLng, endLatLng], { 
         color, 
         weight: 3, 
@@ -406,11 +415,7 @@ function drawLftwRoute() {
     const trueBearing = calculateBearing(lat, lon, lftwLat, lftwLon);
     const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
     
-    drawRoute([lat, lon], [lftwLat, lftwLon], {
-        isLftwRoute: true,
-        magneticBearing: magneticBearing,
-        oaci: `LFTW` // Juste l'OACI pour le tooltip
-    });
+    drawRoute([lat, lon], [lftwLat, lftwLon], { isLftwRoute: true, magneticBearing: magneticBearing });
 }
 
 function toggleGaarVisibility() {
