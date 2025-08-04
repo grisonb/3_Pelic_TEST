@@ -287,14 +287,18 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
     else { labelText = `${Math.round(distance)} Nm`; }
     
-    let layer = isUser ? userToTargetLayer : routesLayer;
-    if (oaci && oaci.startsWith('LFTW')) layer = lftwRouteLayer;
+    let layer = routesLayer;
+    if (isUser) {
+        layer = userToTargetLayer;
+    } else if (oaci && oaci.startsWith('LFTW:')) {
+        layer = lftwRouteLayer;
+    }
 
     const polyline = L.polyline([startLatLng, endLatLng], { 
-        color: isUser ? 'var(--secondary-color)' : color, 
+        color, 
         weight: 3, 
         opacity: 0.8, 
-        dashArray: isUser ? '5, 10' : dashArray 
+        dashArray
     }).addTo(layer);
 
     if (isUser) {
@@ -365,13 +369,8 @@ function toggleLftwRoute() {
     showLftwRoute = !showLftwRoute;
     localStorage.setItem('showLftwRoute', showLftwRoute);
     updateLftwButtonState();
-    if(currentCommune) {
-        // Redessine juste la couche LFTW sans tout recharger
-        if(showLftwRoute) {
-            drawLftwRoute();
-        } else {
-            lftwRouteLayer.clearLayers();
-        }
+    if (currentCommune) {
+        displayCommuneDetails(currentCommune, false);
     }
 }
 
@@ -382,7 +381,9 @@ function updateLftwButtonState() {
 
 function drawLftwRoute() {
     lftwRouteLayer.clearLayers();
-    if (!showLftwRoute || !currentCommune) return;
+    if (!showLftwRoute || !currentCommune) {
+        return;
+    }
     const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
     if (!lftwAirport) return;
     const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
