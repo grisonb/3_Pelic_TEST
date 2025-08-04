@@ -279,27 +279,34 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing, color = 'var(--primary-color)', dashArray = '' } = options;
-    const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
-    let labelText;
-    if (isUser) { labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`; }
-    else if (oaci && oaci.startsWith('LFTW:')) { labelText = oaci; }
-    else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
-    else { labelText = `${Math.round(distance)} Nm`; }
-    
+    const { oaci, isUser, magneticBearing } = options;
+    let color = 'var(--primary-color)';
+    let dashArray = '';
     let layer = routesLayer;
+
     if (isUser) {
+        color = 'var(--secondary-color)';
+        dashArray = '5, 10';
         layer = userToTargetLayer;
-    } else if (oaci && oaci.startsWith('LFTW:')) {
+    } else if (options.isLftwRoute) {
+        color = 'var(--success-color)';
+        dashArray = '5, 10';
         layer = lftwRouteLayer;
     }
 
-    const polyline = L.polyline([startLatLng, endLatLng], { 
-        color, 
-        weight: 3, 
-        opacity: 0.8, 
-        dashArray
-    }).addTo(layer);
+    const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
+    let labelText;
+    if (isUser) {
+        labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
+    } else if (options.isLftwRoute) {
+        labelText = `LFTW: ${Math.round(magneticBearing)}° / ${distance} Nm`;
+    } else if (oaci) {
+        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
+    } else {
+        labelText = `${Math.round(distance)} Nm`;
+    }
+    
+    const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
 
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
@@ -380,23 +387,14 @@ function updateLftwButtonState() {
 }
 
 function drawLftwRoute() {
-    lftwRouteLayer.clearLayers();
-    if (!showLftwRoute || !currentCommune) {
-        return;
-    }
     const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
     if (!lftwAirport) return;
     const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
     const { lat: lftwLat, lon: lftwLon } = lftwAirport;
     const trueBearing = calculateBearing(lat, lon, lftwLat, lftwLon);
     const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
-    const distanceNm = Math.round(calculateDistanceInNm(lat, lon, lftwLat, lftwLon));
     
-    drawRoute([lat, lon], [lftwLat, lftwLon], {
-        oaci: `LFTW: ${Math.round(magneticBearing)}° / ${distanceNm} Nm`,
-        color: 'var(--success-color)',
-        dashArray: '5, 10'
-    });
+    drawRoute([lat, lon], [lftwLat, lftwLon], { isLftwRoute: true, magneticBearing: magneticBearing });
 }
 
 function toggleGaarVisibility() {
@@ -538,7 +536,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v4.6';
+        versionDisplay.innerText = 'v4.7';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
