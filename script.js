@@ -92,7 +92,7 @@ function initMap() {
     map.on('contextmenu', (e) => {
         if (isDrawingMode) return;
         L.DomEvent.preventDefault(e.originalEvent);
-        const pointName = 'Feu manuel';
+        const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Feu manuel';
         const manualCommune = { nom_standard: pointName, latitude_mairie: e.latlng.lat, longitude_mairie: e.latlng.lng, isManual: true };
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
@@ -185,7 +185,7 @@ function setupEventListeners() {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 const { latitude, longitude } = pos.coords;
-                const pointName = 'Feu GPS';
+                const pointName = findClosestCommuneName(latitude, longitude) || 'Feu GPS';
                 const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
                 currentCommune = gpsCommune;
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
@@ -279,38 +279,31 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing } = options;
-    let color = 'var(--primary-color)';
-    let dashArray = '';
+    const { oaci, isUser, magneticBearing, color = 'var(--primary-color)', dashArray = '' } = options;
+    const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
+    let labelText;
+    if (isUser) { labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`; }
+    else if (options.isLftwRoute) { labelText = `LFTW: ${Math.round(magneticBearing)}° / ${distance} Nm`; }
+    else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
+    else { labelText = `${Math.round(distance)} Nm`; }
+    
     let layer = routesLayer;
-
     if (isUser) {
-        color = 'var(--secondary-color)';
-        dashArray = '5, 10';
         layer = userToTargetLayer;
     } else if (options.isLftwRoute) {
-        color = 'var(--success-color)';
-        dashArray = '5, 10';
         layer = lftwRouteLayer;
     }
 
-    const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
-    let labelText;
-    if (isUser) {
-        labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
-    } else if (options.isLftwRoute) {
-        labelText = `LFTW: ${Math.round(magneticBearing)}° / ${distance} Nm`;
-    } else if (oaci) {
-        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
-    } else {
-        labelText = `${Math.round(distance)} Nm`;
-    }
-    
-    const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
+    const polyline = L.polyline([startLatLng, endLatLng], { 
+        color, 
+        weight: 3, 
+        opacity: 0.8, 
+        dashArray
+    }).addTo(layer);
 
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
-    } else if (oaci) {
+    } else if (oaci || options.isLftwRoute) {
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
@@ -372,11 +365,28 @@ function updateUserPosition(pos) {
     }
 }
 
+function findClosestCommuneName(lat, lon) {
+    if (!allCommunes || allCommunes.length === 0) return null;
+    let closestCommune = null;
+    let minDistance = Infinity;
+    for (const commune of allCommunes) {
+        const distance = calculateDistanceInNm(lat, lon, commune.latitude_mairie, commune.longitude_mairie);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestCommune = commune;
+        }
+    }
+    if (closestCommune && minDistance < 27) { // ~50 km
+        return closestCommune.nom_standard;
+    }
+    return null;
+}
+
 function toggleLftwRoute() {
     showLftwRoute = !showLftwRoute;
     localStorage.setItem('showLftwRoute', showLftwRoute);
     updateLftwButtonState();
-    if (currentCommune) {
+    if(currentCommune) {
         displayCommuneDetails(currentCommune, false);
     }
 }
@@ -387,6 +397,8 @@ function updateLftwButtonState() {
 }
 
 function drawLftwRoute() {
+    lftwRouteLayer.clearLayers();
+    if (!showLftwRoute || !currentCommune) return;
     const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
     if (!lftwAirport) return;
     const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
@@ -394,7 +406,11 @@ function drawLftwRoute() {
     const trueBearing = calculateBearing(lat, lon, lftwLat, lftwLon);
     const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
     
-    drawRoute([lat, lon], [lftwLat, lftwLon], { isLftwRoute: true, magneticBearing: magneticBearing });
+    drawRoute([lat, lon], [lftwLat, lftwLon], {
+        isLftwRoute: true,
+        magneticBearing: magneticBearing,
+        oaci: `LFTW` // Juste l'OACI pour le tooltip
+    });
 }
 
 function toggleGaarVisibility() {
@@ -536,7 +552,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v4.7';
+        versionDisplay.innerText = 'v4.8';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
