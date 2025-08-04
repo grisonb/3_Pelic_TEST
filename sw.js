@@ -1,6 +1,6 @@
 // --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v86'; // Version 4.4 stable
+const APP_CACHE_NAME = 'communes-app-cache-v87'; // Version 4.4 stable
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1'; // Pour le cache de navigation normal
 
