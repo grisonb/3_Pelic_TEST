@@ -15,6 +15,11 @@ const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
 let showLftwRoute = true;
+let gaarCircuits = [];
+let isGaarMode = false;
+let isDrawingMode = false;
+const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
+let gaarLayer = null;
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -38,6 +43,10 @@ async function initializeApp() {
     loadState();
     const savedLftwState = localStorage.getItem('showLftwRoute');
     showLftwRoute = savedLftwState === null ? true : (savedLftwState === 'true');
+    const savedGaarJSON = localStorage.getItem('gaarCircuits');
+    if (savedGaarJSON) {
+        gaarCircuits = JSON.parse(savedGaarJSON);
+    }
     try {
         const response = await fetch('./communes.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -74,8 +83,14 @@ function initMap() {
     routesLayer = L.layerGroup().addTo(map);
     userToTargetLayer = L.layerGroup().addTo(map);
     lftwRouteLayer = L.layerGroup().addTo(map);
+    gaarLayer = L.layerGroup().addTo(map);
     drawPermanentAirportMarkers();
+    redrawGaarCircuits();
+    
+    map.on('click', handleGaarMapClick);
+
     map.on('contextmenu', (e) => {
+        if (isDrawingMode) return;
         L.DomEvent.preventDefault(e.originalEvent);
         const pointName = 'Feu manuel';
         const manualCommune = { nom_standard: pointName, latitude_mairie: e.latlng.lat, longitude_mairie: e.latlng.lng, isManual: true };
@@ -94,6 +109,9 @@ function setupEventListeners() {
     const gpsFeuButton = document.getElementById('gps-feu-button');
     const liveGpsButton = document.getElementById('live-gps-button');
     const lftwRouteButton = document.getElementById('lftw-route-button');
+    const gaarModeButton = document.getElementById('gaar-mode-button');
+    const editCircuitsButton = document.getElementById('edit-circuits-button');
+    const deleteCircuitsButton = document.getElementById('delete-circuits-btn');
 
     searchInput.addEventListener('input', () => {
         const rawSearch = searchInput.value;
@@ -181,7 +199,15 @@ function setupEventListeners() {
     
     liveGpsButton.addEventListener('click', toggleLiveGps);
     lftwRouteButton.addEventListener('click', toggleLftwRoute);
+    gaarModeButton.addEventListener('click', toggleGaarVisibility);
+    editCircuitsButton.addEventListener('click', toggleGaarDrawingMode);
+    deleteCircuitsButton.addEventListener('click', () => {
+        if (confirm("Voulez-vous vraiment supprimer tous les circuits GAAR ?")) {
+            clearAllGaarCircuits();
+        }
+    });
     updateLftwButtonState();
+    updateGaarButtonState();
 }
 
 function displayResults(results) {
@@ -214,12 +240,10 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     if (searchToggleControl) {
         searchToggleControl.updateDisplay(commune);
     }
-
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
     document.getElementById('clear-search').style.display = 'block';
-
     const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`;
     
     const allPoints = [[lat, lon]];
@@ -263,8 +287,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     else if (oaci) { labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`; }
     else { labelText = `${Math.round(distance)} Nm`; }
     
-    let layer = routesLayer;
-    if (isUser) layer = userToTargetLayer;
+    let layer = isUser ? userToTargetLayer : routesLayer;
     if (oaci && oaci.startsWith('LFTW')) layer = lftwRouteLayer;
 
     const polyline = L.polyline([startLatLng, endLatLng], { 
@@ -342,25 +365,24 @@ function toggleLftwRoute() {
     showLftwRoute = !showLftwRoute;
     localStorage.setItem('showLftwRoute', showLftwRoute);
     updateLftwButtonState();
-    if (currentCommune) {
-        displayCommuneDetails(currentCommune, false);
+    if(currentCommune) {
+        // Redessine juste la couche LFTW sans tout recharger
+        if(showLftwRoute) {
+            drawLftwRoute();
+        } else {
+            lftwRouteLayer.clearLayers();
+        }
     }
 }
 
 function updateLftwButtonState() {
     const lftwRouteButton = document.getElementById('lftw-route-button');
-    if (showLftwRoute) {
-        lftwRouteButton.classList.add('active');
-    } else {
-        lftwRouteButton.classList.remove('active');
-    }
+    lftwRouteButton.classList.toggle('active', showLftwRoute);
 }
 
 function drawLftwRoute() {
     lftwRouteLayer.clearLayers();
-    if (!showLftwRoute || !currentCommune) {
-        return;
-    }
+    if (!showLftwRoute || !currentCommune) return;
     const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
     if (!lftwAirport) return;
     const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
@@ -376,6 +398,133 @@ function drawLftwRoute() {
     });
 }
 
+function toggleGaarVisibility() {
+    isGaarMode = !isGaarMode;
+    updateGaarButtonState();
+    if (isGaarMode) {
+        redrawGaarCircuits();
+    } else {
+        gaarLayer.clearLayers();
+        if (isDrawingMode) {
+            toggleGaarDrawingMode();
+        }
+    }
+}
+
+function updateGaarButtonState() {
+    const gaarButton = document.getElementById('gaar-mode-button');
+    const gaarControls = document.getElementById('gaar-controls');
+    gaarButton.classList.toggle('active', isGaarMode);
+    gaarControls.style.display = isGaarMode ? 'flex' : 'none';
+}
+
+function toggleGaarDrawingMode() {
+    const editButton = document.getElementById('edit-circuits-button');
+    const mapContainer = document.getElementById('map');
+    const status = document.getElementById('gaar-status');
+    isDrawingMode = !isDrawingMode;
+
+    editButton.classList.toggle('active', isDrawingMode);
+    mapContainer.classList.toggle('crosshair-cursor', isDrawingMode);
+    
+    status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
+}
+
+async function handleGaarMapClick(e) {
+    if (!isDrawingMode) return;
+    
+    let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3);
+    if (!targetCircuit) {
+        const manualCircuitsCount = gaarCircuits.filter(c => c && c.isManual).length;
+        targetCircuit = {
+            points: [],
+            color: manualCircuitColors[manualCircuitsCount % manualCircuitColors.length],
+            isManual: true,
+        };
+        gaarCircuits.push(targetCircuit);
+    }
+    
+    const pointName = await reverseGeocode(e.latlng) || `Point Manuel`;
+    targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
+    
+    redrawGaarCircuits();
+    saveGaarCircuits();
+}
+
+async function reverseGeocode(latlng) {
+    document.getElementById('gaar-status').textContent = 'Recherche du nom...';
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latlng.lat}&lon=${latlng.lng}&zoom=10`);
+        const data = await response.json();
+        const name = data.address.city || data.address.town || data.address.village || data.display_name.split(',')[0];
+        document.getElementById('gaar-status').textContent = `Point ajouté près de ${name}.`;
+        return name;
+    } catch (error) {
+        document.getElementById('gaar-status').textContent = 'Nom non trouvé.';
+        return null;
+    }
+}
+
+function redrawGaarCircuits() {
+    gaarLayer.clearLayers();
+    gaarCircuits.forEach((circuit, circuitIndex) => {
+        if (!circuit || circuit.points.length === 0) return;
+        
+        const latlngs = circuit.points.map(p => [p.lat, p.lng]);
+        
+        if (latlngs.length >= 3) {
+            L.polygon(latlngs, { color: circuit.color }).addTo(gaarLayer);
+        } else if (latlngs.length > 1) {
+            L.polyline(latlngs, { color: circuit.color }).addTo(gaarLayer);
+        }
+
+        circuit.points.forEach((point, pointIndex) => {
+            const marker = L.circleMarker([point.lat, point.lng], { 
+                radius: 8, fillColor: circuit.color, color: '#000', weight: 1, opacity: 1, fillOpacity: 0.8
+            }).addTo(gaarLayer);
+
+            marker.bindTooltip(`${pointIndex + 1}. ${point.name}`, { permanent: true, direction: 'top', className: 'gaar-point-label' });
+
+            const popupContent = `<div class="gaar-popup-form">
+                <input type="text" id="gaar-input-${circuitIndex}-${pointIndex}" value="${point.name}">
+                <button onclick="updateGaarPoint(${circuitIndex}, ${pointIndex})">OK</button>
+                <button class="delete-point-btn" onclick="deleteGaarPoint(${circuitIndex}, ${pointIndex})">Supprimer</button>
+            </div>`;
+            marker.bindPopup(popupContent);
+        });
+    });
+}
+
+window.updateGaarPoint = async function(circuitIndex, pointIndex) {
+    const input = document.getElementById(`gaar-input-${circuitIndex}-${pointIndex}`);
+    const newName = input.value.trim();
+    if (newName) {
+        gaarCircuits[circuitIndex].points[pointIndex].name = newName;
+        redrawGaarCircuits();
+        saveGaarCircuits();
+        map.closePopup();
+    }
+};
+
+window.deleteGaarPoint = function(circuitIndex, pointIndex) {
+    gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
+    if (gaarCircuits[circuitIndex].points.length === 0) {
+        gaarCircuits.splice(circuitIndex, 1);
+    }
+    redrawGaarCircuits();
+    saveGaarCircuits();
+};
+
+function clearAllGaarCircuits() {
+    gaarCircuits = [];
+    gaarLayer.clearLayers();
+    saveGaarCircuits();
+}
+
+function saveGaarCircuits() {
+    localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits));
+}
+
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
@@ -388,7 +537,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v4.7';
+        versionDisplay.innerText = 'v4.6';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
