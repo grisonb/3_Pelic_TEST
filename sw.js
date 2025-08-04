@@ -1,4 +1,4 @@
-const APP_CACHE_NAME = 'communes-app-cache-v70'; // Version stable de secours
+const APP_CACHE_NAME = 'communes-app-cache-v71'; // Version stable de secours
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
