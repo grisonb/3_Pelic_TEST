@@ -68,7 +68,6 @@ async function initializeApp() {
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
             document.getElementById('ui-overlay').style.display = 'none';
-            // --- CORRECTION --- S'assurer que le display est mis à jour après avoir masqué l'overlay
             displayCommuneDetails(currentCommune, true);
         }
     } catch (error) {
@@ -321,16 +320,17 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         labelText = `${Math.round(distance)} Nm`;
     }
 
-    if (oaci) { // S'applique uniquement aux routes de pélicandromes
-        // Ligne invisible pour le clic
-        const hitzone = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 20, opacity: 0, interactive: true }).addTo(layer);
-        hitzone.on('click', () => {
-            selectedBingoAirportOaci = (selectedBingoAirportOaci === oaci) ? null : oaci;
-            displayCommuneDetails(currentCommune, false);
-        });
+    if (oaci) {
+        // Ligne invisible large pour une zone de clic fiable
+        L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 22, opacity: 0, interactive: true })
+            .on('click', () => {
+                selectedBingoAirportOaci = (selectedBingoAirportOaci === oaci) ? null : oaci;
+                displayCommuneDetails(currentCommune, false);
+            })
+            .addTo(layer);
     }
 
-    // Ligne visible
+    // Ligne visible (non-interactive pour laisser passer le clic vers la ligne invisible)
     const visibleLine = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray, interactive: false }).addTo(layer);
     
     if (isUser) {
@@ -643,7 +643,7 @@ const BingoCalculatorControl = L.Control.extend({
 });
 
 // =========================================================================
-// === MODIFICATION === CONTRÔLE UNIFIÉ POUR LA RECHERCHE ET L'AFFICHAGE
+// === MODIFICATION === CONTRÔLE UNIFIÉ REVENU POUR LE STYLE ET LA LOGIQUE
 // =========================================================================
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
