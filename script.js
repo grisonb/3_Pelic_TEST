@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set();
-let searchToggleControl, bingoCalculatorControl; // Ajout de bingoCalculatorControl
+let searchToggleControl, bingoCalculatorControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -79,9 +79,8 @@ function initMap() {
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    // Ajout des contrôles personnalisés
     searchToggleControl = new SearchToggleControl().addTo(map);
-    bingoCalculatorControl = new BingoCalculatorControl().addTo(map); // Ajout du contrôle BINGO
+    bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
     permanentAirportLayer = L.layerGroup().addTo(map);
@@ -176,7 +175,7 @@ function setupEventListeners() {
         if (searchToggleControl) {
             searchToggleControl.updateDisplay(null);
         }
-        if (bingoCalculatorControl) { // Mise à jour BINGO
+        if (bingoCalculatorControl) {
             bingoCalculatorControl.update();
             bingoCalculatorControl.hidePanel();
         }
@@ -249,7 +248,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     if (searchToggleControl) {
         searchToggleControl.updateDisplay(commune);
     }
-    if (bingoCalculatorControl) { // Mise à jour BINGO
+    if (bingoCalculatorControl) {
         bingoCalculatorControl.update();
     }
 
@@ -547,7 +546,7 @@ function saveGaarCircuits() {
 }
 
 // =========================================================================
-// == NOUVEAU CONTRÔLE : CALCULATRICE BINGO ==
+// CONTRÔLE : CALCULATRICE BINGO
 // =========================================================================
 const BingoCalculatorControl = L.Control.extend({
     options: { position: 'topright' },
@@ -575,20 +574,38 @@ const BingoCalculatorControl = L.Control.extend({
             this.update();
         }
     },
+    // === MODIFICATION === Logique de calcul mise à jour
     update: function() {
         if (!currentCommune) {
             this.panel.innerHTML = 'Sélectionnez un feu';
             return;
         }
+
         const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
         if (!lftwAirport) {
             this.panel.innerHTML = 'Erreur: LFTW introuvable';
             return;
         }
+
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
-        const distance = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
-        const fuel = distance <= 70 ? distance * 5 : distance * 4;
-        this.panel.innerHTML = `BINGO LFTW<br><span>${Math.round(fuel)} kg</span>`;
+        let panelHtml = '';
+
+        // 1. Calcul pour LFTW
+        const distanceLftw = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
+        const fuelLftw = (distanceLftw <= 70 ? distanceLftw * 5 : distanceLftw * 4) + 700;
+        panelHtml += `BINGO LFTW<br><span>${Math.round(fuelLftw)} kg</span>`;
+        
+        // 2. Calcul pour les pélicandromes sélectionnés
+        const numAirports = parseInt(document.getElementById('airport-count').value, 10);
+        const closestAirports = getClosestAirports(lat, lon, numAirports);
+
+        closestAirports.forEach(airport => {
+            // airport.distance est déjà calculé par getClosestAirports
+            const fuelAirport = (airport.distance <= 70 ? airport.distance * 5 : airport.distance * 4) + 700;
+            panelHtml += `<br><br>BINGO ${airport.oaci}<br><span>${Math.round(fuelAirport)} kg</span>`;
+        });
+
+        this.panel.innerHTML = panelHtml;
     },
     hidePanel: function() {
         this.panel.style.display = 'none';
@@ -609,7 +626,8 @@ const SearchToggleControl = L.Control.extend({
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        versionDisplay.innerText = 'v5.2'; // --- MISE À JOUR DE LA VERSION ---
+        // --- MISE À JOUR DE LA VERSION ---
+        versionDisplay.innerText = 'v5.3'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
