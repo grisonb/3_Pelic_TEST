@@ -199,7 +199,6 @@ html, body {
     font-size: 14px;
     font-weight: bold;
     color: #333;
-    cursor: pointer;
 }
 
 .leaflet-tooltip.route-tooltip-selected {
@@ -235,28 +234,13 @@ html, body {
     gap: 8px;
 }
 
-.search-toggle-button, .commune-display-control {
+.commune-display-control {
     background-color: white;
-    display: flex;
+    display: none;
     align-items: center;
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
     border-radius: var(--border-radius);
     border: 1px solid rgba(0,0,0,0.2);
-}
-
-/* === MODIFICATION === Style unifié pour les boutons de contrôle */
-.search-toggle-button {
-    width: 52px;
-    height: 52px;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 2.2em !important;
-    color: var(--primary-color);
-    align-items: center; /* Ajout pour un meilleur centrage vertical */
-}
-
-.commune-display-control {
-    display: none;
     height: 52px;
     padding: 0 18px;
     font-weight: 500;
@@ -264,6 +248,22 @@ html, body {
     max-width: 350px;
     color: var(--text-color);
     justify-content: space-between;
+}
+
+/* === MODIFICATION === Classe commune pour les boutons de contrôle en haut de la carte */
+.map-control-button {
+    width: 52px;
+    height: 52px;
+    background-color: white;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(0,0,0,0.2);
+    font-size: 2.2em !important;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
 }
 
 .commune-display-control > span {
@@ -428,21 +428,6 @@ html, body {
     background-color: var(--secondary-color);
     color: white;
     border-color: var(--secondary-color);
-}
-
-#bingo-calculator-button {
-    width: 52px;
-    height: 52px;
-    background-color: white;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-    border-radius: var(--border-radius);
-    border: 1px solid rgba(0,0,0,0.2);
-    font-size: 2.2em !important;
-    color: var(--primary-color);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
 }
 
 #bingo-panel {
