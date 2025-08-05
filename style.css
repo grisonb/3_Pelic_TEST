@@ -199,10 +199,9 @@ html, body {
     font-size: 14px;
     font-weight: bold;
     color: #333;
-    cursor: pointer; /* Pour indiquer qu'elle est cliquable */
+    cursor: pointer;
 }
 
-/* === AJOUT === Style pour l'étiquette sélectionnée */
 .leaflet-tooltip.route-tooltip-selected {
     background-color: var(--success-color);
     color: white;
@@ -245,13 +244,15 @@ html, body {
     border: 1px solid rgba(0,0,0,0.2);
 }
 
+/* === MODIFICATION === Style unifié pour les boutons de contrôle */
 .search-toggle-button {
     width: 52px;
     height: 52px;
     justify-content: center;
     cursor: pointer;
-    font-size: 2.2em !important; /* Ajustement pour l'icône menu */
+    font-size: 2.2em !important;
     color: var(--primary-color);
+    align-items: center; /* Ajout pour un meilleur centrage vertical */
 }
 
 .commune-display-control {
@@ -487,17 +488,17 @@ html, body {
     margin-top: 15px;
     border-top: 1px solid var(--border-color);
     padding-top: 15px;
-    text-align: left; /* Aligné à gauche pour une meilleure lisibilité */
+    text-align: left;
     font-weight: bold;
 }
 
 #bingo-results p {
-    margin: 0 0 10px 0; /* Espacement entre les lignes de BINGO */
+    margin: 0 0 10px 0;
 }
 
 #bingo-results span {
-    font-size: 1.2em; /* Taille ajustée pour tenir sur une ligne */
+    font-size: 1.2em;
     color: var(--primary-color);
     font-weight: bold;
-    margin-left: 8px; /* Espace après le ":" */
+    margin-left: 8px;
 }
