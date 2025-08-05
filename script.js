@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set();
-let searchToggleControl, bingoCalculatorControl;
+// --- MODIFICATION --- Séparation des contrôles
+let searchToggleButtonControl, communeDisplayControl, bingoCalculatorControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -80,7 +81,9 @@ function initMap() {
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    searchToggleControl = new SearchToggleControl().addTo(map);
+    // --- MODIFICATION --- Instanciation des contrôles séparés
+    searchToggleButtonControl = new SearchToggleButtonControl().addTo(map);
+    communeDisplayControl = new CommuneDisplayControl().addTo(map);
     bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
@@ -174,8 +177,8 @@ function setupEventListeners() {
         currentCommune = null;
         localStorage.removeItem('currentCommune');
         selectedBingoAirportOaci = null;
-        if (searchToggleControl) {
-            searchToggleControl.updateDisplay(null);
+        if (communeDisplayControl) {
+            communeDisplayControl.update(null);
         }
         if (bingoCalculatorControl) {
             bingoCalculatorControl.update();
@@ -234,6 +237,9 @@ function displayResults(results) {
                 localStorage.setItem('currentCommune', JSON.stringify(c));
                 displayCommuneDetails(c);
                 document.getElementById('ui-overlay').style.display = 'none';
+                if (communeDisplayControl) {
+                    communeDisplayControl.update(c);
+                }
             });
             resultsList.appendChild(li);
         });
@@ -252,8 +258,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         selectedBingoAirportOaci = null;
     }
 
-    if (searchToggleControl) {
-        searchToggleControl.updateDisplay(commune);
+    if (communeDisplayControl) {
+        communeDisplayControl.update(commune);
     }
     if (bingoCalculatorControl) {
         bingoCalculatorControl.update();
@@ -297,7 +303,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     }
 }
 
-// === CORRECTION CLIC & POSITION === 
+// === CORRECTION CLIC & POSITION ===
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
@@ -322,7 +328,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     
     const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
 
-    if (oaci) { // Attacher l'événement de clic à la ligne pour les pélicandromes
+    if (oaci) {
         polyline.on('click', () => {
             selectedBingoAirportOaci = (selectedBingoAirportOaci === oaci) ? null : oaci;
             displayCommuneDetails(currentCommune, false);
@@ -334,7 +340,6 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     } else if (oaci || options.isLftwRoute) {
         const isSelected = oaci === selectedBingoAirportOaci;
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip';
-        // Revenir à L.tooltip pour un positionnement correct à l'extrémité
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass })
             .setLatLng(endLatLng)
             .setContent(labelText)
@@ -559,7 +564,7 @@ function saveGaarCircuits() {
 }
 
 // =========================================================================
-// CONTRÔLE : CALCULATRICE BINGO (MODIFIÉ)
+// CONTRÔLE : CALCULATRICE BINGO
 // =========================================================================
 const BingoCalculatorControl = L.Control.extend({
     options: { position: 'topright' },
@@ -609,21 +614,17 @@ const BingoCalculatorControl = L.Control.extend({
     },
     update: function() {
         if (!this.resultsDiv) return;
-
         if (!currentCommune) {
             this.resultsDiv.innerHTML = 'Sélectionnez un feu';
             return;
         }
-
         const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
         if (!lftwAirport) {
             this.resultsDiv.innerHTML = 'Erreur: LFTW introuvable';
             return;
         }
-
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
         let resultsHtml = '';
-
         const distanceLftw = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
         const fuelLftw = (distanceLftw <= 70 ? distanceLftw * 5 : distanceLftw * 4) + 700;
         resultsHtml += `<p>BINGO LFTW: <span>${Math.round(fuelLftw)} kg</span></p>`;
@@ -636,7 +637,6 @@ const BingoCalculatorControl = L.Control.extend({
                 resultsHtml += `<p>BINGO ${selectedAirport.oaci}: <span>${Math.round(fuelAirport)} kg</span></p>`;
             }
         }
-
         this.resultsDiv.innerHTML = resultsHtml;
     },
     hidePanel: function() {
@@ -644,45 +644,50 @@ const BingoCalculatorControl = L.Control.extend({
     }
 });
 
+// =========================================================================
+// === MODIFICATION === CONTRÔLES SÉPARÉS POUR LE STYLE ET LA LOGIQUE
+// =========================================================================
+const SearchToggleButtonControl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function(map) {
+        const container = L.DomUtil.create('div', 'leaflet-control');
+        const button = L.DomUtil.create('a', 'map-control-button', container);
+        button.innerHTML = '⚙️';
+        button.href = '#';
 
-const SearchToggleControl = L.Control.extend({
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(button, 'click', L.DomEvent.stop);
+        L.DomEvent.on(button, 'click', () => {
+            const uiOverlay = document.getElementById('ui-overlay');
+            const isOverlayVisible = uiOverlay.style.display !== 'none';
+            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
+            if (communeDisplayControl) {
+                communeDisplayControl.update(isOverlayVisible ? currentCommune : null);
+            }
+        });
+        return container;
+    }
+});
+
+const CommuneDisplayControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
-        const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
-        // --- MODIFICATION --- Application du style unifié
-        this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
-        this.toggleButton.innerHTML = '⚙️';
-        this.toggleButton.href = '#';
-        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
+        const container = L.DomUtil.create('div', 'leaflet-bar commune-display-container', mainContainer);
+        
+        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', container);
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        // --- MISE À JOUR DE LA VERSION ---
-        versionDisplay.innerText = 'v5.6'; 
+        versionDisplay.innerText = 'v5.7'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
-        L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
-        L.DomEvent.on(this.toggleButton, 'click', () => {
-            const uiOverlay = document.getElementById('ui-overlay');
-            if (uiOverlay.style.display === 'none') {
-                uiOverlay.style.display = 'block';
-                this.communeDisplay.style.display = 'none';
-            } else {
-                uiOverlay.style.display = 'none';
-                if (this.communeNameSpan.textContent) {
-                    this.communeDisplay.style.display = 'flex';
-                }
-            }
-        });
         return mainContainer;
     },
-    updateDisplay: function (commune) {
-        if (!commune) {
+    update: function (commune) {
+        if (!commune || document.getElementById('ui-overlay').style.display !== 'none') {
             this.communeDisplay.style.display = 'none';
-            this.communeNameSpan.textContent = '';
-            this.sunsetDisplay.textContent = '';
             return;
         }
 
