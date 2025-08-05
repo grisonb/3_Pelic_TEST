@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v97'; // Version incrémentée pour forcer la mise à jour
+const APP_CACHE_NAME = 'communes-app-cache-v98'; // Version pour le fix final du clic et du style
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
