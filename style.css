@@ -229,6 +229,13 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
+/* === MODIFICATION === Conteneur Flex pour les contrôles du haut */
+.search-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .commune-display-control {
     background-color: white;
     display: none;
@@ -258,6 +265,7 @@ html, body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    flex-shrink: 0; /* Empêche le bouton de rétrécir */
 }
 
 .commune-display-control > span {
