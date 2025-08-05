@@ -229,12 +229,6 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
-.search-toggle-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
 .commune-display-control {
     background-color: white;
     display: none;
