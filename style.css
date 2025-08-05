@@ -313,6 +313,10 @@ html, body {
     100% { box-shadow: 0 0 0 0 rgba(0, 90, 156, 0); }
 }
 
+/* ========================================================== */
+/* == STYLES GAAR RESTAURÉS DE LA VERSION 4.9 == */
+/* ========================================================== */
+
 .extra-controls {
     margin-top: 10px;
     padding-top: 10px;
@@ -337,4 +341,81 @@ html, body {
 .toggle-button.active {
     background-color: var(--primary-color);
     color: white;
+}
+
+#gaar-controls {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+#gaar-status {
+    margin-top: 10px;
+    font-weight: bold;
+    color: var(--primary-color);
+    min-height: 20px;
+}
+
+#map.crosshair-cursor {
+    cursor: crosshair;
+}
+
+.gaar-popup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gaar-popup-form input {
+    border: 1px solid #ccc;
+    padding: 5px;
+    border-radius: 3px;
+}
+.gaar-popup-form button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.gaar-popup-form .delete-point-btn {
+    background-color: var(--secondary-color);
+}
+
+.gaar-point-label {
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid #777;
+    border-radius: 4px;
+    box-shadow: none;
+    padding: 2px 5px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.delete-button {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    color: var(--secondary-color);
+    background-color: transparent;
+    border: 1px solid var(--secondary-color);
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.delete-button:hover {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+#edit-circuits-button.active {
+    background-color: var(--secondary-color);
+    color: white;
+    border-color: var(--secondary-color);
 }
