@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v93'; // Version incrémentée pour les champs de saisie
+const APP_CACHE_NAME = 'communes-app-cache-v94'; // Version incrémentée pour la sélection BINGO
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
