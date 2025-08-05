@@ -199,7 +199,7 @@ html, body {
     font-size: 14px;
     font-weight: bold;
     color: #333;
-    pointer-events: none; /* L'étiquette n'intercepte plus les clics */
+    pointer-events: none;
 }
 
 .leaflet-tooltip.route-tooltip-selected {
@@ -207,7 +207,6 @@ html, body {
     color: white;
     border-color: #1f7a35;
 }
-
 
 .airport-popup .popup-buttons {
     display: flex;
