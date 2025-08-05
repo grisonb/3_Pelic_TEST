@@ -49,6 +49,9 @@ async function initializeApp() {
     if (savedGaarJSON) {
         gaarCircuits = JSON.parse(savedGaarJSON);
     }
+    // --- AJOUT --- Chargement du pélicandrome sélectionné
+    selectedBingoAirportOaci = localStorage.getItem('selectedBingoAirport') || null;
+
     try {
         const response = await fetch('./communes.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -68,7 +71,7 @@ async function initializeApp() {
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
             document.getElementById('ui-overlay').style.display = 'none';
-            displayCommuneDetails(currentCommune, true);
+            displayCommuneDetails(currentCommune, false); // false ici pour ne pas réinitialiser la sélection
         }
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
@@ -102,7 +105,7 @@ function initMap() {
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
         document.getElementById('ui-overlay').style.display = 'none';
-        displayCommuneDetails(manualCommune, false);
+        displayCommuneDetails(manualCommune, true);
     });
 }
 
@@ -174,6 +177,7 @@ function setupEventListeners() {
         currentCommune = null;
         localStorage.removeItem('currentCommune');
         selectedBingoAirportOaci = null;
+        localStorage.removeItem('selectedBingoAirport');
         if (searchToggleControl) {
             searchToggleControl.update(null);
         }
@@ -186,6 +190,7 @@ function setupEventListeners() {
     });
     airportCountInput.addEventListener('input', () => {
         selectedBingoAirportOaci = null;
+        localStorage.removeItem('selectedBingoAirport');
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
     gpsFeuButton.addEventListener('click', () => {
@@ -201,7 +206,7 @@ function setupEventListeners() {
                 currentCommune = gpsCommune;
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
                 document.getElementById('ui-overlay').style.display = 'none';
-                displayCommuneDetails(gpsCommune, false);
+                displayCommuneDetails(gpsCommune, true);
             },
             () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
             { enableHighAccuracy: true }
@@ -233,7 +238,7 @@ function displayResults(results) {
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
                 document.getElementById('ui-overlay').style.display = 'none';
-                displayCommuneDetails(c);
+                displayCommuneDetails(c, true);
             });
             resultsList.appendChild(li);
         });
@@ -242,16 +247,21 @@ function displayResults(results) {
     }
 }
 
-function displayCommuneDetails(commune, shouldFitBounds = true) {
+function displayCommuneDetails(commune, isNewSelection = false) {
     routesLayer.clearLayers();
     userToTargetLayer.clearLayers();
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
     
-    if (shouldFitBounds) {
-        selectedBingoAirportOaci = null;
-    }
+    const numAirports = parseInt(document.getElementById('airport-count').value, 10);
+    const closestAirports = getClosestAirports(commune.latitude_mairie, commune.longitude_mairie, numAirports);
 
+    // --- AJOUT --- Auto-sélection du plus proche
+    if (isNewSelection && closestAirports.length > 0) {
+        selectedBingoAirportOaci = closestAirports[0].oaci;
+        localStorage.setItem('selectedBingoAirport', selectedBingoAirportOaci);
+    }
+    
     if (searchToggleControl) {
         searchToggleControl.update(commune);
     }
@@ -269,8 +279,6 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
     L.marker([lat, lon], { icon: fireIcon }).bindPopup(popupContent).addTo(routesLayer);
     
-    const numAirports = parseInt(document.getElementById('airport-count').value, 10);
-    const closestAirports = getClosestAirports(lat, lon, numAirports);
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
@@ -283,7 +291,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     
     navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
 
-    if (shouldFitBounds) {
+    if (isNewSelection) {
         setTimeout(() => {
             if (userMarker && userMarker.getLatLng()) {
                 allPoints.push(userMarker.getLatLng());
@@ -297,7 +305,6 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     }
 }
 
-// === CORRECTION CLIC & POSITION ===
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
@@ -321,20 +328,27 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     }
 
     if (oaci) {
-        // Ligne invisible large pour une zone de clic fiable
         L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 22, opacity: 0, interactive: true })
             .on('click', () => {
-                selectedBingoAirportOaci = (selectedBingoAirportOaci === oaci) ? null : oaci;
+                const newSelection = (selectedBingoAirportOaci === oaci) ? null : oaci;
+                selectedBingoAirportOaci = newSelection;
+                if (newSelection) {
+                    localStorage.setItem('selectedBingoAirport', newSelection);
+                } else {
+                    localStorage.removeItem('selectedBingoAirport');
+                }
                 displayCommuneDetails(currentCommune, false);
             })
             .addTo(layer);
     }
 
-    // Ligne visible (non-interactive pour laisser passer le clic vers la ligne invisible)
     const visibleLine = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray, interactive: false }).addTo(layer);
     
     if (isUser) {
-        visibleLine.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
+        L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true, interactive: false })
+           .setLatLng(visibleLine.getCenter())
+           .setContent(labelText)
+           .addTo(layer);
     } else if (oaci || options.isLftwRoute) {
         const isSelected = oaci === selectedBingoAirportOaci;
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip';
@@ -360,7 +374,6 @@ function toggleLiveGps() {
         watchId = null;
         liveGpsButton.classList.remove('active');
         localStorage.setItem('liveGpsActive', 'false');
-        console.log("Suivi GPS désactivé.");
     } else {
         if (!navigator.geolocation) {
             alert("La géolocalisation n'est pas supportée.");
@@ -377,7 +390,6 @@ function toggleLiveGps() {
         );
         liveGpsButton.classList.add('active');
         localStorage.setItem('liveGpsActive', 'true');
-        console.log("Suivi GPS activé.");
     }
 }
 
@@ -394,11 +406,9 @@ function updateUserPosition(pos) {
 
     if (currentCommune) {
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
-        if (lat.toFixed(6) !== userLat.toFixed(6) || lon.toFixed(6) !== userLon.toFixed(6)) {
-            const trueBearing = calculateBearing(userLat, userLon, lat, lon);
-            const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
-            drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
-        }
+        const trueBearing = calculateBearing(userLat, userLon, lat, lon);
+        const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
+        drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
     }
 }
 
@@ -643,7 +653,7 @@ const BingoCalculatorControl = L.Control.extend({
 });
 
 // =========================================================================
-// === MODIFICATION === CONTRÔLE UNIFIÉ REVENU POUR LE STYLE ET LA LOGIQUE
+// CONTRÔLE UNIFIÉ POUR LA RECHERCHE ET L'AFFICHAGE
 // =========================================================================
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
@@ -660,7 +670,7 @@ const SearchToggleControl = L.Control.extend({
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        versionDisplay.innerText = 'v5.7';
+        versionDisplay.innerText = 'v5.8';
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
