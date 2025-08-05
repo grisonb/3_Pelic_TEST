@@ -446,16 +446,43 @@ html, body {
     padding: 15px;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow);
-    /* === MODIFICATION === Largeur augmentée pour afficher plus de contenu */
-    width: 220px;
+    width: 250px; 
     z-index: 1000;
-    text-align: center;
     font-size: 16px;
-    font-weight: bold;
     color: var(--text-color);
 }
 
-#bingo-panel span {
+.bingo-input-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.bingo-input-group label {
+    font-weight: bold;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.bingo-input-group input {
+    width: 100px;
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 16px;
+    text-align: center;
+}
+
+#bingo-results {
+    margin-top: 15px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+    text-align: center;
+    font-weight: bold;
+}
+
+#bingo-results span {
     font-size: 1.5em;
     color: var(--primary-color);
     font-weight: bold;
