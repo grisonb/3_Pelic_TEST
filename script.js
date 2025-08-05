@@ -297,7 +297,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     }
 }
 
-// === CORRECTION DU CLIC === L'événement est maintenant attaché à la polyligne
+// === CORRECTION CLIC & POSITION === 
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
@@ -322,11 +322,10 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     
     const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
 
-    if (oaci) { // S'applique uniquement aux routes de pélicandromes
+    if (oaci) { // Attacher l'événement de clic à la ligne pour les pélicandromes
         polyline.on('click', () => {
             selectedBingoAirportOaci = (selectedBingoAirportOaci === oaci) ? null : oaci;
-            displayCommuneDetails(currentCommune, false); // Redessine pour mettre à jour les styles
-            bingoCalculatorControl.update(); // Met à jour le panneau BINGO
+            displayCommuneDetails(currentCommune, false);
         });
     }
 
@@ -335,7 +334,11 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     } else if (oaci || options.isLftwRoute) {
         const isSelected = oaci === selectedBingoAirportOaci;
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip';
-        polyline.bindTooltip(labelText, { permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass });
+        // Revenir à L.tooltip pour un positionnement correct à l'extrémité
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass })
+            .setLatLng(endLatLng)
+            .setContent(labelText)
+            .addTo(layer);
     }
 }
 
@@ -562,8 +565,7 @@ const BingoCalculatorControl = L.Control.extend({
     options: { position: 'topright' },
     onAdd: function(map) {
         const container = L.DomUtil.create('div', 'leaflet-control bingo-calculator-container');
-        this.button = L.DomUtil.create('a', '', container);
-        this.button.id = 'bingo-calculator-button';
+        this.button = L.DomUtil.create('a', 'map-control-button', container);
         this.button.innerHTML = '🧮';
         this.button.href = '#';
 
@@ -586,11 +588,9 @@ const BingoCalculatorControl = L.Control.extend({
         this.fuelInput = this.panel.querySelector('#bingo-fuel-input');
         this.timeInput = this.panel.querySelector('#bingo-time-input');
 
-        // --- AJOUT --- Sauvegarde des données lors de la saisie
         this.fuelInput.addEventListener('input', () => localStorage.setItem('bingo_fuel', this.fuelInput.value));
         this.timeInput.addEventListener('input', () => localStorage.setItem('bingo_tmd', this.timeInput.value));
 
-        // --- AJOUT --- Chargement des données sauvegardées
         this.fuelInput.value = localStorage.getItem('bingo_fuel') || '';
         this.timeInput.value = localStorage.getItem('bingo_tmd') || '';
 
@@ -650,8 +650,8 @@ const SearchToggleControl = L.Control.extend({
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
         const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
-        this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
-        // --- MODIFICATION --- Remplacement de l'icône maison par un engrenage
+        // --- MODIFICATION --- Application du style unifié
+        this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
         this.toggleButton.innerHTML = '⚙️';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
