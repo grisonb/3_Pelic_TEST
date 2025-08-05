@@ -11,8 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set();
-// --- MODIFICATION --- Séparation des contrôles
-let searchToggleButtonControl, communeDisplayControl, bingoCalculatorControl;
+let searchToggleControl, bingoCalculatorControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -68,8 +67,9 @@ async function initializeApp() {
         const savedCommuneJSON = localStorage.getItem('currentCommune');
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
-            displayCommuneDetails(currentCommune, true);
             document.getElementById('ui-overlay').style.display = 'none';
+            // --- CORRECTION --- S'assurer que le display est mis à jour après avoir masqué l'overlay
+            displayCommuneDetails(currentCommune, true);
         }
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
@@ -81,9 +81,7 @@ function initMap() {
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    // --- MODIFICATION --- Instanciation des contrôles séparés
-    searchToggleButtonControl = new SearchToggleButtonControl().addTo(map);
-    communeDisplayControl = new CommuneDisplayControl().addTo(map);
+    searchToggleControl = new SearchToggleControl().addTo(map);
     bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
@@ -104,8 +102,8 @@ function initMap() {
         const manualCommune = { nom_standard: pointName, latitude_mairie: e.latlng.lat, longitude_mairie: e.latlng.lng, isManual: true };
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
-        displayCommuneDetails(manualCommune, false);
         document.getElementById('ui-overlay').style.display = 'none';
+        displayCommuneDetails(manualCommune, false);
     });
 }
 
@@ -177,8 +175,8 @@ function setupEventListeners() {
         currentCommune = null;
         localStorage.removeItem('currentCommune');
         selectedBingoAirportOaci = null;
-        if (communeDisplayControl) {
-            communeDisplayControl.update(null);
+        if (searchToggleControl) {
+            searchToggleControl.update(null);
         }
         if (bingoCalculatorControl) {
             bingoCalculatorControl.update();
@@ -203,8 +201,8 @@ function setupEventListeners() {
                 const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
                 currentCommune = gpsCommune;
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
-                displayCommuneDetails(gpsCommune, false);
                 document.getElementById('ui-overlay').style.display = 'none';
+                displayCommuneDetails(gpsCommune, false);
             },
             () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
             { enableHighAccuracy: true }
@@ -235,11 +233,8 @@ function displayResults(results) {
             li.addEventListener('click', () => {
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
-                displayCommuneDetails(c);
                 document.getElementById('ui-overlay').style.display = 'none';
-                if (communeDisplayControl) {
-                    communeDisplayControl.update(c);
-                }
+                displayCommuneDetails(c);
             });
             resultsList.appendChild(li);
         });
@@ -258,8 +253,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         selectedBingoAirportOaci = null;
     }
 
-    if (communeDisplayControl) {
-        communeDisplayControl.update(commune);
+    if (searchToggleControl) {
+        searchToggleControl.update(commune);
     }
     if (bingoCalculatorControl) {
         bingoCalculatorControl.update();
@@ -325,22 +320,25 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     } else {
         labelText = `${Math.round(distance)} Nm`;
     }
-    
-    const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
 
-    if (oaci) {
-        polyline.on('click', () => {
+    if (oaci) { // S'applique uniquement aux routes de pélicandromes
+        // Ligne invisible pour le clic
+        const hitzone = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 20, opacity: 0, interactive: true }).addTo(layer);
+        hitzone.on('click', () => {
             selectedBingoAirportOaci = (selectedBingoAirportOaci === oaci) ? null : oaci;
             displayCommuneDetails(currentCommune, false);
         });
     }
 
+    // Ligne visible
+    const visibleLine = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray, interactive: false }).addTo(layer);
+    
     if (isUser) {
-        polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
+        visibleLine.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci || options.isLftwRoute) {
         const isSelected = oaci === selectedBingoAirportOaci;
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip';
-        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass })
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass, interactive: false })
             .setLatLng(endLatLng)
             .setContent(labelText)
             .addTo(layer);
@@ -645,48 +643,38 @@ const BingoCalculatorControl = L.Control.extend({
 });
 
 // =========================================================================
-// === MODIFICATION === CONTRÔLES SÉPARÉS POUR LE STYLE ET LA LOGIQUE
+// === MODIFICATION === CONTRÔLE UNIFIÉ POUR LA RECHERCHE ET L'AFFICHAGE
 // =========================================================================
-const SearchToggleButtonControl = L.Control.extend({
-    options: { position: 'topleft' },
-    onAdd: function(map) {
-        const container = L.DomUtil.create('div', 'leaflet-control');
-        const button = L.DomUtil.create('a', 'map-control-button', container);
-        button.innerHTML = '⚙️';
-        button.href = '#';
-
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(button, 'click', L.DomEvent.stop);
-        L.DomEvent.on(button, 'click', () => {
-            const uiOverlay = document.getElementById('ui-overlay');
-            const isOverlayVisible = uiOverlay.style.display !== 'none';
-            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
-            if (communeDisplayControl) {
-                communeDisplayControl.update(isOverlayVisible ? currentCommune : null);
-            }
-        });
-        return container;
-    }
-});
-
-const CommuneDisplayControl = L.Control.extend({
+const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
-        const container = L.DomUtil.create('div', 'leaflet-bar commune-display-container', mainContainer);
+        const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
         
-        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', container);
+        this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
+        this.toggleButton.innerHTML = '🏙️';
+        this.toggleButton.href = '#';
+
+        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        versionDisplay.innerText = 'v5.7'; 
+        versionDisplay.innerText = 'v5.7';
         
         L.DomEvent.disableClickPropagation(mainContainer);
+        L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
+        L.DomEvent.on(this.toggleButton, 'click', () => {
+            const uiOverlay = document.getElementById('ui-overlay');
+            const isOverlayVisible = uiOverlay.style.display !== 'none';
+            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
+            this.update(currentCommune);
+        });
         return mainContainer;
     },
     update: function (commune) {
-        if (!commune || document.getElementById('ui-overlay').style.display !== 'none') {
+        const uiOverlay = document.getElementById('ui-overlay');
+        if (!commune || uiOverlay.style.display !== 'none') {
             this.communeDisplay.style.display = 'none';
             return;
         }
