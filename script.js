@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set();
-let searchToggleControl, bingoCalculatorControl;
+let searchToggleControl, communeDisplayControl, bingoCalculatorControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -49,7 +49,6 @@ async function initializeApp() {
     if (savedGaarJSON) {
         gaarCircuits = JSON.parse(savedGaarJSON);
     }
-    // --- AJOUT --- Chargement du pélicandrome sélectionné
     selectedBingoAirportOaci = localStorage.getItem('selectedBingoAirport') || null;
 
     try {
@@ -71,7 +70,7 @@ async function initializeApp() {
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
             document.getElementById('ui-overlay').style.display = 'none';
-            displayCommuneDetails(currentCommune, false); // false ici pour ne pas réinitialiser la sélection
+            displayCommuneDetails(currentCommune, false);
         }
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
@@ -83,7 +82,9 @@ function initMap() {
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    searchToggleControl = new SearchToggleControl().addTo(map);
+    // --- CORRECTION --- Instanciation des contrôles séparés
+    searchToggleControl = new SearchToggleButtonControl().addTo(map);
+    communeDisplayControl = new CommuneDisplayControl().addTo(map);
     bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
@@ -178,8 +179,8 @@ function setupEventListeners() {
         localStorage.removeItem('currentCommune');
         selectedBingoAirportOaci = null;
         localStorage.removeItem('selectedBingoAirport');
-        if (searchToggleControl) {
-            searchToggleControl.update(null);
+        if (communeDisplayControl) {
+            communeDisplayControl.update(null);
         }
         if (bingoCalculatorControl) {
             bingoCalculatorControl.update();
@@ -256,14 +257,13 @@ function displayCommuneDetails(commune, isNewSelection = false) {
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(commune.latitude_mairie, commune.longitude_mairie, numAirports);
 
-    // --- AJOUT --- Auto-sélection du plus proche
     if (isNewSelection && closestAirports.length > 0) {
         selectedBingoAirportOaci = closestAirports[0].oaci;
         localStorage.setItem('selectedBingoAirport', selectedBingoAirportOaci);
     }
     
-    if (searchToggleControl) {
-        searchToggleControl.update(commune);
+    if (communeDisplayControl) {
+        communeDisplayControl.update(commune);
     }
     if (bingoCalculatorControl) {
         bingoCalculatorControl.update();
@@ -653,19 +653,36 @@ const BingoCalculatorControl = L.Control.extend({
 });
 
 // =========================================================================
-// CONTRÔLE UNIFIÉ POUR LA RECHERCHE ET L'AFFICHAGE
+// === CORRECTION === CONTRÔLES SÉPARÉS POUR LE STYLE ET LA LOGIQUE
 // =========================================================================
-const SearchToggleControl = L.Control.extend({
+const SearchToggleButtonControl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd: function(map) {
+        const container = L.DomUtil.create('div', 'leaflet-control');
+        const button = L.DomUtil.create('a', 'map-control-button', container);
+        button.innerHTML = '🏙️';
+        button.href = '#';
+
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(button, 'click', L.DomEvent.stop);
+        L.DomEvent.on(button, 'click', () => {
+            const uiOverlay = document.getElementById('ui-overlay');
+            const isOverlayVisible = uiOverlay.style.display !== 'none';
+            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
+            if (communeDisplayControl) {
+                communeDisplayControl.update(currentCommune);
+            }
+        });
+        return container;
+    }
+});
+
+const CommuneDisplayControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
-        const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
         
-        this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
-        this.toggleButton.innerHTML = '🏙️';
-        this.toggleButton.href = '#';
-
-        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
+        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', mainContainer);
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
@@ -673,13 +690,6 @@ const SearchToggleControl = L.Control.extend({
         versionDisplay.innerText = 'v5.8';
         
         L.DomEvent.disableClickPropagation(mainContainer);
-        L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
-        L.DomEvent.on(this.toggleButton, 'click', () => {
-            const uiOverlay = document.getElementById('ui-overlay');
-            const isOverlayVisible = uiOverlay.style.display !== 'none';
-            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
-            this.update(currentCommune);
-        });
         return mainContainer;
     },
     update: function (commune) {
