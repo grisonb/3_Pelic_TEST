@@ -82,7 +82,6 @@ function initMap() {
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    // --- CORRECTION --- Les contrôles sont maintenant de nouveau unifiés en un seul pour une gestion parfaite du layout
     searchToggleControl = new SearchToggleControl().addTo(map);
     bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
 
@@ -512,15 +511,19 @@ function handleGaarMapClick(e) {
 
 function redrawGaarCircuits() {
     gaarLayer.clearLayers();
-    gaarCircuits.forEach((circuit, circuitIndex) => {
+    gaarCircuits.forEach((circuit, circuitIndex) => { // Correction ici pour passer l'index
         if (!circuit || circuit.points.length === 0) return;
         
         const latlngs = circuit.points.map(p => [p.lat, p.lng]);
         
         if (latlngs.length >= 3) {
-            L.polygon(latlngs, { color: circuit.color }).addTo(gaarLayer);
+            L.polygon(latlngs, { 
+                color: circuit.color,
+                fillOpacity: 0.2,
+                weight: 2
+            }).addTo(gaarLayer);
         } else if (latlngs.length > 1) {
-            L.polyline(latlngs, { color: circuit.color }).addTo(gaarLayer);
+            L.polyline(latlngs, { color: circuit.color, weight: 2 }).addTo(gaarLayer);
         }
 
         circuit.points.forEach((point, pointIndex) => {
@@ -529,7 +532,8 @@ function redrawGaarCircuits() {
             }).addTo(gaarLayer);
 
             marker.bindTooltip(`${pointIndex + 1}. ${point.name}`, { permanent: true, direction: 'top', className: 'gaar-point-label' });
-
+            
+            // --- CORRECTION --- Utilisation de l'index du circuit pour l'ID
             const popupContent = `<div class="gaar-popup-form">
                 <input type="text" id="gaar-input-${circuitIndex}-${pointIndex}" value="${point.name}">
                 <button onclick="updateGaarPoint(${circuitIndex}, ${pointIndex})">OK</button>
@@ -540,11 +544,12 @@ function redrawGaarCircuits() {
     });
 }
 
-window.updateGaarPoint = async function(circuitIndex, pointIndex) {
+// --- CORRECTION --- Utilisation de l'index du circuit
+window.updateGaarPoint = function(circuitIndex, pointIndex) {
     const input = document.getElementById(`gaar-input-${circuitIndex}-${pointIndex}`);
-    const newName = input.value.trim();
-    if (newName) {
-        gaarCircuits[circuitIndex].points[pointIndex].name = newName;
+    const circuit = gaarCircuits[circuitIndex];
+    if (circuit && input && input.value.trim()) {
+        circuit.points[pointIndex].name = input.value.trim();
         redrawGaarCircuits();
         saveGaarCircuits();
         map.closePopup();
@@ -552,12 +557,14 @@ window.updateGaarPoint = async function(circuitIndex, pointIndex) {
 };
 
 window.deleteGaarPoint = function(circuitIndex, pointIndex) {
-    gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
-    if (gaarCircuits[circuitIndex].points.length === 0) {
-        gaarCircuits.splice(circuitIndex, 1);
+    if (gaarCircuits[circuitIndex]) {
+        gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
+        if (gaarCircuits[circuitIndex].points.length === 0) {
+            gaarCircuits.splice(circuitIndex, 1);
+        }
+        redrawGaarCircuits();
+        saveGaarCircuits();
     }
-    redrawGaarCircuits();
-    saveGaarCircuits();
 };
 
 function clearAllGaarCircuits() {
@@ -658,7 +665,6 @@ const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
-        // --- CORRECTION --- Utilisation d'un conteneur flexbox qui ne porte PAS la classe .leaflet-bar
         const topBar = L.DomUtil.create('div', 'search-toggle-container', mainContainer);
         
         this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
@@ -670,7 +676,7 @@ const SearchToggleControl = L.Control.extend({
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        versionDisplay.innerText = 'v5.8';
+        versionDisplay.innerText = 'v5.9';
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
@@ -705,4 +711,4 @@ const SearchToggleControl = L.Control.extend({
     }
 });
 
-function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
+function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }```
