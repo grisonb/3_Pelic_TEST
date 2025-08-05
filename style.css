@@ -208,6 +208,7 @@ html, body {
     border-color: #1f7a35;
 }
 
+
 .airport-popup .popup-buttons {
     display: flex;
     gap: 5px;
@@ -227,12 +228,6 @@ html, body {
 .airport-popup .water-btn { background-color: var(--water-color); }
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
-
-.search-toggle-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
 
 .commune-display-control {
     background-color: white;
