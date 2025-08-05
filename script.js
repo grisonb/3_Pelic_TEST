@@ -546,7 +546,7 @@ function saveGaarCircuits() {
 }
 
 // =========================================================================
-// CONTRÔLE : CALCULATRICE BINGO
+// CONTRÔLE : CALCULATRICE BINGO (MODIFIÉ)
 // =========================================================================
 const BingoCalculatorControl = L.Control.extend({
     options: { position: 'topright' },
@@ -559,7 +559,20 @@ const BingoCalculatorControl = L.Control.extend({
 
         this.panel = L.DomUtil.create('div', '', container);
         this.panel.id = 'bingo-panel';
-        this.panel.innerHTML = 'Sélectionnez un feu';
+        
+        this.panel.innerHTML = `
+            <div class="bingo-input-group">
+                <label for="bingo-fuel-input">FUEL</label>
+                <input type="number" id="bingo-fuel-input" placeholder="kg">
+            </div>
+            <div class="bingo-input-group">
+                <label for="bingo-time-input">Fin dispo</label>
+                <input type="time" id="bingo-time-input">
+            </div>
+            <div id="bingo-results">Sélectionnez un feu</div>
+        `;
+        
+        this.resultsDiv = this.panel.querySelector('#bingo-results');
 
         L.DomEvent.disableClickPropagation(container);
         L.DomEvent.on(this.button, 'click', L.DomEvent.stop);
@@ -574,38 +587,36 @@ const BingoCalculatorControl = L.Control.extend({
             this.update();
         }
     },
-    // === MODIFICATION === Logique de calcul mise à jour
     update: function() {
+        if (!this.resultsDiv) return;
+
         if (!currentCommune) {
-            this.panel.innerHTML = 'Sélectionnez un feu';
+            this.resultsDiv.innerHTML = 'Sélectionnez un feu';
             return;
         }
 
         const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
         if (!lftwAirport) {
-            this.panel.innerHTML = 'Erreur: LFTW introuvable';
+            this.resultsDiv.innerHTML = 'Erreur: LFTW introuvable';
             return;
         }
 
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
         let panelHtml = '';
 
-        // 1. Calcul pour LFTW
         const distanceLftw = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
         const fuelLftw = (distanceLftw <= 70 ? distanceLftw * 5 : distanceLftw * 4) + 700;
         panelHtml += `BINGO LFTW<br><span>${Math.round(fuelLftw)} kg</span>`;
         
-        // 2. Calcul pour les pélicandromes sélectionnés
         const numAirports = parseInt(document.getElementById('airport-count').value, 10);
         const closestAirports = getClosestAirports(lat, lon, numAirports);
 
         closestAirports.forEach(airport => {
-            // airport.distance est déjà calculé par getClosestAirports
             const fuelAirport = (airport.distance <= 70 ? airport.distance * 5 : airport.distance * 4) + 700;
             panelHtml += `<br><br>BINGO ${airport.oaci}<br><span>${Math.round(fuelAirport)} kg</span>`;
         });
 
-        this.panel.innerHTML = panelHtml;
+        this.resultsDiv.innerHTML = panelHtml;
     },
     hidePanel: function() {
         this.panel.style.display = 'none';
@@ -627,7 +638,7 @@ const SearchToggleControl = L.Control.extend({
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
         // --- MISE À JOUR DE LA VERSION ---
-        versionDisplay.innerText = 'v5.3'; 
+        versionDisplay.innerText = 'v5.4'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
