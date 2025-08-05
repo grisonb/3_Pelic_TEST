@@ -199,6 +199,7 @@ html, body {
     font-size: 14px;
     font-weight: bold;
     color: #333;
+    pointer-events: none; /* L'étiquette n'intercepte plus les clics */
 }
 
 .leaflet-tooltip.route-tooltip-selected {
@@ -228,8 +229,7 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
-/* === MODIFICATION === Style du conteneur de l'affichage du feu */
-.commune-display-container {
+.search-toggle-container {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -237,7 +237,7 @@ html, body {
 
 .commune-display-control {
     background-color: white;
-    display: none; /* Reste caché par défaut */
+    display: none;
     align-items: center;
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
     border-radius: var(--border-radius);
@@ -251,7 +251,6 @@ html, body {
     justify-content: space-between;
 }
 
-/* === MODIFICATION === Classe commune pour les boutons de contrôle */
 .map-control-button {
     width: 52px;
     height: 52px;
