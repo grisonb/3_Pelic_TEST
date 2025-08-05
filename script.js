@@ -240,12 +240,10 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     if (searchToggleControl) {
         searchToggleControl.updateDisplay(commune);
     }
-
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
     document.getElementById('clear-search').style.display = 'block';
-
     const popupContent = `<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`;
     
     const allPoints = [[lat, lon]];
@@ -281,7 +279,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing, isLftwRoute } = options;
+    const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     let labelText;
 
@@ -294,7 +292,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         color = 'var(--secondary-color)';
         dashArray = '5, 10';
         layer = userToTargetLayer;
-    } else if (isLftwRoute) {
+    } else if (options.isLftwRoute) {
         labelText = `LFTW: ${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
         color = 'var(--success-color)';
         dashArray = '5, 10';
@@ -305,11 +303,16 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         labelText = `${Math.round(distance)} Nm`;
     }
     
-    const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
+    const polyline = L.polyline([startLatLng, endLatLng], { 
+        color, 
+        weight: 3, 
+        opacity: 0.8, 
+        dashArray
+    }).addTo(layer);
 
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
-    } else if (oaci || isLftwRoute) {
+    } else if (oaci || options.isLftwRoute) {
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
@@ -382,7 +385,8 @@ function findClosestCommuneName(lat, lon) {
             closestCommune = commune;
         }
     }
-    if (closestCommune && minDistance < 27) { // ~50 km
+    // Augmentation du seuil pour trouver une commune même si un peu éloigné
+    if (closestCommune && minDistance < 50) { // ~92 km
         return closestCommune.nom_standard;
     }
     return null;
@@ -392,7 +396,7 @@ function toggleLftwRoute() {
     showLftwRoute = !showLftwRoute;
     localStorage.setItem('showLftwRoute', showLftwRoute);
     updateLftwButtonState();
-    if (currentCommune) {
+    if(currentCommune) {
         displayCommuneDetails(currentCommune, false);
     }
 }
@@ -447,7 +451,10 @@ function toggleGaarDrawingMode() {
     status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
 }
 
-async function handleGaarMapClick(e) {
+// =========================================================================
+// == MODIFICATION CLÉ POUR LE NOMMAGE HORS-LIGNE ==
+// =========================================================================
+function handleGaarMapClick(e) {
     if (!isDrawingMode) return;
     
     let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3);
@@ -461,25 +468,14 @@ async function handleGaarMapClick(e) {
         gaarCircuits.push(targetCircuit);
     }
     
-    const pointName = await reverseGeocode(e.latlng) || `Point Manuel`;
+    // Utilisation de la fonction locale/hors-ligne pour trouver le nom de la commune
+    const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Point Manuel';
     targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
     
+    document.getElementById('gaar-status').textContent = `Point ajouté près de ${pointName}.`;
+
     redrawGaarCircuits();
     saveGaarCircuits();
-}
-
-async function reverseGeocode(latlng) {
-    document.getElementById('gaar-status').textContent = 'Recherche du nom...';
-    try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latlng.lat}&lon=${latlng.lng}&zoom=10`);
-        const data = await response.json();
-        const name = data.address.city || data.address.town || data.address.village || data.display_name.split(',')[0];
-        document.getElementById('gaar-status').textContent = `Point ajouté près de ${name}.`;
-        return name;
-    } catch (error) {
-        document.getElementById('gaar-status').textContent = 'Nom non trouvé.';
-        return null;
-    }
 }
 
 function redrawGaarCircuits() {
@@ -554,7 +550,10 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v5.0';
+        
+        // --- MISE À JOUR DE LA VERSION ---
+        versionDisplay.innerText = 'v5.1'; 
+        
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
