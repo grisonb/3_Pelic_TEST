@@ -21,6 +21,8 @@ let isGaarMode = false;
 let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
+// --- AJOUT --- variable pour suivre l'aéroport sélectionné pour le BINGO
+let selectedBingoAirportOaci = null; 
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -172,6 +174,7 @@ function setupEventListeners() {
         drawPermanentAirportMarkers();
         currentCommune = null;
         localStorage.removeItem('currentCommune');
+        selectedBingoAirportOaci = null; // Réinitialiser l'aéroport sélectionné
         if (searchToggleControl) {
             searchToggleControl.updateDisplay(null);
         }
@@ -183,6 +186,7 @@ function setupEventListeners() {
         map.setView([46.6, 2.2], 5.5);
     });
     airportCountInput.addEventListener('input', () => {
+        selectedBingoAirportOaci = null; // Réinitialiser si le nombre change
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
     gpsFeuButton.addEventListener('click', () => {
@@ -245,6 +249,11 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
     
+    // Réinitialiser la sélection BINGO si on change de commune
+    if (shouldFitBounds) {
+        selectedBingoAirportOaci = null;
+    }
+
     if (searchToggleControl) {
         searchToggleControl.updateDisplay(commune);
     }
@@ -290,6 +299,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     }
 }
 
+// --- MODIFICATION --- La fonction drawRoute gère maintenant le clic sur les étiquettes
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
@@ -325,7 +335,30 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci || options.isLftwRoute) {
-        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
+        // Déterminer si l'étiquette doit être verte
+        const isSelected = oaci === selectedBingoAirportOaci;
+        const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip';
+
+        const routeTooltip = L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass })
+            .setLatLng(endLatLng)
+            .setContent(labelText)
+            .addTo(layer);
+        
+        // Ajouter un écouteur d'événement de clic uniquement pour les pélicandromes
+        if (oaci) {
+            L.DomEvent.on(routeTooltip.getElement(), 'click', () => {
+                // Si on clique sur celui déjà sélectionné, on le désélectionne
+                if (selectedBingoAirportOaci === oaci) {
+                    selectedBingoAirportOaci = null;
+                } else {
+                    selectedBingoAirportOaci = oaci;
+                }
+                // Redessiner les détails pour mettre à jour les couleurs des étiquettes
+                displayCommuneDetails(currentCommune, false);
+                // Mettre à jour le panneau BINGO
+                bingoCalculatorControl.update();
+            });
+        }
     }
 }
 
@@ -560,13 +593,14 @@ const BingoCalculatorControl = L.Control.extend({
         this.panel = L.DomUtil.create('div', '', container);
         this.panel.id = 'bingo-panel';
         
+        // --- MODIFICATION --- Renommage en "TMD"
         this.panel.innerHTML = `
             <div class="bingo-input-group">
                 <label for="bingo-fuel-input">FUEL</label>
                 <input type="number" id="bingo-fuel-input" placeholder="kg">
             </div>
             <div class="bingo-input-group">
-                <label for="bingo-time-input">Fin dispo</label>
+                <label for="bingo-time-input">TMD</label>
                 <input type="time" id="bingo-time-input">
             </div>
             <div id="bingo-results">Sélectionnez un feu</div>
@@ -587,6 +621,7 @@ const BingoCalculatorControl = L.Control.extend({
             this.update();
         }
     },
+    // --- MODIFICATION --- Logique de calcul et d'affichage entièrement revue
     update: function() {
         if (!this.resultsDiv) return;
 
@@ -602,21 +637,24 @@ const BingoCalculatorControl = L.Control.extend({
         }
 
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
-        let panelHtml = '';
+        let resultsHtml = '';
 
+        // 1. Calcul pour LFTW
         const distanceLftw = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
         const fuelLftw = (distanceLftw <= 70 ? distanceLftw * 5 : distanceLftw * 4) + 700;
-        panelHtml += `BINGO LFTW<br><span>${Math.round(fuelLftw)} kg</span>`;
+        resultsHtml += `<p>BINGO LFTW: <span>${Math.round(fuelLftw)} kg</span></p>`;
         
-        const numAirports = parseInt(document.getElementById('airport-count').value, 10);
-        const closestAirports = getClosestAirports(lat, lon, numAirports);
+        // 2. Calcul pour le pélicandrome sélectionné (s'il y en a un)
+        if (selectedBingoAirportOaci) {
+            const selectedAirport = airports.find(ap => ap.oaci === selectedBingoAirportOaci);
+            if (selectedAirport) {
+                const distanceAirport = calculateDistanceInNm(lat, lon, selectedAirport.lat, selectedAirport.lon);
+                const fuelAirport = (distanceAirport <= 70 ? distanceAirport * 5 : distanceAirport * 4) + 700;
+                resultsHtml += `<p>BINGO ${selectedAirport.oaci}: <span>${Math.round(fuelAirport)} kg</span></p>`;
+            }
+        }
 
-        closestAirports.forEach(airport => {
-            const fuelAirport = (airport.distance <= 70 ? airport.distance * 5 : airport.distance * 4) + 700;
-            panelHtml += `<br><br>BINGO ${airport.oaci}<br><span>${Math.round(fuelAirport)} kg</span>`;
-        });
-
-        this.resultsDiv.innerHTML = panelHtml;
+        this.resultsDiv.innerHTML = resultsHtml;
     },
     hidePanel: function() {
         this.panel.style.display = 'none';
@@ -630,7 +668,8 @@ const SearchToggleControl = L.Control.extend({
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
         const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
         this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
-        this.toggleButton.innerHTML = '🏠';
+        // --- MODIFICATION --- Remplacement de l'icône maison
+        this.toggleButton.innerHTML = '☰';
         this.toggleButton.href = '#';
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
@@ -638,7 +677,7 @@ const SearchToggleControl = L.Control.extend({
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
         // --- MISE À JOUR DE LA VERSION ---
-        versionDisplay.innerText = 'v5.4'; 
+        versionDisplay.innerText = 'v5.5'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
