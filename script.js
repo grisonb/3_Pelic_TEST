@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // VARIABLES GLOBALES
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
-let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
+let disabledAirports = new Set(), waterAirports = new Set();
+let searchToggleControl, bingoCalculatorControl; // Ajout de bingoCalculatorControl
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -77,7 +78,11 @@ function initMap() {
     if (map) return;
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+    
+    // Ajout des contrôles personnalisés
     searchToggleControl = new SearchToggleControl().addTo(map);
+    bingoCalculatorControl = new BingoCalculatorControl().addTo(map); // Ajout du contrôle BINGO
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
@@ -171,6 +176,10 @@ function setupEventListeners() {
         if (searchToggleControl) {
             searchToggleControl.updateDisplay(null);
         }
+        if (bingoCalculatorControl) { // Mise à jour BINGO
+            bingoCalculatorControl.update();
+            bingoCalculatorControl.hidePanel();
+        }
         navigator.geolocation.getCurrentPosition(updateUserPosition);
         map.setView([46.6, 2.2], 5.5);
     });
@@ -240,6 +249,10 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     if (searchToggleControl) {
         searchToggleControl.updateDisplay(commune);
     }
+    if (bingoCalculatorControl) { // Mise à jour BINGO
+        bingoCalculatorControl.update();
+    }
+
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
@@ -385,8 +398,7 @@ function findClosestCommuneName(lat, lon) {
             closestCommune = commune;
         }
     }
-    // Augmentation du seuil pour trouver une commune même si un peu éloigné
-    if (closestCommune && minDistance < 50) { // ~92 km
+    if (closestCommune && minDistance < 50) {
         return closestCommune.nom_standard;
     }
     return null;
@@ -451,9 +463,6 @@ function toggleGaarDrawingMode() {
     status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
 }
 
-// =========================================================================
-// == MODIFICATION CLÉ POUR LE NOMMAGE HORS-LIGNE ==
-// =========================================================================
 function handleGaarMapClick(e) {
     if (!isDrawingMode) return;
     
@@ -468,7 +477,6 @@ function handleGaarMapClick(e) {
         gaarCircuits.push(targetCircuit);
     }
     
-    // Utilisation de la fonction locale/hors-ligne pour trouver le nom de la commune
     const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Point Manuel';
     targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
     
@@ -538,6 +546,56 @@ function saveGaarCircuits() {
     localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits));
 }
 
+// =========================================================================
+// == NOUVEAU CONTRÔLE : CALCULATRICE BINGO ==
+// =========================================================================
+const BingoCalculatorControl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function(map) {
+        const container = L.DomUtil.create('div', 'leaflet-control bingo-calculator-container');
+        this.button = L.DomUtil.create('a', '', container);
+        this.button.id = 'bingo-calculator-button';
+        this.button.innerHTML = '🧮';
+        this.button.href = '#';
+
+        this.panel = L.DomUtil.create('div', '', container);
+        this.panel.id = 'bingo-panel';
+        this.panel.innerHTML = 'Sélectionnez un feu';
+
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.on(this.button, 'click', L.DomEvent.stop);
+        L.DomEvent.on(this.button, 'click', this.togglePanel, this);
+
+        return container;
+    },
+    togglePanel: function() {
+        const panelStyle = this.panel.style;
+        panelStyle.display = panelStyle.display === 'block' ? 'none' : 'block';
+        if (panelStyle.display === 'block') {
+            this.update();
+        }
+    },
+    update: function() {
+        if (!currentCommune) {
+            this.panel.innerHTML = 'Sélectionnez un feu';
+            return;
+        }
+        const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
+        if (!lftwAirport) {
+            this.panel.innerHTML = 'Erreur: LFTW introuvable';
+            return;
+        }
+        const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
+        const distance = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
+        const fuel = distance <= 70 ? distance * 5 : distance * 4;
+        this.panel.innerHTML = `BINGO LFTW<br><span>${Math.round(fuel)} kg</span>`;
+    },
+    hidePanel: function() {
+        this.panel.style.display = 'none';
+    }
+});
+
+
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
@@ -551,8 +609,7 @@ const SearchToggleControl = L.Control.extend({
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        // --- MISE À JOUR DE LA VERSION ---
-        versionDisplay.innerText = 'v5.1'; 
+        versionDisplay.innerText = 'v5.2'; // --- MISE À JOUR DE LA VERSION ---
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
