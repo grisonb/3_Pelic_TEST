@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
 let disabledAirports = new Set(), waterAirports = new Set();
-let searchToggleControl, communeDisplayControl, bingoCalculatorControl;
+let searchToggleControl, bingoCalculatorControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -82,9 +82,8 @@ function initMap() {
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     
-    // --- CORRECTION --- Instanciation des contrôles séparés
-    searchToggleControl = new SearchToggleButtonControl().addTo(map);
-    communeDisplayControl = new CommuneDisplayControl().addTo(map);
+    // --- CORRECTION --- Les contrôles sont maintenant de nouveau unifiés en un seul pour une gestion parfaite du layout
+    searchToggleControl = new SearchToggleControl().addTo(map);
     bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
@@ -179,8 +178,8 @@ function setupEventListeners() {
         localStorage.removeItem('currentCommune');
         selectedBingoAirportOaci = null;
         localStorage.removeItem('selectedBingoAirport');
-        if (communeDisplayControl) {
-            communeDisplayControl.update(null);
+        if (searchToggleControl) {
+            searchToggleControl.update(null);
         }
         if (bingoCalculatorControl) {
             bingoCalculatorControl.update();
@@ -262,8 +261,8 @@ function displayCommuneDetails(commune, isNewSelection = false) {
         localStorage.setItem('selectedBingoAirport', selectedBingoAirportOaci);
     }
     
-    if (communeDisplayControl) {
-        communeDisplayControl.update(commune);
+    if (searchToggleControl) {
+        searchToggleControl.update(commune);
     }
     if (bingoCalculatorControl) {
         bingoCalculatorControl.update();
@@ -577,7 +576,7 @@ function saveGaarCircuits() {
 const BingoCalculatorControl = L.Control.extend({
     options: { position: 'topright' },
     onAdd: function(map) {
-        const container = L.DomUtil.create('div', 'leaflet-control bingo-calculator-container');
+        const container = L.DomUtil.create('div', 'leaflet-control');
         this.button = L.DomUtil.create('a', 'map-control-button', container);
         this.button.innerHTML = '🧮';
         this.button.href = '#';
@@ -653,36 +652,20 @@ const BingoCalculatorControl = L.Control.extend({
 });
 
 // =========================================================================
-// === CORRECTION === CONTRÔLES SÉPARÉS POUR LE STYLE ET LA LOGIQUE
+// CONTRÔLE UNIFIÉ POUR LA RECHERCHE ET L'AFFICHAGE
 // =========================================================================
-const SearchToggleButtonControl = L.Control.extend({
-    options: { position: 'topleft' },
-    onAdd: function(map) {
-        const container = L.DomUtil.create('div', 'leaflet-control');
-        const button = L.DomUtil.create('a', 'map-control-button', container);
-        button.innerHTML = '🏙️';
-        button.href = '#';
-
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(button, 'click', L.DomEvent.stop);
-        L.DomEvent.on(button, 'click', () => {
-            const uiOverlay = document.getElementById('ui-overlay');
-            const isOverlayVisible = uiOverlay.style.display !== 'none';
-            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
-            if (communeDisplayControl) {
-                communeDisplayControl.update(currentCommune);
-            }
-        });
-        return container;
-    }
-});
-
-const CommuneDisplayControl = L.Control.extend({
+const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
+        // --- CORRECTION --- Utilisation d'un conteneur flexbox qui ne porte PAS la classe .leaflet-bar
+        const topBar = L.DomUtil.create('div', 'search-toggle-container', mainContainer);
         
-        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', mainContainer);
+        this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
+        this.toggleButton.innerHTML = '🏙️';
+        this.toggleButton.href = '#';
+
+        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
@@ -690,6 +673,13 @@ const CommuneDisplayControl = L.Control.extend({
         versionDisplay.innerText = 'v5.8';
         
         L.DomEvent.disableClickPropagation(mainContainer);
+        L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
+        L.DomEvent.on(this.toggleButton, 'click', () => {
+            const uiOverlay = document.getElementById('ui-overlay');
+            const isOverlayVisible = uiOverlay.style.display !== 'none';
+            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
+            this.update(currentCommune);
+        });
         return mainContainer;
     },
     update: function (commune) {
