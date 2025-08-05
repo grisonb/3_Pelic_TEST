@@ -1,6 +1,6 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v94'; // Version pour la persistance des données et le fix du clic
+const APP_CACHE_NAME = 'communes-app-cache-v95'; // Version pour la persistance des données et le fix du clic
 const DATA_CACHE_NAME = 'communes-data-cache-v1';
 const TILE_CACHE_NAME = 'communes-tile-cache-v1';
 
