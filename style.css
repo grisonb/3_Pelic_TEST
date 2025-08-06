@@ -265,20 +265,16 @@ html, body {
 }
 
 .search-toggle-button {
-    background-color: white;
-    display: flex;
-    align-items: center;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-    border-radius: var(--border-radius);
-    border: 1px solid rgba(0,0,0,0.2);
-    width: 52px;
-    height: 52px;
-    justify-content: center;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    width: auto;
+    height: auto;
+    padding: 5px;
     cursor: pointer;
-    font-size: 2.2em !important; /* Ajusté pour la nouvelle icône */
-    color: var(--primary-color);
+    font-size: 2.8em !important;
     text-decoration: none;
-    line-height: 52px; /* Centrage vertical de l'emoji */
+    line-height: 1; 
 }
 
 .version-display {
@@ -291,7 +287,7 @@ html, body {
     margin: -1px 2px 0 2px;
 }
 
-#gps-feu-button, #live-gps-button {
+#live-gps-button {
     flex-shrink: 0;
     width: 48px;
     height: 48px;
@@ -309,8 +305,29 @@ html, body {
     transition: background-color 0.2s, color 0.2s;
 }
 
-#gps-feu-button:hover, #live-gps-button:hover {
+#live-gps-button:hover {
     background-color: #e9f5ff;
+}
+
+#gps-feu-button {
+    position: absolute;
+    top: var(--safe-area-top);
+    right: 20px;
+    z-index: 1001;
+    width: 90px;
+    height: 90px;
+    font-size: 48px;
+    border: 2px solid var(--border-color);
+    border-radius: 20px;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    color: var(--primary-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
 }
 
 #live-gps-button.active {
@@ -420,4 +437,5 @@ html, body {
     background-color: var(--secondary-color);
     color: white;
     border-color: var(--secondary-color);
-}
+}```
+--- FIN DU FICHIER style.css ---
