@@ -385,8 +385,7 @@ function findClosestCommuneName(lat, lon) {
             closestCommune = commune;
         }
     }
-    // Augmentation du seuil pour trouver une commune même si un peu éloigné
-    if (closestCommune && minDistance < 50) { // ~92 km
+    if (closestCommune && minDistance < 27) { // ~50 km
         return closestCommune.nom_standard;
     }
     return null;
@@ -451,10 +450,7 @@ function toggleGaarDrawingMode() {
     status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
 }
 
-// =========================================================================
-// == MODIFICATION CLÉ POUR LE NOMMAGE HORS-LIGNE ==
-// =========================================================================
-function handleGaarMapClick(e) {
+async function handleGaarMapClick(e) {
     if (!isDrawingMode) return;
     
     let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3);
@@ -468,14 +464,25 @@ function handleGaarMapClick(e) {
         gaarCircuits.push(targetCircuit);
     }
     
-    // Utilisation de la fonction locale/hors-ligne pour trouver le nom de la commune
-    const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Point Manuel';
+    const pointName = await reverseGeocode(e.latlng) || `Point Manuel`;
     targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
     
-    document.getElementById('gaar-status').textContent = `Point ajouté près de ${pointName}.`;
-
     redrawGaarCircuits();
     saveGaarCircuits();
+}
+
+async function reverseGeocode(latlng) {
+    document.getElementById('gaar-status').textContent = 'Recherche du nom...';
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latlng.lat}&lon=${latlng.lng}&zoom=10`);
+        const data = await response.json();
+        const name = data.address.city || data.address.town || data.address.village || data.display_name.split(',')[0];
+        document.getElementById('gaar-status').textContent = `Point ajouté près de ${name}.`;
+        return name;
+    } catch (error) {
+        document.getElementById('gaar-status').textContent = 'Nom non trouvé.';
+        return null;
+    }
 }
 
 function redrawGaarCircuits() {
@@ -550,10 +557,7 @@ const SearchToggleControl = L.Control.extend({
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        
-        // --- MISE À JOUR DE LA VERSION ---
-        versionDisplay.innerText = 'v6.0'; 
-        
+        versionDisplay.innerText = 'v4.9';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
