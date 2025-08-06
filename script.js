@@ -10,9 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // VARIABLES GLOBALES
 // =========================================================================
 let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
-let disabledAirports = new Set(), waterAirports = new Set();
-// --- CORRECTION --- On garde une seule variable pour le contrôle unifié
-let searchToggleControl, bingoCalculatorControl; 
+let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
 let userToTargetLayer = null, lftwRouteLayer = null;
@@ -22,7 +20,6 @@ let isGaarMode = false;
 let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
-let selectedBingoAirportOaci = null; 
 const airports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }
 ];
@@ -50,8 +47,6 @@ async function initializeApp() {
     if (savedGaarJSON) {
         gaarCircuits = JSON.parse(savedGaarJSON);
     }
-    selectedBingoAirportOaci = localStorage.getItem('selectedBingoAirport') || null;
-
     try {
         const response = await fetch('./communes.json');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -70,8 +65,8 @@ async function initializeApp() {
         const savedCommuneJSON = localStorage.getItem('currentCommune');
         if (savedCommuneJSON) {
             currentCommune = JSON.parse(savedCommuneJSON);
+            displayCommuneDetails(currentCommune, true);
             document.getElementById('ui-overlay').style.display = 'none';
-            displayCommuneDetails(currentCommune, false);
         }
     } catch (error) {
         statusMessage.textContent = `❌ Erreur: ${error.message}`;
@@ -82,10 +77,7 @@ function initMap() {
     if (map) return;
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    
     searchToggleControl = new SearchToggleControl().addTo(map);
-    bingoCalculatorControl = new BingoCalculatorControl().addTo(map);
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
@@ -104,8 +96,8 @@ function initMap() {
         const manualCommune = { nom_standard: pointName, latitude_mairie: e.latlng.lat, longitude_mairie: e.latlng.lng, isManual: true };
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
+        displayCommuneDetails(manualCommune, false);
         document.getElementById('ui-overlay').style.display = 'none';
-        displayCommuneDetails(manualCommune, true);
     });
 }
 
@@ -176,21 +168,13 @@ function setupEventListeners() {
         drawPermanentAirportMarkers();
         currentCommune = null;
         localStorage.removeItem('currentCommune');
-        selectedBingoAirportOaci = null;
-        localStorage.removeItem('selectedBingoAirport');
         if (searchToggleControl) {
-            searchToggleControl.update(null);
-        }
-        if (bingoCalculatorControl) {
-            bingoCalculatorControl.update();
-            bingoCalculatorControl.hidePanel();
+            searchToggleControl.updateDisplay(null);
         }
         navigator.geolocation.getCurrentPosition(updateUserPosition);
         map.setView([46.6, 2.2], 5.5);
     });
     airportCountInput.addEventListener('input', () => {
-        selectedBingoAirportOaci = null;
-        localStorage.removeItem('selectedBingoAirport');
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
     gpsFeuButton.addEventListener('click', () => {
@@ -205,8 +189,8 @@ function setupEventListeners() {
                 const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
                 currentCommune = gpsCommune;
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
+                displayCommuneDetails(gpsCommune, false);
                 document.getElementById('ui-overlay').style.display = 'none';
-                displayCommuneDetails(gpsCommune, true);
             },
             () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
             { enableHighAccuracy: true }
@@ -237,8 +221,8 @@ function displayResults(results) {
             li.addEventListener('click', () => {
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
+                displayCommuneDetails(c);
                 document.getElementById('ui-overlay').style.display = 'none';
-                displayCommuneDetails(c, true);
             });
             resultsList.appendChild(li);
         });
@@ -247,27 +231,15 @@ function displayResults(results) {
     }
 }
 
-function displayCommuneDetails(commune, isNewSelection = false) {
+function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
     userToTargetLayer.clearLayers();
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
     
-    const numAirports = parseInt(document.getElementById('airport-count').value, 10);
-    const closestAirports = getClosestAirports(commune.latitude_mairie, commune.longitude_mairie, numAirports);
-
-    if (isNewSelection && closestAirports.length > 0) {
-        selectedBingoAirportOaci = closestAirports[0].oaci;
-        localStorage.setItem('selectedBingoAirport', selectedBingoAirportOaci);
-    }
-    
     if (searchToggleControl) {
-        searchToggleControl.update(commune);
+        searchToggleControl.updateDisplay(commune);
     }
-    if (bingoCalculatorControl) {
-        bingoCalculatorControl.update();
-    }
-
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
@@ -278,6 +250,8 @@ function displayCommuneDetails(commune, isNewSelection = false) {
     const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
     L.marker([lat, lon], { icon: fireIcon }).bindPopup(popupContent).addTo(routesLayer);
     
+    const numAirports = parseInt(document.getElementById('airport-count').value, 10);
+    const closestAirports = getClosestAirports(lat, lon, numAirports);
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
@@ -290,7 +264,7 @@ function displayCommuneDetails(commune, isNewSelection = false) {
     
     navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
 
-    if (isNewSelection) {
+    if (shouldFitBounds) {
         setTimeout(() => {
             if (userMarker && userMarker.getLatLng()) {
                 allPoints.push(userMarker.getLatLng());
@@ -308,7 +282,10 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     let labelText;
-    let color = 'var(--primary-color)', dashArray = '', layer = routesLayer;
+
+    let color = 'var(--primary-color)';
+    let dashArray = '';
+    let layer = routesLayer;
 
     if (isUser) {
         labelText = `${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
@@ -325,36 +302,18 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
     } else {
         labelText = `${Math.round(distance)} Nm`;
     }
-
-    if (oaci) {
-        L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 22, opacity: 0, interactive: true })
-            .on('click', () => {
-                const newSelection = (selectedBingoAirportOaci === oaci) ? null : oaci;
-                selectedBingoAirportOaci = newSelection;
-                if (newSelection) {
-                    localStorage.setItem('selectedBingoAirport', newSelection);
-                } else {
-                    localStorage.removeItem('selectedBingoAirport');
-                }
-                displayCommuneDetails(currentCommune, false);
-            })
-            .addTo(layer);
-    }
-
-    const visibleLine = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray, interactive: false }).addTo(layer);
     
+    const polyline = L.polyline([startLatLng, endLatLng], { 
+        color, 
+        weight: 3, 
+        opacity: 0.8, 
+        dashArray
+    }).addTo(layer);
+
     if (isUser) {
-        L.tooltip({ permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true, interactive: false })
-           .setLatLng(visibleLine.getCenter())
-           .setContent(labelText)
-           .addTo(layer);
+        polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci || options.isLftwRoute) {
-        const isSelected = oaci === selectedBingoAirportOaci;
-        const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip';
-        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass, interactive: false })
-            .setLatLng(endLatLng)
-            .setContent(labelText)
-            .addTo(layer);
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
 
@@ -373,6 +332,7 @@ function toggleLiveGps() {
         watchId = null;
         liveGpsButton.classList.remove('active');
         localStorage.setItem('liveGpsActive', 'false');
+        console.log("Suivi GPS désactivé.");
     } else {
         if (!navigator.geolocation) {
             alert("La géolocalisation n'est pas supportée.");
@@ -389,6 +349,7 @@ function toggleLiveGps() {
         );
         liveGpsButton.classList.add('active');
         localStorage.setItem('liveGpsActive', 'true');
+        console.log("Suivi GPS activé.");
     }
 }
 
@@ -405,9 +366,11 @@ function updateUserPosition(pos) {
 
     if (currentCommune) {
         const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
-        const trueBearing = calculateBearing(userLat, userLon, lat, lon);
-        const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
-        drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
+        if (lat.toFixed(6) !== userLat.toFixed(6) || lon.toFixed(6) !== userLon.toFixed(6)) {
+            const trueBearing = calculateBearing(userLat, userLon, lat, lon);
+            const magneticBearing = (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
+            drawRoute([userLat, userLon], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
+        }
     }
 }
 
@@ -422,7 +385,8 @@ function findClosestCommuneName(lat, lon) {
             closestCommune = commune;
         }
     }
-    if (closestCommune && minDistance < 50) {
+    // Augmentation du seuil pour trouver une commune même si un peu éloigné
+    if (closestCommune && minDistance < 50) { // ~92 km
         return closestCommune.nom_standard;
     }
     return null;
@@ -518,13 +482,9 @@ function redrawGaarCircuits() {
         const latlngs = circuit.points.map(p => [p.lat, p.lng]);
         
         if (latlngs.length >= 3) {
-            L.polygon(latlngs, { 
-                color: circuit.color,
-                fillOpacity: 0.2,
-                weight: 2
-            }).addTo(gaarLayer);
+            L.polygon(latlngs, { color: circuit.color }).addTo(gaarLayer);
         } else if (latlngs.length > 1) {
-            L.polyline(latlngs, { color: circuit.color, weight: 2 }).addTo(gaarLayer);
+            L.polyline(latlngs, { color: circuit.color }).addTo(gaarLayer);
         }
 
         circuit.points.forEach((point, pointIndex) => {
@@ -533,7 +493,7 @@ function redrawGaarCircuits() {
             }).addTo(gaarLayer);
 
             marker.bindTooltip(`${pointIndex + 1}. ${point.name}`, { permanent: true, direction: 'top', className: 'gaar-point-label' });
-            
+
             const popupContent = `<div class="gaar-popup-form">
                 <input type="text" id="gaar-input-${circuitIndex}-${pointIndex}" value="${point.name}">
                 <button onclick="updateGaarPoint(${circuitIndex}, ${pointIndex})">OK</button>
@@ -544,11 +504,11 @@ function redrawGaarCircuits() {
     });
 }
 
-window.updateGaarPoint = function(circuitIndex, pointIndex) {
+window.updateGaarPoint = async function(circuitIndex, pointIndex) {
     const input = document.getElementById(`gaar-input-${circuitIndex}-${pointIndex}`);
-    const circuit = gaarCircuits[circuitIndex];
-    if (circuit && input && input.value.trim()) {
-        circuit.points[pointIndex].name = input.value.trim();
+    const newName = input.value.trim();
+    if (newName) {
+        gaarCircuits[circuitIndex].points[pointIndex].name = newName;
         redrawGaarCircuits();
         saveGaarCircuits();
         map.closePopup();
@@ -556,14 +516,12 @@ window.updateGaarPoint = function(circuitIndex, pointIndex) {
 };
 
 window.deleteGaarPoint = function(circuitIndex, pointIndex) {
-    if (gaarCircuits[circuitIndex]) {
-        gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
-        if (gaarCircuits[circuitIndex].points.length === 0) {
-            gaarCircuits.splice(circuitIndex, 1);
-        }
-        redrawGaarCircuits();
-        saveGaarCircuits();
+    gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
+    if (gaarCircuits[circuitIndex].points.length === 0) {
+        gaarCircuits.splice(circuitIndex, 1);
     }
+    redrawGaarCircuits();
+    saveGaarCircuits();
 };
 
 function clearAllGaarCircuits() {
@@ -576,121 +534,43 @@ function saveGaarCircuits() {
     localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits));
 }
 
-// =========================================================================
-// CONTRÔLE : CALCULATRICE BINGO
-// =========================================================================
-const BingoCalculatorControl = L.Control.extend({
-    options: { position: 'topright' },
-    onAdd: function(map) {
-        const container = L.DomUtil.create('div', 'leaflet-control');
-        this.button = L.DomUtil.create('a', 'map-control-button', container);
-        this.button.innerHTML = '🧮';
-        this.button.href = '#';
-
-        this.panel = L.DomUtil.create('div', '', container);
-        this.panel.id = 'bingo-panel';
-        
-        this.panel.innerHTML = `
-            <div class="bingo-input-group">
-                <label for="bingo-fuel-input">FUEL</label>
-                <input type="number" id="bingo-fuel-input" placeholder="kg">
-            </div>
-            <div class="bingo-input-group">
-                <label for="bingo-time-input">TMD</label>
-                <input type="time" id="bingo-time-input">
-            </div>
-            <div id="bingo-results">Sélectionnez un feu</div>
-        `;
-        
-        this.resultsDiv = this.panel.querySelector('#bingo-results');
-        this.fuelInput = this.panel.querySelector('#bingo-fuel-input');
-        this.timeInput = this.panel.querySelector('#bingo-time-input');
-
-        this.fuelInput.addEventListener('input', () => localStorage.setItem('bingo_fuel', this.fuelInput.value));
-        this.timeInput.addEventListener('input', () => localStorage.setItem('bingo_tmd', this.timeInput.value));
-
-        this.fuelInput.value = localStorage.getItem('bingo_fuel') || '';
-        this.timeInput.value = localStorage.getItem('bingo_tmd') || '';
-
-        L.DomEvent.disableClickPropagation(container);
-        L.DomEvent.on(this.button, 'click', L.DomEvent.stop);
-        L.DomEvent.on(this.button, 'click', this.togglePanel, this);
-
-        return container;
-    },
-    togglePanel: function() {
-        const panelStyle = this.panel.style;
-        panelStyle.display = panelStyle.display === 'block' ? 'none' : 'block';
-        if (panelStyle.display === 'block') {
-            this.update();
-        }
-    },
-    update: function() {
-        if (!this.resultsDiv) return;
-        if (!currentCommune) {
-            this.resultsDiv.innerHTML = 'Sélectionnez un feu';
-            return;
-        }
-        const lftwAirport = airports.find(ap => ap.oaci === 'LFTW');
-        if (!lftwAirport) {
-            this.resultsDiv.innerHTML = 'Erreur: LFTW introuvable';
-            return;
-        }
-        const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
-        let resultsHtml = '';
-        const distanceLftw = calculateDistanceInNm(lat, lon, lftwAirport.lat, lftwAirport.lon);
-        const fuelLftw = (distanceLftw <= 70 ? distanceLftw * 5 : distanceLftw * 4) + 700;
-        resultsHtml += `<p>BINGO LFTW: <span>${Math.round(fuelLftw)} kg</span></p>`;
-        
-        if (selectedBingoAirportOaci) {
-            const selectedAirport = airports.find(ap => ap.oaci === selectedBingoAirportOaci);
-            if (selectedAirport) {
-                const distanceAirport = calculateDistanceInNm(lat, lon, selectedAirport.lat, selectedAirport.lon);
-                const fuelAirport = (distanceAirport <= 70 ? distanceAirport * 5 : distanceAirport * 4) + 700;
-                resultsHtml += `<p>BINGO ${selectedAirport.oaci}: <span>${Math.round(fuelAirport)} kg</span></p>`;
-            }
-        }
-        this.resultsDiv.innerHTML = resultsHtml;
-    },
-    hidePanel: function() {
-        this.panel.style.display = 'none';
-    }
-});
-
-// =========================================================================
-// CONTRÔLE UNIFIÉ POUR LA RECHERCHE ET L'AFFICHAGE
-// =========================================================================
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
-        const topBar = L.DomUtil.create('div', 'search-toggle-container', mainContainer);
-        
-        this.toggleButton = L.DomUtil.create('a', 'map-control-button', topBar);
-        this.toggleButton.innerHTML = '🏙️';
+        const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
+        this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
+        this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
-
         this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
         this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        versionDisplay.innerText = 'v5.9';
+        // --- MISE À JOUR DE LA VERSION APPLICATIVE ---
+        versionDisplay.innerText = 'v5.2'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
             const uiOverlay = document.getElementById('ui-overlay');
-            const isOverlayVisible = uiOverlay.style.display !== 'none';
-            uiOverlay.style.display = isOverlayVisible ? 'none' : 'block';
-            this.update(currentCommune);
+            if (uiOverlay.style.display === 'none') {
+                uiOverlay.style.display = 'block';
+                this.communeDisplay.style.display = 'none';
+            } else {
+                uiOverlay.style.display = 'none';
+                if (this.communeNameSpan.textContent) {
+                    this.communeDisplay.style.display = 'flex';
+                }
+            }
         });
         return mainContainer;
     },
-    update: function (commune) {
-        const uiOverlay = document.getElementById('ui-overlay');
-        if (!commune || uiOverlay.style.display !== 'none') {
+    updateDisplay: function (commune) {
+        if (!commune) {
             this.communeDisplay.style.display = 'none';
+            this.communeNameSpan.textContent = '';
+            this.sunsetDisplay.textContent = '';
             return;
         }
 
@@ -702,7 +582,7 @@ const SearchToggleControl = L.Control.extend({
                 const now = new Date();
                 const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
                 const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                this.sunsetDisplay.innerHTML = `🌅 CS <b>${sunsetString}</b>`;
+                this.sunsetDisplay.innerHTML = `🌅&nbsp;CS&nbsp;<b>${sunsetString}</b>`;
             } catch (e) {
                 this.sunsetDisplay.innerHTML = '';
             }
@@ -710,4 +590,429 @@ const SearchToggleControl = L.Control.extend({
     }
 });
 
-function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
+function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }```
+
+---
+
+### FICHIER 3 : `style.css` (corrigé)
+
+```css
+:root {
+    --primary-color: #005a9c;
+    --secondary-color: #e3001b;
+    --background-color: #f5f7fa;
+    --card-background-color: #ffffff;
+    --text-color: #333333;
+    --light-text-color: #6c757d;
+    --border-color: #dee2e6;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --border-radius: 12px;
+    --success-color: #28a745;
+    --water-color: #007bff;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+    background-color: #eef2f5;
+    z-index: 0;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    z-index: 1000;
+    max-width: 500px;
+    margin: auto;
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 15px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+#status-message {
+    color: var(--light-text-color);
+    font-style: italic;
+    text-align: center;
+}
+
+.controls-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-wrapper {
+    position: relative;
+    flex-grow: 1;
+}
+
+.search-wrapper::before {
+    content: '🔍';
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.2em;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+#search-input {
+    width: 100%;
+    padding: 15px 40px 15px 50px;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-sizing: border-box;
+    -webkit-appearance: none;
+}
+
+#clear-search {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    display: none;
+}
+
+.airport-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.8em;
+    color: var(--light-text-color);
+}
+
+#airport-count {
+    width: 60px;
+    padding: 8px;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 4px;
+}
+
+#results-list {
+    list-style-type: none;
+    padding: 0;
+    margin-top: 5px;
+    max-height: 40vh;
+    overflow-y: auto;
+    text-align: left;
+    border-top: 1px solid var(--border-color);
+}
+
+#results-list li {
+    padding: 15px 20px;
+    border-bottom: 1px solid #f1f3f5;
+    cursor: pointer;
+}
+
+#results-list li:hover {
+    background-color: #e9f5ff;
+}
+
+#offline-status {
+    font-size: 0.8em;
+    color: var(--light-text-color);
+    text-align: center;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--border-color);
+}
+
+#offline-status.ready {
+    color: var(--success-color);
+    font-weight: bold;
+}
+
+.custom-marker-icon {
+    text-align: center;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2em;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    border: 2px solid white;
+}
+
+.user-marker { background-color: var(--secondary-color); }
+.fire-marker { background-color: orangered; }
+
+.airport-marker-base {
+    font-size: 1em;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    opacity: 0.9;
+}
+
+.airport-marker-active { background-color: var(--success-color); }
+.airport-marker-water { background-color: var(--water-color); }
+.airport-marker-disabled {
+    background-color: rgba(255, 255, 255, 0.8);
+    border: 2px solid var(--secondary-color);
+    color: var(--secondary-color);
+    font-size: 1.8em;
+    font-weight: bold;
+    line-height: 20px;
+    opacity: 0.8;
+}
+
+.leaflet-tooltip.route-tooltip {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid #777;
+    border-radius: 4px;
+    box-shadow: none;
+    padding: 4px 8px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+
+.airport-popup .popup-buttons {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+.airport-popup button {
+    flex-grow: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.airport-popup .water-btn { background-color: var(--water-color); }
+.airport-popup .enable-btn { background-color: var(--success-color); }
+.airport-popup .disable-btn { background-color: var(--secondary-color); }
+
+.search-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-toggle-button, .commune-display-control {
+    background-color: white;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(0,0,0,0.2);
+}
+
+.search-toggle-button {
+    width: 52px;
+    height: 52px;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 2.8em !important;
+    color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+/* Styles restaurés de la v4.9 pour garantir que l'affichage ne casse pas */
+.commune-display-control {
+    display: none;
+    height: 52px;
+    padding: 0 18px;
+    font-size: 18px;
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-color);
+    gap: 12px;
+}
+
+.commune-display-control > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sunset-info {
+    font-size: 15px;
+    color: var(--light-text-color);
+    margin-left: auto;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.version-display {
+    font-size: 10px;
+    color: #888;
+    text-align: center;
+    padding-top: 2px;
+    background-color: rgba(255, 255, 255, 0.7);
+    border-radius: 0 0 4px 4px;
+    margin: -1px 2px 0 2px;
+}
+
+#gps-feu-button, #live-gps-button {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--card-background-color);
+    color: var(--primary-color);
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+#gps-feu-button:hover, #live-gps-button:hover {
+    background-color: #e9f5ff;
+}
+
+#live-gps-button.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 90, 156, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 90, 156, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 90, 156, 0); }
+}
+
+.extra-controls {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.toggle-button {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    border: 1px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    background-color: transparent;
+    color: var(--primary-color);
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.toggle-button.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+#gaar-controls {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+#gaar-status {
+    margin-top: 10px;
+    font-weight: bold;
+    color: var(--primary-color);
+    min-height: 20px;
+}
+
+#map.crosshair-cursor {
+    cursor: crosshair;
+}
+
+.gaar-popup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.gaar-popup-form input {
+    border: 1px solid #ccc;
+    padding: 5px;
+    border-radius: 3px;
+}
+.gaar-popup-form button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.gaar-popup-form .delete-point-btn {
+    background-color: var(--secondary-color);
+}
+
+.gaar-point-label {
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid #777;
+    border-radius: 4px;
+    box-shadow: none;
+    padding: 2px 5px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.delete-button {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    color: var(--secondary-color);
+    background-color: transparent;
+    border: 1px solid var(--secondary-color);
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.delete-button:hover {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+#edit-circuits-button.active {
+    background-color: var(--secondary-color);
+    color: white;
+    border-color: var(--secondary-color);
+}
