@@ -474,14 +474,25 @@ async function handleGaarMapClick(e) {
 async function reverseGeocode(latlng) {
     document.getElementById('gaar-status').textContent = 'Recherche du nom...';
     try {
+        if (!navigator.onLine) {
+             throw new Error("Application hors ligne.");
+        }
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latlng.lat}&lon=${latlng.lng}&zoom=10`);
+        if (!response.ok) throw new Error('La réponse du réseau n\'était pas OK.');
         const data = await response.json();
         const name = data.address.city || data.address.town || data.address.village || data.display_name.split(',')[0];
         document.getElementById('gaar-status').textContent = `Point ajouté près de ${name}.`;
         return name;
     } catch (error) {
-        document.getElementById('gaar-status').textContent = 'Nom non trouvé.';
-        return null;
+        console.log("Échec du géocodage inversé en ligne, passage à la recherche hors ligne :", error.message);
+        const closestCommuneName = findClosestCommuneName(latlng.lat, latlng.lng);
+        if (closestCommuneName) {
+            document.getElementById('gaar-status').textContent = `Point ajouté près de ${closestCommuneName} (hors-ligne).`;
+            return closestCommuneName;
+        } else {
+            document.getElementById('gaar-status').textContent = 'Nom non trouvé (hors-ligne).';
+            return null;
+        }
     }
 }
 
@@ -492,10 +503,18 @@ function redrawGaarCircuits() {
         
         const latlngs = circuit.points.map(p => [p.lat, p.lng]);
         
+        const styleOptions = {
+            color: circuit.color,
+            weight: 3,
+            opacity: 0.6,
+            fillColor: circuit.color,
+            fillOpacity: 0.2
+        };
+
         if (latlngs.length >= 3) {
-            L.polygon(latlngs, { color: circuit.color }).addTo(gaarLayer);
+            L.polygon(latlngs, styleOptions).addTo(gaarLayer);
         } else if (latlngs.length > 1) {
-            L.polyline(latlngs, { color: circuit.color }).addTo(gaarLayer);
+            L.polyline(latlngs, styleOptions).addTo(gaarLayer);
         }
 
         circuit.points.forEach((point, pointIndex) => {
@@ -552,7 +571,7 @@ const SearchToggleControl = L.Control.extend({
         const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
         
         this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
-        this.toggleButton.innerHTML = '🏠';
+        this.toggleButton.innerHTML = '🏙️';
         this.toggleButton.href = '#';
 
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
