@@ -240,7 +240,7 @@ html, body {
     font-size: 18px;
     font-weight: 500;
     white-space: nowrap;
-    max-width: calc(100vw - 150px);
+    max-width: calc(100vw - 220px);
     overflow: hidden;
     color: var(--text-color);
     gap: 12px;
@@ -258,33 +258,34 @@ html, body {
     white-space: nowrap;
 }
 
-.search-toggle-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.search-toggle-wrapper {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-align: center;
 }
 
 .search-toggle-button {
-    background-color: transparent;
+    background: transparent;
     border: none;
     box-shadow: none;
-    width: auto;
-    height: auto;
-    padding: 5px;
     cursor: pointer;
     font-size: 2.8em !important;
     text-decoration: none;
     line-height: 1; 
+    padding: 0;
+    color: #333;
+    text-shadow: 0 0 4px white, 0 0 4px white;
 }
 
 .version-display {
     font-size: 10px;
-    color: #888;
+    color: #333;
+    text-shadow: 0 0 2px white, 0 0 2px white;
     text-align: center;
-    padding-top: 2px;
-    background-color: rgba(255, 255, 255, 0.7);
-    border-radius: 0 0 4px 4px;
-    margin: -1px 2px 0 2px;
+    padding: 0;
+    background-color: transparent;
+    margin-top: -5px;
 }
 
 #live-gps-button {
@@ -437,5 +438,4 @@ html, body {
     background-color: var(--secondary-color);
     color: white;
     border-color: var(--secondary-color);
-}```
---- FIN DU FICHIER style.css ---
+}
