@@ -1,8 +1,8 @@
-// --- FICHIER sw.js ---
+// --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v113'; // Version incrémentée pour refléter les changements
-const DATA_CACHE_NAME = 'communes-data-cache-v113';
-const TILE_CACHE_NAME = 'communes-tile-cache-v113';
+const APP_CACHE_NAME = 'communes-app-cache-v200'; // Version 4.4 stable
+const DATA_CACHE_NAME = 'communes-data-cache-v200';
+const TILE_CACHE_NAME = 'communes-tile-cache-v200'; // Pour le cache de navigation normal
 
 const APP_SHELL_URLS = [
     './',
@@ -20,6 +20,7 @@ const DATA_URLS = [
 ];
 
 self.addEventListener('install', event => {
+    console.log(`[SW] Installation ${APP_CACHE_NAME}`);
     event.waitUntil(
         Promise.all([
             caches.open(APP_CACHE_NAME).then(cache => cache.addAll(APP_SHELL_URLS)),
