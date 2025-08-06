@@ -242,31 +242,32 @@ html, body {
     flex-shrink: 0;
 }
 
+/* Styles corrigés pour le bandeau supérieur */
 .commune-display-control {
     display: none;
     height: 52px;
     padding: 0 18px;
     font-weight: 500;
     white-space: nowrap;
-    max-width: 350px;
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--text-color);
-    justify-content: space-between;
+    gap: 12px;
 }
 
 .commune-display-control > span {
     font-size: 18px;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 1;
-    min-width: 0;
 }
 
 .sunset-info {
     font-size: 15px;
     color: var(--light-text-color);
+    margin-left: auto;
     white-space: nowrap;
     flex-shrink: 0;
-    margin-left: 12px;
 }
 
 .version-display {
@@ -340,7 +341,6 @@ html, body {
     color: white;
 }
 
-/* --- INJECTION DES STYLES DE LA V4.9 --- */
 #gaar-controls {
     margin-top: 10px;
     padding-top: 10px;
@@ -381,4 +381,3 @@ html, body {
     color: white;
     border-color: var(--secondary-color);
 }
-/* --- FIN DE L'INJECTION --- */
