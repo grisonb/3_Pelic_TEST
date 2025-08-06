@@ -1,8 +1,8 @@
 // --- FICHIER sw.js ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v91'; // Version incrémentée pour forcer la mise à jour des styles
-const DATA_CACHE_NAME = 'communes-data-cache-v1';
-const TILE_CACHE_NAME = 'communes-tile-cache-v1';
+const APP_CACHE_NAME = 'communes-app-cache-v100'; // Version majeure pour forcer la réinitialisation
+const DATA_CACHE_NAME = 'communes-data-cache-v100';
+const TILE_CACHE_NAME = 'communes-tile-cache-v100';
 
 const APP_SHELL_URLS = [
     './',
@@ -32,7 +32,9 @@ self.addEventListener('activate', event => {
     event.waitUntil(
         caches.keys().then(cacheNames => Promise.all(
             cacheNames.map(cacheName => {
+                // Suppression de TOUS les anciens caches qui ne correspondent pas
                 if (cacheName !== APP_CACHE_NAME && cacheName !== DATA_CACHE_NAME && cacheName !== TILE_CACHE_NAME) {
+                    console.log('Service Worker: suppression de l\'ancien cache :', cacheName);
                     return caches.delete(cacheName);
                 }
             })
@@ -43,6 +45,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const requestUrl = new URL(event.request.url);
 
+    // Stratégie pour les tuiles de carte
     if (requestUrl.hostname.includes('tile.openstreetmap.org')) {
         event.respondWith(
             caches.open(TILE_CACHE_NAME).then(cache => {
@@ -60,10 +63,17 @@ self.addEventListener('fetch', event => {
         return;
     }
     
+    // Stratégie pour les autres requêtes (fichiers de l'app et données)
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
-                return cachedResponse || fetch(event.request).catch(error => {
+                // Si la ressource est en cache, la retourner
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+                // Sinon, la récupérer sur le réseau
+                return fetch(event.request).catch(error => {
+                    // Si la navigation échoue (hors ligne), retourner la page d'accueil
                     if (event.request.mode === 'navigate') {
                         return caches.match('./index.html');
                     }
