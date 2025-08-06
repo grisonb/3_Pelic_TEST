@@ -217,49 +217,61 @@ html, body {
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
 
+#commune-info-display {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background-color: white;
+    display: none; /* Managed by JS, will be 'flex' */
+    align-items: center;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(0,0,0,0.2);
+    height: 52px;
+    padding: 0 18px;
+    font-size: 18px;
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: calc(100vw - 150px);
+    overflow: hidden;
+    color: var(--text-color);
+    gap: 12px;
+}
+
+#commune-info-display > .commune-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#commune-info-display .sunset-info {
+    font-size: 15px;
+    color: var(--light-text-color);
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 .search-toggle-container {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.search-toggle-button, .commune-display-control {
+.search-toggle-button {
     background-color: white;
     display: flex;
     align-items: center;
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
     border-radius: var(--border-radius);
     border: 1px solid rgba(0,0,0,0.2);
-}
-
-.search-toggle-button {
     width: 52px;
     height: 52px;
     justify-content: center;
     cursor: pointer;
     font-size: 2.8em !important;
     color: var(--primary-color);
-}
-
-.commune-display-control {
-    display: none;
-    height: 52px;
-    padding: 0 18px;
-    font-size: 18px;
-    font-weight: 500;
-    white-space: nowrap;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--text-color);
-    gap: 12px;
-}
-
-.sunset-info {
-    font-size: 15px;
-    color: var(--light-text-color);
-    margin-left: auto;
-    white-space: nowrap;
+    text-decoration: none;
 }
 
 .version-display {
