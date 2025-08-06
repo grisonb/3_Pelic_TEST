@@ -10,6 +10,7 @@
     --border-radius: 12px;
     --success-color: #28a745;
     --water-color: #007bff;
+    --safe-area-top: 22px; /* Marge supérieure pour les appareils mobiles */
 }
 
 html, body {
@@ -33,9 +34,14 @@ html, body {
     -webkit-touch-callout: none;
 }
 
+/* Ajustement de la position des contrôles Leaflet */
+.leaflet-control-container .leaflet-top {
+    top: var(--safe-area-top);
+}
+
 #ui-overlay {
     position: absolute;
-    top: 10px;
+    top: var(--safe-area-top);
     left: 10px;
     right: 10px;
     z-index: 1000;
@@ -219,12 +225,12 @@ html, body {
 
 #commune-info-display {
     position: absolute;
-    top: 10px;
+    top: var(--safe-area-top);
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000;
     background-color: white;
-    display: none; /* Managed by JS, will be 'flex' */
+    display: none; /* Géré par JS */
     align-items: center;
     box-shadow: 0 1px 5px rgba(0,0,0,0.4);
     border-radius: var(--border-radius);
@@ -269,9 +275,10 @@ html, body {
     height: 52px;
     justify-content: center;
     cursor: pointer;
-    font-size: 2.8em !important;
+    font-size: 2.2em !important; /* Ajusté pour la nouvelle icône */
     color: var(--primary-color);
     text-decoration: none;
+    line-height: 52px; /* Centrage vertical de l'emoji */
 }
 
 .version-display {
@@ -358,7 +365,7 @@ html, body {
 #gaar-status {
     margin-top: 10px;
     font-weight: bold;
-    color: var(--sc-blue);
+    color: var(--primary-color);
     min-height: 20px;
 }
 #map.crosshair-cursor {
