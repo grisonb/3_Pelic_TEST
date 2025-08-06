@@ -385,6 +385,7 @@ function findClosestCommuneName(lat, lon) {
             closestCommune = commune;
         }
     }
+    // Augmentation du seuil pour trouver une commune même si un peu éloigné
     if (closestCommune && minDistance < 50) { // ~92 km
         return closestCommune.nom_standard;
     }
@@ -450,6 +451,9 @@ function toggleGaarDrawingMode() {
     status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
 }
 
+// =========================================================================
+// == MODIFICATION CLÉ POUR LE NOMMAGE HORS-LIGNE ==
+// =========================================================================
 function handleGaarMapClick(e) {
     if (!isDrawingMode) return;
     
@@ -464,6 +468,7 @@ function handleGaarMapClick(e) {
         gaarCircuits.push(targetCircuit);
     }
     
+    // Utilisation de la fonction locale/hors-ligne pour trouver le nom de la commune
     const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Point Manuel';
     targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
     
@@ -546,7 +551,8 @@ const SearchToggleControl = L.Control.extend({
         this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
-        versionDisplay.innerText = 'v5.6'; 
+        // --- MISE À JOUR DE LA VERSION ---
+        versionDisplay.innerText = 'v5.1'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
@@ -580,7 +586,7 @@ const SearchToggleControl = L.Control.extend({
                 const now = new Date();
                 const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
                 const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                this.sunsetDisplay.innerHTML = `🌅&nbsp;CS&nbsp;<b>${sunsetString}</b>`;
+                this.sunsetDisplay.innerHTML = `🌅 CS <b>${sunsetString}</b>`;
             } catch (e) {
                 this.sunsetDisplay.innerHTML = '';
             }
