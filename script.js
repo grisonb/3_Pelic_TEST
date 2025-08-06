@@ -550,51 +550,57 @@ const SearchToggleControl = L.Control.extend({
     onAdd: function (map) {
         const mainContainer = L.DomUtil.create('div', 'leaflet-control');
         const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
+        
         this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
         this.toggleButton.innerHTML = '🏠';
         this.toggleButton.href = '#';
-        this.communeDisplay = L.DomUtil.create('div', 'commune-display-control', topBar);
-        this.communeNameSpan = L.DomUtil.create('span', '', this.communeDisplay);
-        this.sunsetDisplay = L.DomUtil.create('div', 'sunset-info', this.communeDisplay);
+
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v7.0';
+        versionDisplay.innerText = 'v7.1';
+
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
             const uiOverlay = document.getElementById('ui-overlay');
+            const communeDisplay = document.getElementById('commune-info-display');
+
             if (uiOverlay.style.display === 'none') {
                 uiOverlay.style.display = 'block';
-                this.communeDisplay.style.display = 'none';
+                communeDisplay.style.display = 'none';
             } else {
                 uiOverlay.style.display = 'none';
-                if (this.communeNameSpan.textContent) {
-                    this.communeDisplay.style.display = 'flex';
+                if (communeDisplay.innerHTML.trim() !== '') {
+                    communeDisplay.style.display = 'flex';
                 }
             }
         });
         return mainContainer;
     },
     updateDisplay: function (commune) {
+        const communeDisplay = document.getElementById('commune-info-display');
+        
         if (!commune) {
-            this.communeDisplay.style.display = 'none';
-            this.communeNameSpan.textContent = '';
-            this.sunsetDisplay.textContent = '';
+            communeDisplay.innerHTML = '';
+            communeDisplay.style.display = 'none';
             return;
         }
 
-        this.communeDisplay.style.display = 'flex';
-        this.communeNameSpan.textContent = commune.nom_standard;
+        communeDisplay.style.display = 'flex';
         
+        const communeNameHTML = `<span class="commune-name">${commune.nom_standard}</span>`;
+        let sunsetHTML = '';
+
         if (typeof SunCalc !== 'undefined') {
             try {
                 const now = new Date();
                 const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
                 const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                this.sunsetDisplay.innerHTML = `🌅 CS <b>${sunsetString}</b>`;
+                sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div>`;
             } catch (e) {
-                this.sunsetDisplay.innerHTML = '';
+                sunsetHTML = '<div class="sunset-info"></div>';
             }
         }
+        communeDisplay.innerHTML = communeNameHTML + sunsetHTML;
     }
 });
 
