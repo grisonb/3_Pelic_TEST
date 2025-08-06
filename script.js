@@ -450,6 +450,8 @@ function toggleGaarDrawingMode() {
     status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
 }
 
+// --- MODIFICATION CI-DESSOUS ---
+// La fonction handleGaarMapClick est modifiée pour utiliser le nommage hors-ligne.
 function handleGaarMapClick(e) {
     if (!isDrawingMode) return;
     
@@ -464,6 +466,7 @@ function handleGaarMapClick(e) {
         gaarCircuits.push(targetCircuit);
     }
     
+    // Utilisation de la fonction locale/hors-ligne pour trouver le nom de la commune
     const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Point Manuel';
     targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
     
@@ -472,6 +475,7 @@ function handleGaarMapClick(e) {
     redrawGaarCircuits();
     saveGaarCircuits();
 }
+// --- FIN DE LA MODIFICATION ---
 
 function redrawGaarCircuits() {
     gaarLayer.clearLayers();
@@ -547,7 +551,7 @@ const SearchToggleControl = L.Control.extend({
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
         // --- MISE À JOUR DE LA VERSION APPLICATIVE ---
-        versionDisplay.innerText = 'v5.3'; 
+        versionDisplay.innerText = 'v5.4'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
