@@ -245,27 +245,21 @@ html, body {
     display: none;
     height: 52px;
     padding: 0 18px;
+    font-size: 18px;
     font-weight: 500;
     white-space: nowrap;
-    max-width: 350px;
-    color: var(--text-color);
-    justify-content: space-between;
-}
-
-.commune-display-control > span {
-    font-size: 18px;
+    max-width: 250px;
     overflow: hidden;
     text-overflow: ellipsis;
-    flex-shrink: 1;
-    min-width: 0;
+    color: var(--text-color);
+    gap: 12px;
 }
 
 .sunset-info {
     font-size: 15px;
     color: var(--light-text-color);
+    margin-left: auto;
     white-space: nowrap;
-    flex-shrink: 0;
-    margin-left: 12px;
 }
 
 .version-display {
@@ -313,10 +307,6 @@ html, body {
     100% { box-shadow: 0 0 0 0 rgba(0, 90, 156, 0); }
 }
 
-/* ========================================================== */
-/* == STYLES GAAR RESTAURÉS DE LA VERSION 4.9 == */
-/* ========================================================== */
-
 .extra-controls {
     margin-top: 10px;
     padding-top: 10px;
@@ -353,14 +343,12 @@ html, body {
     align-items: center;
     justify-content: center;
 }
-
 #gaar-status {
     margin-top: 10px;
     font-weight: bold;
-    color: var(--primary-color);
+    color: var(--sc-blue);
     min-height: 20px;
 }
-
 #map.crosshair-cursor {
     cursor: crosshair;
 }
@@ -406,12 +394,7 @@ html, body {
     color: var(--secondary-color);
     background-color: transparent;
     border: 1px solid var(--secondary-color);
-    transition: background-color 0.2s, color 0.2s;
-}
-
-.delete-button:hover {
-    background-color: var(--secondary-color);
-    color: white;
+    margin-top: 0;
 }
 
 #edit-circuits-button.active {
