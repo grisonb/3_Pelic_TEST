@@ -552,7 +552,7 @@ const SearchToggleControl = L.Control.extend({
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
         
         // --- MISE À JOUR DE LA VERSION ---
-        versionDisplay.innerText = 'v5.1'; 
+        versionDisplay.innerText = 'v6.0'; 
         
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
