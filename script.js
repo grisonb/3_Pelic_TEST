@@ -1,6 +1,6 @@
 // =========================================================================
 // INITIALISATION DE L'APPLICATION
-// =========================================================================v
+// =========================================================================
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof L === 'undefined') { document.getElementById('status-message').textContent = "❌ ERREUR : leaflet.min.js non chargé."; return; }
     initializeApp();
@@ -575,7 +575,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
 
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v7.2';
+        versionDisplay.innerText = 'v7.3';
 
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
