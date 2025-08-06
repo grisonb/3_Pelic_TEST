@@ -567,15 +567,14 @@ function saveGaarCircuits() {
 const SearchToggleControl = L.Control.extend({
     options: { position: 'topleft' },
     onAdd: function (map) {
-        const mainContainer = L.DomUtil.create('div', 'leaflet-control');
-        const topBar = L.DomUtil.create('div', 'leaflet-bar search-toggle-container', mainContainer);
+        const mainContainer = L.DomUtil.create('div', 'leaflet-control search-toggle-wrapper');
         
-        this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', topBar);
+        this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', mainContainer);
         this.toggleButton.innerHTML = '🏙️';
         this.toggleButton.href = '#';
 
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v7.3';
+        versionDisplay.innerText = 'v7.4';
 
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
