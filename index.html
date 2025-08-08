@@ -23,8 +23,12 @@
 </head>
 <body>
     <div id="map"></div>
+    
+    <!-- Boutons flottants sur la carte -->
     <button id="calculateur-button" title="Ouvrir le calculateur de vol">✈️</button>
     <div id="commune-info-display"></div>
+
+    <!-- Fenêtre de recherche de base -->
     <div id="ui-overlay">
         <div id="status-message">Chargement des données...</div>
         <div id="search-section" style="display: none;">
@@ -40,12 +44,10 @@
                 </div>
             </div>
             <ul id="results-list" style="display: none;"></ul>
-            
             <div class="extra-controls">
                 <button id="lftw-route-button" class="toggle-button active" title="Afficher/Masquer la route vers LFTW">Route LFTW</button>
                 <button id="gaar-mode-button" class="toggle-button" title="Afficher/Masquer les circuits GAAR">Circuits GAAR</button>
             </div>
-
             <div id="gaar-controls" style="display: none;">
                 <button id="edit-circuits-button" class="toggle-button">Modifier Circuits</button>
                 <button id="delete-circuits-btn" class="delete-button">Supprimer Circuits</button>
@@ -55,9 +57,7 @@
         </div>
     </div>
 
-    <!-- ======================================================= -->
-    <!-- == NOUVEAU : Fenêtre Modale du Journal de Vol        == -->
-    <!-- ======================================================= -->
+    <!-- Fenêtre Modale du Journal de Vol -->
     <div id="flight-log-modal" style="display: none;">
         <div class="main-container">
             <div class="onglets-navigation">
@@ -106,7 +106,7 @@
                         <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="suivi-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
                             <div class="rotations-group">
-                                <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
                                 <div class="result-line"><span class="label">Fuel Pélic. Actuel :</span><span class="value" id="suivi-fuel-actuel">-- kg</span></div>
                                 <div class="result-line"><span class="label">Conso. Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-conso-rotation-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="suivi-conso-rotation-manual-btn">AUTO</button></div></div>
                                 <div class="result-line"><span class="label">Durée Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-duree-rotation-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input manual-input" readonly><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div><button class="manual-btn" id="suivi-duree-rotation-manual-btn">AUTO</button></div></div>
