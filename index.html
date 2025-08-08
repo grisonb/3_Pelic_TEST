@@ -23,7 +23,7 @@
 </head>
 <body>
     <div id="map"></div>
-    <button id="gps-feu-button" title="Créer un feu à ma position">🎯</button>
+    <button id="calculateur-button" title="Ouvrir le calculateur de vol">✈️</button>
     <div id="commune-info-display"></div>
     <div id="ui-overlay">
         <div id="status-message">Chargement des données...</div>
@@ -42,12 +42,8 @@
             <ul id="results-list" style="display: none;"></ul>
             
             <div class="extra-controls">
-                <button id="lftw-route-button" class="toggle-button active" title="Afficher/Masquer la route vers LFTW">
-                    Route LFTW
-                </button>
-                <button id="gaar-mode-button" class="toggle-button" title="Afficher/Masquer les circuits GAAR">
-                    Circuits GAAR
-                </button>
+                <button id="lftw-route-button" class="toggle-button active" title="Afficher/Masquer la route vers LFTW">Route LFTW</button>
+                <button id="gaar-mode-button" class="toggle-button" title="Afficher/Masquer les circuits GAAR">Circuits GAAR</button>
             </div>
 
             <div id="gaar-controls" style="display: none;">
@@ -55,10 +51,94 @@
                 <button id="delete-circuits-btn" class="delete-button">Supprimer Circuits</button>
                 <p id="gaar-status"></p>
             </div>
-
             <div id="offline-status"></div>
         </div>
     </div>
+
+    <!-- ======================================================= -->
+    <!-- == NOUVEAU : Fenêtre Modale du Journal de Vol        == -->
+    <!-- ======================================================= -->
+    <div id="flight-log-modal" style="display: none;">
+        <div class="main-container">
+            <div class="onglets-navigation">
+                <button class="onglet-bouton active" data-onglet="bloc-fuel">BLOC / FUEL</button>
+                <button class="onglet-bouton" data-onglet="previ-rotations">Prévi. Nbr Rotations</button>
+                <button class="onglet-bouton" data-onglet="suivi-rotations">Suivi Rotations</button>
+                <button class="onglet-bouton" data-onglet="deroutement">Déroutement</button>
+            </div>
+            <div class="onglets-conteneur">
+                <div class="onglet-panneau active" id="bloc-fuel">
+                    <div class="header-section">
+                        <div class="header-item"><label>BLOC Départ</label><div id="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>FUEL Départ</label><div id="fuel-depart" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
+                        <div class="header-item"><label>CS LFTW</label><input type="text" id="cs-lftw-display" class="display-input" readonly></div>
+                        <div class="header-item"><label>TMD</label><div id="tmd" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>LIMITE HDV</label><div id="limite-hdv" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                    </div>
+                    <div class="table-wrapper"><table class="table-section"><thead><tr><th>BLOC Arrivée</th><th>FUEL Pélic.</th><th>Durée Rotations</th><th>FUEL Rotations</th><th>Tps de Vol</th><th>Tps de Vol Restant</th></tr></thead><tbody></tbody></table></div>
+                </div>
+                <div class="onglet-panneau" id="previ-rotations">
+                    <div class="analyse-grid">
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO LFTW</span><span class="value" id="previ-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group"><h3 class="analyse-col-title">Nbr Rotations</h3><div id="previ-rotation-results-container"><div class="result-line" data-rotation-type="base"><span class="label">RETOUR BASE :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="pelic"><span class="label">RETOUR Pélic :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="cs"><span class="label">CS :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="tmd"><span class="label">TMD :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="hdv"><span class="label">HdV :</span><span class="value">--</span></div></div></div>
+                        </div>
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="previ-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="result-line"><span class="label">Heure sur Feu :</span><span class="value" id="heure-sur-feu">--:--</span></div>
+                            <div class="result-line"><span class="label">Durée transit :</span><span class="value" id="duree-transit">--:--</span></div>
+                            <div class="result-line"><span class="label">Consommation transit :</span><span class="value" id="conso-aller-feu">-- kg</span></div>
+                            <div class="result-line"><span class="label">Fuel sur Feu :</span><div style="display: flex; align-items: center;"><div id="fuel-sur-feu-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="fuel-sur-feu-manual-btn">AUTO</button></div></div>
+                            <div class="result-line"><span class="label">Durée Rotation :</span><span class="value" id="duree-rotation">--:--</span></div>
+                            <div class="result-line"><span class="label">Consommation Rotation :</span><span class="value" id="conso-par-rotation">-- kg</span></div>
+                            <div class="result-line"><span class="label">CS sur feu :</span><span class="value" id="cs-sur-feu">--:--</span></div>
+                            <div class="result-line"><span class="label">TMD :</span><span class="value" id="tmd-display">--:--</span></div>
+                            <div class="result-line"><span class="label">HdV restant :</span><span class="value" id="hdv-restant-display">--:--</span></div>
+                        </div>
+                    </div>
+                </div>
+                 <div class="onglet-panneau" id="suivi-rotations">
+                    <div class="analyse-grid">
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO LFTW</span><span class="value" id="suivi-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group"><h3 class="analyse-col-title">Nbr Rotations Restantes</h3><div id="suivi-rotation-results-container"><div class="result-line" data-rotation-type="base"><span class="label">RETOUR BASE :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="pelic"><span class="label">RETOUR Pélic :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="cs"><span class="label">CS :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="tmd"><span class="label">TMD :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="hdv"><span class="label">HdV :</span><span class="value">--</span></div></div></div>
+                        </div>
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="suivi-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group">
+                                <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                <div class="result-line"><span class="label">Fuel Pélic. Actuel :</span><span class="value" id="suivi-fuel-actuel">-- kg</span></div>
+                                <div class="result-line"><span class="label">Conso. Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-conso-rotation-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="suivi-conso-rotation-manual-btn">AUTO</button></div></div>
+                                <div class="result-line"><span class="label">Durée Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-duree-rotation-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input manual-input" readonly><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div><button class="manual-btn" id="suivi-duree-rotation-manual-btn">AUTO</button></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="placeholder-message" style="display: none;">Veuillez saisir au moins une ligne dans l'onglet "BLOC / FUEL" pour activer le suivi.</div>
+                </div>
+                <div class="onglet-panneau" id="deroutement">
+                    <div class="analyse-grid">
+                         <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO LFTW</span><span class="value" id="derout-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group"><h3 class="analyse-col-title">Nbr Rotations Possibles</h3><div id="derout-rotation-results-container"><div class="result-line" data-rotation-type="base"><span class="label">RETOUR BASE :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="pelic"><span class="label">RETOUR Pélic :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="cs"><span class="label">CS :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="tmd"><span class="label">TMD :</span><span class="value">--</span></div><div class="result-line" data-rotation-type="hdv"><span class="label">HdV :</span><span class="value">--</span></div></div></div>
+                        </div>
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="derout-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group">
+                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                <div class="result-line"><span class="label">Fuel actuel :</span><div id="deroutement-fuel-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric"><span class="clear-btn">&times;</span></div></div>
+                                <div class="result-line"><span class="label">Heure actuelle :</span><div id="deroutement-heure-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                                <div class="result-line"><span class="label">Fuel mini 1 largage / LFTW :</span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
+                                <div class="result-line"><span class="label">Fuel mini 1 largage / Pélic :</span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
+                                <button id="refresh-gps-btn">🛰️ Rafraîchir GPS</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button id="reset-all-btn" title="Réinitialiser le tableau">🗑️</button>
+    </div>
+
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="script.js"></script>
