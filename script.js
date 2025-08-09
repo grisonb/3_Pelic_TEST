@@ -770,11 +770,75 @@ function initializeCalculator() {
 
     function masterRecalculate() { recalculateBlocFuel(); updatePreviTab(); updateSuiviTab(); updateDeroutementTab(); }
 
-    function updatePreviTab() { const blocDepart = parseTime(document.querySelector('#bloc-depart .display-input').value); const fuelDepart = parseNumeric(document.querySelector('#fuel-depart .display-input').value); const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const csFeuTime = parseTime(CALCULATOR_DATA.csFeu); const transitTime = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu)); const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null; const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu); document.getElementById('duree-transit').textContent = formatTime(transitTime); document.getElementById('duree-rotation').textContent = formatTime(rotationTime); document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu); const fuelSurFeuWrapper = document.querySelector('#fuel-sur-feu-wrapper'); const fuelSurFeuInput = fuelSurFeuWrapper.querySelector('.display-input'); if (!isFuelSurFeuManual) { const consoAller = calculateFuelToGo(CALCULATOR_DATA.distBaseFeu); const fuelEstime = fuelDepart ? fuelDepart - consoAller : null; fuelSurFeuInput.value = fuelEstime ? `${fuelEstime} kg` : ''; fuelSurFeuWrapper.classList.toggle('has-value', !!fuelEstime); } document.getElementById('conso-aller-feu').textContent = `${calculateFuelToGo(CALCULATOR_DATA.distBaseFeu)} kg`; document.getElementById('conso-par-rotation').textContent = `${consoRotation} kg`; document.getElementById('cs-sur-feu').textContent = CALCULATOR_DATA.csFeu; document.getElementById('tmd-display').textContent = formatTime(tmdTime); document.getElementById('hdv-restant-display').textContent = formatTime(limiteHDV); const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu); const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu); document.getElementById('previ-bingo-base').textContent = `${bingoBase} kg`; document.getElementById('previ-bingo-pelic').textContent = `${bingoPelic} kg`; const fuelSurFeu = parseNumeric(fuelSurFeuInput.value); const resultsContainer = document.getElementById('previ-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: fuelSurFeu, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime }); }
+    function updatePreviTab() {
+    const blocDepart = parseTime(document.querySelector('#bloc-depart .display-input').value);
+    const fuelDepart = parseNumeric(document.querySelector('#fuel-depart .display-input').value);
+    const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value);
+    const tmdTime = parseTime(document.querySelector('#tmd .display-input').value);
+    const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
+    
+    const transitTime = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu));
+    const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu));
+    const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu);
+    const consoAller = calculateFuelToGo(CALCULATOR_DATA.distBaseFeu);
+    
+    const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null;
+    
+    document.getElementById('duree-transit').textContent = formatTime(transitTime);
+    document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu);
+    document.getElementById('conso-aller-feu').textContent = `${consoAller} kg`;
+    document.getElementById('cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
+    document.getElementById('tmd-display').textContent = formatTime(tmdTime);
+    document.getElementById('hdv-restant-display').textContent = formatTime(limiteHDV);
+
+    // --- Logique d'affichage conditionnel ---
+    document.getElementById('duree-rotation').textContent = rotationTime === 20 ? '--:--' : formatTime(rotationTime);
+    document.getElementById('conso-par-rotation').textContent = consoRotation === 250 ? '-- kg' : `${consoRotation} kg`;
+    
+    const fuelSurFeuWrapper = document.querySelector('#fuel-sur-feu-wrapper');
+    const fuelSurFeuInput = fuelSurFeuWrapper.querySelector('.display-input');
+    if (!isFuelSurFeuManual) {
+        const fuelEstime = fuelDepart ? fuelDepart - consoAller : null;
+        fuelSurFeuInput.value = fuelEstime ? `${fuelEstime} kg` : '';
+        fuelSurFeuWrapper.classList.toggle('has-value', !!fuelEstime);
+    }
+    
+    const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu);
+    const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu);
+    
+    document.getElementById('previ-bingo-base').textContent = bingoBase === 700 ? '-- kg' : `${bingoBase} kg`;
+    document.getElementById('previ-bingo-pelic').textContent = bingoPelic === 700 ? '-- kg' : `${bingoPelic} kg`;
+    
+    const fuelSurFeu = parseNumeric(fuelSurFeuInput.value);
+    const resultsContainer = document.getElementById('previ-rotation-results-container');
+    updateAndSortRotations(resultsContainer, { fuel: fuelSurFeu, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime });
+}
     
     function updateSuiviTab() { const suiviPanel = document.querySelector('#suivi-rotations .analyse-grid'); const placeholder = document.querySelector('#suivi-rotations .placeholder-message'); const allRows = document.querySelectorAll('#bloc-fuel tbody tr'); let lastFilledRow = null; allRows.forEach(row => { if (parseTime(row.querySelector('.time-input-wrapper .display-input').value) !== null || parseNumeric(row.querySelector('.numeric-input-wrapper .display-input').value) !== null) { lastFilledRow = row; } }); document.getElementById('suivi-bingo-base').textContent = `${calculateBingo(CALCULATOR_DATA.distBaseFeu)} kg`; document.getElementById('suivi-bingo-pelic').textContent = `${calculateBingo(CALCULATOR_DATA.distPelicFeu)} kg`; if (!lastFilledRow) { suiviPanel.style.display = 'grid'; placeholder.style.display = 'none'; document.getElementById('suivi-fuel-actuel').textContent = '--'; document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => el.textContent = '--'); const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper'); const dureeWrapper = document.getElementById('suivi-duree-rotation-wrapper'); if (!isSuiviConsoManual) { consoWrapper.querySelector('.display-input').value = `${calculateConsoRotation(CALCULATOR_DATA.distPelicFeu)} kg`; consoWrapper.classList.toggle('has-value', true); } if (!isSuiviDureeManual) { dureeWrapper.querySelector('.display-input').value = formatTime(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); dureeWrapper.classList.toggle('has-value', true); } return; } suiviPanel.style.display = 'grid'; placeholder.style.display = 'none'; const currentFuel = parseNumeric(lastFilledRow.querySelector('.numeric-input-wrapper .display-input').value); const currentTime = parseTime(lastFilledRow.querySelector('.time-input-wrapper .display-input').value); const currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell').textContent); document.getElementById('suivi-fuel-actuel').textContent = currentFuel ? `${currentFuel} kg` : '--'; const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper'); const dureeWrapper = document.getElementById('suivi-duree-rotation-wrapper'); const consoInput = consoWrapper.querySelector('.display-input'); const dureeInput = dureeWrapper.querySelector('.display-input'); let consoRotation = isSuiviConsoManual ? parseNumeric(consoInput.value) : calculateConsoRotation(CALCULATOR_DATA.distPelicFeu); let rotationTime = isSuiviDureeManual ? parseTime(dureeInput.value) : Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); if (!isSuiviConsoManual) { consoInput.value = consoRotation ? `${consoRotation} kg` : ''; consoWrapper.classList.toggle('has-value', !!consoRotation); } if (!isSuiviDureeManual) { dureeInput.value = formatTime(rotationTime) || ''; dureeWrapper.classList.toggle('has-value', !!rotationTime); } const csFeuTime = parseTime(CALCULATOR_DATA.csFeu); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const resultsContainer = document.getElementById('suivi-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(CALCULATOR_DATA.distBaseFeu), bingoPelic: calculateBingo(CALCULATOR_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: 0 }); }
 
-    function updateDeroutementTab() { document.getElementById('derout-bingo-base').textContent = `${calculateBingo(CALCULATOR_DATA.distBaseFeu)} kg`; document.getElementById('derout-bingo-pelic').textContent = `${calculateBingo(CALCULATOR_DATA.distPelicFeu)} kg`; const fuelForGpsTransit = calculateFuelToGo(CALCULATOR_DATA.distGpsFeu); const fuelMiniBase = fuelForGpsTransit + calculateBingo(CALCULATOR_DATA.distBaseFeu) + 250; const fuelMiniPelic = fuelForGpsTransit + calculateBingo(CALCULATOR_DATA.distPelicFeu) + 250; document.getElementById('derout-fuel-mini-base').textContent = `${fuelMiniBase} kg`; document.getElementById('derout-fuel-mini-pelic').textContent = `${fuelMiniPelic} kg`; const currentFuel = parseNumeric(document.querySelector('#deroutement-fuel-wrapper .display-input').value); const currentTime = parseTime(document.querySelector('#deroutement-heure-wrapper .display-input').value); const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu); const csFeuTime = parseTime(CALCULATOR_DATA.csFeu); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value); const transitTimeFromGps = Math.round(calculateTransitTime(CALCULATOR_DATA.distGpsFeu)); const resultsContainer = document.getElementById('derout-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(CALCULATOR_DATA.distBaseFeu), bingoPelic: calculateBingo(CALCULATOR_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime: transitTimeFromGps }); }
+    function updateDeroutementTab() {
+    document.getElementById('derout-bingo-base').textContent = `${calculateBingo(CALCULATOR_DATA.distBaseFeu)} kg`;
+    document.getElementById('derout-bingo-pelic').textContent = `${calculateBingo(CALCULATOR_DATA.distPelicFeu)}`;
+
+    const fuelForGpsTransit = calculateFuelToGo(CALCULATOR_DATA.distGpsFeu);
+    const fuelMiniBase = fuelForGpsTransit + calculateBingo(CALCULATOR_DATA.distBaseFeu) + 250;
+    const fuelMiniPelic = fuelForGpsTransit + calculateBingo(CALCULATOR_DATA.distPelicFeu) + 250;
+
+    // --- Logique d'affichage conditionnel ---
+    document.getElementById('derout-fuel-mini-base').textContent = fuelMiniBase === 950 ? '-- kg' : `${fuelMiniBase} kg`;
+    document.getElementById('derout-fuel-mini-pelic').textContent = fuelMiniPelic === 950 ? '-- kg' : `${fuelMiniPelic} kg`;
+    
+    const currentFuel = parseNumeric(document.querySelector('#deroutement-fuel-wrapper .display-input').value);
+    const currentTime = parseTime(document.querySelector('#deroutement-heure-wrapper .display-input').value);
+    const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu));
+    const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu);
+    const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
+    const tmdTime = parseTime(document.querySelector('#tmd .display-input').value);
+    const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value);
+    const transitTimeFromGps = Math.round(calculateTransitTime(CALCULATOR_DATA.distGpsFeu));
+    const resultsContainer = document.getElementById('derout-rotation-results-container');
+    updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(CALCULATOR_DATA.distBaseFeu), bingoPelic: calculateBingo(CALCULATOR_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime: transitTimeFromGps });
+}
 
     function updateAndSortRotations(container, current, params) { const lines = container.querySelectorAll('.result-line'); const sortable = []; lines.forEach(line => { const type = line.dataset.rotationType; let value = null; if (type === 'base' && current.fuel && params.consoRotation > 0) { value = ((current.fuel - params.bingoBase) / params.consoRotation); } if (type === 'pelic' && current.fuel && params.consoRotation > 0) { value = ((current.fuel - params.bingoPelic) / params.consoRotation); } if (type === 'cs' && params.csFeuTime !== null && current.time !== null && params.rotationTime > 0) { value = (params.csFeuTime - current.time) / params.rotationTime; } if (type === 'tmd' && params.tmdTime !== null && current.time !== null && params.rotationTime > 0) { value = (params.tmdTime - current.time) / params.rotationTime; } if (type === 'hdv' && params.limiteHDV !== null && params.rotationTime > 0) { const hdvOnSite = params.limiteHDV - (params.transitTime || 0); value = hdvOnSite / params.rotationTime; } line.querySelector('.value').textContent = value !== null && value > 0 ? value.toFixed(2) : '0.00'; sortable.push({ value: value !== null ? value : Infinity, element: line }); }); sortable.sort((a, b) => a.value - b.value); sortable.forEach(item => container.appendChild(item.element)); }
     
