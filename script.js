@@ -102,24 +102,37 @@ function initMap() {
 }
 
 function setupEventListeners() {
+    // --- Récupération des éléments du DOM ---
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
     const airportCountInput = document.getElementById('airport-count');
     const resultsList = document.getElementById('results-list');
     const gpsFeuButton = document.getElementById('gps-feu-button');
-const liveGpsButton = document.getElementById('live-gps-button');
-const lftwRouteButton = document.getElementById('lftw-route-button');
-const gaarModeButton = document.getElementById('gaar-mode-button');
-const editCircuitsButton = document.getElementById('edit-circuits-button');
-const deleteCircuitsButton = document.getElementById('delete-circuits-btn');
+    const liveGpsButton = document.getElementById('live-gps-button');
+    const lftwRouteButton = document.getElementById('lftw-route-button');
+    const gaarModeButton = document.getElementById('gaar-mode-button');
+    const editCircuitsButton = document.getElementById('edit-circuits-button');
+    const deleteCircuitsButton = document.getElementById('delete-circuits-btn');
 
-// Nouveaux boutons et conteneurs
-const toggleSearchButton = document.getElementById('toggle-search-button');
-const mainActionButtons = document.getElementById('main-action-buttons');
-const calculatorButton = document.getElementById('calculator-button');
-const calculatorModal = document.getElementById('calculator-modal');
-const closeCalculatorButton = document.getElementById('close-calculator-btn');
+    // Nouveaux boutons et conteneurs
+    const toggleSearchButton = document.getElementById('toggle-search-button');
+    const mainActionButtons = document.getElementById('main-action-buttons');
+    const calculatorButton = document.getElementById('calculator-button');
+    const calculatorModal = document.getElementById('calculator-modal');
+    const closeCalculatorButton = document.getElementById('close-calculator-btn');
 
+    // --- Gestion du numéro de version ---
+    // On vérifie que le conteneur existe avant de faire quoi que ce soit
+    if (mainActionButtons) {
+        const versionDisplay = document.createElement('div');
+        versionDisplay.className = 'version-display';
+        versionDisplay.innerText = 'v10.0'; // Version mise à jour
+        mainActionButtons.appendChild(versionDisplay);
+    }
+
+    // --- Ajout des écouteurs d'événements ---
+
+    // Barre de recherche
     searchInput.addEventListener('input', () => {
         const rawSearch = searchInput.value;
         clearSearchBtn.style.display = rawSearch.length > 0 ? 'block' : 'none';
@@ -165,113 +178,120 @@ const closeCalculatorButton = document.getElementById('close-calculator-btn');
         displayResults(scoredResults.slice(0, 10));
     });
 
+    // Bouton pour vider la recherche
     clearSearchBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    resultsList.style.display = 'none';
-    clearSearchBtn.style.display = 'none';
-    routesLayer.clearLayers();
-    userToTargetLayer.clearLayers();
-    lftwRouteLayer.clearLayers();
-    drawPermanentAirportMarkers();
-    currentCommune = null;
-    localStorage.removeItem('currentCommune');
-    
-    // Logique mise à jour
-    document.getElementById('toggle-search-button').classList.remove('active');
-    document.getElementById('commune-info-display').style.display = 'none';
-    document.getElementById('ui-overlay').style.display = 'block';
+        searchInput.value = '';
+        resultsList.style.display = 'none';
+        clearSearchBtn.style.display = 'none';
+        routesLayer.clearLayers();
+        userToTargetLayer.clearLayers();
+        lftwRouteLayer.clearLayers();
+        drawPermanentAirportMarkers();
+        currentCommune = null;
+        localStorage.removeItem('currentCommune');
+        document.getElementById('commune-info-display').style.display = 'none';
+        navigator.geolocation.getCurrentPosition(updateUserPosition);
+        map.setView([46.6, 2.2], 5.5);
+    });
 
-    navigator.geolocation.getCurrentPosition(updateUserPosition);
-    map.setView([46.6, 2.2], 5.5);
-});
+    // Nombre de pélicans
     airportCountInput.addEventListener('input', () => {
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
+
+    // Bouton GPS Feu (Cible)
     gpsFeuButton.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-        alert("La géolocalisation n'est pas supportée par votre navigateur.");
-        return;
-    }
-    navigator.geolocation.getCurrentPosition(
-        (pos) => {
-            const { latitude, longitude } = pos.coords;
-            const pointName = findClosestCommuneName(latitude, longitude) || 'Feu GPS';
-            const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
-            currentCommune = gpsCommune;
-            localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
-            displayCommuneDetails(gpsCommune, false);
-            // Déclenche l'événement personnalisé pour fermer l'overlay
-            document.dispatchEvent(new Event('communeSelected'));
-        },
-        () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
-        { enableHighAccuracy: true }
-    );
-});
-    
+        if (!navigator.geolocation) {
+            alert("La géolocalisation n'est pas supportée par votre navigateur.");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const { latitude, longitude } = pos.coords;
+                const pointName = findClosestCommuneName(latitude, longitude) || 'Feu GPS';
+                const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
+                currentCommune = gpsCommune;
+                localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
+                displayCommuneDetails(gpsCommune, false);
+                document.dispatchEvent(new Event('communeSelected'));
+            },
+            () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
+            { enableHighAccuracy: true }
+        );
+    });
+
+    // Bouton GPS Live (Satellite)
     liveGpsButton.addEventListener('click', toggleLiveGps);
+
+    // Bouton Route LFTW
     lftwRouteButton.addEventListener('click', toggleLftwRoute);
+
+    // Boutons GAAR
     gaarModeButton.addEventListener('click', toggleGaarVisibility);
     editCircuitsButton.addEventListener('click', toggleGaarDrawingMode);
     deleteCircuitsButton.addEventListener('click', () => {
         if (confirm("Voulez-vous vraiment supprimer tous les circuits GAAR ?")) {
             clearAllGaarCircuits();
         }
-        // Gestion du numéro de version
-const versionDisplay = document.createElement('div');
-versionDisplay.className = 'version-display';
-versionDisplay.innerText = 'v10.0'; // Version mise à jour
-mainActionButtons.appendChild(versionDisplay);
-
-// Gestion du nouveau bouton pour afficher/cacher la recherche
-toggleSearchButton.addEventListener('click', () => {
-    const uiOverlay = document.getElementById('ui-overlay');
-    const communeDisplay = document.getElementById('commune-info-display');
-
-    if (uiOverlay.style.display === 'none') {
-        uiOverlay.style.display = 'block';
-        communeDisplay.style.display = 'none';
-        toggleSearchButton.classList.add('active');
-    } else {
-        uiOverlay.style.display = 'none';
-        toggleSearchButton.classList.remove('active');
-        if (communeDisplay.innerHTML.trim() !== '' && currentCommune) {
-            communeDisplay.style.display = 'flex';
-        }
-    }
-});
-
-// Ferme le panneau de recherche lorsqu'une commune est sélectionnée
-// (cela se trouve dans la fonction displayResults, on va le modifier là-bas)
-// Et on ajoute cette logique ici aussi pour la sélection manuelle
-document.addEventListener('communeSelected', () => {
-    document.getElementById('ui-overlay').style.display = 'none';
-    document.getElementById('toggle-search-button').classList.remove('active');
-    document.getElementById('commune-info-display').style.display = 'flex';
-});
     });
-    updateLftwButtonState();
+
+    // --- NOUVELLE LOGIQUE POUR LES BOUTONS D'ACTION ---
+
+    // Bouton pour ouvrir/fermer le panneau de recherche (Ville)
+    toggleSearchButton.addEventListener('click', () => {
+        const uiOverlay = document.getElementById('ui-overlay');
+        const communeDisplay = document.getElementById('commune-info-display');
+
+        if (uiOverlay.style.display === 'none') {
+            uiOverlay.style.display = 'block';
+            communeDisplay.style.display = 'none';
+            toggleSearchButton.classList.add('active');
+        } else {
+            uiOverlay.style.display = 'none';
+            toggleSearchButton.classList.remove('active');
+            if (communeDisplay.innerHTML.trim() !== '' && currentCommune) {
+                communeDisplay.style.display = 'flex';
+            }
+        }
+    });
+
+    // Événement personnalisé pour gérer la sélection d'une commune
+    document.addEventListener('communeSelected', () => {
+        document.getElementById('ui-overlay').style.display = 'none';
+        document.getElementById('toggle-search-button').classList.remove('active');
+        if (currentCommune) {
+            document.getElementById('commune-info-display').style.display = 'flex';
+        }
+    });
+
+    // --- LOGIQUE POUR LE CALCULATEUR ---
+
+    // Bouton pour ouvrir la modale (Avion)
     calculatorButton.addEventListener('click', () => {
-    calculatorModal.style.display = 'flex';
-    // Cache l'overlay de recherche si il est ouvert, pour ne pas avoir les deux en même temps
-    document.getElementById('ui-overlay').style.display = 'none';
-});
+        calculatorModal.style.display = 'flex';
+    });
 
-closeCalculatorButton.addEventListener('click', () => {
-    calculatorModal.style.display = 'none';
-});
-
-calculatorModal.addEventListener('click', (e) => {
-    // Si on clique sur le fond sombre de la modale, on la ferme
-    if (e.target === calculatorModal) {
+    // Bouton pour fermer la modale
+    closeCalculatorButton.addEventListener('click', () => {
         calculatorModal.style.display = 'none';
-    }
-});
+    });
+
+    // Fermer la modale en cliquant sur le fond
+    calculatorModal.addEventListener('click', (e) => {
+        if (e.target === calculatorModal) {
+            calculatorModal.style.display = 'none';
+        }
+    });
+
+    // Fermer la modale avec la touche Echap
     window.addEventListener('keydown', (e) => {
-    // Si on appuie sur la touche "Echap"
-    if (e.key === 'Escape' && calculatorModal.style.display === 'flex') {
-        calculatorModal.style.display = 'none';
-    }
-});
+        if (e.key === 'Escape' && calculatorModal.style.display === 'flex') {
+            calculatorModal.style.display = 'none';
+        }
+    });
+
+    // Mise à jour de l'état des boutons au chargement
+    updateLftwButtonState();
     updateGaarButtonState();
 }
 
