@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
-let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null;
+let allCommunes = [], map, permanentAirportLayer, routesLayer, currentCommune = null, selectedPelicanOACI = null;
 let disabledAirports = new Set(), waterAirports = new Set(), searchToggleControl;
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null;
@@ -323,9 +323,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
     
-    if (searchToggleControl) {
-        searchToggleControl.updateDisplay(commune);
-    }
+    document.dispatchEvent(new Event('communeSelected'));
+    
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
     document.getElementById('search-input').value = name;
     document.getElementById('results-list').style.display = 'none';
@@ -338,6 +337,21 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(lat, lon, numAirports);
+    
+    // --- NOUVELLE LOGIQUE DE SÉLECTION ---
+    // Si aucun pélican n'est sélectionné, ou si le pélican sélectionné n'est plus dans la liste des plus proches,
+    // on sélectionne le plus proche par défaut.
+    const closestOACIs = new Set(closestAirports.map(ap => ap.oaci));
+    if (!selectedPelicanOACI || !closestOACIs.has(selectedPelicanOACI)) {
+        if (closestAirports.length > 0) {
+            selectedPelicanOACI = closestAirports[0].oaci;
+            console.log(`Pélicandrome par défaut sélectionné : ${selectedPelicanOACI}`);
+        } else {
+            selectedPelicanOACI = null; // Aucun pélican disponible
+        }
+    }
+    // --- FIN DE LA NOUVELLE LOGIQUE ---
+    
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
@@ -348,6 +362,9 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         drawLftwRoute();
     }
     
+    // Mettre à jour les données du calculateur avec les vraies valeurs
+    updateCalculatorData();
+
     navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
 
     if (shouldFitBounds) {
@@ -365,10 +382,9 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 }
 
 function drawRoute(startLatLng, endLatLng, options = {}) {
-    const { oaci, isUser, magneticBearing } = options;
+    const { oaci, isUser, isLftwRoute, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
     let labelText;
-
     let color = 'var(--primary-color)';
     let dashArray = '';
     let layer = routesLayer;
@@ -378,17 +394,48 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         color = 'var(--secondary-color)';
         dashArray = '5, 10';
         layer = userToTargetLayer;
-    } else if (options.isLftwRoute) {
+    } else if (isLftwRoute) {
         labelText = `LFTW: ${Math.round(magneticBearing)}° / ${Math.round(distance)} Nm`;
         color = 'var(--success-color)';
         dashArray = '5, 10';
         layer = lftwRouteLayer;
     } else if (oaci) {
+        // C'est une route vers un pélican
+        const isSelected = selectedPelicanOACI === oaci;
+        color = isSelected ? 'var(--success-color)' : 'var(--primary-color)'; // Vert si sélectionné
         labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
+
+        // Ligne visible
+        L.polyline([startLatLng, endLatLng], { 
+            color, 
+            weight: 3, 
+            opacity: 0.8 
+        }).addTo(layer);
+
+        // Ligne invisible pour faciliter le clic (hitbox)
+        const hitbox = L.polyline([startLatLng, endLatLng], { 
+            color: 'transparent', 
+            weight: 20, // Très large
+            opacity: 0 
+        }).addTo(layer);
+
+        // Ajout de l'écouteur de clic
+        hitbox.on('click', () => {
+            selectedPelicanOACI = oaci;
+            console.log(`Pélicandrome sélectionné pour les calculs : ${oaci}`);
+            // Redessiner les routes pour mettre à jour les couleurs et les calculs
+            displayCommuneDetails(currentCommune, false);
+        });
+
+        // Affichage du tooltip
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
+
+        return; // On arrête ici car on a géré le dessin nous-mêmes
     } else {
         labelText = `${Math.round(distance)} Nm`;
     }
     
+    // Code original pour les autres types de routes
     const polyline = L.polyline([startLatLng, endLatLng], { 
         color, 
         weight: 3, 
@@ -398,7 +445,8 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
 
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
-    } else if (oaci || options.isLftwRoute) {
+    } else if (oaci || isLftwRoute) {
+        // Cette partie n'est plus atteinte pour les pélicans, mais gardée pour la route LFTW
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
@@ -650,6 +698,52 @@ function saveGaarCircuits() {
     localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits));
 }
 
+function updateCalculatorData() {
+    if (!currentCommune) return; // Pas de commune, pas de calcul
+
+    const lftw = airports.find(ap => ap.oaci === 'LFTW');
+    const selectedPelican = airports.find(ap => ap.oaci === selectedPelicanOACI);
+    const { latitude_mairie: feuLat, longitude_mairie: feuLon } = currentCommune;
+
+    let distBaseFeu = 0;
+    if (lftw) {
+        distBaseFeu = calculateDistanceInNm(lftw.lat, lftw.lon, feuLat, feuLon);
+    }
+
+    let distPelicFeu = 0;
+    if (selectedPelican) {
+        distPelicFeu = calculateDistanceInNm(selectedPelican.lat, selectedPelican.lon, feuLat, feuLon);
+    }
+
+    let csFeu = '--:--';
+    if (typeof SunCalc !== 'undefined') {
+        try {
+            const now = new Date();
+            const times = SunCalc.getTimes(now, feuLat, feuLon);
+            csFeu = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+        } catch (e) { /* ignore */ }
+    }
+    
+    let distGpsFeu = 0;
+    if (userMarker && userMarker.getLatLng()) {
+        const userLatLng = userMarker.getLatLng();
+        distGpsFeu = calculateDistanceInNm(userLatLng.lat, userLatLng.lng, feuLat, feuLon);
+    }
+
+    // Mettre à jour la variable globale du calculateur
+    CALCULATOR_DATA.distBaseFeu = Math.round(distBaseFeu);
+    CALCULATOR_DATA.distPelicFeu = Math.round(distPelicFeu);
+    CALCULATOR_DATA.csFeu = csFeu;
+    CALCULATOR_DATA.distGpsFeu = Math.round(distGpsFeu);
+
+    console.log("Données du calculateur mises à jour :", CALCULATOR_DATA);
+
+    // Rafraîchir l'affichage du calculateur
+    if (typeof masterRecalculate === 'function') {
+        masterRecalculate();
+    }
+}
+
 function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
 
 // =========================================================================
@@ -657,9 +751,9 @@ function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f 
 // =========================================================================
 
 // NOTE: Les données de mission sont actuellement simulées.
-// Pour une intégration complète, il faudrait remplacer FAKE_DATA
+// Pour une intégration complète, il faudrait remplacer CALCULATOR_DATA
 // par des valeurs dynamiques issues de la carte (ex: distance au feu).
-const FAKE_DATA = { distBaseFeu: 87, distPelicFeu: 16, csFeu: '21:05', distGpsFeu: 25 };
+let CALCULATOR_DATA = { distBaseFeu: 0, distPelicFeu: 0, csFeu: '--:--', distGpsFeu: 0 };
 
 const calculateBingo = (dist) => (dist <= 70) ? (dist * 5) + 700 : (dist * 4) + 700;
 const calculateFuelToGo = (dist) => (dist <= 70) ? (dist * 5) : (dist * 4);
@@ -680,11 +774,11 @@ function initializeCalculator() {
 
     function masterRecalculate() { recalculateBlocFuel(); updatePreviTab(); updateSuiviTab(); updateDeroutementTab(); }
 
-    function updatePreviTab() { const blocDepart = parseTime(document.querySelector('#bloc-depart .display-input').value); const fuelDepart = parseNumeric(document.querySelector('#fuel-depart .display-input').value); const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const csFeuTime = parseTime(FAKE_DATA.csFeu); const transitTime = Math.round(calculateTransitTime(FAKE_DATA.distBaseFeu)); const rotationTime = Math.round(calculateRotationTime(FAKE_DATA.distPelicFeu)); const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null; const consoRotation = calculateConsoRotation(FAKE_DATA.distPelicFeu); document.getElementById('duree-transit').textContent = formatTime(transitTime); document.getElementById('duree-rotation').textContent = formatTime(rotationTime); document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu); const fuelSurFeuWrapper = document.querySelector('#fuel-sur-feu-wrapper'); const fuelSurFeuInput = fuelSurFeuWrapper.querySelector('.display-input'); if (!isFuelSurFeuManual) { const consoAller = calculateFuelToGo(FAKE_DATA.distBaseFeu); const fuelEstime = fuelDepart ? fuelDepart - consoAller : null; fuelSurFeuInput.value = fuelEstime ? `${fuelEstime} kg` : ''; fuelSurFeuWrapper.classList.toggle('has-value', !!fuelEstime); } document.getElementById('conso-aller-feu').textContent = `${calculateFuelToGo(FAKE_DATA.distBaseFeu)} kg`; document.getElementById('conso-par-rotation').textContent = `${consoRotation} kg`; document.getElementById('cs-sur-feu').textContent = FAKE_DATA.csFeu; document.getElementById('tmd-display').textContent = formatTime(tmdTime); document.getElementById('hdv-restant-display').textContent = formatTime(limiteHDV); const bingoBase = calculateBingo(FAKE_DATA.distBaseFeu); const bingoPelic = calculateBingo(FAKE_DATA.distPelicFeu); document.getElementById('previ-bingo-base').textContent = `${bingoBase} kg`; document.getElementById('previ-bingo-pelic').textContent = `${bingoPelic} kg`; const fuelSurFeu = parseNumeric(fuelSurFeuInput.value); const resultsContainer = document.getElementById('previ-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: fuelSurFeu, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime }); }
+    function updatePreviTab() { const blocDepart = parseTime(document.querySelector('#bloc-depart .display-input').value); const fuelDepart = parseNumeric(document.querySelector('#fuel-depart .display-input').value); const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const csFeuTime = parseTime(CALCULATOR_DATA.csFeu); const transitTime = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu)); const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null; const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu); document.getElementById('duree-transit').textContent = formatTime(transitTime); document.getElementById('duree-rotation').textContent = formatTime(rotationTime); document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu); const fuelSurFeuWrapper = document.querySelector('#fuel-sur-feu-wrapper'); const fuelSurFeuInput = fuelSurFeuWrapper.querySelector('.display-input'); if (!isFuelSurFeuManual) { const consoAller = calculateFuelToGo(CALCULATOR_DATA.distBaseFeu); const fuelEstime = fuelDepart ? fuelDepart - consoAller : null; fuelSurFeuInput.value = fuelEstime ? `${fuelEstime} kg` : ''; fuelSurFeuWrapper.classList.toggle('has-value', !!fuelEstime); } document.getElementById('conso-aller-feu').textContent = `${calculateFuelToGo(CALCULATOR_DATA.distBaseFeu)} kg`; document.getElementById('conso-par-rotation').textContent = `${consoRotation} kg`; document.getElementById('cs-sur-feu').textContent = CALCULATOR_DATA.csFeu; document.getElementById('tmd-display').textContent = formatTime(tmdTime); document.getElementById('hdv-restant-display').textContent = formatTime(limiteHDV); const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu); const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu); document.getElementById('previ-bingo-base').textContent = `${bingoBase} kg`; document.getElementById('previ-bingo-pelic').textContent = `${bingoPelic} kg`; const fuelSurFeu = parseNumeric(fuelSurFeuInput.value); const resultsContainer = document.getElementById('previ-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: fuelSurFeu, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime }); }
     
-    function updateSuiviTab() { const suiviPanel = document.querySelector('#suivi-rotations .analyse-grid'); const placeholder = document.querySelector('#suivi-rotations .placeholder-message'); const allRows = document.querySelectorAll('#bloc-fuel tbody tr'); let lastFilledRow = null; allRows.forEach(row => { if (parseTime(row.querySelector('.time-input-wrapper .display-input').value) !== null || parseNumeric(row.querySelector('.numeric-input-wrapper .display-input').value) !== null) { lastFilledRow = row; } }); document.getElementById('suivi-bingo-base').textContent = `${calculateBingo(FAKE_DATA.distBaseFeu)} kg`; document.getElementById('suivi-bingo-pelic').textContent = `${calculateBingo(FAKE_DATA.distPelicFeu)} kg`; if (!lastFilledRow) { suiviPanel.style.display = 'grid'; placeholder.style.display = 'none'; document.getElementById('suivi-fuel-actuel').textContent = '--'; document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => el.textContent = '--'); const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper'); const dureeWrapper = document.getElementById('suivi-duree-rotation-wrapper'); if (!isSuiviConsoManual) { consoWrapper.querySelector('.display-input').value = `${calculateConsoRotation(FAKE_DATA.distPelicFeu)} kg`; consoWrapper.classList.toggle('has-value', true); } if (!isSuiviDureeManual) { dureeWrapper.querySelector('.display-input').value = formatTime(calculateRotationTime(FAKE_DATA.distPelicFeu)); dureeWrapper.classList.toggle('has-value', true); } return; } suiviPanel.style.display = 'grid'; placeholder.style.display = 'none'; const currentFuel = parseNumeric(lastFilledRow.querySelector('.numeric-input-wrapper .display-input').value); const currentTime = parseTime(lastFilledRow.querySelector('.time-input-wrapper .display-input').value); const currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell').textContent); document.getElementById('suivi-fuel-actuel').textContent = currentFuel ? `${currentFuel} kg` : '--'; const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper'); const dureeWrapper = document.getElementById('suivi-duree-rotation-wrapper'); const consoInput = consoWrapper.querySelector('.display-input'); const dureeInput = dureeWrapper.querySelector('.display-input'); let consoRotation = isSuiviConsoManual ? parseNumeric(consoInput.value) : calculateConsoRotation(FAKE_DATA.distPelicFeu); let rotationTime = isSuiviDureeManual ? parseTime(dureeInput.value) : Math.round(calculateRotationTime(FAKE_DATA.distPelicFeu)); if (!isSuiviConsoManual) { consoInput.value = consoRotation ? `${consoRotation} kg` : ''; consoWrapper.classList.toggle('has-value', !!consoRotation); } if (!isSuiviDureeManual) { dureeInput.value = formatTime(rotationTime) || ''; dureeWrapper.classList.toggle('has-value', !!rotationTime); } const csFeuTime = parseTime(FAKE_DATA.csFeu); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const resultsContainer = document.getElementById('suivi-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(FAKE_DATA.distBaseFeu), bingoPelic: calculateBingo(FAKE_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: 0 }); }
+    function updateSuiviTab() { const suiviPanel = document.querySelector('#suivi-rotations .analyse-grid'); const placeholder = document.querySelector('#suivi-rotations .placeholder-message'); const allRows = document.querySelectorAll('#bloc-fuel tbody tr'); let lastFilledRow = null; allRows.forEach(row => { if (parseTime(row.querySelector('.time-input-wrapper .display-input').value) !== null || parseNumeric(row.querySelector('.numeric-input-wrapper .display-input').value) !== null) { lastFilledRow = row; } }); document.getElementById('suivi-bingo-base').textContent = `${calculateBingo(CALCULATOR_DATA.distBaseFeu)} kg`; document.getElementById('suivi-bingo-pelic').textContent = `${calculateBingo(CALCULATOR_DATA.distPelicFeu)} kg`; if (!lastFilledRow) { suiviPanel.style.display = 'grid'; placeholder.style.display = 'none'; document.getElementById('suivi-fuel-actuel').textContent = '--'; document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => el.textContent = '--'); const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper'); const dureeWrapper = document.getElementById('suivi-duree-rotation-wrapper'); if (!isSuiviConsoManual) { consoWrapper.querySelector('.display-input').value = `${calculateConsoRotation(CALCULATOR_DATA.distPelicFeu)} kg`; consoWrapper.classList.toggle('has-value', true); } if (!isSuiviDureeManual) { dureeWrapper.querySelector('.display-input').value = formatTime(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); dureeWrapper.classList.toggle('has-value', true); } return; } suiviPanel.style.display = 'grid'; placeholder.style.display = 'none'; const currentFuel = parseNumeric(lastFilledRow.querySelector('.numeric-input-wrapper .display-input').value); const currentTime = parseTime(lastFilledRow.querySelector('.time-input-wrapper .display-input').value); const currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell').textContent); document.getElementById('suivi-fuel-actuel').textContent = currentFuel ? `${currentFuel} kg` : '--'; const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper'); const dureeWrapper = document.getElementById('suivi-duree-rotation-wrapper'); const consoInput = consoWrapper.querySelector('.display-input'); const dureeInput = dureeWrapper.querySelector('.display-input'); let consoRotation = isSuiviConsoManual ? parseNumeric(consoInput.value) : calculateConsoRotation(CALCULATOR_DATA.distPelicFeu); let rotationTime = isSuiviDureeManual ? parseTime(dureeInput.value) : Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); if (!isSuiviConsoManual) { consoInput.value = consoRotation ? `${consoRotation} kg` : ''; consoWrapper.classList.toggle('has-value', !!consoRotation); } if (!isSuiviDureeManual) { dureeInput.value = formatTime(rotationTime) || ''; dureeWrapper.classList.toggle('has-value', !!rotationTime); } const csFeuTime = parseTime(CALCULATOR_DATA.csFeu); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const resultsContainer = document.getElementById('suivi-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(CALCULATOR_DATA.distBaseFeu), bingoPelic: calculateBingo(CALCULATOR_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: 0 }); }
 
-    function updateDeroutementTab() { document.getElementById('derout-bingo-base').textContent = `${calculateBingo(FAKE_DATA.distBaseFeu)} kg`; document.getElementById('derout-bingo-pelic').textContent = `${calculateBingo(FAKE_DATA.distPelicFeu)} kg`; const fuelForGpsTransit = calculateFuelToGo(FAKE_DATA.distGpsFeu); const fuelMiniBase = fuelForGpsTransit + calculateBingo(FAKE_DATA.distBaseFeu) + 250; const fuelMiniPelic = fuelForGpsTransit + calculateBingo(FAKE_DATA.distPelicFeu) + 250; document.getElementById('derout-fuel-mini-base').textContent = `${fuelMiniBase} kg`; document.getElementById('derout-fuel-mini-pelic').textContent = `${fuelMiniPelic} kg`; const currentFuel = parseNumeric(document.querySelector('#deroutement-fuel-wrapper .display-input').value); const currentTime = parseTime(document.querySelector('#deroutement-heure-wrapper .display-input').value); const rotationTime = Math.round(calculateRotationTime(FAKE_DATA.distPelicFeu)); const consoRotation = calculateConsoRotation(FAKE_DATA.distPelicFeu); const csFeuTime = parseTime(FAKE_DATA.csFeu); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value); const transitTimeFromGps = Math.round(calculateTransitTime(FAKE_DATA.distGpsFeu)); const resultsContainer = document.getElementById('derout-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(FAKE_DATA.distBaseFeu), bingoPelic: calculateBingo(FAKE_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime: transitTimeFromGps }); }
+    function updateDeroutementTab() { document.getElementById('derout-bingo-base').textContent = `${calculateBingo(CALCULATOR_DATA.distBaseFeu)} kg`; document.getElementById('derout-bingo-pelic').textContent = `${calculateBingo(CALCULATOR_DATA.distPelicFeu)} kg`; const fuelForGpsTransit = calculateFuelToGo(CALCULATOR_DATA.distGpsFeu); const fuelMiniBase = fuelForGpsTransit + calculateBingo(CALCULATOR_DATA.distBaseFeu) + 250; const fuelMiniPelic = fuelForGpsTransit + calculateBingo(CALCULATOR_DATA.distPelicFeu) + 250; document.getElementById('derout-fuel-mini-base').textContent = `${fuelMiniBase} kg`; document.getElementById('derout-fuel-mini-pelic').textContent = `${fuelMiniPelic} kg`; const currentFuel = parseNumeric(document.querySelector('#deroutement-fuel-wrapper .display-input').value); const currentTime = parseTime(document.querySelector('#deroutement-heure-wrapper .display-input').value); const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)); const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu); const csFeuTime = parseTime(CALCULATOR_DATA.csFeu); const tmdTime = parseTime(document.querySelector('#tmd .display-input').value); const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value); const transitTimeFromGps = Math.round(calculateTransitTime(CALCULATOR_DATA.distGpsFeu)); const resultsContainer = document.getElementById('derout-rotation-results-container'); updateAndSortRotations(resultsContainer, { fuel: currentFuel, time: currentTime }, { bingoBase: calculateBingo(CALCULATOR_DATA.distBaseFeu), bingoPelic: calculateBingo(CALCULATOR_DATA.distPelicFeu), consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime: transitTimeFromGps }); }
 
     function updateAndSortRotations(container, current, params) { const lines = container.querySelectorAll('.result-line'); const sortable = []; lines.forEach(line => { const type = line.dataset.rotationType; let value = null; if (type === 'base' && current.fuel && params.consoRotation > 0) { value = ((current.fuel - params.bingoBase) / params.consoRotation); } if (type === 'pelic' && current.fuel && params.consoRotation > 0) { value = ((current.fuel - params.bingoPelic) / params.consoRotation); } if (type === 'cs' && params.csFeuTime !== null && current.time !== null && params.rotationTime > 0) { value = (params.csFeuTime - current.time) / params.rotationTime; } if (type === 'tmd' && params.tmdTime !== null && current.time !== null && params.rotationTime > 0) { value = (params.tmdTime - current.time) / params.rotationTime; } if (type === 'hdv' && params.limiteHDV !== null && params.rotationTime > 0) { const hdvOnSite = params.limiteHDV - (params.transitTime || 0); value = hdvOnSite / params.rotationTime; } line.querySelector('.value').textContent = value !== null && value > 0 ? value.toFixed(2) : '0.00'; sortable.push({ value: value !== null ? value : Infinity, element: line }); }); sortable.sort((a, b) => a.value - b.value); sortable.forEach(item => container.appendChild(item.element)); }
     
