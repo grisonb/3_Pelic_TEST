@@ -76,6 +76,7 @@ html, body {
 .airport-popup .water-btn { background-color: var(--water-color); }
 .airport-popup .enable-btn { background-color: var(--success-color); }
 .airport-popup .disable-btn { background-color: var(--secondary-color); }
+.leaflet-control-container .leaflet-top.leaflet-left { top: calc(var(--safe-area-top) + 60px); }
 #commune-info-display { position: absolute; top: var(--safe-area-top); left: 50%; transform: translateX(-50%); z-index: 1000; background-color: white; display: none; align-items: center; box-shadow: 0 1px 5px rgba(0,0,0,0.4); border-radius: var(--border-radius); border: 1px solid rgba(0,0,0,0.2); height: 52px; padding: 0 18px; font-size: 18px; font-weight: 500; white-space: nowrap; max-width: calc(100vw - 220px); overflow: hidden; color: var(--text-color); gap: 12px; }
 #commune-info-display > .commune-name { overflow: hidden; text-overflow: ellipsis; }
 #commune-info-display .sunset-info { font-size: 15px; color: var(--light-text-color); margin-left: auto; white-space: nowrap; }
