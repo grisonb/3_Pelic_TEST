@@ -258,36 +258,6 @@ html, body {
     white-space: nowrap;
 }
 
-.search-toggle-wrapper {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    text-align: center;
-}
-
-.search-toggle-button {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    cursor: pointer;
-    font-size: 2.8em !important;
-    text-decoration: none;
-    line-height: 1; 
-    padding: 0;
-    color: #333;
-    text-shadow: 0 0 4px white, 0 0 4px white;
-}
-
-.version-display {
-    font-size: 10px;
-    color: #333;
-    text-shadow: 0 0 2px white, 0 0 2px white;
-    text-align: center;
-    padding: 0;
-    background-color: transparent;
-    margin-top: -5px;
-}
-
 #live-gps-button {
     flex-shrink: 0;
     width: 48px;
@@ -310,7 +280,7 @@ html, body {
     background-color: #e9f5ff;
 }
 
-#action-buttons-container {
+#main-action-buttons {
     position: absolute;
     top: var(--safe-area-top);
     right: 20px;
@@ -318,9 +288,10 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 15px;
+    align-items: center; /* Pour centrer le numéro de version */
 }
 
-#calculator-button, #gps-feu-button {
+#toggle-search-button, #calculator-button, #gps-feu-button {
     width: 90px;
     height: 90px;
     font-size: 48px;
@@ -337,6 +308,23 @@ html, body {
     box-shadow: var(--shadow);
     padding: 0;
     line-height: 1;
+}
+
+/* Style spécifique pour le bouton de recherche s'il est actif */
+#toggle-search-button.active {
+    border-color: var(--primary-color);
+    background-color: rgba(233, 245, 255, 0.9);
+}
+
+.version-display {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+    text-shadow: 0 0 3px white, 0 0 3px white;
+    background-color: rgba(255, 255, 255, 0.6);
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-top: -5px; /* Pour le rapprocher du bouton au-dessus */
 }
 
 #live-gps-button.active {
@@ -520,7 +508,17 @@ html, body {
 #bloc-fuel .table-section tbody tr:nth-child(odd) { background-color: #fdfdfd; }
 #bloc-fuel .table-section tbody tr:nth-child(even) { background-color: var(--background-color); }
 
-.analyse-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px 50px; padding: 25px; overflow-y: auto; flex-grow: 1; }
+.analyse-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px 50px;
+    padding: 25px;
+    overflow-y: auto;
+    flex-grow: 1;
+    /* AJOUTS POUR CORRIGER LE DÉPASSEMENT */
+    height: 100%;
+    box-sizing: border-box;
+}
 .result-line { display: grid; grid-template-columns: 1fr auto; align-items: center; margin-bottom: 25px; font-size: 19px; }
 .result-line .label { font-weight: 500; text-align: left; }
 .result-line .value { font-weight: bold; background-color: #e9f5ff; padding: 8px 15px; border-radius: 6px; text-align: right; }
@@ -537,4 +535,21 @@ html, body {
 .rotations-group { display: flex; flex-direction: column; }
 .placeholder-message { text-align: center; padding: 40px; font-size: 18px; color: var(--light-text-color); }
 
-#reset-all-btn { position: absolute; bottom: 20px; right: 20px; width: 70px; height: 70px; border-radius: 50%; background-color: var(--secondary-color); color: white; font-size: 36px; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 1050; display: flex; justify-content: center; align-items: center; }
+#reset-all-btn {
+    position: absolute; /* MODIFIÉ DE 'fixed' A 'absolute' */
+    bottom: 20px;
+    right: 20px;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background-color: var(--secondary-color);
+    color: white;
+    font-size: 36px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    z-index: 1050;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
