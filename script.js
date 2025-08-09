@@ -317,12 +317,38 @@ function displayResults(results) {
     }
 }
 
+function updateCommuneDisplay(commune) {
+    const communeDisplay = document.getElementById('commune-info-display');
+    if (!commune) {
+        communeDisplay.innerHTML = '';
+        communeDisplay.style.display = 'none';
+        return;
+    }
+
+    const communeNameHTML = `<span class="commune-name">${commune.nom_standard}</span>`;
+    let sunsetHTML = '';
+
+    if (typeof SunCalc !== 'undefined') {
+        try {
+            const now = new Date();
+            const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
+            const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+            sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div>`;
+        } catch (e) {
+            sunsetHTML = '<div class="sunset-info"></div>';
+        }
+    }
+    communeDisplay.innerHTML = communeNameHTML + sunsetHTML;
+}
+
 function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
     userToTargetLayer.clearLayers();
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
     
+    // --- CORRECTION : Appeler la fonction de mise à jour de l'affichage ---
+    updateCommuneDisplay(commune); // On s'assure que l'affichage est mis à jour
     document.dispatchEvent(new Event('communeSelected'));
     
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
@@ -338,19 +364,14 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(lat, lon, numAirports);
     
-    // --- NOUVELLE LOGIQUE DE SÉLECTION ---
-    // Si aucun pélican n'est sélectionné, ou si le pélican sélectionné n'est plus dans la liste des plus proches,
-    // on sélectionne le plus proche par défaut.
     const closestOACIs = new Set(closestAirports.map(ap => ap.oaci));
     if (!selectedPelicanOACI || !closestOACIs.has(selectedPelicanOACI)) {
         if (closestAirports.length > 0) {
             selectedPelicanOACI = closestAirports[0].oaci;
-            console.log(`Pélicandrome par défaut sélectionné : ${selectedPelicanOACI}`);
         } else {
-            selectedPelicanOACI = null; // Aucun pélican disponible
+            selectedPelicanOACI = null;
         }
     }
-    // --- FIN DE LA NOUVELLE LOGIQUE ---
     
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
@@ -362,9 +383,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         drawLftwRoute();
     }
     
-    // Mettre à jour les données du calculateur avec les vraies valeurs
     updateCalculatorData();
-
     navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
 
     if (shouldFitBounds) {
@@ -400,53 +419,30 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         dashArray = '5, 10';
         layer = lftwRouteLayer;
     } else if (oaci) {
-        // C'est une route vers un pélican
         const isSelected = selectedPelicanOACI === oaci;
-        color = isSelected ? 'var(--success-color)' : 'var(--primary-color)'; // Vert si sélectionné
+        color = isSelected ? 'var(--success-color)' : 'var(--primary-color)';
+        let tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected' : 'route-tooltip'; // Classe dynamique
         labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
 
-        // Ligne visible
-        L.polyline([startLatLng, endLatLng], { 
-            color, 
-            weight: 3, 
-            opacity: 0.8 
-        }).addTo(layer);
+        L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8 }).addTo(layer);
+        const hitbox = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 20, opacity: 0 }).addTo(layer);
 
-        // Ligne invisible pour faciliter le clic (hitbox)
-        const hitbox = L.polyline([startLatLng, endLatLng], { 
-            color: 'transparent', 
-            weight: 20, // Très large
-            opacity: 0 
-        }).addTo(layer);
-
-        // Ajout de l'écouteur de clic
         hitbox.on('click', () => {
             selectedPelicanOACI = oaci;
-            console.log(`Pélicandrome sélectionné pour les calculs : ${oaci}`);
-            // Redessiner les routes pour mettre à jour les couleurs et les calculs
             displayCommuneDetails(currentCommune, false);
         });
 
-        // Affichage du tooltip
-        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
-
-        return; // On arrête ici car on a géré le dessin nous-mêmes
+        L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: tooltipClass }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
+        return;
     } else {
         labelText = `${Math.round(distance)} Nm`;
     }
     
-    // Code original pour les autres types de routes
-    const polyline = L.polyline([startLatLng, endLatLng], { 
-        color, 
-        weight: 3, 
-        opacity: 0.8, 
-        dashArray
-    }).addTo(layer);
+    const polyline = L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
 
     if (isUser) {
         polyline.bindTooltip(labelText, { permanent: true, direction: 'center', className: 'route-tooltip route-tooltip-user', sticky: true });
     } else if (oaci || isLftwRoute) {
-        // Cette partie n'est plus atteinte pour les pélicans, mais gardée pour la route LFTW
         L.tooltip({ permanent: true, direction: 'right', offset: [10, 0], className: 'route-tooltip' }).setLatLng(endLatLng).setContent(labelText).addTo(layer);
     }
 }
