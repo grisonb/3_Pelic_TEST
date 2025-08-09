@@ -1,8 +1,8 @@
 // --- FICHIER sw.js SANS TÉLÉCHARGEMENT DE MASSE ---
 
-const APP_CACHE_NAME = 'communes-app-cache-v110'; // Version 10.0
-const DATA_CACHE_NAME = 'communes-data-cache-v110';
-const TILE_CACHE_NAME = 'communes-tile-cache-v110';
+const APP_CACHE_NAME = 'communes-app-cache-v111'; // Version 10.0
+const DATA_CACHE_NAME = 'communes-data-cache-v111';
+const TILE_CACHE_NAME = 'communes-tile-cache-v111';
 
 const APP_SHELL_URLS = [
     './',
