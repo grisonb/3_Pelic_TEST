@@ -251,7 +251,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = document.getElementById('commune-info-display'); 
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v10.0';
+        versionDisplay.innerText = 'v10.1';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
@@ -291,7 +291,6 @@ const SearchToggleControl = L.Control.extend({
     }
 });
 function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
-
 
 // =======================================================
 // == MODULE DU CALCULATEUR DE VOL
@@ -355,16 +354,5 @@ const flightLog = {
         document.getElementById('refresh-gps-btn').addEventListener('click', () => { console.log("Rafraîchissement de la position GPS demandé."); masterRecalculate(); });
         
         masterRecalculate();
-    },
-
-    updateOnOpen() {
-        const lftw = airports.find(ap => ap.oaci === 'LFTW');
-        if (lftw && typeof SunCalc !== 'undefined') {
-            const now = new Date();
-            const times = SunCalc.getTimes(now, lftw.lat, lftw.lon);
-            const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-            document.getElementById('cs-lftw-display').value = sunsetString;
-        }
-        this.masterRecalculate();
     }
 };
