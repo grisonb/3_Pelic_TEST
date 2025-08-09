@@ -77,8 +77,7 @@ function initMap() {
     if (map) return;
     map = L.map('map', { attributionControl: false, zoomControl: false }).setView([46.6, 2.2], 5.5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    searchToggleControl = new SearchToggleControl().addTo(map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
     userToTargetLayer = L.layerGroup().addTo(map);
@@ -90,15 +89,16 @@ function initMap() {
     map.on('click', handleGaarMapClick);
 
     map.on('contextmenu', (e) => {
-        if (isDrawingMode) return;
-        L.DomEvent.preventDefault(e.originalEvent);
-        const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Feu manuel';
-        const manualCommune = { nom_standard: pointName, latitude_mairie: e.latlng.lat, longitude_mairie: e.latlng.lng, isManual: true };
-        currentCommune = manualCommune;
-        localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
-        displayCommuneDetails(manualCommune, false);
-        document.getElementById('ui-overlay').style.display = 'none';
-    });
+    if (isDrawingMode) return;
+    L.DomEvent.preventDefault(e.originalEvent);
+    const pointName = findClosestCommuneName(e.latlng.lat, e.latlng.lng) || 'Feu manuel';
+    const manualCommune = { nom_standard: pointName, latitude_mairie: e.latlng.lat, longitude_mairie: e.latlng.lng, isManual: true };
+    currentCommune = manualCommune;
+    localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
+    displayCommuneDetails(manualCommune, false);
+    // Déclenche l'événement personnalisé pour fermer l'overlay
+    document.dispatchEvent(new Event('communeSelected'));
+});
 }
 
 function setupEventListeners() {
@@ -107,12 +107,16 @@ function setupEventListeners() {
     const airportCountInput = document.getElementById('airport-count');
     const resultsList = document.getElementById('results-list');
     const gpsFeuButton = document.getElementById('gps-feu-button');
-    const liveGpsButton = document.getElementById('live-gps-button');
-    const lftwRouteButton = document.getElementById('lftw-route-button');
-    const gaarModeButton = document.getElementById('gaar-mode-button');
-    const editCircuitsButton = document.getElementById('edit-circuits-button');
-    const deleteCircuitsButton = document.getElementById('delete-circuits-btn');
-    const calculatorButton = document.getElementById('calculator-button');
+const liveGpsButton = document.getElementById('live-gps-button');
+const lftwRouteButton = document.getElementById('lftw-route-button');
+const gaarModeButton = document.getElementById('gaar-mode-button');
+const editCircuitsButton = document.getElementById('edit-circuits-button');
+const deleteCircuitsButton = document.getElementById('delete-circuits-btn');
+
+// Nouveaux boutons et conteneurs
+const toggleSearchButton = document.getElementById('toggle-search-button');
+const mainActionButtons = document.getElementById('main-action-buttons');
+const calculatorButton = document.getElementById('calculator-button');
 const calculatorModal = document.getElementById('calculator-modal');
 const closeCalculatorButton = document.getElementById('close-calculator-btn');
 
@@ -162,43 +166,47 @@ const closeCalculatorButton = document.getElementById('close-calculator-btn');
     });
 
     clearSearchBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        resultsList.style.display = 'none';
-        clearSearchBtn.style.display = 'none';
-        routesLayer.clearLayers();
-        userToTargetLayer.clearLayers();
-        lftwRouteLayer.clearLayers();
-        drawPermanentAirportMarkers();
-        currentCommune = null;
-        localStorage.removeItem('currentCommune');
-        if (searchToggleControl) {
-            searchToggleControl.updateDisplay(null);
-        }
-        navigator.geolocation.getCurrentPosition(updateUserPosition);
-        map.setView([46.6, 2.2], 5.5);
-    });
+    searchInput.value = '';
+    resultsList.style.display = 'none';
+    clearSearchBtn.style.display = 'none';
+    routesLayer.clearLayers();
+    userToTargetLayer.clearLayers();
+    lftwRouteLayer.clearLayers();
+    drawPermanentAirportMarkers();
+    currentCommune = null;
+    localStorage.removeItem('currentCommune');
+    
+    // Logique mise à jour
+    document.getElementById('toggle-search-button').classList.remove('active');
+    document.getElementById('commune-info-display').style.display = 'none';
+    document.getElementById('ui-overlay').style.display = 'block';
+
+    navigator.geolocation.getCurrentPosition(updateUserPosition);
+    map.setView([46.6, 2.2], 5.5);
+});
     airportCountInput.addEventListener('input', () => {
         if (currentCommune) displayCommuneDetails(currentCommune, false);
     });
     gpsFeuButton.addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            alert("La géolocalisation n'est pas supportée par votre navigateur.");
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const { latitude, longitude } = pos.coords;
-                const pointName = findClosestCommuneName(latitude, longitude) || 'Feu GPS';
-                const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
-                currentCommune = gpsCommune;
-                localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
-                displayCommuneDetails(gpsCommune, false);
-                document.getElementById('ui-overlay').style.display = 'none';
-            },
-            () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
-            { enableHighAccuracy: true }
-        );
-    });
+    if (!navigator.geolocation) {
+        alert("La géolocalisation n'est pas supportée par votre navigateur.");
+        return;
+    }
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const pointName = findClosestCommuneName(latitude, longitude) || 'Feu GPS';
+            const gpsCommune = { nom_standard: pointName, latitude_mairie: latitude, longitude_mairie: longitude, isManual: true };
+            currentCommune = gpsCommune;
+            localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
+            displayCommuneDetails(gpsCommune, false);
+            // Déclenche l'événement personnalisé pour fermer l'overlay
+            document.dispatchEvent(new Event('communeSelected'));
+        },
+        () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
+        { enableHighAccuracy: true }
+    );
+});
     
     liveGpsButton.addEventListener('click', toggleLiveGps);
     lftwRouteButton.addEventListener('click', toggleLftwRoute);
@@ -208,6 +216,38 @@ const closeCalculatorButton = document.getElementById('close-calculator-btn');
         if (confirm("Voulez-vous vraiment supprimer tous les circuits GAAR ?")) {
             clearAllGaarCircuits();
         }
+        // Gestion du numéro de version
+const versionDisplay = document.createElement('div');
+versionDisplay.className = 'version-display';
+versionDisplay.innerText = 'v10.0'; // Version mise à jour
+mainActionButtons.appendChild(versionDisplay);
+
+// Gestion du nouveau bouton pour afficher/cacher la recherche
+toggleSearchButton.addEventListener('click', () => {
+    const uiOverlay = document.getElementById('ui-overlay');
+    const communeDisplay = document.getElementById('commune-info-display');
+
+    if (uiOverlay.style.display === 'none') {
+        uiOverlay.style.display = 'block';
+        communeDisplay.style.display = 'none';
+        toggleSearchButton.classList.add('active');
+    } else {
+        uiOverlay.style.display = 'none';
+        toggleSearchButton.classList.remove('active');
+        if (communeDisplay.innerHTML.trim() !== '' && currentCommune) {
+            communeDisplay.style.display = 'flex';
+        }
+    }
+});
+
+// Ferme le panneau de recherche lorsqu'une commune est sélectionnée
+// (cela se trouve dans la fonction displayResults, on va le modifier là-bas)
+// Et on ajoute cette logique ici aussi pour la sélection manuelle
+document.addEventListener('communeSelected', () => {
+    document.getElementById('ui-overlay').style.display = 'none';
+    document.getElementById('toggle-search-button').classList.remove('active');
+    document.getElementById('commune-info-display').style.display = 'flex';
+});
     });
     updateLftwButtonState();
     calculatorButton.addEventListener('click', () => {
@@ -244,11 +284,12 @@ function displayResults(results) {
             const li = document.createElement('li');
             li.textContent = `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
             li.addEventListener('click', () => {
-                currentCommune = c;
-                localStorage.setItem('currentCommune', JSON.stringify(c));
-                displayCommuneDetails(c);
-                document.getElementById('ui-overlay').style.display = 'none';
-            });
+    currentCommune = c;
+    localStorage.setItem('currentCommune', JSON.stringify(c));
+    displayCommuneDetails(c);
+    // Déclenche l'événement personnalisé pour fermer l'overlay
+    document.dispatchEvent(new Event('communeSelected'));
+});
             resultsList.appendChild(li);
         });
     } else {
@@ -588,64 +629,6 @@ function clearAllGaarCircuits() {
 function saveGaarCircuits() {
     localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits));
 }
-
-const SearchToggleControl = L.Control.extend({
-    options: { position: 'topleft' },
-    onAdd: function (map) {
-        const mainContainer = L.DomUtil.create('div', 'leaflet-control search-toggle-wrapper');
-        
-        this.toggleButton = L.DomUtil.create('a', 'search-toggle-button', mainContainer);
-        this.toggleButton.innerHTML = '🏙️';
-        this.toggleButton.href = '#';
-
-        const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v8.0';
-
-        L.DomEvent.disableClickPropagation(mainContainer);
-        L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
-        L.DomEvent.on(this.toggleButton, 'click', () => {
-            const uiOverlay = document.getElementById('ui-overlay');
-            const communeDisplay = document.getElementById('commune-info-display');
-
-            if (uiOverlay.style.display === 'none') {
-                uiOverlay.style.display = 'block';
-                communeDisplay.style.display = 'none';
-            } else {
-                uiOverlay.style.display = 'none';
-                if (communeDisplay.innerHTML.trim() !== '') {
-                    communeDisplay.style.display = 'flex';
-                }
-            }
-        });
-        return mainContainer;
-    },
-    updateDisplay: function (commune) {
-        const communeDisplay = document.getElementById('commune-info-display');
-        
-        if (!commune) {
-            communeDisplay.innerHTML = '';
-            communeDisplay.style.display = 'none';
-            return;
-        }
-
-        communeDisplay.style.display = 'flex';
-        
-        const communeNameHTML = `<span class="commune-name">${commune.nom_standard}</span>`;
-        let sunsetHTML = '';
-
-        if (typeof SunCalc !== 'undefined') {
-            try {
-                const now = new Date();
-                const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
-                const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div>`;
-            } catch (e) {
-                sunsetHTML = '<div class="sunset-info"></div>';
-            }
-        }
-        communeDisplay.innerHTML = communeNameHTML + sunsetHTML;
-    }
-});
 
 function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f = a.shift(); if (!f) return ""; let r = ""; const codes = { a: "", e: "", i: "", o: "", u: "", b: 1, f: 1, p: 1, v: 1, c: 2, g: 2, j: 2, k: 2, q: 2, s: 2, x: 2, z: 2, d: 3, t: 3, l: 4, m: 5, n: 5, r: 6 }; return r = f + a.map(v => codes[v]).filter((v, i, a) => 0 === i ? v !== codes[f] : v !== a[i - 1]).join(""), (r + "000").slice(0, 4).toUpperCase() }
 
