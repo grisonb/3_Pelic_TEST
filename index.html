@@ -23,7 +23,11 @@
 </head>
 <body>
     <div id="map"></div>
-    <div id="action-buttons-container">     <button id="calculator-button" title="Ouvrir le calculateur de mission">✈️</button>     <button id="gps-feu-button" title="Créer un feu à ma position">🎯</button> </div>
+    <div id="main-action-buttons">
+    <button id="toggle-search-button" title="Rechercher une commune">🏙️</button>
+    <button id="calculator-button" title="Ouvrir le calculateur de mission">✈️</button>
+    <button id="gps-feu-button" title="Créer un feu à ma position">🎯</button>
+</div>
     <div id="commune-info-display"></div>
     <div id="ui-overlay">
         <div id="status-message">Chargement des données...</div>
@@ -140,7 +144,8 @@
                 </div>
             </div>
         </div>
-         <button id="reset-all-btn" title="Réinitialiser le tableau">🗑️</button>
+        <!-- La corbeille est maintenant ici, à l'intérieur de .main-container mais après .onglets-conteneur -->
+        <button id="reset-all-btn" title="Réinitialiser le tableau">🗑️</button>
     </div>
 </div>
 </body>
