@@ -530,7 +530,16 @@ html, body {
     background-color: #fff0f3;
     margin-top: 5px;
     width: 100%;
-    box-sizing: border-box; /* Ajout pour un calcul de largeur correct */
+    box-sizing: border-box;
+    /* AJOUTS POUR PERMETTRE AU CONTENU DE GRANDIR */
+    height: auto;
+    min-height: 45px; /* Garde une hauteur minimale cohérente */
+    padding: 10px 15px; /* Ajuste le padding vertical et horizontal */
+    display: flex; /* Pour centrer le contenu */
+    align-items: center;
+    justify-content: center;
+    text-align: center; /* Assure le centrage du texte sur plusieurs lignes */
+    line-height: 1.2; /* Améliore la lisibilité sur plusieurs lignes */
 }
 .analyse-separator { border: 0; height: 1px; background-color: var(--border-color); margin: 0 0 20px 0; }
 .manual-btn, #refresh-gps-btn { padding: 8px 12px; font-size: 14px; font-weight: bold; border: 1px solid var(--border-color); border-radius: 6px; background-color: #fff; cursor: pointer; }
