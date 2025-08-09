@@ -525,7 +525,13 @@ html, body {
 .result-line .input-wrapper { max-width: 180px; }
 .bingo-group { margin-bottom: 20px; }
 .bingo-group .result-line .label { font-size: 22px; font-weight: bold; }
-.bingo-group .result-line .value { border: 2px solid var(--secondary-color); background-color: #fff0f3; margin-top: 5px; width: 100%; }
+.bingo-group .result-line .value {
+    border: 2px solid var(--secondary-color);
+    background-color: #fff0f3;
+    margin-top: 5px;
+    width: 100%;
+    box-sizing: border-box; /* Ajout pour un calcul de largeur correct */
+}
 .analyse-separator { border: 0; height: 1px; background-color: var(--border-color); margin: 0 0 20px 0; }
 .manual-btn, #refresh-gps-btn { padding: 8px 12px; font-size: 14px; font-weight: bold; border: 1px solid var(--border-color); border-radius: 6px; background-color: #fff; cursor: pointer; }
 .manual-btn { margin-left: 10px; }
