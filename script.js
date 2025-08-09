@@ -251,7 +251,7 @@ const SearchToggleControl = L.Control.extend({
         this.toggleButton.href = '#';
         this.communeDisplay = document.getElementById('commune-info-display'); 
         const versionDisplay = L.DomUtil.create('div', 'version-display', mainContainer);
-        versionDisplay.innerText = 'v10.2';
+        versionDisplay.innerText = 'v10.3';
         L.DomEvent.disableClickPropagation(mainContainer);
         L.DomEvent.on(this.toggleButton, 'click', L.DomEvent.stop);
         L.DomEvent.on(this.toggleButton, 'click', () => {
@@ -298,7 +298,7 @@ function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f 
 // =======================================================
 const flightLog = {
     init: function() {
-        // ... (Le script complet de la maquette v49 est ici)
+        // ... (script de la maquette v49)
     },
     updateOnOpen: function() {
         const lftw = airports.find(ap => ap.oaci === 'LFTW');
