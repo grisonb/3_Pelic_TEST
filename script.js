@@ -126,7 +126,7 @@ function setupEventListeners() {
     if (mainActionButtons) {
         const versionDisplay = document.createElement('div');
         versionDisplay.className = 'version-display';
-        versionDisplay.innerText = 'v10.3'; // Version mise à jour
+        versionDisplay.innerText = 'v10.4'; // Version mise à jour
         mainActionButtons.appendChild(versionDisplay);
     }
 
@@ -762,7 +762,17 @@ function initializeCalculator() {
     
     const resetButton = document.getElementById('reset-all-btn');
     const onglets = document.querySelectorAll('.onglet-bouton'); const panneaux = document.querySelectorAll('.onglet-panneau');
-    onglets.forEach(onglet => { onglet.addEventListener('click', () => { onglets.forEach(btn => btn.classList.remove('active')); panneaux.forEach(p => p.classList.remove('active')); onglet.classList.add('active'); const activePanel = document.getElementById(onglet.dataset.onglet); activePanel.classList.add('active'); resetButton.style.display = (onglet.dataset.onglet === 'bloc-fuel' && activePanel.contains(resetButton)) ? 'flex' : 'none'; }); });
+    onglets.forEach(onglet => {
+    onglet.addEventListener('click', () => {
+        onglets.forEach(btn => btn.classList.remove('active'));
+        panneaux.forEach(p => p.classList.remove('active'));
+        onglet.classList.add('active');
+        const activePanel = document.getElementById(onglet.dataset.onglet);
+        activePanel.classList.add('active');
+        // La corbeille est visible uniquement sur le premier onglet
+        resetButton.style.display = (onglet.dataset.onglet === 'bloc-fuel') ? 'flex' : 'none';
+    });
+});
 
     const parseTime = (timeString) => { if (!timeString || !timeString.includes(':')) return null; const parts = timeString.split(':'); return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10); };
     const formatTime = (totalMinutes) => { if (totalMinutes === null || isNaN(totalMinutes) || totalMinutes < 0) return ''; const roundedMinutes = Math.round(totalMinutes); const hours = Math.floor(roundedMinutes / 60); const minutes = roundedMinutes % 60; return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`; };
@@ -771,6 +781,25 @@ function initializeCalculator() {
     function masterRecalculate() { recalculateBlocFuel(); updatePreviTab(); updateSuiviTab(); updateDeroutementTab(); }
 
     function updatePreviTab() {
+    // --- Calculs de base qui ne dépendent pas des entrées utilisateur ---
+    const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu);
+    const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu);
+    
+    const bingoBaseDisplay = document.getElementById('previ-bingo-base');
+    if (bingoBase === 700) {
+        bingoBaseDisplay.innerHTML = '-- kg';
+    } else {
+        bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b>${bingoBase} kg</b>`;
+    }
+
+    const bingoPelicDisplay = document.getElementById('previ-bingo-pelic');
+    if (bingoPelic === 700 || !selectedPelicanOACI) {
+        bingoPelicDisplay.innerHTML = '-- kg';
+    } else {
+        bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
+    }
+
+    // --- Calculs dépendants des entrées utilisateur ---
     const blocDepart = parseTime(document.querySelector('#bloc-depart .display-input').value);
     const fuelDepart = parseNumeric(document.querySelector('#fuel-depart .display-input').value);
     const limiteHDV = parseTime(document.querySelector('#limite-hdv .display-input').value);
@@ -802,25 +831,6 @@ function initializeCalculator() {
         fuelSurFeuWrapper.classList.toggle('has-value', !!fuelEstime);
     }
     
-    const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu);
-    const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu);
-    
-    // --- NOUVEL AFFICHAGE DES BINGOS ---
-    const bingoBaseDisplay = document.getElementById('previ-bingo-base');
-    if (bingoBase === 700) {
-        bingoBaseDisplay.innerHTML = '-- kg';
-    } else {
-        bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b>${bingoBase} kg</b>`;
-    }
-
-    const bingoPelicDisplay = document.getElementById('previ-bingo-pelic');
-    if (bingoPelic === 700 || !selectedPelicanOACI) {
-        bingoPelicDisplay.innerHTML = '-- kg';
-    } else {
-        bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
-    }
-    // --- FIN DU NOUVEL AFFICHAGE ---
-    
     const fuelSurFeu = parseNumeric(fuelSurFeuInput.value);
     const resultsContainer = document.getElementById('previ-rotation-results-container');
     updateAndSortRotations(resultsContainer, { fuel: fuelSurFeu, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime });
@@ -837,7 +847,6 @@ function initializeCalculator() {
         }
     });
 
-    // --- NOUVEL AFFICHAGE DES BINGOS ---
     const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu);
     const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu);
 
@@ -854,11 +863,10 @@ function initializeCalculator() {
     } else {
         bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
     }
-    // --- FIN DU NOUVEL AFFICHAGE ---
     
     if (!lastFilledRow) {
-        suiviPanel.style.display = 'grid'; // Afficher la grille même si vide
-        placeholder.style.display = 'none'; // Cacher le placeholder
+        suiviPanel.style.display = 'grid';
+        placeholder.style.display = 'none';
         document.getElementById('suivi-fuel-actuel').textContent = '-- kg';
         document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => el.textContent = '--');
         const consoWrapper = document.getElementById('suivi-conso-rotation-wrapper');
@@ -910,7 +918,6 @@ function initializeCalculator() {
     const bingoBase = calculateBingo(CALCULATOR_DATA.distBaseFeu);
     const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu);
     
-    // --- NOUVEL AFFICHAGE DES BINGOS ---
     const bingoBaseDisplay = document.getElementById('derout-bingo-base');
     if (bingoBase === 700) {
         bingoBaseDisplay.innerHTML = '-- kg';
@@ -924,8 +931,7 @@ function initializeCalculator() {
     } else {
         bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
     }
-    // --- FIN DU NOUVEL AFFICHAGE ---
-
+    
     const fuelForGpsTransit = calculateFuelToGo(CALCULATOR_DATA.distGpsFeu);
     const fuelMiniBase = fuelForGpsTransit + bingoBase + 250;
     const fuelMiniPelic = fuelForGpsTransit + bingoPelic + 250;
