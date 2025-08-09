@@ -240,7 +240,7 @@ html, body {
     font-size: 18px;
     font-weight: 500;
     white-space: nowrap;
-    max-width: calc(100vw - 220px);
+    max-width: calc(100vw - 130px); /* Ligne corrigée */
     overflow: hidden;
     color: var(--text-color);
     gap: 12px;
