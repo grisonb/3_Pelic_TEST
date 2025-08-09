@@ -126,7 +126,7 @@ function setupEventListeners() {
     if (mainActionButtons) {
         const versionDisplay = document.createElement('div');
         versionDisplay.className = 'version-display';
-        versionDisplay.innerText = 'v10.8'; // Version mise à jour
+        versionDisplay.innerText = 'v10.9'; // Version mise à jour
         mainActionButtons.appendChild(versionDisplay);
     }
 
@@ -770,7 +770,6 @@ function initializeCalculator() {
             onglet.classList.add('active');
             const activePanel = document.getElementById(onglet.dataset.onglet);
             activePanel.classList.add('active');
-            // La corbeille est visible uniquement sur le premier onglet
             resetButton.style.display = (onglet.dataset.onglet === 'bloc-fuel') ? 'flex' : 'none';
         });
     });
@@ -787,14 +786,14 @@ function initializeCalculator() {
         if (bingoBase === 700) {
             bingoBaseDisplay.innerHTML = '-- kg';
         } else {
-            bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b> ${bingoBase} kg</b>`;
+            bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b>${bingoBase} kg</b>`;
         }
 
         const bingoPelicDisplay = document.getElementById('previ-bingo-pelic');
         if (bingoPelic === 700 || !selectedPelicanOACI) {
             bingoPelicDisplay.innerHTML = '-- kg';
         } else {
-            bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b> ${bingoPelic} kg</b>`;
+            bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
         }
 
         const blocDepart = parseTime(document.querySelector('#bloc-depart .display-input').value);
@@ -838,14 +837,14 @@ function initializeCalculator() {
         if (bingoBase === 700) {
             bingoBaseDisplay.innerHTML = '-- kg';
         } else {
-            bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b> ${bingoBase} kg</b>`;
+            bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b>${bingoBase} kg</b>`;
         }
 
         const bingoPelicDisplay = document.getElementById('suivi-bingo-pelic');
         if (bingoPelic === 700 || !selectedPelicanOACI) {
             bingoPelicDisplay.innerHTML = '-- kg';
         } else {
-            bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b> ${bingoPelic} kg</b>`;
+            bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
         }
 
         const allRows = document.querySelectorAll('#bloc-fuel tbody tr');
@@ -877,14 +876,14 @@ function initializeCalculator() {
         if (bingoBase === 700) {
             bingoBaseDisplay.innerHTML = '-- kg';
         } else {
-            bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b> ${bingoBase} kg</b>`;
+            bingoBaseDisplay.innerHTML = `${CALCULATOR_DATA.distBaseFeu} Nm / <b>${bingoBase} kg</b>`;
         }
 
         const bingoPelicDisplay = document.getElementById('derout-bingo-pelic');
         if (bingoPelic === 700 || !selectedPelicanOACI) {
             bingoPelicDisplay.innerHTML = '-- kg';
         } else {
-            bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b> ${bingoPelic} kg</b>`;
+            bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm / <b>${bingoPelic} kg</b>`;
         }
         
         const fuelForGpsTransit = calculateFuelToGo(CALCULATOR_DATA.distGpsFeu);
