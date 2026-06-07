@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-47-mobile-real-selectors';
+const SW_VERSION = 'sw-v11-48-smartphone-full-resize';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
