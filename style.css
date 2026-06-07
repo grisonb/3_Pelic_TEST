@@ -2663,3 +2663,67 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.50 — réduction bandeau Bingo carte */
+@media (max-width: 760px) {
+    .bingo-banner,
+    #bingo-banner,
+    .bingo-alert,
+    #bingo-alert,
+    .bingo-panel,
+    #bingo-panel,
+    .bingo-status,
+    #bingo-status,
+    .bingo-card,
+    #bingo-card,
+    [class*="bingo"],
+    [id*="bingo"] {
+        max-height: 48px !important;
+        min-height: 0 !important;
+        padding: 5px 8px !important;
+        font-size: 13px !important;
+        line-height: 1.05 !important;
+        border-radius: 10px !important;
+        box-sizing: border-box !important;
+        overflow: hidden !important;
+    }
+
+    .bingo-banner *,
+    #bingo-banner *,
+    .bingo-alert *,
+    #bingo-alert *,
+    .bingo-panel *,
+    #bingo-panel *,
+    .bingo-status *,
+    #bingo-status *,
+    .bingo-card *,
+    #bingo-card *,
+    [class*="bingo"] *,
+    [id*="bingo"] * {
+        font-size: inherit !important;
+        line-height: 1.05 !important;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+}
+
+@media (min-width: 761px) {
+    .bingo-banner,
+    #bingo-banner,
+    .bingo-alert,
+    #bingo-alert,
+    .bingo-panel,
+    #bingo-panel,
+    .bingo-status,
+    #bingo-status,
+    .bingo-card,
+    #bingo-card,
+    [class*="bingo"],
+    [id*="bingo"] {
+        max-height: 58px !important;
+        padding: 7px 11px !important;
+        font-size: 15px !important;
+        line-height: 1.1 !important;
+        overflow: hidden !important;
+    }
+}
+
