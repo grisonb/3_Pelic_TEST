@@ -2727,3 +2727,158 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.51 — smartphone : bandeaux et boutons compacts */
+@media (max-width: 760px) {
+    :root { --safe-area-top: 8px; }
+
+    #ui-overlay {
+        top: 22px !important;
+        left: 10px !important;
+        right: auto !important;
+        width: calc(100vw - 96px) !important;
+        max-width: calc(100vw - 96px) !important;
+        padding: 10px !important;
+        border-radius: 16px !important;
+        max-height: 38vh !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+    }
+
+    #bingo-map-display {
+        top: 6px !important;
+        left: 8px !important;
+        right: 74px !important;
+        transform: none !important;
+        width: auto !important;
+        height: 34px !important;
+        min-height: 34px !important;
+        padding: 0 10px !important;
+        gap: 14px !important;
+        border-width: 2px !important;
+        border-radius: 10px !important;
+        font-size: 17px !important;
+        justify-content: flex-start !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        box-sizing: border-box !important;
+    }
+
+    #bingo-map-display span {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    #commune-info-display {
+        top: 46px !important;
+        left: 8px !important;
+        right: 74px !important;
+        transform: none !important;
+        max-width: none !important;
+        width: auto !important;
+        height: 38px !important;
+        padding: 0 8px 0 10px !important;
+        border-radius: 10px !important;
+        font-size: 15px !important;
+        gap: 6px !important;
+        box-sizing: border-box !important;
+    }
+
+    #commune-info-display .sunset-info { font-size: 12px !important; }
+
+    #commune-info-display .gps-feu-route-info {
+        font-size: 13px !important;
+        padding: 2px 6px !important;
+    }
+
+    .clear-commune-btn {
+        font-size: 22px !important;
+        padding: 0 3px !important;
+        margin-left: 2px !important;
+    }
+
+    #main-action-buttons {
+        top: 20px !important;
+        right: 8px !important;
+        gap: 8px !important;
+        z-index: 1001 !important;
+    }
+
+    #toggle-search-button,
+    #calculator-button,
+    #gps-feu-button,
+    #center-gps-button,
+    #chat-toggle-button {
+        width: 56px !important;
+        height: 56px !important;
+        min-width: 56px !important;
+        min-height: 56px !important;
+        max-width: 56px !important;
+        max-height: 56px !important;
+        border-radius: 14px !important;
+        font-size: 30px !important;
+        border-width: 1px !important;
+    }
+
+    #calculator-button .calculator-fun-icon {
+        width: 42px !important;
+        height: 48px !important;
+    }
+
+    .version-display {
+        font-size: 12px !important;
+        padding: 1px 6px !important;
+        margin-top: -3px !important;
+    }
+
+    .force-update-button {
+        font-size: 13px !important;
+        padding: 5px 7px !important;
+        border-radius: 8px !important;
+    }
+
+    #nearest-commune-display {
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 72px !important;
+        max-width: none !important;
+        width: auto !important;
+        padding: 9px 12px !important;
+        font-size: 18px !important;
+        border-radius: 16px !important;
+        box-sizing: border-box !important;
+    }
+
+    #nearest-commune-display b { font-size: 24px !important; }
+
+    .leaflet-control-zoom {
+        margin-left: 8px !important;
+        margin-bottom: 58px !important;
+    }
+
+    .leaflet-control-zoom a {
+        width: 34px !important;
+        height: 34px !important;
+        line-height: 34px !important;
+        font-size: 20px !important;
+    }
+
+    .controls-container { gap: 8px !important; }
+
+    #search-input {
+        padding: 12px 34px 12px 44px !important;
+        font-size: 16px !important;
+    }
+
+    .extra-controls-grid { gap: 8px !important; }
+
+    .extra-controls-grid button,
+    .toggle-button {
+        min-height: 44px !important;
+        font-size: 15px !important;
+        line-height: 1.05 !important;
+        padding: 6px 8px !important;
+        border-radius: 12px !important;
+    }
+}
+
