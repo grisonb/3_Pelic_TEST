@@ -2882,3 +2882,50 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.52 — smartphone : texte bingo lisible sans coupure */
+@media (max-width: 760px) {
+    #bingo-map-display {
+        right: 66px !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        padding: 0 7px !important;
+        gap: 6px !important;
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        justify-content: space-between !important;
+    }
+
+    #bingo-map-display span {
+        min-width: 0 !important;
+        flex: 1 1 50% !important;
+        overflow: hidden !important;
+        text-overflow: clip !important;
+        white-space: nowrap !important;
+    }
+
+    #bingo-map-display #map-bingo-lftw::before {
+        content: "BASE ";
+    }
+
+    #bingo-map-display #map-bingo-pelic::before {
+        content: "PÉLIC ";
+    }
+
+    #bingo-map-display #map-bingo-lftw,
+    #bingo-map-display #map-bingo-pelic {
+        font-size: 0 !important;
+    }
+
+    #bingo-map-display #map-bingo-lftw b,
+    #bingo-map-display #map-bingo-pelic b {
+        font-size: 16px !important;
+    }
+
+    #bingo-map-display #map-bingo-lftw::before,
+    #bingo-map-display #map-bingo-pelic::before {
+        font-size: 13px !important;
+        color: var(--text-color);
+        font-weight: 700;
+    }
+}
+
