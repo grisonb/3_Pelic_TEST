@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-44-fire-history-red-buttons';
+const SW_VERSION = 'sw-v11-45-smartphone-layout';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
