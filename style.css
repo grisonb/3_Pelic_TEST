@@ -2391,3 +2391,275 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.49 — redimensionnement smartphone des onglets et panneaux */
+@media (max-width: 760px) {
+    /* Conteneur global des pages à onglets : plein écran utile, sans gros cadre */
+    .main-container {
+        width: calc(100vw - 12px) !important;
+        max-width: calc(100vw - 12px) !important;
+        height: calc(100dvh - 16px) !important;
+        max-height: calc(100dvh - 16px) !important;
+        margin: 8px auto !important;
+        border-radius: 14px !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Barre des onglets : moins haute, défilement horizontal si nécessaire */
+    .onglets-navigation {
+        min-height: 42px !important;
+        height: 42px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        flex-wrap: nowrap !important;
+    }
+
+    .onglets-navigation::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .onglet-bouton {
+        flex: 0 0 auto !important;
+        min-width: 92px !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        padding: 0 8px !important;
+        font-size: 13px !important;
+        line-height: 1.05 !important;
+        border-bottom-width: 2px !important;
+        white-space: normal !important;
+        text-align: center !important;
+    }
+
+    .onglets-conteneur {
+        height: calc(100% - 42px) !important;
+        overflow: hidden !important;
+    }
+
+    .onglet-panneau {
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+    }
+
+    /* En-têtes des onglets : grille trop large sur PC -> deux colonnes compactes */
+    .header-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        padding: 10px !important;
+        align-items: stretch !important;
+        border-bottom-width: 1px !important;
+    }
+
+    .header-item {
+        min-width: 0 !important;
+    }
+
+    .header-item label {
+        font-size: 11px !important;
+        line-height: 1.05 !important;
+        margin-bottom: 4px !important;
+        min-height: 22px !important;
+        display: flex !important;
+        align-items: flex-end !important;
+        justify-content: center !important;
+    }
+
+    .input-wrapper .display-input,
+    .header-item input,
+    .header-item select,
+    .header-item .display-input {
+        min-height: 34px !important;
+        height: 34px !important;
+        padding: 5px 6px !important;
+        font-size: 15px !important;
+        border-radius: 8px !important;
+    }
+
+    /* Tables : lisibles mais plus compactes */
+    .table-wrapper {
+        min-height: 0 !important;
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    .table-section {
+        min-width: 620px !important;
+        table-layout: fixed !important;
+    }
+
+    .table-section th {
+        font-size: 11px !important;
+        line-height: 1.05 !important;
+        padding: 6px 3px !important;
+    }
+
+    .table-section td {
+        font-size: 13px !important;
+        line-height: 1.1 !important;
+        padding: 4px 3px !important;
+    }
+
+    .table-section input,
+    .table-section select {
+        height: 30px !important;
+        min-height: 30px !important;
+        padding: 3px 4px !important;
+        font-size: 14px !important;
+        border-radius: 6px !important;
+    }
+
+    .table-section td.duree-rotation-cell,
+    .table-section td.fuel-rotation-cell {
+        font-size: 18px !important;
+        line-height: 1.05 !important;
+    }
+
+    /* Onglet analyse / résultats : une seule colonne sur smartphone */
+    .analyse-grid {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+        padding: 10px !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        min-height: 0 !important;
+    }
+
+    .result-line {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        gap: 8px !important;
+        margin-bottom: 8px !important;
+        font-size: 14px !important;
+    }
+
+    .result-line strong,
+    .result-line .result-value {
+        font-size: 15px !important;
+    }
+
+    /* Boutons internes des pages à onglets */
+    .onglet-panneau button,
+    .main-container button {
+        min-height: 34px !important;
+        padding: 5px 8px !important;
+        font-size: 13px !important;
+        border-radius: 9px !important;
+    }
+
+    /* Bouton fermeture calculateur */
+    #close-calculator-btn {
+        width: 38px !important;
+        height: 38px !important;
+        top: 6px !important;
+        right: 6px !important;
+        font-size: 24px !important;
+        border-width: 2px !important;
+        z-index: 1200 !important;
+    }
+
+    #close-calculator-btn::before {
+        inset: -8px !important;
+    }
+
+    /* Modales et panneaux autres que carte : taille smartphone maîtrisée */
+    .modal-content,
+    .offline-map-modal-content,
+    .calculator-modal-content,
+    .fuel-split-modal-content,
+    .chat-clear-modal-content {
+        width: calc(100vw - 16px) !important;
+        max-width: calc(100vw - 16px) !important;
+        height: auto !important;
+        max-height: calc(100dvh - 24px) !important;
+        padding: 10px !important;
+        border-radius: 14px !important;
+        overflow-y: auto !important;
+        box-sizing: border-box !important;
+    }
+
+    .modal-content h2,
+    .offline-map-modal-content h2,
+    .calculator-modal-content h2,
+    .fuel-split-modal-content h2 {
+        font-size: 18px !important;
+        line-height: 1.1 !important;
+        margin: 0 0 8px !important;
+    }
+
+    /* Listes dans les onglets / modales */
+    .offline-map-actions {
+        gap: 6px !important;
+    }
+
+    .offline-map-name-line {
+        gap: 7px !important;
+        font-size: 14px !important;
+        line-height: 1.1 !important;
+    }
+
+    .offline-map-select-checkbox {
+        width: 18px !important;
+        height: 18px !important;
+        min-width: 18px !important;
+    }
+
+    .delete-map-btn,
+    .select-map-btn {
+        min-height: 30px !important;
+        padding: 4px 8px !important;
+        font-size: 12px !important;
+    }
+
+    /* Derniers feux : compact */
+    .fire-history-header {
+        padding: 6px 8px !important;
+        font-size: 14px !important;
+    }
+
+    .fire-history-clear-all {
+        font-size: 11px !important;
+        padding: 6px 9px !important;
+    }
+
+    .fire-history-item {
+        padding: 5px 7px !important;
+        gap: 6px !important;
+    }
+
+    .fire-history-select {
+        font-size: 14px !important;
+        padding: 6px 3px !important;
+    }
+
+    .fire-history-delete {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 16px !important;
+        line-height: 28px !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .onglet-bouton {
+        min-width: 82px !important;
+        font-size: 12px !important;
+        padding: 0 6px !important;
+    }
+
+    .header-section {
+        gap: 6px !important;
+        padding: 8px !important;
+    }
+
+    .header-item label {
+        font-size: 10.5px !important;
+    }
+
+    .table-section {
+        min-width: 580px !important;
+    }
+}
+
