@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-45-smartphone-layout';
+const SW_VERSION = 'sw-v11-46-mobile-reset-compact';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
