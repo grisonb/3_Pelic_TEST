@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-49-mobile-tabs-panels-resize';
+const SW_VERSION = 'sw-v11-50-bingo-banner-compact';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
