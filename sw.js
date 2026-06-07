@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-51-mobile-bingo-compact';
+const SW_VERSION = 'sw-v11-52-bingo-text-compact';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
