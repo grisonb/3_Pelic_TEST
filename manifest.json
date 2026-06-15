@@ -2,22 +2,24 @@
     "name": "NPF-Q400-TEST",
     "short_name": "NPF-Q400-TEST",
     "id": "./index.html?test=1",
-    "start_url": "./index.html?appv=v11.52",
+    "start_url": "./index.html?appv=v11.53",
     "scope": "./",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#0056b3",
+    "background_color": "#0b2f6b",
+    "theme_color": "#0b2f6b",
     "description": "Nearest Pélicandrome Finder Q400 - version test",
     "icons": [
         {
             "src": "icons/icon-192x192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/icon-512x512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/maskable-icon-512x512.png",
