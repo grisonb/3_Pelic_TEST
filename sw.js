@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-52-bingo-text-compact';
+const SW_VERSION = 'sw-v11-53-app-icon';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -21,7 +21,9 @@ const APP_SHELL_URLS = [
     './communes.json',
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
-];
+,
+    './icons/apple-touch-icon.png',
+    './icons/maskable-icon-512x512.png'];
 
 
 /*
