@@ -1,137 +1,165 @@
-PATCH — Briefing_fdf_TEST — index.html
-Version cible : 3.7 TEST BINGO
+PATCH — NPF-Q400-TEST — index.html
+Version cible : v11.54 TEST
 
-Objectif :
-Agrandir la police des deux BINGO affichés sur la carte sur iPad et PC, sans modifier Android.
+ATTENTION :
+Le dépôt NPF-Q400-TEST doit repartir du fichier index.html de production NPF-Q400 v2026.35.
+Le fichier index.html TEST actuel ne doit pas servir de base s'il contient le patch erroné "Briefing_fdf_TEST".
 
-Fichier concerné :
-index.html
+Fichier de base à reprendre :
+grisonb/NPF-Q400 / index.html
+Version de base : v2026.35
 
-============================================================
-MODIFICATION 1/3 — Version affichée dans l'en-tête
-============================================================
-
-OÙ CHERCHER :
-v<span id="app-version">3.6 TEST PWA TDF 2026</span>
-
-AVANT :
-v<span id="app-version">3.6 TEST PWA TDF 2026</span>
-
-APRÈS :
-v<span id="app-version">3.7 TEST BINGO</span>
+Fichier cible :
+grisonb/NPF-Q400-TEST / index.html
 
 
 ============================================================
-MODIFICATION 2/3 — Constante APP_VERSION
+MODIFICATION 1/5 — Cache-busting des fichiers chargés dans le <head>
 ============================================================
 
 OÙ CHERCHER :
-const APP_VERSION = "3.6 TEST PWA TDF 2026";
+    <link rel="stylesheet" href="style.css?appv=v2026.35-app-icon">
+    <link rel="manifest" href="manifest.json?appv=v2026.35-app-icon">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v2026.35-app-icon">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v2026.35-app-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v2026.35-app-icon">
 
 AVANT :
-const APP_VERSION = "3.6 TEST PWA TDF 2026";
+    <link rel="stylesheet" href="style.css?appv=v2026.35-app-icon">
+    <link rel="manifest" href="manifest.json?appv=v2026.35-app-icon">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v2026.35-app-icon">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v2026.35-app-icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v2026.35-app-icon">
 
 APRÈS :
-const APP_VERSION = "3.7 TEST BINGO";
+    <link rel="stylesheet" href="style.css?appv=v11.54-test-bingo">
+    <link rel="manifest" href="manifest.json?appv=v11.54-test-bingo">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.54-test-bingo">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.54-test-bingo">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.54-test-bingo">
 
 
 ============================================================
-MODIFICATION 3/3 — Agrandissement BINGO PC/iPad hors Android
+MODIFICATION 2/5 — Override CSS BINGO hors Android
 ============================================================
 
 OÙ COLLER :
-Dans le bloc <style>, juste AVANT la ligne :
-/* --- TOUR DE FRANCE TEST --- */
+Juste APRÈS la ligne :
+    <meta name="apple-mobile-web-app-title" content="NPF-Q400">
 
 AJOUTER :
 
-        /* --- BINGO carte : police agrandie sur PC/iPad, inchangée sur Android --- */
-        html.non-android .bingo-font-non-android {
-            font-size: 22px !important;
-            line-height: 1.15 !important;
+    <style>
+        /* BINGO carte : agrandissement uniquement PC/iPad, Android inchangé */
+        html.non-android #bingo-map-display {
+            height: 72px;
+            padding: 0 34px;
+            gap: 40px;
+            font-size: 30px;
+            line-height: 1.15;
         }
 
+        html.non-android #bingo-map-display b {
+            font-size: inherit;
+        }
+
+        @media (max-width: 720px) {
+            html.non-android #bingo-map-display {
+                height: 66px;
+                padding: 0 26px;
+                gap: 28px;
+                font-size: 27px;
+            }
+        }
+    </style>
+
+
+NOTE :
+- Android garde les valeurs existantes de style.css :
+  height: 60px;
+  padding: 0 27px;
+  gap: 30px;
+  font-size: 24px;
+- iPad et PC passent à 30px.
+- Petits écrans non Android passent à 27px.
+
+
+============================================================
+MODIFICATION 3/5 — Version applicative TEST
+============================================================
+
+OÙ CHERCHER :
+        const APP_VERSION = 'v2026.35';
+
+AVANT :
+        const APP_VERSION = 'v2026.35';
+
+APRÈS :
+        const APP_VERSION = 'v11.54';
+
+
+============================================================
+MODIFICATION 4/5 — Détection Android / non-Android
+============================================================
 
 OÙ COLLER :
-Dans le bloc <script>, juste APRÈS la ligne :
-const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
+Juste APRÈS la ligne :
+        window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
 AJOUTER :
 
-        // --- BINGO carte : agrandissement PC/iPad uniquement, Android inchangé ---
-        (function initializeBingoFontPatch() {
-            const isAndroid = /Android/i.test(navigator.userAgent || '');
-            document.documentElement.classList.toggle('is-android', isAndroid);
-            document.documentElement.classList.toggle('non-android', !isAndroid);
-
-            if (isAndroid) return;
-
-            function markBingoElements(root = document) {
-                if (!root || !root.querySelectorAll) return;
-
-                const candidates = root.querySelectorAll('div, span, p, strong, b, label');
-                candidates.forEach(el => {
-                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim().toUpperCase();
-
-                    if (
-                        text.length <= 140 &&
-                        (text.includes('BINGO BASE') || text.includes('BINGO LFLX'))
-                    ) {
-                        el.classList.add('bingo-font-non-android');
-                        el.querySelectorAll('*').forEach(child => {
-                            child.classList.add('bingo-font-non-android');
-                        });
-                    }
-                });
-            }
-
-            document.addEventListener('DOMContentLoaded', () => {
-                markBingoElements();
-
-                const observer = new MutationObserver(mutations => {
-                    mutations.forEach(mutation => {
-                        mutation.addedNodes.forEach(node => {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                markBingoElements(node);
-                            }
-                        });
-                    });
-
-                    markBingoElements();
-                });
-
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                });
-            });
-        })();
+        const IS_ANDROID = /Android/i.test(navigator.userAgent || '');
+        document.documentElement.classList.toggle('android', IS_ANDROID);
+        document.documentElement.classList.toggle('non-android', !IS_ANDROID);
 
 
 ============================================================
-NOTE TECHNIQUE
+MODIFICATION 5/5 — Cache-busting du script principal
 ============================================================
 
-- Android est exclu via le userAgent : /Android/i.
-- PC et iPad reçoivent la classe html.non-android.
-- Le patch ne dépend pas d'un id ou d'une classe existante : il repère les éléments dont le texte contient "BINGO BASE" ou "BINGO LFLX".
-- La limite text.length <= 140 évite d'appliquer la classe à toute une grande section de page.
-- Si la police est encore trop petite, remplacer 22px par 24px.
-- Si elle est trop grande, remplacer 22px par 20px.
+OÙ CHERCHER :
+    <script src="script.js?appv=v2026.35-app-icon"></script>
+
+AVANT :
+    <script src="script.js?appv=v2026.35-app-icon"></script>
+
+APRÈS :
+    <script src="script.js?appv=v11.54-test-bingo"></script>
+
+
+============================================================
+CONTRÔLE APRÈS MODIFICATION
+============================================================
+
+Dans index.html TEST, vérifier que tu as bien :
+
+        const APP_VERSION = 'v11.54';
+
+Et :
+
+        const IS_ANDROID = /Android/i.test(navigator.userAgent || '');
+        document.documentElement.classList.toggle('android', IS_ANDROID);
+        document.documentElement.classList.toggle('non-android', !IS_ANDROID);
+
+Et :
+
+        html.non-android #bingo-map-display {
+            height: 72px;
+            padding: 0 34px;
+            gap: 40px;
+            font-size: 30px;
+            line-height: 1.15;
+        }
 
 
 ============================================================
 ROLLBACK RAPIDE
 ============================================================
 
-1. Remettre :
-   v<span id="app-version">3.6 TEST PWA TDF 2026</span>
-
+1. Reprendre index.html depuis NPF-Q400 v2026.35.
 2. Remettre :
-   const APP_VERSION = "3.6 TEST PWA TDF 2026";
-
-3. Supprimer le bloc CSS :
-   /* --- BINGO carte : police agrandie sur PC/iPad, inchangée sur Android --- */
-
-4. Supprimer le bloc JS :
-   // --- BINGO carte : agrandissement PC/iPad uniquement, Android inchangé ---
+        const APP_VERSION = 'v2026.35';
+3. Supprimer le bloc <style> ajouté pour les BINGO.
+4. Supprimer les 3 lignes IS_ANDROID / classList.
+5. Remettre les paramètres appv :
+        v2026.35-app-icon
