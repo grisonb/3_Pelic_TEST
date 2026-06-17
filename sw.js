@@ -1,39 +1,58 @@
-PATCH — Briefing_fdf_TEST — sw.js
-Version cible : 3.7 TEST BINGO
+PATCH — NPF-Q400-TEST — sw.js
+Version cible : v11.54 TEST
 
-Objectif :
-Incrémenter le cache du Service Worker pour forcer la prise en compte de la nouvelle version sur iPad/PC/PWA.
+ATTENTION :
+Le dépôt NPF-Q400-TEST doit repartir du fichier sw.js de production NPF-Q400 v2026.35.
+Le fichier sw.js TEST actuel ne doit pas servir de base s'il contient le patch erroné "Briefing_fdf_TEST".
 
-Fichier concerné :
-sw.js
+Fichier de base à reprendre :
+grisonb/NPF-Q400 / sw.js
+Version de base : v2026.35
+
+Fichier cible :
+grisonb/NPF-Q400-TEST / sw.js
+
 
 ============================================================
-MODIFICATION 1/1 — Nom du cache
+MODIFICATION 1/1 — Incrémentation Service Worker
 ============================================================
 
 OÙ CHERCHER :
-const CACHE_NAME = 'briefing-fdf-test-v3.6-lfbn-niort';
+const SW_VERSION = 'sw-v2026-35-app-icon';
 
 AVANT :
-const CACHE_NAME = 'briefing-fdf-test-v3.6-lfbn-niort';
+const SW_VERSION = 'sw-v2026-35-app-icon';
 
 APRÈS :
-const CACHE_NAME = 'briefing-fdf-test-v3.7-bingo-font';
+const SW_VERSION = 'sw-v11-54-test-bingo';
+
+
+============================================================
+CONTRÔLE APRÈS MODIFICATION
+============================================================
+
+Le début de sw.js doit être :
+
+const SW_VERSION = 'sw-v11-54-test-bingo';
+
+const DB_NAME = 'OfflineTilesDB';
+const DB_VERSION = 3;
 
 
 ============================================================
 NOTE TECHNIQUE
 ============================================================
 
-- Cette modification force la création d'un nouveau cache.
-- À l'activation, l'ancien cache sera supprimé par la logique existante :
-  caches.delete(key)
-- Après publication GitHub Pages, utiliser "Forcer MAJ" sur l'iPad si nécessaire.
+- Cette modification crée un nouveau cache :
+  npf-q400-app-shell-sw-v11-54-test-bingo
+- Les anciens caches npf-q400-app-shell-* seront supprimés à l'activation du Service Worker.
+- Après publication GitHub Pages, utiliser le bouton "🔄 MAJ" dans NPF TEST si nécessaire.
 
 
 ============================================================
 ROLLBACK RAPIDE
 ============================================================
 
-Remettre :
-const CACHE_NAME = 'briefing-fdf-test-v3.6-lfbn-niort';
+Reprendre sw.js depuis NPF-Q400 v2026.35, ou remettre :
+
+const SW_VERSION = 'sw-v2026-35-app-icon';
