@@ -1,367 +1,137 @@
-      
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NPF-Q400-TEST</title>
-    <link rel="stylesheet" href="leaflet.css">
-    <link rel="stylesheet" href="style.css?appv=v11.53-app-icon">
-    <link rel="manifest" href="manifest.json?appv=v11.53-app-icon">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.53-app-icon">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.53-app-icon">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.53-app-icon">
-    <meta name="theme-color" content="#0b2f6b">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="NPF-Q400-TEST">
-    <script>
-        const APP_VERSION = 'v11.53';
-        const APP_VERSION_STORAGE_KEY = 'appVersion';
-        const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
-        window.APP_VERSION = APP_VERSION;
-        const shouldDisableServiceWorker = false;
-        window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
-        window.forceRecoveryReload = async () => {
-            try {
-                if ('serviceWorker' in navigator) {
-                    const registration = await navigator.serviceWorker.getRegistration();
-                    if (registration) {
-                        await registration.update();
-                        if (registration.waiting) {
-                            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                        }
-                    }
-                }
-            } catch (_) {}
+PATCH — Briefing_fdf_TEST — index.html
+Version cible : 3.7 TEST BINGO
 
-            const refreshUrl = new URL(window.location.href);
-            refreshUrl.searchParams.set('appv', APP_VERSION);
-            refreshUrl.searchParams.set('ts', Date.now().toString());
-            window.location.replace(refreshUrl.toString());
-        };
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', async () => {
-                try {
-                    const previousVersion = localStorage.getItem(APP_VERSION_STORAGE_KEY);
-                    if (previousVersion !== APP_VERSION) {
-                        localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
-                        sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
-                    }
-                } catch (e) {
-                    console.log('Version refresh warning:', e);
-                }
+Objectif :
+Agrandir la police des deux BINGO affichés sur la carte sur iPad et PC, sans modifier Android.
 
-                try {
-                    const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-                    console.log('Service Worker enregistré:', reg);
-                } catch (err) {
-                    console.log('Erreur enregistrement Service Worker:', err);
-                }
-            });
+Fichier concerné :
+index.html
+
+============================================================
+MODIFICATION 1/3 — Version affichée dans l'en-tête
+============================================================
+
+OÙ CHERCHER :
+v<span id="app-version">3.6 TEST PWA TDF 2026</span>
+
+AVANT :
+v<span id="app-version">3.6 TEST PWA TDF 2026</span>
+
+APRÈS :
+v<span id="app-version">3.7 TEST BINGO</span>
+
+
+============================================================
+MODIFICATION 2/3 — Constante APP_VERSION
+============================================================
+
+OÙ CHERCHER :
+const APP_VERSION = "3.6 TEST PWA TDF 2026";
+
+AVANT :
+const APP_VERSION = "3.6 TEST PWA TDF 2026";
+
+APRÈS :
+const APP_VERSION = "3.7 TEST BINGO";
+
+
+============================================================
+MODIFICATION 3/3 — Agrandissement BINGO PC/iPad hors Android
+============================================================
+
+OÙ COLLER :
+Dans le bloc <style>, juste AVANT la ligne :
+/* --- TOUR DE FRANCE TEST --- */
+
+AJOUTER :
+
+        /* --- BINGO carte : police agrandie sur PC/iPad, inchangée sur Android --- */
+        html.non-android .bingo-font-non-android {
+            font-size: 22px !important;
+            line-height: 1.15 !important;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const mainVersionDisplay = document.getElementById('app-version-display');
-            if (mainVersionDisplay) {
-                mainVersionDisplay.textContent = APP_VERSION;
-            }
 
-            const earlyForceButton = document.getElementById('force-update-button');
-            if (earlyForceButton) {
-                earlyForceButton.addEventListener('click', () => {
-                    earlyForceButton.disabled = true;
-                    earlyForceButton.textContent = '⏳ MAJ...';
-                    window.forceRecoveryReload();
+OÙ COLLER :
+Dans le bloc <script>, juste APRÈS la ligne :
+const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
+
+AJOUTER :
+
+        // --- BINGO carte : agrandissement PC/iPad uniquement, Android inchangé ---
+        (function initializeBingoFontPatch() {
+            const isAndroid = /Android/i.test(navigator.userAgent || '');
+            document.documentElement.classList.toggle('is-android', isAndroid);
+            document.documentElement.classList.toggle('non-android', !isAndroid);
+
+            if (isAndroid) return;
+
+            function markBingoElements(root = document) {
+                if (!root || !root.querySelectorAll) return;
+
+                const candidates = root.querySelectorAll('div, span, p, strong, b, label');
+                candidates.forEach(el => {
+                    const text = (el.textContent || '').replace(/\s+/g, ' ').trim().toUpperCase();
+
+                    if (
+                        text.length <= 140 &&
+                        (text.includes('BINGO BASE') || text.includes('BINGO LFLX'))
+                    ) {
+                        el.classList.add('bingo-font-non-android');
+                        el.querySelectorAll('*').forEach(child => {
+                            child.classList.add('bingo-font-non-android');
+                        });
+                    }
                 });
             }
-        });
-    </script>
-</head>
-<body>
-    <div id="map"></div>
-    <div id="main-action-buttons">
-        <button id="toggle-search-button" title="Rechercher une commune">🏙️</button>
-        <button id="calculator-button" title="Ouvrir le calculateur de mission" aria-label="Calculateur"><span class="calculator-fun-icon" aria-hidden="true"></span></button>
-        <button id="gps-feu-button" title="Créer un feu à ma position">🎯</button>
-        <button id="center-gps-button" title="Recentrer la carte sur ma position GPS">📍</button>
-        <button id="chat-toggle-button" title="Ouvrir/Fermer le chat équipe">💬<span id="chat-alert-badge" style="display:none;">0</span><span id="chat-offline-badge" aria-hidden="true">✕</span></button>
-        <div id="app-version-display" class="version-display">--</div>
-        <button id="force-update-button" class="force-update-button" type="button" title="Forcer la recherche de mise à jour">🔄 MAJ</button>
-    </div>
-      <div id="bingo-map-display" style="display: none;">
-        <span id="map-bingo-lftw"></span>
-        <span id="map-bingo-pelic"></span>
-    </div>
-    <div id="commune-info-display"></div>
-    <div id="nearest-commune-display" style="display: none;"></div>
-    <div id="team-chat-panel" style="display: none;">
-        <div class="chat-header">
-            <span id="chat-online-users">En ligne: --</span>
-            <div class="chat-header-actions">
-                <span id="chat-connection-state">Hors ligne</span>
-                <button id="chat-clear-button" title="Supprimer les messages">🗑️</button>
-                <button id="chat-minimize-button" title="Réduire/Agrandir le chat">—</button>
-            </div>
-        </div>
-        <div class="chat-config-row">
-            <input type="text" id="chat-room-input" maxlength="32" placeholder="Canal sans espace (ex: GAAR-ALPHA)">
-            <input type="text" id="chat-user-input" maxlength="24" placeholder="Votre pseudo">
-            <button id="chat-connect-button">Connexion</button>
-        </div>
-        <div id="chat-messages"></div>
-        <div class="chat-send-row">
-            <input type="text" id="chat-message-input" maxlength="280" placeholder="Message...">
-            <button id="chat-send-button">Envoyer</button>
-        </div>
-    </div>
 
-    <div id="chat-clear-modal" class="chat-clear-modal" style="display: none;">
-        <div class="chat-clear-modal-content">
-            <h3>Suppression des messages</h3>
-            <p>Choisissez l’action à effectuer :</p>
-            <div class="chat-clear-modal-actions">
-                <button id="chat-clear-local-button" class="chat-clear-option">Supprimer localement</button>
-                <button id="chat-clear-channel-button" class="chat-clear-option chat-clear-option-danger">Local + canal</button>
-                <button id="chat-clear-cancel-button" class="chat-clear-option">Annuler</button>
-            </div>
-        </div>
-    </div>
-    <div id="ui-overlay">
-        <div id="status-message">Chargement des données...</div>
-        <button id="boot-force-update-button" type="button" style="display:none;">🔄 Forcer MAJ</button>
-        <div id="search-section" style="display: none;">
-            <div class="controls-container">
-                <div class="search-wrapper">
-                    <input type="text" id="search-input" placeholder="Rechercher une commune..." autocomplete="off">
-                    <span id="clear-search">×</span>
-                </div>
-                <button id="live-gps-button" title="Activer/Désactiver le suivi GPS">🛰️</button>
-                <div class="airport-controls">
-                    <label for="airport-count">Nbr Pélic.</label>
-                    <input type="number" id="airport-count" value="3" min="0" max="10">
-                </div>
-            </div>
-            <ul id="results-list" style="display: none;"></ul>
-               
-<div class="extra-controls extra-controls-grid">
-                <button id="lftw-route-button" class="toggle-button active" title="Afficher/Masquer la route vers la base">Route BASE<br>LFTW</button>
-                <button id="gaar-mode-button" class="toggle-button" title="Afficher/Masquer les circuits GAAR">Circuits<br>GAAR</button>
-                <button id="departments-layer-button" class="toggle-button" title="Afficher/Masquer les contours de départements">Départements</button>
-                <button id="communes-layer-button" class="toggle-button" title="Afficher/Masquer les contours de communes">Communes</button>
-                <button id="offline-maps-button" class="toggle-button" title="Gérer les cartes hors-ligne">Cartes</button>
-            </div>
+            document.addEventListener('DOMContentLoaded', () => {
+                markBingoElements();
 
-  
-                
-<div id="gaar-controls" style="display: none;">
-                <button id="edit-circuits-button" class="toggle-button">Modifier Circuits</button>
-                <button id="delete-circuits-btn" class="delete-button">Supprimer Circuits</button>
-                <p id="gaar-status"></p>
-            </div>
+                const observer = new MutationObserver(mutations => {
+                    mutations.forEach(mutation => {
+                        mutation.addedNodes.forEach(node => {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                markBingoElements(node);
+                            }
+                        });
+                    });
 
-            <div id="offline-status"></div>
-        </div>
-    </div>
-    <script src="leaflet.min.js"></script>
-    <script src="suncalc.js"></script>
-    <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v11.53-app-icon"></script>
-    
-    <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
-        <div class="fuel-split-modal-content">
-            <button id="fuel-split-close-btn" class="fuel-split-close-btn" type="button" title="Fermer">&times;</button>
-            <h3>Saisie carburant</h3>
-            <div class="fuel-split-tanks-row">
-                <label class="fuel-split-field">
-                    <span>G</span>
-                    <input type="text" id="fuel-split-left" inputmode="numeric" autocomplete="off">
-                </label>
-                <label class="fuel-split-field">
-                    <span>D</span>
-                    <input type="text" id="fuel-split-right" inputmode="numeric" autocomplete="off">
-                </label>
-            </div>
-            <label class="fuel-split-total-field">
-                <span>TOTAL</span>
-                <input type="text" id="fuel-split-total" inputmode="numeric" autocomplete="off">
-            </label>
-            <div class="fuel-split-actions">
-                <button type="button" id="fuel-split-clear-btn">Effacer</button>
-                <button type="button" id="fuel-split-cancel-btn">Annuler</button>
-                <button type="button" id="fuel-split-validate-btn">Valider</button>
-            </div>
-        </div>
-    </div>
-    <div id="calculator-modal" style="display: none;">
-        <div class="main-container">
-            <button id="close-calculator-btn">&times;</button>
-            <div class="onglets-navigation">
-                <button class="onglet-bouton active" data-onglet="bloc-fuel">BLOC / FUEL</button>
-                <button class="onglet-bouton" data-onglet="previ-rotations">PREVI. NBR ROTATIONS</button>
-                <button class="onglet-bouton" data-onglet="suivi-rotations">SUIVI ROTATIONS</button>
-                <button class="onglet-bouton" data-onglet="deroutement">DEROUT. / GAAR</button>
-            </div>
-            <div class="onglets-conteneur">
-                <div class="onglet-panneau active" id="bloc-fuel">
-                    <div class="header-section">
-                        <div class="header-item"><label id="bloc-depart-label">BLOC DÉPART</label><div id="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
-                        <div class="header-item"><label>FUEL Départ</label><div id="fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
-                        <div class="header-item"><label id="cs-base-label">CS BASE (LFTW)</label><div class="input-wrapper"><input type="text" id="cs-lftw-display" class="display-input" readonly></div></div>
-                        <div class="header-item"><label>TMD</label><div id="tmd" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
-                        <div class="header-item"><label>LIMITE HDV</label><div id="limite-hdv" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
-                    </div>
-                    <div class="table-wrapper"><table class="table-section"><thead><tr><th>BLOC Arrivée</th><th>FUEL Pélic.</th><th>OACI</th><th>Durée<br>Rotations</th><th>Fuel<br>Rotations</th><th>Tps de Vol</th><th>Tps de Vol Restant</th></tr></thead><tbody></tbody></table></div>
-                </div>
-                  
-<div class="onglet-panneau" id="previ-rotations">
-                    <div class="analyse-grid">
-                        <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="previ-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
-                                <h3 class="analyse-col-title">NBR ROTATIONS POSSIBLES</h3>
-                                <div id="previ-rotation-results-container">
-                                    <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="tmd"><span class="label">TMD :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="previ-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="result-line"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
-                            <div class="result-line"><span class="label">Durée transit :<span id="duree-transit-help" class="formula-help-icon">?</span></span><span class="value" id="duree-transit">--:--</span></div>
-                            <div class="result-line"><span class="label">Conso. transit :<span id="conso-aller-feu-help" class="formula-help-icon">?</span></span><span class="value" id="conso-aller-feu">-- kg</span></div>
-                            <div class="result-line"><span class="label">Fuel sur Feu :<span id="fuel-sur-feu-help" class="formula-help-icon">?</span></span><div style="display: flex; align-items: center;"><div id="fuel-sur-feu-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="fuel-sur-feu-manual-btn">AUTO</button></div></div>
-                            <div class="result-line"><span class="label">Durée Rotation :<span id="duree-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="duree-rotation">--:--</span></div>
-                            <div class="result-line"><span class="label">Conso. Rotation :<span id="conso-par-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="conso-par-rotation">-- kg</span></div>
-                            <div class="result-line"><span class="label">CS sur feu :</span><span class="value" id="cs-sur-feu">--:--</span></div>
-                            <div class="result-line"><span class="label">TMD :</span><span class="value" id="tmd-display">--:--</span></div>
-                            <div class="result-line"><span class="label">HdV restant :</span><span class="value" id="hdv-restant-display">--:--</span></div>
-                        </div>
-                    </div>
-                </div>
+                    markBingoElements();
+                });
 
-  
-                <div class="onglet-panneau" id="suivi-rotations">
-                    <div class="analyse-grid">
-                        <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="suivi-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
-                                <h3 class="analyse-col-title">Nbr Rotations Restantes</h3>
-                                    
-<div id="suivi-rotation-results-container">
-                                    <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="tmd"><span class="label">TMD :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                </div>
-                                  
-                            </div>
-                        </div>
-                        <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="suivi-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
-                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
-                                <div class="result-line"><span class="label">Fuel Pélic. Actuel :</span><span class="value" id="suivi-fuel-actuel">-- kg</span></div>
-                                <div class="result-line"><span class="label">Heure sur Feu :<span id="suivi-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="suivi-heure-sur-feu">--:--</span></div>
-                                <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="suivi-cs-sur-feu">--:--</span></div>
-                               <div class="result-line"><span class="label">Conso. Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-conso-rotation-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly><span class="clear-btn">&times;</span></div><button class="manual-btn" id="suivi-conso-rotation-manual-btn">AUTO</button></div></div>
-                                <div class="result-line"><span class="label">Durée Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-duree-rotation-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input manual-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div><button class="manual-btn" id="suivi-duree-rotation-manual-btn">AUTO</button></div></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="placeholder-message" style="display: none;">Veuillez saisir au moins une ligne dans l'onglet "BLOC / FUEL" pour activer le suivi.</div>
-                </div>
-                    
-<div class="onglet-panneau" id="deroutement">
-                    <div class="analyse-grid">
-                         <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="derout-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
-                                <h3 class="analyse-col-title">Nbr Rotations Possibles</h3>
-                                <div id="derout-rotation-results-container">
-                                    <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="tmd"><span class="label">TMD :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                    <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="derout-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
-                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
-                                <div class="result-line"><span class="label">Fuel actuel :</span><div id="deroutement-fuel-wrapper" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric"><span class="clear-btn">&times;</span></div></div>
-                                <div class="result-line"><span class="label">Heure actuelle :</span><div id="deroutement-heure-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
-                                <div class="result-line"><span class="label">Heure sur Feu :<span id="derout-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="derout-heure-sur-feu">--:--</span></div>
-                                <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="derout-cs-sur-feu">--:--</span></div>
-                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 largage / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
-                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-pelic-label">Fuel mini 1 largage / Pélic :</span><span id="derout-fuel-mini-pelic-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
-                                <button id="refresh-gps-btn">🛰️ Rafraîchir GPS</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            });
+        })();
 
-  
-            </div>
-            <button id="reset-all-btn" title="Réinitialiser le tableau">🗑️</button>
-        </div>
-    </div>
-          
-<div id="offline-map-modal" style="display: none;">
-        <div class="main-container">
-            <button id="close-offline-map-btn">&times;</button>
-            <h2>Gestion des Cartes Hors-ligne</h2>
-            
-            <div class="modal-content">
-                <div class="import-section">
-                    <p>Importez un pack de tuiles au format .zip (formats reconnus : z/x/y.png, z_x_y.png ou z-x-y.png) pour l'utiliser hors-ligne.</p>
-                    <label for="zip-importer-input" class="import-button">Importer un pack de tuiles (.zip)</label>
-                    <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
-                </div>
 
-                <div id="import-progress-section" style="display: none;">
-                    <p id="import-status-message">Importation en cours...</p>
-                    <div class="progress-bar-container">
-                        <div id="import-progress-bar" class="progress-bar"></div>
-                    </div>
-                </div>
+============================================================
+NOTE TECHNIQUE
+============================================================
 
-                <div class="installed-maps-section">
-                    <h3>Packs installés</h3>
-                    <div class="offline-toggle-row">
-                        <span>Type de carte :</span>
-                        <div class="map-source-buttons">
-                            <button type="button" id="map-source-online-btn" class="map-source-btn map-source-btn-online active">Online</button>
-                            <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">Offline</button>
-                        </div>
-                    </div>
-                    <button type="button" id="purge-inactive-packs-btn" class="danger-inline-btn">Vider le cache des packs désélectionnés</button>
-                    <button type="button" id="refresh-offline-tiles-btn" class="neutral-inline-btn">Rafraîchir l'affichage des cartes offline</button>
-                    <ul id="installed-maps-list">
-                        <!-- Les packs installés seront listés ici par le JavaScript -->
-                        <li class="no-maps-placeholder">Aucun pack de cartes installé.</li>
-                    </ul>
-                </div>
-                <div class="airport-pdf-section">
-                    <h3>PDF aérodromes offline</h3>
-                    <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne depuis le bouton PDF des pélicandromes.</p>
-                    <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDF aérodromes</label>
-                    <input type="file" id="airport-pdf-importer-input" accept="application/pdf,.pdf" multiple style="display: none;">
-                    <ul id="installed-airport-pdfs-list">
-                        <li class="no-pdfs-placeholder">Aucun PDF aérodrome stocké.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
- </body>
-</html>
+- Android est exclu via le userAgent : /Android/i.
+- PC et iPad reçoivent la classe html.non-android.
+- Le patch ne dépend pas d'un id ou d'une classe existante : il repère les éléments dont le texte contient "BINGO BASE" ou "BINGO LFLX".
+- La limite text.length <= 140 évite d'appliquer la classe à toute une grande section de page.
+- Si la police est encore trop petite, remplacer 22px par 24px.
+- Si elle est trop grande, remplacer 22px par 20px.
 
-    
+
+============================================================
+ROLLBACK RAPIDE
+============================================================
+
+1. Remettre :
+   v<span id="app-version">3.6 TEST PWA TDF 2026</span>
+
+2. Remettre :
+   const APP_VERSION = "3.6 TEST PWA TDF 2026";
+
+3. Supprimer le bloc CSS :
+   /* --- BINGO carte : police agrandie sur PC/iPad, inchangée sur Android --- */
+
+4. Supprimer le bloc JS :
+   // --- BINGO carte : agrandissement PC/iPad uniquement, Android inchangé ---
