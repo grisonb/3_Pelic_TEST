@@ -1415,10 +1415,10 @@ function updateMapBingoDisplay() {
     const lftwEl = document.getElementById('map-bingo-lftw');
     const pelicEl = document.getElementById('map-bingo-pelic');
 
-    lftwEl.innerHTML = `BINGO BASE ${selectedBaseOACI}: <b>${bingoBase} kg</b>`;
+    lftwEl.innerHTML = `<span class="bingo-title">BINGO BASE ${selectedBaseOACI}:</span> <b>${bingoBase} kg</b>`;
 
     if (bingoPelic !== 700 && selectedPelicanOACI) {
-        pelicEl.innerHTML = `BINGO ${selectedPelicanOACI}: <b>${bingoPelic} kg</b>`;
+        pelicEl.innerHTML = `<span class="bingo-title">BINGO ${selectedPelicanOACI}:</span> <b>${bingoPelic} kg</b>`;
         pelicEl.style.display = 'inline-block';
     } else {
         pelicEl.style.display = 'none';
