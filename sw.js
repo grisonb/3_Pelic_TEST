@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-54-bingo-desktop-ipad';
+const SW_VERSION = 'sw-v11-55-bingo-title-size';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
