@@ -2996,3 +2996,47 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.56 — PC/iPad : vrais titres BINGO agrandis.
+   Le JS ajoute .bingo-title, donc les libellés sont réellement pilotables.
+   Android/smartphone non modifié : seuil min-width 761px. */
+@media (min-width: 761px) {
+    #bingo-map-display {
+        height: 78px;
+        min-height: 78px;
+    }
+
+    #bingo-map-display .bingo-title {
+        font-size: 25px;
+        font-weight: 900;
+        letter-spacing: -0.2px;
+    }
+
+    #bingo-map-display b {
+        font-size: 38px;
+        font-weight: 950;
+    }
+
+    #commune-info-display {
+        top: calc(var(--safe-area-top) + 98px);
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display {
+        height: 74px;
+        min-height: 74px;
+    }
+
+    #bingo-map-display .bingo-title {
+        font-size: 23px;
+    }
+
+    #bingo-map-display b {
+        font-size: 34px;
+    }
+
+    #commune-info-display {
+        top: calc(var(--safe-area-top) + 94px);
+    }
+}
+
