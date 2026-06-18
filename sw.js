@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-53-app-icon';
+const SW_VERSION = 'sw-v11-54-bingo-desktop-ipad';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
