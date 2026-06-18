@@ -3092,3 +3092,8 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.58 — étiquettes route : distance + temps de vol */
+.route-tooltip .route-label-sub {
+    white-space: nowrap;
+}
+
