@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-58-route-label-flight-time';
+const SW_VERSION = 'sw-v11-59-route-label-order-center';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
