@@ -132,6 +132,23 @@ const formatRouteDegrees = (bearing) => {
     const normalizedBearing = ((roundedBearing % 360) + 360) % 360;
     return `${String(normalizedBearing).padStart(3, '0')}°`;
 };
+function calculateOneWayFlightTimeMinutes(distanceNm) {
+    /*
+     * v11.58 — temps de vol étiquette carte.
+     * Distance prise uniquement : feu ↔ base ou feu ↔ pélicandrome.
+     * Formule identique transit : 210 kt jusqu'à 70 Nm, 240 kt au-delà.
+     */
+    const distance = Number(distanceNm);
+    if (!Number.isFinite(distance) || distance <= 0) return null;
+    const speedKt = distance <= 70 ? 210 : 240;
+    return Math.round(distance * 60 / speedKt);
+}
+
+function formatFlightTimeLabel(distanceNm) {
+    const minutes = calculateOneWayFlightTimeMinutes(distanceNm);
+    return Number.isFinite(minutes) ? `${minutes}'` : "--'";
+}
+
 const convertToDMM = (deg, type) => { if (deg === null || isNaN(deg)) return 'N/A'; const absDeg = Math.abs(deg), degrees = Math.floor(absDeg), minutesTotal = (absDeg - degrees) * 60, minutesFormatted = minutesTotal.toFixed(2).padStart(5, '0'); let direction = type === 'lat' ? (deg >= 0 ? 'N' : 'S') : (deg >= 0 ? 'E' : 'W'); return `${degrees}° ${minutesFormatted}' ${direction}`; };
 const levenshteinDistance = (a, b) => { const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null)); for (let i = 0; i <= a.length; i += 1) matrix[0][i] = i; for (let j = 0; j <= b.length; j += 1) matrix[j][0] = j; for (let j = 1; j <= b.length; j += 1) for (let i = 1; i <= a.length; i += 1) { const indicator = a[i - 1] === b[j - 1] ? 0 : 1; matrix[j][i] = Math.min(matrix[j][i - 1] + 1, matrix[j - 1][i] + 1, matrix[j - 1][i - 1] + indicator); } return matrix[b.length][a.length]; };
 const withTimeout = (promise, timeoutMs, timeoutMessage) => new Promise((resolve, reject) => {
@@ -1496,7 +1513,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         dashArray = '5, 10';
         layer = userToTargetLayer;
     } else if (isLftwRoute) {
-        labelText = `<b>BASE ${selectedBaseOACI}</b><span class="route-label-sub">${formatRouteDegrees(magneticBearing)} / ${Math.round(distance)} Nm</span>`;
+        labelText = `<b>BASE ${selectedBaseOACI}</b><span class="route-label-sub">${formatRouteDegrees(magneticBearing)} / ${formatFlightTimeLabel(distance)} / ${Math.round(distance)} Nm</span>`;
         color = 'var(--success-color)';
         dashArray = '5, 10';
         layer = lftwRouteLayer;
@@ -1504,7 +1521,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         const isSelected = selectedPelicanOACI === oaci;
         color = isSelected ? 'var(--success-color)' : 'var(--primary-color)';
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon' : 'route-tooltip route-tooltip-near-icon';
-        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm`;
+        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}`;
 
         L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8 }).addTo(layer);
 
