@@ -1513,7 +1513,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         dashArray = '5, 10';
         layer = userToTargetLayer;
     } else if (isLftwRoute) {
-        labelText = `<b>BASE ${selectedBaseOACI}</b><span class="route-label-sub">${formatRouteDegrees(magneticBearing)} / ${formatFlightTimeLabel(distance)} / ${Math.round(distance)} Nm</span>`;
+        labelText = `<b>BASE ${selectedBaseOACI}</b><span class="route-label-sub">${formatRouteDegrees(magneticBearing)} / ${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</span>`;
         color = 'var(--success-color)';
         dashArray = '5, 10';
         layer = lftwRouteLayer;
@@ -1521,7 +1521,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         const isSelected = selectedPelicanOACI === oaci;
         color = isSelected ? 'var(--success-color)' : 'var(--primary-color)';
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon' : 'route-tooltip route-tooltip-near-icon';
-        labelText = `<b>${oaci}</b><br>${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}`;
+        labelText = `<div class="route-label-oaci">${oaci}</div><div class="route-label-sub">${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</div>`;
 
         L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8 }).addTo(layer);
 
