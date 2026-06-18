@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-57-bingo-title-strong';
+const SW_VERSION = 'sw-v11-58-route-label-flight-time';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
