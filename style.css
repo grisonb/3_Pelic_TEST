@@ -2972,3 +2972,27 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.55 — PC/iPad : titres BINGO agrandis.
+   Android/smartphone non modifié : seuil min-width 761px. */
+@media (min-width: 761px) {
+    #bingo-map-display {
+        font-size: 32px;
+        font-weight: 800;
+    }
+
+    #bingo-map-display b {
+        font-size: 38px;
+        font-weight: 950;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display {
+        font-size: 29px;
+    }
+
+    #bingo-map-display b {
+        font-size: 34px;
+    }
+}
+
