@@ -2929,3 +2929,46 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.54 — PC/iPad : bingo plus lisible, sans chevauchement avec la fenêtre commune.
+   Ne touche pas Android/smartphone : les règles ci-dessous commencent à 761px. */
+@media (min-width: 761px) {
+    #bingo-map-display {
+        height: 74px;
+        min-height: 74px;
+        padding: 0 36px;
+        gap: 42px;
+        font-size: 29px;
+        font-weight: 650;
+        border-radius: 20px;
+        box-sizing: border-box;
+    }
+
+    #bingo-map-display b {
+        font-size: 30px;
+        font-weight: 900;
+    }
+
+    #commune-info-display {
+        top: calc(var(--safe-area-top) + 94px);
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display {
+        height: 70px;
+        min-height: 70px;
+        padding: 0 28px;
+        gap: 34px;
+        font-size: 25px;
+        max-width: calc(100vw - 180px);
+    }
+
+    #bingo-map-display b {
+        font-size: 27px;
+    }
+
+    #commune-info-display {
+        top: calc(var(--safe-area-top) + 90px);
+    }
+}
+
