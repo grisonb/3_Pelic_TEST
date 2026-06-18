@@ -3097,3 +3097,21 @@ body.fuel-keyboard-open .fuel-split-hint {
     white-space: nowrap;
 }
 
+/* v11.59 — étiquettes route : OACI pélicandrome centré + ordre base corrigé */
+.route-tooltip-near-icon {
+    text-align: center;
+}
+
+.route-tooltip .route-label-oaci {
+    display: block;
+    text-align: center;
+    font-weight: 900;
+    line-height: 1.05;
+}
+
+.route-tooltip .route-label-sub {
+    display: block;
+    text-align: center;
+    white-space: nowrap;
+}
+
