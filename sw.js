@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-64-bingo-oaci-tabs-depcode';
+const SW_VERSION = 'sw-v11-65-bingo-oaci-size-tabs-compact';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
