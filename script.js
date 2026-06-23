@@ -5404,6 +5404,73 @@ function escapeHtml(value) {
 }
 
 function initializeCalculator() {
+    let isSharedHeaderSyncing = false;
+
+    function getSharedHeaderMainId(wrapper) {
+        if (!wrapper) return '';
+        return wrapper.dataset?.syncTarget || wrapper.id || '';
+    }
+
+    function getSharedHeaderMirrorWrapper(mainId) {
+        return document.querySelector(`.previ-shared-header-section [data-sync-target="${mainId}"]`);
+    }
+
+    function copyWrapperValue(sourceWrapper, targetWrapper) {
+        if (!sourceWrapper || !targetWrapper) return;
+
+        const sourceDisplay = sourceWrapper.querySelector('.display-input');
+        const targetDisplay = targetWrapper.querySelector('.display-input');
+        if (sourceDisplay && targetDisplay && targetDisplay.value !== sourceDisplay.value) {
+            targetDisplay.value = sourceDisplay.value;
+        }
+
+        const sourceEngine = sourceWrapper.querySelector('.engine-input');
+        const targetEngine = targetWrapper.querySelector('.engine-input');
+        if (sourceEngine && targetEngine && targetEngine.value !== sourceEngine.value) {
+            targetEngine.value = sourceEngine.value;
+        }
+    }
+
+    function syncSharedHeaderFromWrapper(wrapper) {
+        if (!wrapper || isSharedHeaderSyncing) return;
+
+        const mainId = getSharedHeaderMainId(wrapper);
+        if (!mainId) return;
+
+        const mainWrapper = document.getElementById(mainId);
+        const mirrorWrapper = getSharedHeaderMirrorWrapper(mainId);
+
+        isSharedHeaderSyncing = true;
+        try {
+            if (wrapper === mirrorWrapper) {
+                copyWrapperValue(mirrorWrapper, mainWrapper);
+            } else if (wrapper === mainWrapper) {
+                copyWrapperValue(mainWrapper, mirrorWrapper);
+            }
+        } finally {
+            isSharedHeaderSyncing = false;
+        }
+    }
+
+    function refreshSharedHeaderMirrorValues() {
+        ['bloc-depart', 'fuel-depart', 'tmd', 'limite-hdv'].forEach((mainId) => {
+            copyWrapperValue(document.getElementById(mainId), getSharedHeaderMirrorWrapper(mainId));
+        });
+
+        const mainCs = document.getElementById('cs-lftw-display');
+        const previCs = document.getElementById('previ-cs-lftw-display');
+        if (mainCs && previCs) previCs.value = mainCs.value;
+
+        const mainBlocLabel = document.getElementById('bloc-depart-label');
+        const previBlocLabel = document.getElementById('previ-bloc-depart-label');
+        if (mainBlocLabel && previBlocLabel) previBlocLabel.textContent = mainBlocLabel.textContent;
+
+        const mainCsLabel = document.getElementById('cs-base-label');
+        const previCsLabel = document.getElementById('previ-cs-base-label');
+        if (mainCsLabel && previCsLabel) previCsLabel.textContent = mainCsLabel.textContent;
+    }
+
+
     const resetButton = document.getElementById('reset-all-btn');
     const onglets = document.querySelectorAll('.onglet-bouton');
     const csLftwDisplay = document.getElementById('cs-lftw-display');
@@ -5568,76 +5635,6 @@ function initializeCalculator() {
         localStorage.setItem('calculator_state', JSON.stringify(state));
     }
 
-    
-function getSharedHeaderSyncTargetId(wrapper) {
-        if (!wrapper || !wrapper.id) return '';
-        return wrapper.dataset.syncTarget || '';
-    }
-
-    function getSharedHeaderMirrorId(wrapper) {
-        if (!wrapper || !wrapper.id) return '';
-        const targetId = getSharedHeaderSyncTargetId(wrapper);
-        if (targetId) return targetId;
-
-        const mirror = document.querySelector(`[data-sync-target="${wrapper.id}"]`);
-        return mirror ? mirror.id : '';
-    }
-
-    function copySharedHeaderWrapperValue(sourceWrapper, targetWrapper) {
-        if (!sourceWrapper || !targetWrapper) return;
-
-        const sourceDisplay = sourceWrapper.querySelector('.display-input');
-        const targetDisplay = targetWrapper.querySelector('.display-input');
-        if (sourceDisplay && targetDisplay && targetDisplay.value !== sourceDisplay.value) {
-            targetDisplay.value = sourceDisplay.value;
-        }
-
-        const sourceEngine = sourceWrapper.querySelector('.engine-input');
-        const targetEngine = targetWrapper.querySelector('.engine-input');
-        if (sourceEngine && targetEngine && targetEngine.value !== sourceEngine.value) {
-            targetEngine.value = sourceEngine.value;
-        }
-    }
-
-    function syncSharedHeaderWrapperValue(wrapper) {
-        if (!wrapper || !wrapper.id) return;
-        const mirrorId = getSharedHeaderMirrorId(wrapper);
-        if (!mirrorId) return;
-
-        const mirrorWrapper = document.getElementById(mirrorId);
-        copySharedHeaderWrapperValue(wrapper, mirrorWrapper);
-    }
-
-    function refreshSharedHeaderLabels() {
-        const mainBlocLabel = document.getElementById('bloc-depart-label');
-        const previBlocLabel = document.getElementById('previ-bloc-depart-label');
-        if (mainBlocLabel && previBlocLabel) {
-            previBlocLabel.textContent = mainBlocLabel.textContent || 'BLOC DÉPART';
-        }
-
-        const mainCsLabel = document.getElementById('cs-base-label');
-        const previCsLabel = document.getElementById('previ-cs-base-label');
-        if (mainCsLabel && previCsLabel) {
-            previCsLabel.textContent = mainCsLabel.textContent || `CS BASE (${selectedBaseOACI})`;
-        }
-    }
-
-    function refreshSharedHeaderMirrorValues() {
-        ['bloc-depart', 'fuel-depart', 'tmd', 'limite-hdv'].forEach((mainId) => {
-            const mainWrapper = document.getElementById(mainId);
-            const mirrorWrapper = document.querySelector(`[data-sync-target="${mainId}"]`);
-            copySharedHeaderWrapperValue(mainWrapper, mirrorWrapper);
-        });
-
-        const mainCs = document.getElementById('cs-lftw-display');
-        const previCs = document.getElementById('previ-cs-lftw-display');
-        if (mainCs && previCs && previCs.value !== mainCs.value) {
-            previCs.value = mainCs.value;
-        }
-
-        refreshSharedHeaderLabels();
-    }
-
     function initializeTimeInput(wrapper, initialValue = '') {
         if (!wrapper) return;
         const displayInput = wrapper.querySelector('.display-input');
@@ -5658,7 +5655,8 @@ function getSharedHeaderSyncTargetId(wrapper) {
         };
 
         const recalculateAndSave = () => {
-            syncSharedHeaderWrapperValue(wrapper);
+            syncSharedHeaderFromWrapper(wrapper);
+
             if (wrapperRole === 'bloc-depart') {
                 updateBlocDepartAirportLabel();
             } else {
@@ -5961,7 +5959,7 @@ function getSharedHeaderSyncTargetId(wrapper) {
                 }
                 const total = cleanFuelDigits(totalInput?.value || '');
                 activeFuelSplitInput.value = total ? `${parseInt(total, 10)} kg` : '';
-                syncSharedHeaderWrapperValue(activeFuelSplitInput.closest('.input-wrapper'));
+                syncSharedHeaderFromWrapper(activeFuelSplitInput.closest('.input-wrapper'));
                 refreshSharedHeaderMirrorValues();
                 masterRecalculate();
                 saveCalculatorState();
@@ -6046,7 +6044,7 @@ function getSharedHeaderSyncTargetId(wrapper) {
                     event.preventDefault();
                     event.stopPropagation();
                     displayInput.value = '';
-                    syncSharedHeaderWrapperValue(wrapper);
+                    syncSharedHeaderFromWrapper(wrapper);
                     refreshSharedHeaderMirrorValues();
                     masterRecalculate();
                     saveCalculatorState();
@@ -6056,10 +6054,10 @@ function getSharedHeaderSyncTargetId(wrapper) {
         }
 
         displayInput.addEventListener('focus', () => { if (displayInput.readOnly) return; if (displayInput.value) { shouldClearOnNextInput = true; } displayInput.value = displayInput.value.replace(/[^0-9]/g, ''); });
-        displayInput.addEventListener('blur', () => { if (displayInput.readOnly) return; shouldClearOnNextInput = false; let v = displayInput.value.replace(/[^0-9]/g, ''); if (v) { displayInput.value = `${v} ${unit}`; } else { displayInput.value = ''; } syncSharedHeaderWrapperValue(wrapper); refreshSharedHeaderMirrorValues(); masterRecalculate(); saveCalculatorState(); });
-        displayInput.addEventListener('input', (e) => { if (displayInput.readOnly) return; if (shouldClearOnNextInput && e.data) { displayInput.value = e.data.replace(/[^0-9]/g, ''); shouldClearOnNextInput = false; } else { displayInput.value = displayInput.value.replace(/[^0-9]/g, ''); } syncSharedHeaderWrapperValue(wrapper); refreshSharedHeaderMirrorValues(); masterRecalculate(); });
+        displayInput.addEventListener('blur', () => { if (displayInput.readOnly) return; shouldClearOnNextInput = false; let v = displayInput.value.replace(/[^0-9]/g, ''); if (v) { displayInput.value = `${v} ${unit}`; } else { displayInput.value = ''; } masterRecalculate(); saveCalculatorState(); });
+        displayInput.addEventListener('input', (e) => { if (displayInput.readOnly) return; if (shouldClearOnNextInput && e.data) { displayInput.value = e.data.replace(/[^0-9]/g, ''); shouldClearOnNextInput = false; } else { displayInput.value = displayInput.value.replace(/[^0-9]/g, ''); } masterRecalculate(); });
         displayInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); displayInput.blur(); } });
-        if (clearBtn) { clearBtn.addEventListener('click', () => { displayInput.value = ''; syncSharedHeaderWrapperValue(wrapper); refreshSharedHeaderMirrorValues(); masterRecalculate(); saveCalculatorState(); }); }
+        if (clearBtn) { clearBtn.addEventListener('click', () => { displayInput.value = ''; masterRecalculate(); saveCalculatorState(); }); }
     }
 
     const addNewRow = (tableBody, data, isLastRow = false) => {
@@ -6104,6 +6102,7 @@ function getSharedHeaderSyncTargetId(wrapper) {
         initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3400 kg');
         initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
         initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
+
         initializeTimeInput(document.getElementById('previ-bloc-depart'), state['bloc-depart']);
         initializeNumericInput(document.getElementById('previ-fuel-depart'), state['fuel-depart'] || '3400 kg');
         initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
