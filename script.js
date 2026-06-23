@@ -2719,9 +2719,31 @@ function updateNearestCommuneDisplay(lat, lon) {
     const nearestDisplay = document.getElementById('nearest-commune-display');
     if (!nearestDisplay) return;
 
+    const enrichCommuneForDisplay = (commune) => {
+        if (!commune) return null;
+
+        /*
+         * v11.62 — le polygone carte peut fournir seulement un nom, sans dep_code/dep_nom.
+         * Pour l'affichage bas droite, on ré-enrichit donc systématiquement depuis la base communes.
+         */
+        const databaseMatch = getCommuneFromDatabaseByNameAndDepartment(commune);
+        if (databaseMatch) return databaseMatch;
+
+        if ((!commune.dep_code || !commune.dep_nom) && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon))) {
+            const nearestFromDatabase = findClosestCommune(lat, lon, 27);
+            if (nearestFromDatabase && simplifyString(nearestFromDatabase.nom_standard || '') === simplifyString(commune.nom_standard || commune.name || '')) {
+                return nearestFromDatabase;
+            }
+        }
+
+        return commune;
+    };
+
     const buildLabel = (commune, prefix = 'Commune') => {
-        const depLabel = formatCommuneDepartment(commune);
-        return `📍 ${prefix}: <b>${commune.nom_standard}${depLabel ? ` (${depLabel})` : ''}</b>`;
+        const displayCommune = enrichCommuneForDisplay(commune);
+        if (!displayCommune) return '';
+        const depLabel = formatCommuneDepartment(displayCommune);
+        return `📍 ${prefix}: <b>${displayCommune.nom_standard}${depLabel ? ` (${depLabel})` : ''}</b>`;
     };
 
     const containedCommune = findCommuneContainingPoint(lat, lon);
