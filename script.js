@@ -3734,19 +3734,19 @@ function updatePreviTab() {
     const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null;
 
     document.getElementById('duree-transit').textContent = formatTime(transitTime) || '--:--';
-    setHelp('duree-transit-help', `Formule : Distance * (60 / Vitesse)\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} Nm * (60 / ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240})`);
+    setHelp('duree-transit-help', `Formule : Distance Base → Feu × (60 / Vitesse)\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} Nm × (60 / ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240})`);
 
     document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
     setHelp('heure-sur-feu-help', `Formule : BLOC Départ + Durée transit\n\nCalcul : ${formatTime(blocDepart) || 'N/A'} + ${formatTime(transitTime)}`);
 
     document.getElementById('conso-aller-feu').textContent = `${consoAller} kg`;
-    setHelp('conso-aller-feu-help', `Formule : Distance * Conso. au Nm\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} Nm * ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} kg/Nm`);
+    setHelp('conso-aller-feu-help', `Formule : Distance Base → Feu × Conso. au Nm\n\nRègle consommation :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} Nm × ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} kg/Nm`);
 
     document.getElementById('duree-rotation').textContent = rotationTime === 20 ? '--:--' : formatTime(rotationTime);
-    setHelp('duree-rotation-help', `Formule : 20min + ((Distance effective × 2) / Vitesse Sol)\n\nCalcul : 20 + ((${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm × 2) / ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 50 ? 3.5 : 4})`);
+    setHelp('duree-rotation-help', `Formule : 20 min + ((Distance retenue × 2) / Vitesse)\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nRègle vitesse :\n- Distance retenue ≤ 50 Nm : 3,5 Nm/min, soit 210 kt\n- Distance retenue > 50 Nm : 4,0 Nm/min, soit 240 kt\n\nCalcul : 20 + ((${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm × 2) / ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 50 ? 3.5 : 4})`);
 
     document.getElementById('conso-par-rotation').textContent = consoRotation === 250 ? '-- kg' : `${consoRotation} kg`;
-    setHelp('conso-par-rotation-help', `Formule : (Distance * Conso. au Nm) + Forfait\n\nCalcul : (${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm * ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 70 ? 10 : 8}) + 250`);
+    setHelp('conso-par-rotation-help', `Formule : (Distance retenue × Conso. au Nm) + Forfait largage\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nRègle consommation :\n- Distance retenue ≤ 70 Nm : 10 kg/Nm\n- Distance retenue > 70 Nm : 8 kg/Nm\n- Forfait largage : 250 kg\n\nCalcul : (${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm × ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 70 ? 10 : 8}) + 250`);
 
     const fuelSurFeuInput = document.getElementById('fuel-sur-feu-wrapper').querySelector('.display-input');
     const fuelEstime = fuelDepart ? fuelDepart - consoAller : null;
@@ -3879,18 +3879,18 @@ function updateDeroutementTab() {
     document.getElementById('derout-fuel-mini-base').textContent = fuelMiniBase !== null ? `${fuelMiniBase} kg` : '-- kg';
     document.getElementById('derout-fuel-mini-pelic').textContent = fuelMiniPelic !== null ? `${fuelMiniPelic} kg` : '-- kg';
     setHelp('derout-fuel-mini-base-help', consoTransitFromGps !== null
-        ? `Formule: Conso(GPS->Feu) + Forfait Largage + BINGO Base\n\nCalcul: ${consoTransitFromGps} + 250 + ${bingoBase}`
-        : 'Distance GPS->Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
+        ? `Formule : Conso GPS → Feu + Forfait largage + BINGO Base\n\nRègle conso GPS → Feu :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase}`
+        : 'Distance GPS → Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
     setHelp('derout-fuel-mini-pelic-help', consoTransitFromGps !== null
-        ? `Formule: Conso(GPS->Feu) + Forfait Largage + BINGO Pélic.\n\nCalcul: ${consoTransitFromGps} + 250 + ${bingoPelic}`
-        : 'Distance GPS->Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
+        ? `Formule : Conso GPS → Feu + Forfait largage + BINGO Pélic.\n\nRègle conso GPS → Feu :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic}`
+        : 'Distance GPS → Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
 
     const heureSurFeu = (heureActuelle !== null && transitTimeFromGps !== null) ? heureActuelle + transitTimeFromGps : null;
     document.getElementById('derout-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
     document.getElementById('derout-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
     setHelp('derout-heure-sur-feu-help', transitTimeFromGps !== null
-        ? `Formule : Heure actuelle + Durée transit GPS->Feu\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'}`
-        : 'Distance GPS->Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
+        ? `Formule : Heure actuelle + Durée transit GPS → Feu\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'}`
+        : 'Distance GPS → Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
 
     if (fuelActuel === null || heureActuelle === null || consoTransitFromGps === null || transitTimeFromGps === null) {
         resultsContainer.querySelectorAll('.value').forEach(el => { el.textContent = '--'; el.className = 'value rotation-value-default'; });
