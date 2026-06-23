@@ -3450,3 +3450,31 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.74 — icône BLOC/FUEL agrandie dans le bouton */
+#bloc-fuel-shortcut-button {
+    width: 90px !important;
+    height: 90px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+#bloc-fuel-shortcut-button .bloc-fuel-shortcut-img {
+    width: 88px !important;
+    height: 88px !important;
+    object-fit: cover !important;
+    border-radius: 18px !important;
+}
+
+@media (max-width: 760px) {
+    #bloc-fuel-shortcut-button {
+        width: 64px !important;
+        height: 64px !important;
+    }
+
+    #bloc-fuel-shortcut-button .bloc-fuel-shortcut-img {
+        width: 62px !important;
+        height: 62px !important;
+        border-radius: 13px !important;
+    }
+}
+
