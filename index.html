@@ -6,17 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
-    <link rel="stylesheet" href="style.css?appv=v11.67-tabs-restored-previ-header-bingo-narrow">
-    <link rel="manifest" href="manifest.json?appv=v11.67-tabs-restored-previ-header-bingo-narrow">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.67-tabs-restored-previ-header-bingo-narrow">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.67-tabs-restored-previ-header-bingo-narrow">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.67-tabs-restored-previ-header-bingo-narrow">
+    <link rel="stylesheet" href="style.css?appv=v11.68-tabs-ok-previ-header-bingo-narrow">
+    <link rel="manifest" href="manifest.json?appv=v11.68-tabs-ok-previ-header-bingo-narrow">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.68-tabs-ok-previ-header-bingo-narrow">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.68-tabs-ok-previ-header-bingo-narrow">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.68-tabs-ok-previ-header-bingo-narrow">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="NPF-Q400-TEST">
     <script>
-        const APP_VERSION = 'v11.67';
+        const APP_VERSION = 'v11.68';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -166,7 +166,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v11.67-tabs-restored-previ-header-bingo-narrow"></script>
+    <script src="script.js?appv=v11.68-tabs-ok-previ-header-bingo-narrow"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -205,7 +205,13 @@
             <div class="onglets-conteneur">
                 <div class="onglet-panneau active" id="previ-rotations">
                     <div class="header-section previ-shared-header-section">
-                        <div class="header-item"><label id="previ-bloc-depart-label">BLOC DÉPART</label><div id="previ-bloc-depart" data-sync-target="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label id="previ-bloc-depart-label">BLOC DÉPART</label><div id="previ-bloc-depart" class="input-wrapper time-input-wrapper" data-sync-target="bloc-depart"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>FUEL Départ</label><div id="previ-fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg" data-sync-target="fuel-depart"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
+                        <div class="header-item"><label id="previ-cs-base-label">CS BASE (LFTW)</label><div class="input-wrapper"><input type="text" id="previ-cs-lftw-display" class="display-input" readonly></div></div>
+                        <div class="header-item"><label>TMD</label><div id="previ-tmd" class="input-wrapper time-input-wrapper" data-sync-target="tmd"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>LIMITE HDV</label><div id="previ-limite-hdv" class="input-wrapper time-input-wrapper" data-sync-target="limite-hdv"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                    </div>
+
                     <div class="analyse-grid">
                         <div class="analyse-col">
                             <span id="previ-bingo-base" class="previ-hidden-bingo-value">-- kg</span>
