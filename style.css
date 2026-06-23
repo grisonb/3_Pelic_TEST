@@ -3249,3 +3249,26 @@ body.fuel-keyboard-open .fuel-split-hint {
     line-height: 1.15;
 }
 
+/* v11.66 — OACI carte à la taille carburant + bandeau partagé PREVI */
+#bingo-map-display .bingo-oaci {
+    font-size: 36px !important;
+    font-weight: 1000 !important;
+    line-height: 1;
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display .bingo-oaci {
+        font-size: 31px !important;
+    }
+}
+
+.previ-shared-header-section {
+    margin: 12px 25px 0;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 14px;
+}
+
+.previ-hidden-bingo-value {
+    display: none !important;
+}
+
