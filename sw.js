@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-76-gps-feu-bigger';
+const SW_VERSION = 'sw-v11-77-fms-previ-blocfuel-tab';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
