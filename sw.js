@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-66-map-oaci-fuel-size-previ-shared-header';
+const SW_VERSION = 'sw-v11-67-tabs-restored-previ-header-bingo-narrow';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
