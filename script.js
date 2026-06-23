@@ -1207,15 +1207,16 @@ function setupEventListeners() {
         }
     });
 
-    calculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'flex'; });
+    function openCalculatorTab(tabId) {
+        if (!calculatorModal) return;
+        calculatorModal.style.display = 'flex';
+        const targetTab = calculatorModal.querySelector(`.onglet-bouton[data-onglet="${tabId}"]`);
+        if (targetTab) targetTab.click();
+    }
+
+    calculatorButton.addEventListener('click', () => { openCalculatorTab('previ-rotations'); });
     if (blocFuelShortcutButton) {
-        blocFuelShortcutButton.addEventListener('click', () => {
-            calculatorModal.style.display = 'flex';
-            const blocFuelTab = calculatorModal.querySelector('.onglet-bouton[data-onglet="bloc-fuel"]');
-            if (blocFuelTab) {
-                blocFuelTab.click();
-            }
-        });
+        blocFuelShortcutButton.addEventListener('click', () => { openCalculatorTab('bloc-fuel'); });
     }
     closeCalculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'none'; });
     calculatorModal.addEventListener('click', (e) => { if (e.target === calculatorModal) { calculatorModal.style.display = 'none'; } });
