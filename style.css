@@ -3115,3 +3115,48 @@ body.fuel-keyboard-open .fuel-split-hint {
     white-space: nowrap;
 }
 
+/* v11.62 — bandeau BINGO moins large pour éviter le passage sous l'icône Recherche */
+@media (min-width: 761px) {
+    #bingo-map-display {
+        max-width: calc(100vw - 280px) !important;
+        box-sizing: border-box;
+        overflow: hidden;
+        gap: 24px !important;
+        padding-left: 24px !important;
+        padding-right: 24px !important;
+    }
+
+    #bingo-map-display .bingo-title {
+        font-size: 28px !important;
+    }
+
+    #bingo-map-display b {
+        font-size: 36px !important;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display {
+        max-width: calc(100vw - 220px) !important;
+        gap: 18px !important;
+        padding-left: 18px !important;
+        padding-right: 18px !important;
+    }
+
+    #bingo-map-display .bingo-title {
+        font-size: 24px !important;
+    }
+
+    #bingo-map-display b {
+        font-size: 31px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    #bingo-map-display {
+        max-width: calc(100vw - 112px) !important;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+}
+
