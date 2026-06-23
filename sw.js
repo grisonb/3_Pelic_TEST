@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-69-map-bingo-smaller-bloc-shortcut';
+const SW_VERSION = 'sw-v11-70-bloc-shortcut-icon-pelic-label-offset';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
