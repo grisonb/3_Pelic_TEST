@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-70-bloc-shortcut-icon-pelic-label-offset';
+const SW_VERSION = 'sw-v11-71-bloc-fuel-icon-pelic-label-no-cover';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
