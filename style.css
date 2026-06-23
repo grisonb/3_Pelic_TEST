@@ -3292,7 +3292,7 @@ body.fuel-keyboard-open .fuel-split-hint {
     display: none !important;
 }
 
-/* v11.69 — carte : BINGO un peu plus petit, bouton direct BLOC/FUEL, commune décalée */
+/* v11.72 — carte : icône BLOC/FUEL validée, panneau PREVI droit bleuté */
 #bingo-map-display .bingo-oaci {
     font-size: 32px !important;
 }
@@ -3337,16 +3337,6 @@ body.fuel-keyboard-open .fuel-split-hint {
     max-width: min(520px, calc(100vw - 170px)) !important;
 }
 
-/* Onglet PREVI : lignes de droite plus compactes */
-#previ-rotations .analyse-col:nth-child(2) .result-line {
-    margin-bottom: 16px;
-}
-
-#previ-rotations .analyse-col:nth-child(2) .result-line .value {
-    padding-top: 6px;
-    padding-bottom: 6px;
-}
-
 @media (max-width: 760px) {
     #bloc-fuel-shortcut-button {
         width: 64px;
@@ -3361,39 +3351,60 @@ body.fuel-keyboard-open .fuel-split-hint {
 }
 
 /* v11.71 — icône BLOC/FUEL et étiquettes pélicandromes anti-recouvrement */
+
 #bloc-fuel-shortcut-button {
     font-size: 0 !important;
 }
 
-#bloc-fuel-shortcut-button .bloc-fuel-shortcut-text {
+#bloc-fuel-shortcut-button .bloc-fuel-shortcut-glyph {
     display: inline-flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1px;
     width: 66px;
     height: 66px;
     border-radius: 16px;
     background: #f2f8ff;
     border: 3px solid var(--primary-color);
     color: var(--primary-color);
-    font-size: 17px;
-    font-weight: 1000;
-    letter-spacing: 0;
+    font-size: 22px;
+    font-weight: 900;
     line-height: 1;
+    letter-spacing: -1px;
 }
 
 .leaflet-tooltip.route-tooltip.route-tooltip-near-icon {
     margin: 0 !important;
 }
 
+.previ-details-group {
+    padding-top: 10px;
+}
+
+.previ-details-group .analyse-col-title {
+    margin-bottom: 8px;
+}
+
+.previ-details-group .result-line {
+    margin-bottom: 16px;
+}
+
+.previ-details-group .result-line:last-child {
+    margin-bottom: 4px;
+}
+
+.previ-details-group .result-line .value {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
 @media (max-width: 760px) {
-    #bloc-fuel-shortcut-button .bloc-fuel-shortcut-text {
+    #bloc-fuel-shortcut-button .bloc-fuel-shortcut-glyph {
         width: 48px;
         height: 48px;
         border-radius: 12px;
         border-width: 2px;
-        font-size: 13px;
+        font-size: 16px;
+        letter-spacing: -1px;
     }
 }
 
