@@ -55,6 +55,7 @@ const FIRE_HISTORY_MAX_ITEMS = 20;
 const FORCE_DISPLAY_MODE = new URLSearchParams(window.location.search).get('force_display') === '1';
 const SHOW_DEPARTMENTS_LAYER_KEY = 'showDepartmentsLayer';
 const SHOW_COMMUNES_LAYER_KEY = 'showCommunesLayer';
+const LAST_GPS_POSITION_KEY = 'lastGpsPositionV1';
 const COMMUNES_DISPLAY_MIN_ZOOM = 10.5;
 const ONLINE_MAX_NATIVE_ZOOM = 18;
 const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
@@ -91,11 +92,11 @@ const CHAT_PUSH_VAPID_PUBLIC_KEY = 'BAB6UkrM0OzfJPCKYux_BdLfQJbMo7qKoXPhIoTB99J9
 let mqttLoaderPromise = null;
 
 const pelicanAirports = [
-    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }
+    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }, { oaci: "LFSJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }
 ];
 
 const otherAirports = [
-    { oaci: "LFBC", name: "Cazaux", lat: 44.534, lon: -1.155 }, { oaci: "LFBH", name: "La Rochelle-Île de Ré", lat: 46.179, lon: -1.195 }, { oaci: "LFBF", name: "Toulouse-Francazal", lat: 43.546, lon: 1.365 }, { oaci: "LFBG", name: "Cognac-Châteaubernard", lat: 45.660, lon: -0.354 }, { oaci: "LFBI", name: "Poitiers-Biard", lat: 46.587, lon: 0.309 }, { oaci: "LFBK", name: "Saint-Brieuc-Armor", lat: 48.538, lon: -2.852 }, { oaci: "LFBO", name: "Toulouse-Blagnac", lat: 43.635, lon: 1.363 }, { oaci: "LFBS", name: "Chambéry-Savoie", lat: 45.640, lon: 5.881 }, { oaci: "LFBT", name: "Tarbes-Lourdes-Pyrénées", lat: 43.185, lon: -0.003 }, { oaci: "LFBU", name: "Angoulême-Cognac", lat: 45.729, lon: 0.220 }, { oaci: "LFBV", name: "Brive-Souillac", lat: 45.040, lon: 1.484 }, { oaci: "LFCU", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFLA", name: "Auxerre-Branches", lat: 47.848, lon: 3.497 }, { oaci: "LFLC", name: "Clermont-Ferrand-Auvergne", lat: 45.786, lon: 3.169 }, { oaci: "LFLD", name: "Bourges", lat: 47.059, lon: 2.370 }, { oaci: "LFLL", name: "Lyon-Saint Exupéry", lat: 45.725, lon: 5.081 }, { oaci: "LFLN", name: "Saint-Yan", lat: 46.409, lon: 4.013 }, { oaci: "LFLS", name: "Grenoble-Isère", lat: 45.363, lon: 5.331 }, { oaci: "LFLV", name: "Vichy-Charmeil", lat: 46.167, lon: 3.403 }, { oaci: "LFLW", name: "Aurillac", lat: 44.887, lon: 2.418 }, { oaci: "LFLY", name: "Lyon-Bron", lat: 45.729, lon: 4.945 }, { oaci: "LFLZ", name: "Le Puy-Loudes", lat: 45.079, lon: 3.762 }, { oaci: "LFMC", name: "Le Luc-Le Cannet", lat: 43.385, lon: 6.368 }, { oaci: "LFMI", name: "Istres-Le Tubé", lat: 43.524, lon: 4.944 }, { oaci: "LFMN", name: "Nice-Côte d'Azur", lat: 43.665, lon: 7.215 }, { oaci: "LFMQ", name: "Le Castellet", lat: 43.253, lon: 5.786 }, { oaci: "LFMV", name: "Avignon-Provence", lat: 43.906, lon: 4.902 }, { oaci: "LFMY", name: "Salon-de-Provence", lat: 43.606, lon: 5.110 }, { oaci: "LFOA", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFOB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFOC", name: "Châteaudun", lat: 48.058, lon: 1.378 }, { oaci: "LFOE", name: "Évreux-Fauville", lat: 49.028, lon: 1.218 }, { oaci: "LFOK", name: "Châlons-Vatry", lat: 48.776, lon: 4.185 }, { oaci: "LFOJ", name: "Orléans-Bricy", lat: 47.989, lon: 1.758 }, { oaci: "LFOP", name: "Rouen-Vallée de Seine", lat: 49.385, lon: 1.182 }, { oaci: "LFOQ", name: "Blois-Le Breuil", lat: 47.678, lon: 1.217 }, { oaci: "LFOR", name: "Chartres-Métropole", lat: 48.455, lon: 1.530 }, { oaci: "LFOT", name: "Tours-Val de Loire", lat: 47.432, lon: 0.722 }, { oaci: "LFOU", name: "Cholet-Le Pontreau", lat: 47.081, lon: -0.871 }, { oaci: "LFOV", name: "Laval-Entrammes", lat: 48.033, lon: -0.749 }, { oaci: "LFPB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFPC", name: "Creil", lat: 49.253, lon: 2.520 }, { oaci: "LFPG", name: "Paris-Charles-de-Gaulle", lat: 49.009, lon: 2.547 }, { oaci: "LFPO", name: "Paris-Orly", lat: 48.723, lon: 2.379 }, { oaci: "LFPV", name: "Villacoublay-Vélizy", lat: 48.773, lon: 2.203 }, { oaci: "LFRB", name: "Brest-Bretagne", lat: 48.447, lon: -4.418 }, { oaci: "LFRC", name: "Cherbourg-Manche", lat: 49.650, lon: -1.478 }, { oaci: "LFRD", name: "Dinard-Pleurtuit-Saint-Malo", lat: 48.587, lon: -2.080 }, { oaci: "LFRE", name: "La Baule-Escoublac", lat: 47.289, lon: -2.348 }, { oaci: "LFRF", name: "Granville-Mont-Saint-Michel", lat: 48.887, lon: -1.564 }, { oaci: "LFRG", name: "Deauville-Normandie", lat: 49.365, lon: 0.154 }, { oaci: "LFRH", name: "Lorient-Bretagne-Sud", lat: 47.760, lon: -3.440 }, { oaci: "LFRI", name: "La Roche-sur-Yon-Les Ajoncs", lat: 46.702, lon: -1.381 }, { oaci: "LFRJ", name: "Landivisiau", lat: 48.527, lon: -4.156 }, { oaci: "LFRK", name: "Caen-Carpiquet", lat: 49.173, lon: -0.450 }, { oaci: "LFRL", name: "Lanvéoc-Poulmic", lat: 48.278, lon: -4.437 }, { oaci: "LFRM", name: "Le Mans-Arnage", lat: 47.949, lon: 0.203 }, { oaci: "LFRN", name: "Rennes-Saint-Jacques", lat: 48.070, lon: -1.732 }, { oaci: "LFRO", name: "Lannion-Côte de Granit Rose", lat: 48.755, lon: -3.472 }, { oaci: "LFRQ", name: "Quimper-Pluguffan", lat: 47.975, lon: -4.167 }, { oaci: "LFRS", name: "Nantes-Atlantique", lat: 47.153, lon: -1.607 }, { oaci: "LFRT", name: "Saint-Nazaire-Montoir", lat: 47.312, lon: -2.152 }, { oaci: "LFRU", name: "Morlaix-Ploujean", lat: 48.604, lon: -3.818 }, { oaci: "LFSD", name: "Dijon-Longvic", lat: 47.268, lon: 5.088 }, { oaci: "LFSF", name: "Metz-Nancy-Lorraine", lat: 48.981, lon: 6.251 }, { oaci: "LFSH", name: "Haguenau", lat: 48.790, lon: 7.820 }, { oaci: "LFSJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }, { oaci: "LFSK", name: "Colmar-Houssen", lat: 48.110, lon: 7.359 }, { oaci: "LFSO", name: "Nancy-Ochey", lat: 48.577, lon: 5.955 }, { oaci: "LFSQ", name: "Luxeuil-Saint-Sauveur", lat: 47.779, lon: 6.353 }, { oaci: "LFSR", name: "Reims-Prunay", lat: 49.207, lon: 4.148 }, { oaci: "LFST", name: "Strasbourg-Entzheim", lat: 48.542, lon: 7.628 }, { oaci: "LFSX", name: "Montbéliard-Courcelles", lat: 47.487, lon: 6.852 }, { oaci: "LFYR", name: "Romorantin-Pruniers", lat: 47.352, lon: 1.670 }, { oaci: "LFYD", name: "Dinard", lat: 48.587, lon: -2.080 }, { oaci: "LFXI", name: "Reims-Champagne", lat: 49.308, lon: 4.045 }, { oaci: "LFYL", name: "Lille-Lesquin", lat: 50.563, lon: 3.086 }, { oaci: "LFXM", name: "Melun-Villaroche", lat: 48.608, lon: 2.671 }, { oaci: "LFXO", name: "Beauvais-Tillé", lat: 49.454, lon: 2.112 }, { oaci: "LFXQ", name: "Saint-Omer-Wizernes", lat: 50.725, lon: 2.220 }, { oaci: "LFKS", name: "Solenzara", lat: 41.924, lon: 9.405 },
+    { oaci: "LFBC", name: "Cazaux", lat: 44.534, lon: -1.155 }, { oaci: "LFBH", name: "La Rochelle-Île de Ré", lat: 46.179, lon: -1.195 }, { oaci: "LFBF", name: "Toulouse-Francazal", lat: 43.546, lon: 1.365 }, { oaci: "LFBG", name: "Cognac-Châteaubernard", lat: 45.660, lon: -0.354 }, { oaci: "LFBI", name: "Poitiers-Biard", lat: 46.587, lon: 0.309 }, { oaci: "LFBK", name: "Saint-Brieuc-Armor", lat: 48.538, lon: -2.852 }, { oaci: "LFBO", name: "Toulouse-Blagnac", lat: 43.635, lon: 1.363 }, { oaci: "LFBS", name: "Chambéry-Savoie", lat: 45.640, lon: 5.881 }, { oaci: "LFBT", name: "Tarbes-Lourdes-Pyrénées", lat: 43.185, lon: -0.003 }, { oaci: "LFBU", name: "Angoulême-Cognac", lat: 45.729, lon: 0.220 }, { oaci: "LFBV", name: "Brive-Souillac", lat: 45.040, lon: 1.484 }, { oaci: "LFCU", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFLA", name: "Auxerre-Branches", lat: 47.848, lon: 3.497 }, { oaci: "LFLC", name: "Clermont-Ferrand-Auvergne", lat: 45.786, lon: 3.169 }, { oaci: "LFLD", name: "Bourges", lat: 47.059, lon: 2.370 }, { oaci: "LFLL", name: "Lyon-Saint Exupéry", lat: 45.725, lon: 5.081 }, { oaci: "LFLN", name: "Saint-Yan", lat: 46.409, lon: 4.013 }, { oaci: "LFLS", name: "Grenoble-Isère", lat: 45.363, lon: 5.331 }, { oaci: "LFLV", name: "Vichy-Charmeil", lat: 46.167, lon: 3.403 }, { oaci: "LFLW", name: "Aurillac", lat: 44.887, lon: 2.418 }, { oaci: "LFLY", name: "Lyon-Bron", lat: 45.729, lon: 4.945 }, { oaci: "LFLZ", name: "Le Puy-Loudes", lat: 45.079, lon: 3.762 }, { oaci: "LFMC", name: "Le Luc-Le Cannet", lat: 43.385, lon: 6.368 }, { oaci: "LFMI", name: "Istres-Le Tubé", lat: 43.524, lon: 4.944 }, { oaci: "LFMN", name: "Nice-Côte d'Azur", lat: 43.665, lon: 7.215 }, { oaci: "LFMQ", name: "Le Castellet", lat: 43.253, lon: 5.786 }, { oaci: "LFMV", name: "Avignon-Provence", lat: 43.906, lon: 4.902 }, { oaci: "LFMY", name: "Salon-de-Provence", lat: 43.606, lon: 5.110 }, { oaci: "LFOA", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFOB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFOC", name: "Châteaudun", lat: 48.058, lon: 1.378 }, { oaci: "LFOE", name: "Évreux-Fauville", lat: 49.028, lon: 1.218 }, { oaci: "LFOK", name: "Châlons-Vatry", lat: 48.776, lon: 4.185 }, { oaci: "LFOJ", name: "Orléans-Bricy", lat: 47.989, lon: 1.758 }, { oaci: "LFOP", name: "Rouen-Vallée de Seine", lat: 49.385, lon: 1.182 }, { oaci: "LFOQ", name: "Blois-Le Breuil", lat: 47.678, lon: 1.217 }, { oaci: "LFOR", name: "Chartres-Métropole", lat: 48.455, lon: 1.530 }, { oaci: "LFOT", name: "Tours-Val de Loire", lat: 47.432, lon: 0.722 }, { oaci: "LFOU", name: "Cholet-Le Pontreau", lat: 47.081, lon: -0.871 }, { oaci: "LFOV", name: "Laval-Entrammes", lat: 48.033, lon: -0.749 }, { oaci: "LFPB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFPC", name: "Creil", lat: 49.253, lon: 2.520 }, { oaci: "LFPG", name: "Paris-Charles-de-Gaulle", lat: 49.009, lon: 2.547 }, { oaci: "LFPO", name: "Paris-Orly", lat: 48.723, lon: 2.379 }, { oaci: "LFPV", name: "Villacoublay-Vélizy", lat: 48.773, lon: 2.203 }, { oaci: "LFRB", name: "Brest-Bretagne", lat: 48.447, lon: -4.418 }, { oaci: "LFRC", name: "Cherbourg-Manche", lat: 49.650, lon: -1.478 }, { oaci: "LFRD", name: "Dinard-Pleurtuit-Saint-Malo", lat: 48.587, lon: -2.080 }, { oaci: "LFRE", name: "La Baule-Escoublac", lat: 47.289, lon: -2.348 }, { oaci: "LFRF", name: "Granville-Mont-Saint-Michel", lat: 48.887, lon: -1.564 }, { oaci: "LFRG", name: "Deauville-Normandie", lat: 49.365, lon: 0.154 }, { oaci: "LFRH", name: "Lorient-Bretagne-Sud", lat: 47.760, lon: -3.440 }, { oaci: "LFRI", name: "La Roche-sur-Yon-Les Ajoncs", lat: 46.702, lon: -1.381 }, { oaci: "LFRJ", name: "Landivisiau", lat: 48.527, lon: -4.156 }, { oaci: "LFRK", name: "Caen-Carpiquet", lat: 49.173, lon: -0.450 }, { oaci: "LFRL", name: "Lanvéoc-Poulmic", lat: 48.278, lon: -4.437 }, { oaci: "LFRM", name: "Le Mans-Arnage", lat: 47.949, lon: 0.203 }, { oaci: "LFRN", name: "Rennes-Saint-Jacques", lat: 48.070, lon: -1.732 }, { oaci: "LFRO", name: "Lannion-Côte de Granit Rose", lat: 48.755, lon: -3.472 }, { oaci: "LFRQ", name: "Quimper-Pluguffan", lat: 47.975, lon: -4.167 }, { oaci: "LFRS", name: "Nantes-Atlantique", lat: 47.153, lon: -1.607 }, { oaci: "LFRT", name: "Saint-Nazaire-Montoir", lat: 47.312, lon: -2.152 }, { oaci: "LFRU", name: "Morlaix-Ploujean", lat: 48.604, lon: -3.818 }, { oaci: "LFSD", name: "Dijon-Longvic", lat: 47.268, lon: 5.088 }, { oaci: "LFSF", name: "Metz-Nancy-Lorraine", lat: 48.981, lon: 6.251 }, { oaci: "LFSH", name: "Haguenau", lat: 48.790, lon: 7.820 }, { oaci: "LFSK", name: "Colmar-Houssen", lat: 48.110, lon: 7.359 }, { oaci: "LFSO", name: "Nancy-Ochey", lat: 48.577, lon: 5.955 }, { oaci: "LFSQ", name: "Luxeuil-Saint-Sauveur", lat: 47.779, lon: 6.353 }, { oaci: "LFSR", name: "Reims-Prunay", lat: 49.207, lon: 4.148 }, { oaci: "LFST", name: "Strasbourg-Entzheim", lat: 48.542, lon: 7.628 }, { oaci: "LFSX", name: "Montbéliard-Courcelles", lat: 47.487, lon: 6.852 }, { oaci: "LFYR", name: "Romorantin-Pruniers", lat: 47.352, lon: 1.670 }, { oaci: "LFYD", name: "Dinard", lat: 48.587, lon: -2.080 }, { oaci: "LFXI", name: "Reims-Champagne", lat: 49.308, lon: 4.045 }, { oaci: "LFYL", name: "Lille-Lesquin", lat: 50.563, lon: 3.086 }, { oaci: "LFXM", name: "Melun-Villaroche", lat: 48.608, lon: 2.671 }, { oaci: "LFXO", name: "Beauvais-Tillé", lat: 49.454, lon: 2.112 }, { oaci: "LFXQ", name: "Saint-Omer-Wizernes", lat: 50.725, lon: 2.220 }, { oaci: "LFKS", name: "Solenzara", lat: 41.924, lon: 9.405 },
 
     // Terrains ajoutés depuis le PDF "piste revêtue > 1500 m"
     { oaci: "LFBA", name: "Agen-La Garenne", lat: 44.1747, lon: 0.5906 },
@@ -211,6 +212,59 @@ async function refreshOfflineTilesRendering() {
         setupBaseTileLayer();
     }
 }
+
+
+function formatCommuneDepartment(commune) {
+    if (!commune || typeof commune !== 'object') return '';
+    const depCode = commune.dep_code ? String(commune.dep_code).trim() : '';
+    const depName = commune.dep_nom ? String(commune.dep_nom).trim() : '';
+
+    if (depCode && depName) return `${depCode} - ${depName}`;
+    if (depCode) return depCode;
+    if (depName) return depName;
+    return '';
+}
+
+function getCommuneFromDatabaseByNameAndDepartment(commune) {
+    if (!commune || !Array.isArray(allCommunes) || !allCommunes.length) return null;
+
+    const targetName = simplifyString(commune.nom_standard || commune.name || '');
+    if (!targetName) return null;
+
+    const targetDep = commune.dep_code ? String(commune.dep_code).trim().toUpperCase() : '';
+    const sameName = allCommunes.filter(item => simplifyString(item.nom_standard || item.name || '') === targetName);
+
+    if (!sameName.length) return null;
+    if (targetDep) {
+        const sameDep = sameName.find(item => String(item.dep_code || '').trim().toUpperCase() === targetDep);
+        if (sameDep) return sameDep;
+    }
+
+    return sameName[0];
+}
+
+function buildManualFireCommuneFromPoint(lat, lon) {
+    /*
+     * v11.61 — feu manuel :
+     * on privilégie la base communes par centre/nom de commune plutôt que
+     * le polygone sous le pointeur. Cela évite les incohérences aux limites
+     * départementales, par exemple Marseillargues (34) proche du 30.
+     */
+    const nearestFromDatabase = findClosestCommune(lat, lon, 27);
+    const containedFromMap = findCommuneContainingPoint(lat, lon);
+    const referenceCommune = nearestFromDatabase || containedFromMap || null;
+    const databaseCommune = getCommuneFromDatabaseByNameAndDepartment(referenceCommune) || referenceCommune;
+
+    return {
+        nom_standard: databaseCommune?.nom_standard || 'Feu manuel',
+        dep_code: databaseCommune?.dep_code || null,
+        dep_nom: databaseCommune?.dep_nom || null,
+        latitude_mairie: lat,
+        longitude_mairie: lon,
+        isManual: true
+    };
+}
+
 
 function normalizeHistoryCommune(commune) {
     if (!commune || typeof commune !== 'object') return null;
@@ -605,10 +659,12 @@ async function initializeApp() {
     setTimeout(() => {
         updateBaseTileNativeZoomFromAvailability({ forceScan: true }).catch(() => {});
     }, 0);
+    setupGpsResumeHandlers();
+    primeGpsFromStoredPosition();
     if (localStorage.getItem('liveGpsActive') === 'true') {
-        toggleLiveGps();
+        restartLiveGpsWatch({ silent: true });
     } else {
-        navigator.geolocation.getCurrentPosition(updateUserPosition, () => {}, { enableHighAccuracy: true });
+        requestOneShotGps({ silent: true, highAccuracy: true, timeout: 30000, maximumAge: 600000 });
     }
     const savedCommuneJSON = localStorage.getItem('currentCommune');
     if (savedCommuneJSON) {
@@ -753,16 +809,7 @@ function initMap() {
         if (isDrawingMode) return;
         selectedPelicanOACI = null;
         L.DomEvent.preventDefault(e.originalEvent);
-        const closestCommune = findCommuneContainingPoint(e.latlng.lat, e.latlng.lng) || findClosestCommune(e.latlng.lat, e.latlng.lng, 27);
-        const pointName = closestCommune?.nom_standard || 'Feu manuel';
-        const manualCommune = {
-            nom_standard: pointName,
-            dep_code: closestCommune?.dep_code || null,
-            dep_nom: closestCommune?.dep_nom || null,
-            latitude_mairie: e.latlng.lat,
-            longitude_mairie: e.latlng.lng,
-            isManual: true
-        };
+        const manualCommune = buildManualFireCommuneFromPoint(e.latlng.lat, e.latlng.lng);
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
         displayCommuneDetails(manualCommune, false);
@@ -1362,12 +1409,15 @@ function updateCommuneDisplay(commune) {
         communeDisplay.style.display = 'none';
         return;
     }
+
+    const dbCommune = getCommuneFromDatabaseByNameAndDepartment(commune);
     const fallbackClosest = (!commune.dep_code && commune.latitude_mairie != null && commune.longitude_mairie != null)
         ? findClosestCommune(commune.latitude_mairie, commune.longitude_mairie, 27)
         : null;
-    const depCodeValue = commune.dep_code || fallbackClosest?.dep_code || '';
-    const depCode = depCodeValue ? ` (${depCodeValue})` : '';
-    const communeNameHTML = `<span class="commune-name">${commune.nom_standard}${depCode}</span>`;
+    const displayCommune = dbCommune || fallbackClosest || commune;
+    const depLabel = formatCommuneDepartment(displayCommune);
+    const depCode = depLabel ? ` (${depLabel})` : '';
+    const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1383,7 +1433,7 @@ function updateCommuneDisplay(commune) {
     }
     communeDisplay.innerHTML = communeNameHTML + sunsetHTML;
     updateCommuneGpsRouteDisplay();
-    
+
     // On attache l'événement de clic au nouveau bouton
     const clearCommuneBtn = document.getElementById('clear-commune-btn');
     if (clearCommuneBtn) {
@@ -2498,6 +2548,113 @@ window.setBaseAirport = oaci => {
     if (map) map.closePopup();
 };
 
+
+function getStoredGpsPosition() {
+    try {
+        const raw = localStorage.getItem(LAST_GPS_POSITION_KEY);
+        const parsed = JSON.parse(raw || 'null');
+        if (!parsed) return null;
+        const lat = Number(parsed.lat);
+        const lng = Number(parsed.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng, timestamp: Number(parsed.timestamp) || 0 };
+    } catch (_) {
+        return null;
+    }
+}
+
+function saveStoredGpsPosition(lat, lng, timestamp = Date.now()) {
+    try {
+        localStorage.setItem(LAST_GPS_POSITION_KEY, JSON.stringify({ lat, lng, timestamp }));
+    } catch (_) {}
+}
+
+function primeGpsFromStoredPosition() {
+    if (userMarker || !map) return false;
+    const stored = getStoredGpsPosition();
+    if (!stored) return false;
+
+    const fakePosition = {
+        coords: {
+            latitude: stored.lat,
+            longitude: stored.lng,
+            altitude: null,
+            heading: null,
+            speed: null,
+            accuracy: null
+        },
+        timestamp: stored.timestamp || Date.now()
+    };
+
+    updateUserPosition(fakePosition);
+    return true;
+}
+
+function requestOneShotGps({ silent = true, highAccuracy = true, timeout = 30000, maximumAge = 600000 } = {}) {
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+        updateUserPosition,
+        (error) => {
+            console.warn('GPS ponctuel indisponible:', error);
+            primeGpsFromStoredPosition();
+            if (!silent) alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
+        },
+        { enableHighAccuracy: highAccuracy, timeout, maximumAge }
+    );
+}
+
+function restartLiveGpsWatch({ silent = true } = {}) {
+    if (!navigator.geolocation) {
+        if (!silent) alert("La géolocalisation n'est pas supportée.");
+        return;
+    }
+
+    const liveGpsButton = document.getElementById('live-gps-button');
+
+    if (watchId) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+
+    primeGpsFromStoredPosition();
+
+    watchId = navigator.geolocation.watchPosition(
+        updateUserPosition,
+        (error) => {
+            console.warn('Erreur de suivi GPS:', error);
+            primeGpsFromStoredPosition();
+
+            /*
+             * v11.61 — après longue période sans réseau, Safari/Android peut rendre
+             * une erreur temporaire. On ne coupe plus le mode GPS : on relance
+             * une demande ponctuelle puis le watchPosition continue dès que possible.
+             */
+            setTimeout(() => requestOneShotGps({ silent: true, timeout: 30000, maximumAge: 600000 }), 2000);
+        },
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 600000 }
+    );
+
+    if (liveGpsButton) liveGpsButton.classList.add('active');
+    localStorage.setItem('liveGpsActive', 'true');
+}
+
+function setupGpsResumeHandlers() {
+    const resumeGps = () => {
+        if (localStorage.getItem('liveGpsActive') === 'true') {
+            restartLiveGpsWatch({ silent: true });
+        } else {
+            requestOneShotGps({ silent: true, highAccuracy: true, timeout: 30000, maximumAge: 600000 });
+        }
+    };
+
+    window.addEventListener('online', resumeGps);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) resumeGps();
+    });
+}
+
+
 function centerMapOnCurrentPosition() {
     if (!map) return;
 
@@ -2528,7 +2685,7 @@ function centerMapOnCurrentPosition() {
             }
             alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 600000 }
     );
 }
 
@@ -2537,17 +2694,10 @@ function toggleLiveGps() {
     if (watchId) {
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
-        liveGpsButton.classList.remove('active');
+        if (liveGpsButton) liveGpsButton.classList.remove('active');
         localStorage.setItem('liveGpsActive', 'false');
     } else {
-        if (!navigator.geolocation) { alert("La géolocalisation n'est pas supportée."); return; }
-        watchId = navigator.geolocation.watchPosition(
-            updateUserPosition, 
-            (error) => { console.error("Erreur de suivi GPS:", error); alert("Impossible d'activer le suivi GPS. Vérifiez les autorisations."); if (watchId) toggleLiveGps(); }, 
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-        liveGpsButton.classList.add('active');
-        localStorage.setItem('liveGpsActive', 'true');
+        restartLiveGpsWatch({ silent: false });
     }
 }
 
@@ -2569,10 +2719,15 @@ function updateNearestCommuneDisplay(lat, lon) {
     const nearestDisplay = document.getElementById('nearest-commune-display');
     if (!nearestDisplay) return;
 
+    const buildLabel = (commune, prefix = 'Commune') => {
+        const depLabel = formatCommuneDepartment(commune);
+        return `📍 ${prefix}: <b>${commune.nom_standard}${depLabel ? ` (${depLabel})` : ''}</b>`;
+    };
+
     const containedCommune = findCommuneContainingPoint(lat, lon);
     if (containedCommune) {
         nearestDisplay.style.display = 'block';
-        nearestDisplay.innerHTML = `📍 Commune: <b>${containedCommune.nom_standard}${containedCommune.dep_code ? ` (${containedCommune.dep_code})` : ''}</b>`;
+        nearestDisplay.innerHTML = buildLabel(containedCommune, 'Commune');
         return;
     }
 
@@ -2592,7 +2747,7 @@ function updateNearestCommuneDisplay(lat, lon) {
                 const display = document.getElementById('nearest-commune-display');
                 if (!display) return;
                 display.style.display = 'block';
-                display.innerHTML = `📍 Commune: <b>${preciseCommune.nom_standard}${preciseCommune.dep_code ? ` (${preciseCommune.dep_code})` : ''}</b>`;
+                display.innerHTML = buildLabel(preciseCommune, 'Commune');
             })
             .catch((error) => {
                 console.warn('Chargement du calque communes pour identification impossible:', error);
@@ -2607,7 +2762,7 @@ function updateNearestCommuneDisplay(lat, lon) {
     }
 
     nearestDisplay.style.display = 'block';
-    nearestDisplay.innerHTML = `📍 Plus proche: <b>${simplifyCommuneDisplayName(nearestCommune.nom_standard)} (${nearestCommune.dep_code})</b>`;
+    nearestDisplay.innerHTML = buildLabel(nearestCommune, 'Plus proche');
 }
 
 function findClosestCommune(lat, lon, maxDistanceNm = null) {
@@ -2801,6 +2956,7 @@ function updateUserPosition(pos) {
     const motionSpeed = Number.isFinite(rawSpeed) ? rawSpeed : estimatedMotion.speed;
     updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
     lastPosition = { lat: latitude, lng: longitude };
+    saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
 
     if (!userMarker) {
         const userIcon = buildOwnGpsIcon(ownAltitudeLabel);
