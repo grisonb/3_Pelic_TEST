@@ -3160,3 +3160,44 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.64 — affichage département et BINGO */
+#bingo-map-display .bingo-oaci {
+    font-size: 1.18em;
+    font-weight: 1000;
+    letter-spacing: 0.3px;
+    color: var(--secondary-color);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.bingo-group .result-line {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+}
+
+.bingo-group .result-line .label,
+.bingo-group .result-line .base-bingo-label {
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    line-height: 1.1;
+    text-align: center;
+}
+
+.bingo-group .result-line .value {
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    min-height: 54px;
+}
+
+/* Les bandeaux type "LFTW / 68 Nm / 1040 kg" reprennent la taille du BINGO PELIC. */
+#previ-bingo-base,
+#previ-bingo-pelic,
+#suivi-bingo-base,
+#suivi-bingo-pelic,
+#derout-bingo-base,
+#derout-bingo-pelic,
+.base-bingo-label + .value,
+.bingo-group .value {
+    font-size: 24px !important;
+}
+
