@@ -5439,6 +5439,7 @@ function initializeCalculator() {
 
         const mainWrapper = document.getElementById(mainId);
         const mirrorWrapper = getSharedHeaderMirrorWrapper(mainId);
+        if (!mainWrapper || !mirrorWrapper) return;
 
         isSharedHeaderSyncing = true;
         try {
