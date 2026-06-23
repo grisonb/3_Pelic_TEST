@@ -970,6 +970,7 @@ function setupEventListeners() {
     const toggleSearchButton = document.getElementById('toggle-search-button');
     const mainActionButtons = document.getElementById('main-action-buttons');
     const calculatorButton = document.getElementById('calculator-button');
+    const blocFuelShortcutButton = document.getElementById('bloc-fuel-shortcut-button');
     const calculatorModal = document.getElementById('calculator-modal');
     const closeCalculatorButton = document.getElementById('close-calculator-btn');
     const departmentsLayerButton = document.getElementById('departments-layer-button');
@@ -1193,6 +1194,15 @@ function setupEventListeners() {
     });
 
     calculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'flex'; });
+    if (blocFuelShortcutButton) {
+        blocFuelShortcutButton.addEventListener('click', () => {
+            calculatorModal.style.display = 'flex';
+            const blocFuelTab = calculatorModal.querySelector('.onglet-bouton[data-onglet="bloc-fuel"]');
+            if (blocFuelTab) {
+                blocFuelTab.click();
+            }
+        });
+    }
     closeCalculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'none'; });
     calculatorModal.addEventListener('click', (e) => { if (e.target === calculatorModal) { calculatorModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && calculatorModal.style.display === 'flex') { calculatorModal.style.display = 'none'; } });
