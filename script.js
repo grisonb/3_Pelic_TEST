@@ -463,7 +463,7 @@ function getRouteLabelNearAirportOptions(fireLatLng, airportLatLng, kind = 'defa
      */
     const fallback = {
         latLng: Array.isArray(airportLatLng) ? airportLatLng : [airportLatLng.lat, airportLatLng.lng],
-        offset: [0, 52],
+        offset: kind === 'pelic' ? [0, 78] : [0, 60],
         direction: 'center'
     };
 
@@ -486,15 +486,17 @@ function getRouteLabelNearAirportOptions(fireLatLng, airportLatLng, kind = 'defa
         return fallback;
     }
 
-    const distanceFromIcon = kind === 'base' ? 54 : 42;
+    const distanceFromIcon = kind === 'pelic' ? 78 : (kind === 'base' ? 64 : 62);
     let offsetX = Math.round((-dx / length) * distanceFromIcon);
     let offsetY = Math.round((-dy / length) * distanceFromIcon);
 
     /*
-     * Sécurité : évite que l'étiquette reste collée à l'icône sur les axes quasi purs.
+     * v11.70 — sécurité anti-recouvrement :
+     * les étiquettes pélicandromes sont volontairement décollées de l'icône.
      */
-    if (Math.abs(offsetX) < 12) offsetX = offsetX < 0 ? -12 : 12;
-    if (Math.abs(offsetY) < 12) offsetY = offsetY < 0 ? -12 : 12;
+    const minAxisOffset = kind === 'pelic' ? 30 : 18;
+    if (Math.abs(offsetX) < minAxisOffset) offsetX = offsetX < 0 ? -minAxisOffset : minAxisOffset;
+    if (Math.abs(offsetY) < minAxisOffset) offsetY = offsetY < 0 ? -minAxisOffset : minAxisOffset;
 
     return {
         latLng: airportLatLng,
