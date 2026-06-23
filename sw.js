@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-74-blocfuel-icon-full-button';
+const SW_VERSION = 'sw-v11-75-icons-fms-search-center';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -24,7 +24,10 @@ const APP_SHELL_URLS = [
 ,
     './icons/apple-touch-icon.png',
     './icons/maskable-icon-512x512.png',
-    './icons/bloc-fuel-shortcut-icon.png'];
+    './icons/bloc-fuel-shortcut-icon.png'    , './icons/calculator-fms-icon.png'
+    , './icons/search-commune-icon.png'
+    , './icons/center-gps-icon.png'
+];
 
 
 /*
