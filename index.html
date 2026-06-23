@@ -6,17 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
-    <link rel="stylesheet" href="style.css?appv=v11.71-bloc-fuel-icon-pelic-label-no-cover">
-    <link rel="manifest" href="manifest.json?appv=v11.71-bloc-fuel-icon-pelic-label-no-cover">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.71-bloc-fuel-icon-pelic-label-no-cover">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.71-bloc-fuel-icon-pelic-label-no-cover">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.71-bloc-fuel-icon-pelic-label-no-cover">
+    <link rel="stylesheet" href="style.css?appv=v11.72-previ_blue_blocfuel_icon">
+    <link rel="manifest" href="manifest.json?appv=v11.72-previ_blue_blocfuel_icon">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.72-previ_blue_blocfuel_icon">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.72-previ_blue_blocfuel_icon">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.72-previ_blue_blocfuel_icon">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="NPF-Q400-TEST">
     <script>
-        const APP_VERSION = 'v11.71';
+        const APP_VERSION = 'v11.72';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -83,7 +83,7 @@
     <div id="main-action-buttons">
         <button id="toggle-search-button" title="Rechercher une commune">🏙️</button>
         <button id="calculator-button" title="Ouvrir le calculateur de mission" aria-label="Calculateur"><span class="calculator-fun-icon" aria-hidden="true"></span></button>
-        <button id="bloc-fuel-shortcut-button" title="Ouvrir directement BLOC / FUEL" aria-label="BLOC / FUEL"><span class="bloc-fuel-shortcut-text"><span>BLOC</span><span>FUEL</span></span></button>
+        <button id="bloc-fuel-shortcut-button" title="Ouvrir directement BLOC / FUEL" aria-label="BLOC / FUEL"><span class="bloc-fuel-shortcut-glyph" aria-hidden="true">⏱️⛽</span></button>
         <button id="gps-feu-button" title="Créer un feu à ma position">🎯</button>
         <button id="center-gps-button" title="Recentrer la carte sur ma position GPS">📍</button>
         <button id="chat-toggle-button" title="Ouvrir/Fermer le chat équipe">💬<span id="chat-alert-badge" style="display:none;">0</span><span id="chat-offline-badge" aria-hidden="true">✕</span></button>
@@ -167,7 +167,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v11.71-bloc-fuel-icon-pelic-label-no-cover"></script>
+    <script src="script.js?appv=v11.72-previ_blue_blocfuel_icon"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -229,15 +229,18 @@
                         </div>
                         <div class="analyse-col">
                             <span id="previ-bingo-pelic" class="previ-hidden-bingo-value">-- kg</span>
-                            <div class="result-line"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
-                            <div class="result-line"><span class="label">Durée transit :<span id="duree-transit-help" class="formula-help-icon">?</span></span><span class="value" id="duree-transit">--:--</span></div>
-                            <div class="result-line"><span class="label">Conso. transit :<span id="conso-aller-feu-help" class="formula-help-icon">?</span></span><span class="value" id="conso-aller-feu">-- kg</span></div>
-                            <div class="result-line"><span class="label">Fuel sur Feu :<span id="fuel-sur-feu-help" class="formula-help-icon">?</span></span><div style="display: flex; align-items: center;"><div id="fuel-sur-feu-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="fuel-sur-feu-manual-btn">AUTO</button></div></div>
-                            <div class="result-line"><span class="label">Durée Rotation :<span id="duree-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="duree-rotation">--:--</span></div>
-                            <div class="result-line"><span class="label">Conso. Rotation :<span id="conso-par-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="conso-par-rotation">-- kg</span></div>
-                            <div class="result-line"><span class="label">CS sur feu :</span><span class="value" id="cs-sur-feu">--:--</span></div>
-                            <div class="result-line"><span class="label">TMD :</span><span class="value" id="tmd-display">--:--</span></div>
-                            <div class="result-line"><span class="label">HdV restant :</span><span class="value" id="hdv-restant-display">--:--</span></div>
+                            <div class="rotations-group previ-details-group">
+                                <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                <div class="result-line"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">Durée transit :<span id="duree-transit-help" class="formula-help-icon">?</span></span><span class="value" id="duree-transit">--:--</span></div>
+                                <div class="result-line"><span class="label">Conso. transit :<span id="conso-aller-feu-help" class="formula-help-icon">?</span></span><span class="value" id="conso-aller-feu">-- kg</span></div>
+                                <div class="result-line"><span class="label">Fuel sur Feu :<span id="fuel-sur-feu-help" class="formula-help-icon">?</span></span><div style="display: flex; align-items: center;"><div id="fuel-sur-feu-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="fuel-sur-feu-manual-btn">AUTO</button></div></div>
+                                <div class="result-line"><span class="label">Durée Rotation :<span id="duree-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="duree-rotation">--:--</span></div>
+                                <div class="result-line"><span class="label">Conso. Rotation :<span id="conso-par-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="conso-par-rotation">-- kg</span></div>
+                                <div class="result-line"><span class="label">CS sur feu :</span><span class="value" id="cs-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">TMD :</span><span class="value" id="tmd-display">--:--</span></div>
+                                <div class="result-line"><span class="label">HdV restant :</span><span class="value" id="hdv-restant-display">--:--</span></div>
+                            </div>
                         </div>
                     </div>
                 </div>
