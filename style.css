@@ -3478,3 +3478,65 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.75 — nouvelles icônes boutons carte : recherche, calculatrice/FMS, centrage GPS */
+#toggle-search-button,
+#calculator-button,
+#center-gps-button,
+#bloc-fuel-shortcut-button {
+    overflow: hidden !important;
+}
+
+#toggle-search-button .map-action-icon,
+#calculator-button .map-action-icon,
+#center-gps-button .map-action-icon {
+    width: 78px;
+    height: 78px;
+    object-fit: cover;
+    display: block;
+    border-radius: 18px;
+}
+
+#calculator-button .calculator-fms-icon {
+    width: 82px;
+    height: 82px;
+}
+
+#center-gps-button .center-gps-icon {
+    width: 78px;
+    height: 78px;
+}
+
+#toggle-search-button .search-commune-icon {
+    width: 82px;
+    height: 82px;
+}
+
+#bloc-fuel-shortcut-button .bloc-fuel-shortcut-img {
+    width: 88px !important;
+    height: 88px !important;
+    object-fit: cover !important;
+    border-radius: 18px !important;
+}
+
+@media (max-width: 760px) {
+    #toggle-search-button .map-action-icon,
+    #calculator-button .map-action-icon,
+    #center-gps-button .map-action-icon {
+        width: 54px;
+        height: 54px;
+        border-radius: 13px;
+    }
+
+    #calculator-button .calculator-fms-icon,
+    #toggle-search-button .search-commune-icon {
+        width: 58px;
+        height: 58px;
+    }
+
+    #bloc-fuel-shortcut-button .bloc-fuel-shortcut-img {
+        width: 62px !important;
+        height: 62px !important;
+        border-radius: 13px !important;
+    }
+}
+
