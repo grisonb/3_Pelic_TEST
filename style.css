@@ -3540,3 +3540,54 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+
+/* v11.76 — agrandir le dessin de l’icône GPS FEU */
+#gps-feu-button {
+    overflow: hidden !important;
+}
+
+#gps-feu-button .gps-feu-icon-glyph {
+    display: block;
+    font-size: 60px !important;
+    line-height: 1 !important;
+    transform: scale(1.08);
+    transform-origin: center center;
+}
+
+#gps-feu-button img {
+    width: 78px !important;
+    height: 78px !important;
+    max-width: 78px !important;
+    max-height: 78px !important;
+    object-fit: contain !important;
+    display: block !important;
+}
+
+@media (max-width: 1024px) {
+    #gps-feu-button .gps-feu-icon-glyph {
+        font-size: 48px !important;
+        transform: scale(1.08);
+    }
+
+    #gps-feu-button img {
+        width: 50px !important;
+        height: 50px !important;
+        max-width: 50px !important;
+        max-height: 50px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    #gps-feu-button .gps-feu-icon-glyph {
+        font-size: 44px !important;
+        transform: scale(1.08);
+    }
+
+    #gps-feu-button img {
+        width: 46px !important;
+        height: 46px !important;
+        max-width: 46px !important;
+        max-height: 46px !important;
+    }
+}
+
