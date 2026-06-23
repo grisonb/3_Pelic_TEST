@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-59-route-label-order-center';
+const SW_VERSION = 'sw-v11-60-help-formulas-rules';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
