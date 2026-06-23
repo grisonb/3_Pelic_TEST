@@ -2723,20 +2723,27 @@ function updateNearestCommuneDisplay(lat, lon) {
         if (!commune) return null;
 
         /*
-         * v11.62 — le polygone carte peut fournir seulement un nom, sans dep_code/dep_nom.
-         * Pour l'affichage bas droite, on ré-enrichit donc systématiquement depuis la base communes.
+         * v11.63 — affichage bas droite stable :
+         * au démarrage, le GPS peut d'abord utiliser la base communes,
+         * puis le calque polygone peut repasser dessus avec une donnée incomplète.
+         * On utilise donc la base communes comme référence pour le département.
          */
+        const nearestFromDatabase = findClosestCommune(lat, lon, 27);
         const databaseMatch = getCommuneFromDatabaseByNameAndDepartment(commune);
-        if (databaseMatch) return databaseMatch;
 
-        if ((!commune.dep_code || !commune.dep_nom) && Number.isFinite(Number(lat)) && Number.isFinite(Number(lon))) {
-            const nearestFromDatabase = findClosestCommune(lat, lon, 27);
-            if (nearestFromDatabase && simplifyString(nearestFromDatabase.nom_standard || '') === simplifyString(commune.nom_standard || commune.name || '')) {
-                return nearestFromDatabase;
-            }
+        const candidate = databaseMatch || commune;
+        const candidateHasFullDepartment = !!(candidate.dep_code && candidate.dep_nom);
+
+        if (!candidateHasFullDepartment && nearestFromDatabase) {
+            return {
+                ...candidate,
+                dep_code: candidate.dep_code || nearestFromDatabase.dep_code || null,
+                dep_nom: candidate.dep_nom || nearestFromDatabase.dep_nom || null,
+                nom_standard: candidate.nom_standard || nearestFromDatabase.nom_standard
+            };
         }
 
-        return commune;
+        return candidate;
     };
 
     const buildLabel = (commune, prefix = 'Commune') => {
@@ -2760,16 +2767,23 @@ function updateNearestCommuneDisplay(lat, lon) {
      */
     if (!hasLoadedCommunes) {
         nearestDisplay.style.display = 'block';
-        nearestDisplay.innerHTML = '📍 Commune: <b>chargement...</b>';
+
+        const nearestCommuneDuringLoad = findClosestCommune(lat, lon);
+        if (nearestCommuneDuringLoad) {
+            nearestDisplay.innerHTML = buildLabel(nearestCommuneDuringLoad, 'Commune');
+        } else {
+            nearestDisplay.innerHTML = '📍 Commune: <b>chargement...</b>';
+        }
 
         ensureCommunesLayerDataLoaded()
             .then(() => {
                 const preciseCommune = findCommuneContainingPoint(lat, lon);
-                if (!preciseCommune) return;
+                const communeToDisplay = preciseCommune || findClosestCommune(lat, lon);
+                if (!communeToDisplay) return;
                 const display = document.getElementById('nearest-commune-display');
                 if (!display) return;
                 display.style.display = 'block';
-                display.innerHTML = buildLabel(preciseCommune, 'Commune');
+                display.innerHTML = buildLabel(communeToDisplay, 'Commune');
             })
             .catch((error) => {
                 console.warn('Chargement du calque communes pour identification impossible:', error);
