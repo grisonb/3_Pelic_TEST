@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-63-nearest-dep-persistent';
+const SW_VERSION = 'sw-v11-64-bingo-oaci-tabs-depcode';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
