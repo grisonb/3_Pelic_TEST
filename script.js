@@ -217,12 +217,7 @@ async function refreshOfflineTilesRendering() {
 function formatCommuneDepartment(commune) {
     if (!commune || typeof commune !== 'object') return '';
     const depCode = commune.dep_code ? String(commune.dep_code).trim() : '';
-    const depName = commune.dep_nom ? String(commune.dep_nom).trim() : '';
-
-    if (depCode && depName) return `${depCode} - ${depName}`;
-    if (depCode) return depCode;
-    if (depName) return depName;
-    return '';
+    return depCode || '';
 }
 
 function getCommuneFromDatabaseByNameAndDepartment(commune) {
@@ -1482,10 +1477,10 @@ function updateMapBingoDisplay() {
     const lftwEl = document.getElementById('map-bingo-lftw');
     const pelicEl = document.getElementById('map-bingo-pelic');
 
-    lftwEl.innerHTML = `<span class="bingo-title">BINGO BASE ${selectedBaseOACI}:</span> <b>${bingoBase} kg</b>`;
+    lftwEl.innerHTML = `<span class="bingo-title">BINGO BASE <span class="bingo-oaci">${selectedBaseOACI}</span>:</span> <b>${bingoBase} kg</b>`;
 
     if (bingoPelic !== 700 && selectedPelicanOACI) {
-        pelicEl.innerHTML = `<span class="bingo-title">BINGO ${selectedPelicanOACI}:</span> <b>${bingoPelic} kg</b>`;
+        pelicEl.innerHTML = `<span class="bingo-title">BINGO <span class="bingo-oaci">${selectedPelicanOACI}</span>:</span> <b>${bingoPelic} kg</b>`;
         pelicEl.style.display = 'inline-block';
     } else {
         pelicEl.style.display = 'none';
