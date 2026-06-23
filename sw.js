@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-71-bloc-fuel-icon-pelic-label-no-cover';
+const SW_VERSION = 'sw-v11-72-previ-blue-blocfuel-icon';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
