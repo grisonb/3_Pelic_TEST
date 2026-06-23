@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-75-icons-fms-search-center';
+const SW_VERSION = 'sw-v11-76-gps-feu-bigger';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
