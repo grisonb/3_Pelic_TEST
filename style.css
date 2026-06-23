@@ -3201,3 +3201,51 @@ body.fuel-keyboard-open .fuel-split-hint {
     font-size: 24px !important;
 }
 
+/* v11.65 — correction visuelle BINGO
+   - OACI carte bien visibles
+   - bandeaux des onglets revenus à une taille compacte */
+#bingo-map-display .bingo-title {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+#bingo-map-display .bingo-oaci {
+    display: inline-block;
+    font-size: 1em !important;
+    font-weight: 1000 !important;
+    letter-spacing: 0;
+    color: var(--secondary-color);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    line-height: 1;
+    vertical-align: baseline;
+}
+
+.bingo-group .result-line {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+}
+
+.bingo-group .result-line .label,
+.bingo-group .result-line .base-bingo-label {
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    line-height: 1.15;
+    text-align: left;
+}
+
+.bingo-group .result-line .value,
+#previ-bingo-base,
+#previ-bingo-pelic,
+#suivi-bingo-base,
+#suivi-bingo-pelic,
+#derout-bingo-base,
+#derout-bingo-pelic {
+    font-size: 18px !important;
+    font-weight: 900 !important;
+    min-height: 45px;
+    padding: 8px 10px;
+    line-height: 1.15;
+}
+
