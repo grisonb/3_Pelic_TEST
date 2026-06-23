@@ -455,16 +455,15 @@ function resetRouteTooltipOffsets() {
 
 function getRouteLabelNearAirportOptions(fireLatLng, airportLatLng, kind = 'default') {
     /*
-     * Étiquettes routes :
-     * - ancrées sur l'icône de l'aéroport / base ;
-     * - décalées à l'opposé du trait par rapport à cette icône.
-     *
-     * Exemple : si le trait arrive par le haut de l'icône, l'étiquette part vers le bas.
+     * v11.71 — règle anti-recouvrement pélicandrome :
+     * pour les pélicandromes, l'étiquette est placée sur un côté de l'icône
+     * avec direction Leaflet top/bottom/left/right. Elle ne doit donc plus
+     * se centrer sur l'icône ni la masquer.
      */
     const fallback = {
         latLng: Array.isArray(airportLatLng) ? airportLatLng : [airportLatLng.lat, airportLatLng.lng],
-        offset: kind === 'pelic' ? [0, 78] : [0, 60],
-        direction: 'center'
+        offset: [0, 30],
+        direction: 'bottom'
     };
 
     if (!map || !map.latLngToLayerPoint || !Array.isArray(fireLatLng) || !Array.isArray(airportLatLng)) {
@@ -474,29 +473,42 @@ function getRouteLabelNearAirportOptions(fireLatLng, airportLatLng, kind = 'defa
     const firePoint = map.latLngToLayerPoint(L.latLng(fireLatLng[0], fireLatLng[1]));
     const airportPoint = map.latLngToLayerPoint(L.latLng(airportLatLng[0], airportLatLng[1]));
 
-    /*
-     * Vecteur depuis l'icône vers le feu = direction du trait côté icône.
-     * L'étiquette est placée dans le sens opposé.
-     */
     const dx = firePoint.x - airportPoint.x;
     const dy = firePoint.y - airportPoint.y;
-    const length = Math.sqrt((dx * dx) + (dy * dy));
 
-    if (!Number.isFinite(length) || length < 1) {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy) || (Math.abs(dx) < 1 && Math.abs(dy) < 1)) {
         return fallback;
     }
 
-    const distanceFromIcon = kind === 'pelic' ? 78 : (kind === 'base' ? 64 : 62);
+    if (kind === 'pelic') {
+        /*
+         * Le trait arrive sur l'icône depuis la direction dx/dy.
+         * L'étiquette part du côté opposé, avec une marge courte.
+         */
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            if (dx >= 0) {
+                return { latLng: airportLatLng, offset: [-16, 0], direction: 'left' };
+            }
+            return { latLng: airportLatLng, offset: [16, 0], direction: 'right' };
+        }
+
+        if (dy >= 0) {
+            return { latLng: airportLatLng, offset: [0, -16], direction: 'top' };
+        }
+        return { latLng: airportLatLng, offset: [0, 16], direction: 'bottom' };
+    }
+
+    /*
+     * Base/autres routes : on conserve le principe d'étiquette proche de l'icône,
+     * à l'opposé du trait, sans l'éloignement fort appliqué aux pélicandromes.
+     */
+    const length = Math.sqrt((dx * dx) + (dy * dy));
+    const distanceFromIcon = kind === 'base' ? 54 : 42;
     let offsetX = Math.round((-dx / length) * distanceFromIcon);
     let offsetY = Math.round((-dy / length) * distanceFromIcon);
 
-    /*
-     * v11.70 — sécurité anti-recouvrement :
-     * les étiquettes pélicandromes sont volontairement décollées de l'icône.
-     */
-    const minAxisOffset = kind === 'pelic' ? 30 : 18;
-    if (Math.abs(offsetX) < minAxisOffset) offsetX = offsetX < 0 ? -minAxisOffset : minAxisOffset;
-    if (Math.abs(offsetY) < minAxisOffset) offsetY = offsetY < 0 ? -minAxisOffset : minAxisOffset;
+    if (Math.abs(offsetX) < 12) offsetX = offsetX < 0 ? -12 : 12;
+    if (Math.abs(offsetY) < 12) offsetY = offsetY < 0 ? -12 : 12;
 
     return {
         latLng: airportLatLng,
