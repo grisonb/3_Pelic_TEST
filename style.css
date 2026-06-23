@@ -3249,12 +3249,12 @@ body.fuel-keyboard-open .fuel-split-hint {
     line-height: 1.15;
 }
 
-/* v11.67 — correction après v11.66 : onglets restaurés, OACI plus gros, bandeau carte moins large */
+/* v11.68 — onglets corrigés + bandeau BINGO carte un peu moins large */
 #bingo-map-display {
-    max-width: calc(100vw - 320px) !important;
-    gap: 18px !important;
-    padding-left: 20px !important;
-    padding-right: 20px !important;
+    max-width: calc(100vw - 340px) !important;
+    gap: 16px !important;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
 }
 
 #bingo-map-display .bingo-oaci {
@@ -3265,10 +3265,10 @@ body.fuel-keyboard-open .fuel-split-hint {
 
 @media (min-width: 761px) and (max-width: 1180px) {
     #bingo-map-display {
-        max-width: calc(100vw - 250px) !important;
-        gap: 14px !important;
-        padding-left: 16px !important;
-        padding-right: 16px !important;
+        max-width: calc(100vw - 260px) !important;
+        gap: 12px !important;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
     }
 
     #bingo-map-display .bingo-oaci {
@@ -3278,7 +3278,7 @@ body.fuel-keyboard-open .fuel-split-hint {
 
 @media (max-width: 760px) {
     #bingo-map-display {
-        max-width: calc(100vw - 125px) !important;
+        max-width: calc(100vw - 130px) !important;
     }
 }
 
