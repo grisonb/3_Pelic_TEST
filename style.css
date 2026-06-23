@@ -3292,3 +3292,71 @@ body.fuel-keyboard-open .fuel-split-hint {
     display: none !important;
 }
 
+/* v11.69 — carte : BINGO un peu plus petit, bouton direct BLOC/FUEL, commune décalée */
+#bingo-map-display .bingo-oaci {
+    font-size: 32px !important;
+}
+
+#bingo-map-display b {
+    font-size: 32px !important;
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display .bingo-oaci {
+        font-size: 28px !important;
+    }
+
+    #bingo-map-display b {
+        font-size: 28px !important;
+    }
+}
+
+#bloc-fuel-shortcut-button {
+    width: 90px;
+    height: 90px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--card-background-color);
+    color: var(--primary-color);
+    font-size: 42px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.25);
+}
+
+#bloc-fuel-shortcut-button:hover {
+    background-color: #e9f5ff;
+}
+
+#nearest-commune-display {
+    right: 130px !important;
+    max-width: min(520px, calc(100vw - 170px)) !important;
+}
+
+/* Onglet PREVI : lignes de droite plus compactes */
+#previ-rotations .analyse-col:nth-child(2) .result-line {
+    margin-bottom: 16px;
+}
+
+#previ-rotations .analyse-col:nth-child(2) .result-line .value {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+@media (max-width: 760px) {
+    #bloc-fuel-shortcut-button {
+        width: 64px;
+        height: 64px;
+        font-size: 30px;
+    }
+
+    #nearest-commune-display {
+        right: 92px !important;
+        max-width: calc(100vw - 112px) !important;
+    }
+}
+
