@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-62-hoverdep-bingo-width';
+const SW_VERSION = 'sw-v11-63-nearest-dep-persistent';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
