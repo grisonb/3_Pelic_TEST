@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-60-help-formulas-rules';
+const SW_VERSION = 'sw-v11-61-manual-dep-lfsj-gps-hoverdep';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
