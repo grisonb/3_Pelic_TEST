@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-73-blocfuel-image-icon';
+const SW_VERSION = 'sw-v11-74-blocfuel-icon-full-button';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
