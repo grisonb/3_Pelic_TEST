@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-61-manual-dep-lfsj-gps-hoverdep';
+const SW_VERSION = 'sw-v11-62-hoverdep-bingo-width';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
