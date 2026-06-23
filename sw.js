@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-68-tabs-ok-previ-header-bingo-narrow';
+const SW_VERSION = 'sw-v11-69-map-bingo-smaller-bloc-shortcut';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
