@@ -6,17 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
-    <link rel="stylesheet" href="style.css?appv=v11.65-bingo-oaci-size-tabs-compact">
-    <link rel="manifest" href="manifest.json?appv=v11.65-bingo-oaci-size-tabs-compact">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.65-bingo-oaci-size-tabs-compact">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.65-bingo-oaci-size-tabs-compact">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.65-bingo-oaci-size-tabs-compact">
+    <link rel="stylesheet" href="style.css?appv=v11.66-map-oaci-fuel-size-previ-shared-header">
+    <link rel="manifest" href="manifest.json?appv=v11.66-map-oaci-fuel-size-previ-shared-header">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v11.66-map-oaci-fuel-size-previ-shared-header">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v11.66-map-oaci-fuel-size-previ-shared-header">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v11.66-map-oaci-fuel-size-previ-shared-header">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="NPF-Q400-TEST">
     <script>
-        const APP_VERSION = 'v11.65';
+        const APP_VERSION = 'v11.66';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -166,7 +166,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v11.65-bingo-oaci-size-tabs-compact"></script>
+    <script src="script.js?appv=v11.66-map-oaci-fuel-size-previ-shared-header"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -204,9 +204,11 @@
             </div>
             <div class="onglets-conteneur">
                 <div class="onglet-panneau active" id="previ-rotations">
+                    <div class="header-section previ-shared-header-section">
+                        <div class="header-item"><label id="previ-bloc-depart-label">BLOC DÉPART</label><div id="previ-bloc-depart" data-sync-target="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                     <div class="analyse-grid">
                         <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="previ-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <span id="previ-bingo-base" class="previ-hidden-bingo-value">-- kg</span>
                             <div class="rotations-group">
                                 <h3 class="analyse-col-title">NBR ROTATIONS POSSIBLES</h3>
                                 <div id="previ-rotation-results-container">
@@ -219,7 +221,7 @@
                             </div>
                         </div>
                         <div class="analyse-col">
-                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="previ-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
+                            <span id="previ-bingo-pelic" class="previ-hidden-bingo-value">-- kg</span>
                             <div class="result-line"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
                             <div class="result-line"><span class="label">Durée transit :<span id="duree-transit-help" class="formula-help-icon">?</span></span><span class="value" id="duree-transit">--:--</span></div>
                             <div class="result-line"><span class="label">Conso. transit :<span id="conso-aller-feu-help" class="formula-help-icon">?</span></span><span class="value" id="conso-aller-feu">-- kg</span></div>
