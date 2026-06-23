@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-72-previ-blue-blocfuel-icon';
+const SW_VERSION = 'sw-v11-73-blocfuel-image-icon';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -23,7 +23,8 @@ const APP_SHELL_URLS = [
     './icons/icon-512x512.png'
 ,
     './icons/apple-touch-icon.png',
-    './icons/maskable-icon-512x512.png'];
+    './icons/maskable-icon-512x512.png',
+    './icons/bloc-fuel-shortcut-icon.png'];
 
 
 /*
