@@ -3591,3 +3591,11 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
+/* v11.78 — chat : présence récente */
+#chat-online-users {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
