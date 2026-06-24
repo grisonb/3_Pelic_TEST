@@ -4539,9 +4539,10 @@ function initializeTeamChat() {
             return;
         }
 
-        const preview = users.slice(0, 4).map((record) => `${record.user} ${formatRecentUserAge(record.timeMs)}`).join(', ');
-        const suffix = users.length > 4 ? ` +${users.length - 4}` : '';
-        onlineUsersLabel.textContent = `Vus <30 min: ${users.length} (${preview}${suffix})`;
+        const preview = users
+            .map((record) => `${record.user} ${formatRecentUserAge(record.timeMs)}`)
+            .join(', ');
+        onlineUsersLabel.textContent = `Vus <30 min: ${users.length}${preview ? ` (${preview})` : ''}`;
         onlineUsersLabel.title = users
             .map((record) => `${record.user} — vu il y a ${formatRecentUserAge(record.timeMs)}${record.status === 'offline' ? ' (hors ligne)' : ''}`)
             .join('\n');
