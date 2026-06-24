@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-77-fms-previ-blocfuel-tab';
+const SW_VERSION = 'sw-v11-78-chat-recent-users-history-fix';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
