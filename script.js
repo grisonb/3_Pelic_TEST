@@ -4522,16 +4522,20 @@ function initializeTeamChat() {
     const refreshOnlineUsersLabel = () => {
         const now = Date.now();
 
-        const users = Array.from(activeUsers.values())
-            .map((record) => {
+        const users = Array.from(activeUsers.entries())
+            .map(([clientId, record]) => {
                 if (typeof record === 'string') {
-                    return { user: record, timeMs: now, status: 'online' };
+                    return { clientId, user: record, timeMs: now, status: 'online', isSelf: clientId === myClientId };
                 }
-                return record;
+                return { ...record, clientId, isSelf: clientId === myClientId };
             })
             .filter((record) => record && typeof record.user === 'string' && record.user.trim())
             .filter((record) => Number.isFinite(record.timeMs) && (now - record.timeMs) <= CHAT_RECENT_USER_MAX_AGE_MS)
-            .sort((a, b) => a.user.localeCompare(b.user, 'fr'));
+            .sort((a, b) => {
+                if (a.isSelf && !b.isSelf) return -1;
+                if (!a.isSelf && b.isSelf) return 1;
+                return a.user.localeCompare(b.user, 'fr');
+            });
 
         if (!users.length) {
             onlineUsersLabel.textContent = 'Vus <30 min: 0';
@@ -4540,11 +4544,13 @@ function initializeTeamChat() {
         }
 
         const preview = users
-            .map((record) => `${record.user} ${formatRecentUserAge(record.timeMs)}`)
+            .map((record) => record.isSelf ? `${record.user}` : `${record.user} ${formatRecentUserAge(record.timeMs)}`)
             .join(', ');
         onlineUsersLabel.textContent = `Vus <30 min: ${users.length}${preview ? ` (${preview})` : ''}`;
         onlineUsersLabel.title = users
-            .map((record) => `${record.user} — vu il y a ${formatRecentUserAge(record.timeMs)}${record.status === 'offline' ? ' (hors ligne)' : ''}`)
+            .map((record) => record.isSelf
+                ? `${record.user} — cet appareil`
+                : `${record.user} — vu il y a ${formatRecentUserAge(record.timeMs)}${record.status === 'offline' ? ' (hors ligne)' : ''}`)
             .join('\n');
     };
 
