@@ -263,7 +263,7 @@ html, body {
     flex-direction: column;
     gap: 10px;
 }
-.chat-header-actions { display: flex; align-items: center; gap: 8px; }
+.chat-header-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
 #chat-minimize-button {
     border: 1px solid var(--border-color);
     background: #fff;
@@ -284,16 +284,23 @@ html, body {
     line-height: 1;
     cursor: pointer;
 }
-.chat-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: #555; }
+.chat-header { display: flex; flex-direction: column; align-items: stretch; gap: 8px; font-size: 14px; color: #555; }
 #chat-connection-state.online { color: var(--success-color); font-weight: 700; }
 #chat-connection-state.offline { color: var(--secondary-color); font-weight: 700; }
 .chat-online-users {
-    font-size: 12px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    line-height: 1.35;
     color: #4d5d7a;
     background: #eef4ff;
     border: 1px solid #d4e2ff;
-    border-radius: 999px;
-    padding: 3px 8px;
+    border-radius: 12px;
+    padding: 8px 10px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
 }
 .chat-config-row, .chat-send-row { display: grid; gap: 8px; }
 .chat-config-row { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; }
@@ -3591,11 +3598,8 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
-/* v11.78 — chat : présence récente */
+/* v11.79 — chat : présence récente liste complète */
 #chat-online-users {
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    max-width: none;
 }
 
