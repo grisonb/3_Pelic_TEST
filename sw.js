@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-79-chat-presence-full-list';
+const SW_VERSION = 'sw-v11-80-chat-own-user-no-age';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
