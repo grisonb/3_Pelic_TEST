@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-78-chat-recent-users-history-fix';
+const SW_VERSION = 'sw-v11-79-chat-presence-full-list';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
