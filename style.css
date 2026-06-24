@@ -3598,7 +3598,7 @@ body.fuel-keyboard-open .fuel-split-hint {
     }
 }
 
-/* v11.79 — chat : présence récente liste complète */
+/* v11.80 — chat : présence récente liste complète, sans durée pour cet appareil */
 #chat-online-users {
     max-width: none;
 }
