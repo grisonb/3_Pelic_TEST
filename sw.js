@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-81-ios-background-white-screen-recovery';
+const SW_VERSION = 'sw-v11-82-communes-aliases-2026';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -19,6 +19,7 @@ const APP_SHELL_URLS = [
     './suncalc.js',
     './jszip.min.js',
     './communes.json',
+    './communes_aliases.json',
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
 ,
@@ -145,7 +146,8 @@ function isAppShellRequest(request) {
             'leaflet.min.js',
             'suncalc.js',
             'jszip.min.js',
-            'communes.json'
+            'communes.json',
+            'communes_aliases.json'
         ].includes(filename) || parsed.pathname.includes('/icons/');
     } catch (_) {
         return false;
