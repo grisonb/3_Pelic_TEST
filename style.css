@@ -3603,3 +3603,43 @@ body.fuel-keyboard-open .fuel-split-hint {
     max-width: none;
 }
 
+/* v11.81 — reprise iPad/PWA : éviter écran blanc après longue veille */
+html,
+body {
+    background: #dbeafe;
+}
+
+#app-boot-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, #eaf4ff 0%, #cfe7ff 100%);
+    color: #0b2f6b;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-weight: 800;
+    text-align: center;
+}
+
+#app-boot-screen .boot-card {
+    padding: 18px 22px;
+    border-radius: 18px;
+    background: rgba(255,255,255,.86);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    border: 1px solid rgba(255,255,255,.9);
+}
+
+#app-boot-screen .boot-version {
+    margin-top: 5px;
+    font-size: 12px;
+    opacity: .68;
+}
+
+body.app-ready #app-boot-screen {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+}
+
