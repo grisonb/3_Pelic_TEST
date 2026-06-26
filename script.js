@@ -2,9 +2,124 @@
 // INITIALISATION DE L'APPLICATION
 // =========================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof L === 'undefined') { document.getElementById('status-message').textContent = "❌ ERREUR : leaflet.min.js non chargé."; return; }
-    initializeApp();
+    const markAppReady = () => {
+        if (document.body) {
+            document.body.classList.add('app-ready');
+            document.documentElement.classList.add('app-ready');
+        }
+    };
+
+    window.markNpfAppReady = markAppReady;
+
+    try {
+        if (typeof L === 'undefined') {
+            const statusEl = document.getElementById('status-message');
+            if (statusEl) statusEl.textContent = "❌ ERREUR : leaflet.min.js non chargé.";
+            markAppReady();
+            return;
+        }
+
+        initializeApp();
+
+        // Laisse Leaflet créer la carte, puis retire l'écran de reprise.
+        setTimeout(markAppReady, 250);
+    } catch (error) {
+        console.error('Erreur initialisation application:', error);
+        const statusEl = document.getElementById('status-message');
+        if (statusEl) statusEl.textContent = `❌ Erreur initialisation: ${error.message || error}`;
+        markAppReady();
+    }
 });
+
+
+// =========================================================================
+// REPRISE iPAD / PWA APRÈS LONGUE PÉRIODE EN ARRIÈRE-PLAN
+// =========================================================================
+(function setupBackgroundResumeRecovery() {
+    const LONG_BACKGROUND_MS = 5 * 60 * 1000;
+    const RECOVERY_GUARD_KEY = `npfResumeRecoveryReload:${window.APP_VERSION || 'unknown'}`;
+    let hiddenAt = 0;
+
+    const markReady = () => {
+        if (document.body) {
+            document.body.classList.add('app-ready');
+            document.documentElement.classList.add('app-ready');
+        }
+    };
+
+    const invalidateMapSoon = () => {
+        setTimeout(() => {
+            try {
+                if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                    map.invalidateSize(true);
+                }
+            } catch (_) {}
+            markReady();
+        }, 250);
+    };
+
+    const recoverIfMapStillBlank = () => {
+        setTimeout(() => {
+            try {
+                const mapEl = document.getElementById('map');
+                const mapLooksReady = !!(
+                    mapEl
+                    && mapEl.classList.contains('leaflet-container')
+                    && mapEl.offsetWidth > 0
+                    && mapEl.offsetHeight > 0
+                );
+
+                if (mapLooksReady) return;
+
+                const alreadyReloaded = sessionStorage.getItem(RECOVERY_GUARD_KEY) === '1';
+                if (!alreadyReloaded && typeof window.forceRecoveryReload === 'function') {
+                    sessionStorage.setItem(RECOVERY_GUARD_KEY, '1');
+                    window.forceRecoveryReload();
+                }
+            } catch (_) {}
+        }, 3500);
+    };
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            hiddenAt = Date.now();
+            return;
+        }
+
+        const wasLongBackground = hiddenAt && (Date.now() - hiddenAt) >= LONG_BACKGROUND_MS;
+        invalidateMapSoon();
+
+        if (wasLongBackground) {
+            recoverIfMapStillBlank();
+        }
+    });
+
+    window.addEventListener('pageshow', (event) => {
+        markReady();
+        invalidateMapSoon();
+
+        if (event.persisted) {
+            recoverIfMapStillBlank();
+        }
+    });
+
+    window.addEventListener('load', () => {
+        markReady();
+        setTimeout(() => {
+            try {
+                if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                    map.invalidateSize(true);
+                }
+            } catch (_) {}
+        }, 500);
+    });
+
+    // Si Safari/iPad repart sur un état incomplet, on évite un blanc permanent.
+    setTimeout(() => {
+        markReady();
+        recoverIfMapStillBlank();
+    }, 9000);
+})();
 
 // =========================================================================
 // VARIABLES GLOBALES
