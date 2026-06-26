@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-80-chat-own-user-no-age';
+const SW_VERSION = 'sw-v11-81-ios-background-white-screen-recovery';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
