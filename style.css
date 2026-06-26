@@ -3643,3 +3643,9 @@ body.app-ready #app-boot-screen {
     transition: opacity .18s ease;
 }
 
+
+
+/* v11.82/v2026.41 — résultats alias commune */
+#results-list li {
+    overflow-wrap: anywhere;
+}
