@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-82-communes-aliases-2026';
+const SW_VERSION = 'sw-v11-83-communes-aliases-fuzzy-display-name';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
