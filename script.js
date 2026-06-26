@@ -125,6 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // VARIABLES GLOBALES
 // =========================================================================
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, currentCommune = null, selectedPelicanOACI = null;
+let communeAliases = {};
+let communesByCodeInsee = new Map();
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null, accuracyCircle = null, headingLayer = null, lastPosition = null;
@@ -161,6 +163,7 @@ const OFFLINE_TILES_MAX_ZOOM_KEY = 'offlineTilesMaxZoom';
 const OFFLINE_TILES_MIN_ZOOM_KEY = 'offlineTilesMinZoom';
 const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
 const COMMUNES_CACHE_KEY = 'communesDataCacheV1';
+const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV1';
 const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
 const AIRPORT_PDF_DB_NAME = 'AirportPdfsDB';
 const AIRPORT_PDF_DB_VERSION = 1;
@@ -765,6 +768,8 @@ async function initializeApp() {
         }
         if (!data) data = await loadCommunesData();
         allCommunes = data.data.map(c => ({ ...c, normalized_name: simplifyString(c.nom_standard), search_parts: simplifyString(c.nom_standard).split(' ').filter(Boolean), soundex_parts: simplifyString(c.nom_standard).split(' ').filter(Boolean).map(part => soundex(part)) }));
+        communesByCodeInsee = new Map(allCommunes.map((commune) => [String(commune.code_insee || '').trim(), commune]).filter(([code]) => code));
+        communeAliases = await loadCommunesAliases();
     } catch (error) {
         communesLoadError = error;
         allCommunes = [];
@@ -847,6 +852,99 @@ async function loadCommunesData() {
         }
     }
 }
+
+async function loadCommunesAliases() {
+    const fetchWithTimeout = async (url, options = {}, timeoutMs = 5000) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    };
+
+    const parseAliasPayload = (payload) => {
+        if (!payload) return {};
+        if (payload.aliases && typeof payload.aliases === 'object') return payload.aliases;
+        if (typeof payload === 'object' && !Array.isArray(payload)) return payload;
+        return {};
+    };
+
+    const storeAliases = (payload) => {
+        const aliases = parseAliasPayload(payload);
+        try {
+            localStorage.setItem(COMMUNES_ALIASES_CACHE_KEY, JSON.stringify({ aliases }));
+        } catch (_) {}
+        return aliases;
+    };
+
+    try {
+        const response = await fetchWithTimeout('./communes_aliases.json', { cache: 'no-cache' }, 5000);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return storeAliases(await response.json());
+    } catch (_) {
+        try {
+            const cachedData = localStorage.getItem(COMMUNES_ALIASES_CACHE_KEY);
+            if (cachedData) {
+                return parseAliasPayload(JSON.parse(cachedData));
+            }
+        } catch (_) {}
+
+        try {
+            const fallbackResponse = await fetchWithTimeout('./communes_aliases.json', { cache: 'force-cache' }, 3000);
+            if (!fallbackResponse.ok) throw new Error(`HTTP ${fallbackResponse.status}`);
+            return storeAliases(await fallbackResponse.json());
+        } catch (_) {
+            console.warn('Alias communes indisponibles: recherche principale conservée.');
+            return {};
+        }
+    }
+}
+
+function normalizeCommuneAliasKey(value) {
+    return simplifyString(value).replace(/\s+/g, '-');
+}
+
+function getAliasSearchVariants(value) {
+    const simplified = simplifyString(value);
+    const dashKey = simplified.replace(/\s+/g, '-');
+    const variants = new Set([dashKey, simplified]);
+
+    if (dashKey.includes('saint-')) variants.add(dashKey.replace(/saint-/g, 'st-'));
+    if (dashKey.includes('sainte-')) variants.add(dashKey.replace(/sainte-/g, 'ste-'));
+    if (dashKey.includes('st-')) variants.add(dashKey.replace(/st-/g, 'saint-'));
+    if (dashKey.includes('ste-')) variants.add(dashKey.replace(/ste-/g, 'sainte-'));
+
+    if (simplified.includes('saint ')) variants.add(simplified.replace(/saint /g, 'st '));
+    if (simplified.includes('sainte ')) variants.add(simplified.replace(/sainte /g, 'ste '));
+    if (simplified.includes('st ')) variants.add(simplified.replace(/st /g, 'saint '));
+    if (simplified.includes('ste ')) variants.add(simplified.replace(/ste /g, 'sainte '));
+
+    return Array.from(variants).filter(Boolean);
+}
+
+function findAliasCommune(searchTerm, departmentFilter = null) {
+    if (!communeAliases || !communesByCodeInsee || !searchTerm) return null;
+
+    for (const key of getAliasSearchVariants(searchTerm)) {
+        const targetCode = communeAliases[key];
+        if (!targetCode) continue;
+
+        const commune = communesByCodeInsee.get(String(targetCode).trim());
+        if (!commune) continue;
+        if (departmentFilter && commune.dep_code !== departmentFilter) continue;
+
+        return {
+            ...commune,
+            alias_match: true,
+            alias_searched: searchTerm
+        };
+    }
+
+    return null;
+}
+
 
 
 function applyMapNoBackgroundStyle() {
@@ -1213,6 +1311,11 @@ function setupEventListeners() {
             const finalScore = (wordsFound === searchWords.length) ? totalScore : 999;
             return { ...c, score: finalScore };
         }).filter(c => c.score < 999);
+        const aliasCommune = findAliasCommune(searchTerm, departmentFilter);
+        if (aliasCommune && !scoredResults.some(c => c.code_insee === aliasCommune.code_insee)) {
+            scoredResults.unshift({ ...aliasCommune, score: -1 });
+        }
+
         scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
         displayResults(scoredResults.slice(0, 10));
     });
@@ -1424,7 +1527,7 @@ function displayResults(results) {
         resultsList.style.display = 'block';
         results.forEach(c => {
             const li = document.createElement('li');
-            li.textContent = `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
+            li.textContent = c.alias_match ? `${c.nom_standard} (${c.dep_nom} - ${c.dep_code}) — alias` : `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
             li.addEventListener('click', () => {
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
