@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // VARIABLES GLOBALES
 // =========================================================================
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, currentCommune = null, selectedPelicanOACI = null;
-let communeAliases = {};
+let communeAliases = [];
 let communesByCodeInsee = new Map();
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
 const MAGNETIC_DECLINATION = 1.0;
@@ -163,7 +163,7 @@ const OFFLINE_TILES_MAX_ZOOM_KEY = 'offlineTilesMaxZoom';
 const OFFLINE_TILES_MIN_ZOOM_KEY = 'offlineTilesMinZoom';
 const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
 const COMMUNES_CACHE_KEY = 'communesDataCacheV1';
-const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV1';
+const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV2';
 const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
 const AIRPORT_PDF_DB_NAME = 'AirportPdfsDB';
 const AIRPORT_PDF_DB_VERSION = 1;
@@ -864,11 +864,72 @@ async function loadCommunesAliases() {
         }
     };
 
+    const buildAliasEntry = (entry, key = null) => {
+        if (!entry) return null;
+
+        if (typeof entry === 'string') {
+            return null;
+        }
+
+        const displayName = String(entry.nom_affiche || entry.display_name || entry.nom || '').trim();
+        const targetCode = String(entry.code_insee || entry.target_code_insee || '').trim();
+        if (!displayName || !targetCode) return null;
+
+        const targetCommune = communesByCodeInsee.get(targetCode);
+        if (!targetCommune) return null;
+
+        const searchKeys = Array.isArray(entry.cles_recherche) && entry.cles_recherche.length
+            ? entry.cles_recherche
+            : [key, displayName];
+
+        const normalizedName = simplifyString(displayName);
+        const searchParts = normalizedName.split(' ').filter(Boolean);
+
+        return {
+            ...targetCommune,
+            code_insee: targetCommune.code_insee,
+            nom_standard: displayName,
+            nom_sans_pronom: displayName,
+            nom_sans_accent: normalizedName.replace(/\s+/g, '-'),
+            dep_code: entry.dep_code || targetCommune.dep_code,
+            dep_nom: entry.dep_nom || targetCommune.dep_nom,
+            alias_match: true,
+            alias_nom_affiche: displayName,
+            alias_commune_actuelle: entry.nom_commune_actuelle || targetCommune.nom_standard,
+            alias_target_code_insee: targetCode,
+            alias_old_code_insee: entry.ancien_code_insee || null,
+            normalized_name: normalizedName,
+            search_parts: searchParts,
+            soundex_parts: searchParts.map(part => soundex(part)),
+            alias_search_keys: searchKeys
+        };
+    };
+
     const parseAliasPayload = (payload) => {
-        if (!payload) return {};
-        if (payload.aliases && typeof payload.aliases === 'object') return payload.aliases;
-        if (typeof payload === 'object' && !Array.isArray(payload)) return payload;
-        return {};
+        if (!payload) return [];
+
+        if (Array.isArray(payload.aliases)) {
+            return payload.aliases.map((entry) => buildAliasEntry(entry)).filter(Boolean);
+        }
+
+        if (payload.aliases && typeof payload.aliases === 'object') {
+            return Object.entries(payload.aliases)
+                .map(([key, value]) => {
+                    if (typeof value === 'string') {
+                        const targetCommune = communesByCodeInsee.get(String(value).trim());
+                        if (!targetCommune) return null;
+                        return buildAliasEntry({
+                            nom_affiche: key.replace(/-/g, ' '),
+                            code_insee: value,
+                            nom_commune_actuelle: targetCommune.nom_standard
+                        }, key);
+                    }
+                    return buildAliasEntry(value, key);
+                })
+                .filter(Boolean);
+        }
+
+        return [];
     };
 
     const storeAliases = (payload) => {
@@ -897,52 +958,67 @@ async function loadCommunesAliases() {
             return storeAliases(await fallbackResponse.json());
         } catch (_) {
             console.warn('Alias communes indisponibles: recherche principale conservée.');
-            return {};
+            return [];
         }
     }
 }
 
-function normalizeCommuneAliasKey(value) {
-    return simplifyString(value).replace(/\s+/g, '-');
-}
+function scoreCommuneSearchCandidate(candidate, searchWords) {
+    if (!candidate || !Array.isArray(searchWords) || !searchWords.length) return 999;
 
-function getAliasSearchVariants(value) {
-    const simplified = simplifyString(value);
-    const dashKey = simplified.replace(/\s+/g, '-');
-    const variants = new Set([dashKey, simplified]);
+    const parts = Array.isArray(candidate.search_parts) && candidate.search_parts.length
+        ? candidate.search_parts
+        : simplifyString(candidate.nom_standard).split(' ').filter(Boolean);
 
-    if (dashKey.includes('saint-')) variants.add(dashKey.replace(/saint-/g, 'st-'));
-    if (dashKey.includes('sainte-')) variants.add(dashKey.replace(/sainte-/g, 'ste-'));
-    if (dashKey.includes('st-')) variants.add(dashKey.replace(/st-/g, 'saint-'));
-    if (dashKey.includes('ste-')) variants.add(dashKey.replace(/ste-/g, 'sainte-'));
+    const soundexParts = Array.isArray(candidate.soundex_parts) && candidate.soundex_parts.length
+        ? candidate.soundex_parts
+        : parts.map(part => soundex(part));
 
-    if (simplified.includes('saint ')) variants.add(simplified.replace(/saint /g, 'st '));
-    if (simplified.includes('sainte ')) variants.add(simplified.replace(/sainte /g, 'ste '));
-    if (simplified.includes('st ')) variants.add(simplified.replace(/st /g, 'saint '));
-    if (simplified.includes('ste ')) variants.add(simplified.replace(/ste /g, 'sainte '));
+    let totalScore = 0;
+    let wordsFound = 0;
 
-    return Array.from(variants).filter(Boolean);
-}
+    for (const word of searchWords) {
+        let bestWordScore = 999;
+        const wordSoundex = soundex(word);
 
-function findAliasCommune(searchTerm, departmentFilter = null) {
-    if (!communeAliases || !communesByCodeInsee || !searchTerm) return null;
+        for (let i = 0; i < parts.length; i++) {
+            const communePart = parts[i];
+            const communeSoundex = soundexParts[i];
+            let currentScore = 999;
 
-    for (const key of getAliasSearchVariants(searchTerm)) {
-        const targetCode = communeAliases[key];
-        if (!targetCode) continue;
+            if (communePart.startsWith(word)) {
+                currentScore = 0;
+            } else if (communeSoundex === wordSoundex) {
+                currentScore = 1;
+            } else {
+                const dist = levenshteinDistance(word, communePart);
+                if (dist <= Math.floor(word.length / 3) + 1) {
+                    currentScore = 2 + dist;
+                }
+            }
 
-        const commune = communesByCodeInsee.get(String(targetCode).trim());
-        if (!commune) continue;
-        if (departmentFilter && commune.dep_code !== departmentFilter) continue;
+            if (currentScore < bestWordScore) bestWordScore = currentScore;
+        }
 
-        return {
-            ...commune,
-            alias_match: true,
-            alias_searched: searchTerm
-        };
+        if (bestWordScore < 999) {
+            wordsFound++;
+            totalScore += bestWordScore;
+        }
     }
 
-    return null;
+    return wordsFound === searchWords.length ? totalScore : 999;
+}
+
+function searchAliasCommunes(searchWords, departmentFilter = null) {
+    if (!Array.isArray(communeAliases) || !communeAliases.length) return [];
+
+    return communeAliases
+        .filter(alias => !departmentFilter || alias.dep_code === departmentFilter)
+        .map(alias => {
+            const score = scoreCommuneSearchCandidate(alias, searchWords);
+            return { ...alias, score: score + 0.25 };
+        })
+        .filter(alias => alias.score < 999);
 }
 
 
@@ -1289,32 +1365,22 @@ function setupEventListeners() {
         }
         const searchWords = simplifiedSearch.split(' ').filter(Boolean);
         const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
-        const scoredResults = communesToSearch.map(c => {
-            let totalScore = 0; let wordsFound = 0;
-            for (const word of searchWords) {
-                let bestWordScore = 999;
-                const wordSoundex = soundex(word);
-                for (let i = 0; i < c.search_parts.length; i++) {
-                    const communePart = c.search_parts[i];
-                    const communeSoundex = c.soundex_parts[i];
-                    let currentScore = 999;
-                    if (communePart.startsWith(word)) { currentScore = 0; }
-                    else if (communeSoundex === wordSoundex) { currentScore = 1; }
-                    else {
-                        const dist = levenshteinDistance(word, communePart);
-                        if (dist <= Math.floor(word.length / 3) + 1) { currentScore = 2 + dist; }
-                    }
-                    if (currentScore < bestWordScore) { bestWordScore = currentScore; }
-                }
-                if (bestWordScore < 999) { wordsFound++; totalScore += bestWordScore; }
+
+        const scoredResults = communesToSearch
+            .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords) }))
+            .filter(c => c.score < 999);
+
+        const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
+        const seenResultKeys = new Set(scoredResults.map(c => `commune:${c.code_insee}:${simplifyString(c.nom_standard)}`));
+
+        aliasResults.forEach((alias) => {
+            const key = `alias:${alias.alias_target_code_insee}:${simplifyString(alias.nom_standard)}`;
+            const sameVisibleNameAlreadyPresent = seenResultKeys.has(`commune:${alias.code_insee}:${simplifyString(alias.nom_standard)}`);
+            if (!seenResultKeys.has(key) && !sameVisibleNameAlreadyPresent) {
+                seenResultKeys.add(key);
+                scoredResults.push(alias);
             }
-            const finalScore = (wordsFound === searchWords.length) ? totalScore : 999;
-            return { ...c, score: finalScore };
-        }).filter(c => c.score < 999);
-        const aliasCommune = findAliasCommune(searchTerm, departmentFilter);
-        if (aliasCommune && !scoredResults.some(c => c.code_insee === aliasCommune.code_insee)) {
-            scoredResults.unshift({ ...aliasCommune, score: -1 });
-        }
+        });
 
         scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
         displayResults(scoredResults.slice(0, 10));
@@ -1527,7 +1593,10 @@ function displayResults(results) {
         resultsList.style.display = 'block';
         results.forEach(c => {
             const li = document.createElement('li');
-            li.textContent = c.alias_match ? `${c.nom_standard} (${c.dep_nom} - ${c.dep_code}) — alias` : `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
+            li.textContent = `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
+            if (c.alias_match && c.alias_commune_actuelle) {
+                li.title = `Rattachée à ${c.alias_commune_actuelle}`;
+            }
             li.addEventListener('click', () => {
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
