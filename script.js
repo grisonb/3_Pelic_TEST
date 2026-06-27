@@ -3280,27 +3280,42 @@ async function exportCurrentFireGpx() {
 `;
 
     const fileName = `feu_${sanitizeFilePart(currentCommune.nom_standard)}${depLabel ? `_${sanitizeFilePart(depLabel)}` : ''}.gpx`;
-    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-    const file = new File([blob], fileName, { type: 'application/gpx+xml' });
+    /*
+     * v11.90 — compatibilité iPad/SDVFR.
+     * Certaines apps ne déclarent pas application/gpx+xml dans la feuille de partage iOS.
+     * On tente donc plusieurs types MIME, du plus spécifique au plus générique.
+     */
+    const shareTypes = [
+        'application/gpx+xml',
+        'application/octet-stream',
+        'text/xml'
+    ];
 
-    try {
-        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-            await navigator.share({
-                title: fileName,
-                text: fireName,
-                files: [file]
-            });
-            return;
+    for (const mimeType of shareTypes) {
+        const blobForShare = new Blob([gpx], { type: mimeType });
+        const fileForShare = new File([blobForShare], fileName, { type: mimeType });
+
+        try {
+            if (navigator.canShare && navigator.canShare({ files: [fileForShare] }) && navigator.share) {
+                await navigator.share({
+                    title: fileName,
+                    text: `${fireName}\n${lat.toFixed(6)}, ${lon.toFixed(6)}`,
+                    files: [fileForShare]
+                });
+                return;
+            }
+        } catch (error) {
+            console.warn(`Partage GPX impossible avec ${mimeType}:`, error);
         }
-    } catch (error) {
-        console.warn('Partage GPX indisponible, bascule téléchargement:', error);
     }
 
+    const blob = new Blob([gpx], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = fileName;
     link.rel = 'noopener';
+    link.title = `${fireName} ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
