@@ -3649,3 +3649,5 @@ body.app-ready #app-boot-screen {
 }
 
 /* v11.84 — recherche alias tolérante sans espace : La Tourlandry / la tour landri */
+
+/* v11.85 — saisie recherche : scoring différé pour réduire la latence */
