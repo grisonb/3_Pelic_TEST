@@ -3729,3 +3729,9 @@ body {
     bottom: max(12px, calc(env(safe-area-inset-bottom, 0px) + 6px)) !important;
 }
 
+/* v11.88 — chat iPad : éviter les suggestions de connexion sur le champ message */
+#chat-message-input,
+#chat-room-input,
+#chat-user-input {
+    -webkit-text-security: none;
+}
