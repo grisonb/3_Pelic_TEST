@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-85-search-input-debounce-fluid';
+const SW_VERSION = 'sw-v11-86-ipad-bottom-safe-area';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
