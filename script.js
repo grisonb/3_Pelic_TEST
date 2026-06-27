@@ -504,6 +504,16 @@ function displayFireHistory() {
             localStorage.setItem('currentCommune', JSON.stringify(item));
             displayCommuneDetails(item);
             resultsList.style.display = 'none';
+
+            const searchInput = document.getElementById('search-input');
+            if (searchInput && searchInput.value) {
+                setTimeout(() => {
+                    try {
+                        const end = searchInput.value.length;
+                        searchInput.setSelectionRange(end, end);
+                    } catch (_) {}
+                }, 0);
+            }
         });
 
         li.querySelector('.fire-history-delete').addEventListener('click', (event) => {
@@ -1461,15 +1471,29 @@ function setupEventListeners() {
         if (searchInput.value && searchInput.value.trim().length > 0) {
             setTimeout(() => {
                 try {
+                    const end = searchInput.value.length;
                     searchInput.focus();
-                    searchInput.select();
+                    searchInput.setSelectionRange(end, end);
                 } catch (_) {}
             }, 0);
         }
     };
 
+    const collapseSearchInputSelection = () => {
+        if (document.activeElement !== searchInput || !searchInput.value) return;
+        try {
+            const end = searchInput.value.length;
+            searchInput.setSelectionRange(end, end);
+        } catch (_) {}
+    };
+
     searchInput.addEventListener('focus', showFireHistoryFromSearch);
     searchInput.addEventListener('click', showFireHistoryFromSearch);
+    document.addEventListener('pointerdown', (event) => {
+        if (event.target !== searchInput) {
+            setTimeout(collapseSearchInputSelection, 0);
+        }
+    }, true);
     searchInput.addEventListener('pointerdown', () => {
         searchInput.disabled = false;
         searchInput.readOnly = false;
@@ -4601,6 +4625,23 @@ function initializeTeamChat() {
     const clearCancelButton = document.getElementById('chat-clear-cancel-button');
     if (!panel || !toggleButton || !minimizeButton || !clearButton || !alertBadge || !offlineBadge || !roomInput || !userInput || !connectButton || !sendButton || !messageInput || !messagesBox || !connectionState || !onlineUsersLabel || !clearModal || !clearLocalButton || !clearChannelButton || !clearCancelButton) return;
 
+    /*
+     * v11.88 — iPad/Safari : éviter l'appel du bandeau de connexion/passkey
+     * au focus du champ message. On neutralise aussi les champs canal/pseudo,
+     * car Safari les interprète parfois comme un formulaire de connexion.
+     */
+    [
+        [roomInput, 'off'],
+        [userInput, 'off'],
+        [messageInput, 'one-time-code']
+    ].forEach(([input, autocompleteValue]) => {
+        input.setAttribute('autocomplete', autocompleteValue);
+        input.setAttribute('autocorrect', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.setAttribute('data-lpignore', 'true');
+        input.setAttribute('data-1p-ignore', 'true');
+    });
+
     setupChatKeyboardSafeArea();
 
     const locationShareButton = document.createElement('button');
@@ -5018,9 +5059,9 @@ function initializeTeamChat() {
 
         const makeBox = (point, offset) => ({
             left: point.x + 22 + offset.x,
-            top: point.y - 38 + offset.y,
+            top: point.y - 23 + offset.y,
             right: point.x + 22 + offset.x + labelWidth,
-            bottom: point.y - 38 + offset.y + labelHeight
+            bottom: point.y - 23 + offset.y + labelHeight
         });
 
         const makeOwnBox = () => {
@@ -5047,17 +5088,23 @@ function initializeTeamChat() {
             );
         };
 
+        /*
+         * v11.88 — étiquette utilisateurs distants :
+         * position normale accolée à l'icône, comme les pélicandromes.
+         * Les décalages ne servent qu'en anti-chevauchement.
+         */
         const offsets = [
-            { x: 0, y: -58 },
-            { x: 0, y: 42 },
-            { x: 68, y: -18 },
-            { x: 68, y: 28 },
-            { x: -82, y: -18 },
-            { x: -82, y: 28 },
-            { x: 0, y: -104 },
-            { x: 0, y: 88 },
-            { x: 120, y: -18 },
-            { x: -132, y: -18 }
+            { x: 0, y: 0 },
+            { x: 0, y: -34 },
+            { x: 0, y: 34 },
+            { x: 58, y: 0 },
+            { x: -72, y: 0 },
+            { x: 58, y: -28 },
+            { x: 58, y: 28 },
+            { x: -72, y: -28 },
+            { x: -72, y: 28 },
+            { x: 0, y: -68 },
+            { x: 0, y: 68 }
         ];
 
         const placedBoxes = [];
