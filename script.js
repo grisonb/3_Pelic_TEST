@@ -974,6 +974,28 @@ function scoreCommuneSearchCandidate(candidate, searchWords) {
         ? candidate.soundex_parts
         : parts.map(part => soundex(part));
 
+    /*
+     * v11.84 — recherche alias plus tolérante.
+     * Cas visé : "La Tourlandry" doit sortir avec "la tour landri 49".
+     * Le moteur historique compare mot par mot. Cela échoue quand l'utilisateur
+     * sépare un toponyme composé dans un ancien nom écrit en un seul bloc.
+     * On ajoute donc une comparaison compacte sans espaces avant le scoring mot par mot.
+     */
+    const searchCompact = searchWords.join('');
+    const candidateCompact = parts.join('');
+
+    if (searchCompact.length >= 4 && candidateCompact.length >= 4) {
+        if (candidateCompact.startsWith(searchCompact) || searchCompact.startsWith(candidateCompact)) {
+            return 0.1;
+        }
+
+        const compactDistance = levenshteinDistance(searchCompact, candidateCompact);
+        const compactTolerance = Math.max(1, Math.floor(searchCompact.length / 4));
+        if (compactDistance <= compactTolerance) {
+            return 0.5 + compactDistance;
+        }
+    }
+
     let totalScore = 0;
     let wordsFound = 0;
 
@@ -1012,13 +1034,18 @@ function scoreCommuneSearchCandidate(candidate, searchWords) {
 function searchAliasCommunes(searchWords, departmentFilter = null) {
     if (!Array.isArray(communeAliases) || !communeAliases.length) return [];
 
-    return communeAliases
-        .filter(alias => !departmentFilter || alias.dep_code === departmentFilter)
+    const candidates = departmentFilter
+        ? communeAliases.filter(alias => alias.dep_code === departmentFilter)
+        : communeAliases;
+
+    return candidates
         .map(alias => {
             const score = scoreCommuneSearchCandidate(alias, searchWords);
             return { ...alias, score: score + 0.25 };
         })
-        .filter(alias => alias.score < 999);
+        .filter(alias => alias.score < 999)
+        .sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length)
+        .slice(0, 10);
 }
 
 
