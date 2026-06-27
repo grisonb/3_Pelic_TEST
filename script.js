@@ -1811,6 +1811,7 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
+    const gpxButtonHTML = `<button id="export-gpx-btn" class="export-gpx-btn" type="button" title="Exporter le feu sélectionné en GPX">📤 GPX</button>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1824,8 +1825,13 @@ function updateCommuneDisplay(commune) {
             sunsetHTML = '<div class="sunset-info"></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>';
         }
     }
-    communeDisplay.innerHTML = communeNameHTML + sunsetHTML;
+    communeDisplay.innerHTML = communeNameHTML + gpxButtonHTML + sunsetHTML;
     updateCommuneGpsRouteDisplay();
+
+    const exportGpxBtn = document.getElementById('export-gpx-btn');
+    if (exportGpxBtn) {
+        exportGpxBtn.addEventListener('click', exportCurrentFireGpx);
+    }
 
     // On attache l'événement de clic au nouveau bouton
     const clearCommuneBtn = document.getElementById('clear-commune-btn');
@@ -3221,6 +3227,84 @@ function formatGpsAltitudeFtFromCoords(coords) {
     if (!coords) return '--- ft';
     const altitudeMeters = Number(coords.altitude);
     return Number.isFinite(altitudeMeters) ? `${Math.round(altitudeMeters * 3.28084)} ft` : '--- ft';
+}
+
+function sanitizeFilePart(value) {
+    return simplifyString(value || 'feu')
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'feu';
+}
+
+function escapeXml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+}
+
+async function exportCurrentFireGpx() {
+    if (!currentCommune) {
+        alert('Aucun feu sélectionné.');
+        return;
+    }
+
+    const lat = Number(currentCommune.latitude_mairie);
+    const lon = Number(currentCommune.longitude_mairie);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        alert('Coordonnées du feu indisponibles.');
+        return;
+    }
+
+    const depLabel = formatCommuneDepartment(currentCommune);
+    const fireName = `${currentCommune.nom_standard || 'Feu'}${depLabel ? ` (${depLabel})` : ''}`;
+    const nowIso = new Date().toISOString();
+
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="NPF-Q400 ${APP_VERSION}" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${escapeXml(fireName)}</name>
+    <time>${nowIso}</time>
+  </metadata>
+  <wpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}">
+    <name>${escapeXml(fireName)}</name>
+    <desc>${escapeXml(`Point feu exporté depuis NPF-Q400 ${APP_VERSION}`)}</desc>
+    <sym>Flag, Red</sym>
+    <type>Fire</type>
+  </wpt>
+</gpx>
+`;
+
+    const fileName = `feu_${sanitizeFilePart(currentCommune.nom_standard)}${depLabel ? `_${sanitizeFilePart(depLabel)}` : ''}.gpx`;
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    const file = new File([blob], fileName, { type: 'application/gpx+xml' });
+
+    try {
+        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+            await navigator.share({
+                title: fileName,
+                text: fireName,
+                files: [file]
+            });
+            return;
+        }
+    } catch (error) {
+        console.warn('Partage GPX indisponible, bascule téléchargement:', error);
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 
 
