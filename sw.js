@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-87-ipad-bottom-extend-map';
+const SW_VERSION = 'sw-v11-88-chat-location-input-selection';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
