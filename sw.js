@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-84-aliases-fuzzy-joined-search';
+const SW_VERSION = 'sw-v11-85-search-input-debounce-fluid';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
