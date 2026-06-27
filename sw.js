@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-86-ipad-bottom-safe-area';
+const SW_VERSION = 'sw-v11-87-ipad-bottom-extend-map';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
