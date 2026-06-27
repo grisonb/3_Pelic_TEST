@@ -3651,3 +3651,38 @@ body.app-ready #app-boot-screen {
 /* v11.84 — recherche alias tolérante sans espace : La Tourlandry / la tour landri */
 
 /* v11.85 — saisie recherche : scoring différé pour réduire la latence */
+
+/* v11.86 — iPad/PWA : suppression de la bande basse liée à la safe-area */
+html,
+body {
+    min-height: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #eef5ff;
+    overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+    html,
+    body {
+        height: 100dvh;
+        min-height: 100dvh;
+    }
+}
+
+#map {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+}
+
+/* Le contrôle Leaflet bas-gauche reste au-dessus de la zone du geste iPad. */
+.leaflet-bottom.leaflet-left {
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+}
+
