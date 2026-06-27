@@ -3647,3 +3647,5 @@ body.app-ready #app-boot-screen {
 #results-list li {
     overflow-wrap: anywhere;
 }
+
+/* v11.84 — recherche alias tolérante sans espace : La Tourlandry / la tour landri */
