@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-88-chat-location-input-selection';
+const SW_VERSION = 'sw-v11-89-fire-gpx-export';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
