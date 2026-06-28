@@ -3836,3 +3836,14 @@ body {
     }
 }
 
+/* v11.97 — boutons export placés après route/distance */
+#commune-info-display .fire-export-buttons {
+    margin-left: 4px;
+}
+
+#commune-info-display .export-kml-btn,
+#commune-info-display .export-sdvfr-csv-btn {
+    font-size: 11px;
+    padding: 6px 7px;
+}
+
