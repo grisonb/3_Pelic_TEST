@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-00-search-clear-button-fix';
+const SW_VERSION = 'sw-v12-01-close-right-gps-label-above';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
