@@ -1505,7 +1505,13 @@ function setupEventListeners() {
     };
 
     searchInput.addEventListener('input', keepKeyboardAfterSearchClear);
-    searchInput.addEventListener('search', keepKeyboardAfterSearchClear);
+    searchInput.addEventListener('search', () => {
+        clearSearchBtn.style.display = searchInput.value.length > 0 ? 'block' : 'none';
+        if (searchInput.value.length === 0) {
+            displayFireHistory();
+        }
+        keepKeyboardAfterSearchClear();
+    });
 
     searchInput.addEventListener('input', () => {
         clearSearchBtn.style.display = searchInput.value.length > 0 ? 'block' : 'none';
@@ -1579,22 +1585,40 @@ function setupEventListeners() {
         searchInput.readOnly = false;
     });
 
-    clearSearchBtn.addEventListener('pointerdown', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-    }, { passive: false });
+    const clearSearchInputAndKeepKeyboard = (event = null) => {
+        /*
+         * v12.00 — iPad : correction du bouton X de la barre de recherche.
+         * En v11.99, preventDefault sur touchstart/pointerdown pouvait empêcher
+         * le bouton de fonctionner sur Safari iPad. On laisse le toucher se faire,
+         * puis on efface explicitement au click/touchend et on remet le focus.
+         */
+        if (event) {
+            event.stopPropagation();
+        }
 
-    clearSearchBtn.addEventListener('touchstart', (event) => {
+        searchInput.value = '';
+        clearSearchBtn.style.display = 'none';
+        document.getElementById('results-list').style.display = 'none';
+        displayFireHistory();
+
+        setTimeout(() => {
+            try {
+                searchInput.focus({ preventScroll: true });
+                searchInput.setSelectionRange(0, 0);
+            } catch (_) {
+                searchInput.focus();
+            }
+        }, 0);
+    };
+
+    clearSearchBtn.addEventListener('touchend', (event) => {
         event.preventDefault();
-        event.stopPropagation();
+        clearSearchInputAndKeepKeyboard(event);
     }, { passive: false });
 
     clearSearchBtn.addEventListener('click', (event) => {
         event.preventDefault();
-        event.stopPropagation();
-        clearCurrentSelection();
-        displayFireHistory();
-        keepKeyboardAfterSearchClear();
+        clearSearchInputAndKeepKeyboard(event);
     });
 
     airportCountInput.addEventListener('change', () => {
