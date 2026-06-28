@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-98-update-button-clean-reload';
+const SW_VERSION = 'sw-v11-99-label-offset-search-clear-keyboard';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
