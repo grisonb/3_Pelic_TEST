@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-92-kml-minimal-share-file-only';
+const SW_VERSION = 'sw-v11-93-kml-download-no-share-reopen';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
