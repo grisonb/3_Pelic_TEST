@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-93-kml-download-no-share-reopen';
+const SW_VERSION = 'sw-v11-94-search-keyboard-kml-preview';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
