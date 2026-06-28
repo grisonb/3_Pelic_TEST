@@ -1929,20 +1929,19 @@ function updateCommuneDisplay(commune) {
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
     const exportButtonsHTML = `<span class="fire-export-buttons"><button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML pour ForeFlight">ForeFlight</button><button id="export-sdvfr-csv-btn" class="export-sdvfr-csv-btn" type="button" title="Télécharger le fichier CSV pour SDVFR Next">SDVFR</button></span>`;
+    const closeButtonHTML = `<span id="clear-commune-btn" class="clear-commune-btn" title="Effacer le feu">×</span>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
             const now = new Date();
             const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
             const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-            // On ajoute le bouton "x" ici
-            const closeButtonHTML = `<span id="clear-commune-btn" class="clear-commune-btn" title="Effacer le feu">×</span>`;
-            sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>${closeButtonHTML}`;
+            sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>`;
         } catch (e) {
             sunsetHTML = '<div class="sunset-info"></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>';
         }
     }
-    communeDisplay.innerHTML = communeNameHTML + sunsetHTML + exportButtonsHTML;
+    communeDisplay.innerHTML = communeNameHTML + sunsetHTML + exportButtonsHTML + closeButtonHTML;
     updateCommuneGpsRouteDisplay();
 
     const exportKmlBtn = document.getElementById('export-kml-btn');
@@ -3621,12 +3620,12 @@ function buildOwnGpsIcon(altitudeLabel = '--- ft') {
          * ces anciennes classes ajoutaient une grosse bulle blanche autour du marqueur.
          */
         className: 'own-gps-altitude-marker',
-        html: `<div style="display:flex;align-items:center;gap:12px;">
-                <div style="flex:0 0 auto;width:16px;height:16px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 0 0 2px rgba(124,58,237,.35),0 1px 5px rgba(0,0,0,.45);"></div>
+        html: `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
                 <div style="background:#ffffff;border:1px solid #7c3aed;border-radius:8px;padding:3px 6px;font-size:11px;line-height:1.15;font-weight:700;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.25);white-space:nowrap;text-align:center;min-width:42px;">${safeAltitude}</div>
+                <div style="width:16px;height:16px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 0 0 2px rgba(124,58,237,.35),0 1px 5px rgba(0,0,0,.45);"></div>
             </div>`,
-        iconSize: [96, 28],
-        iconAnchor: [8, 14]
+        iconSize: [74, 52],
+        iconAnchor: [37, 47]
     });
 }
 
