@@ -3860,3 +3860,9 @@ body {
     touch-action: manipulation;
 }
 
+/* v12.00 — bouton X recherche : ne pas bloquer l'événement tactile iPad */
+#clear-search {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
