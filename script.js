@@ -1811,7 +1811,7 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
-    const gpxButtonHTML = `<button id="export-gpx-btn" class="export-gpx-btn" type="button" title="Exporter le feu sélectionné en GPX">📤 GPX</button>`;
+    const gpxButtonHTML = `<button id="export-kml-btn" class="export-kml-btn" type="button" title="Exporter le feu sélectionné en KML">📤 KML</button>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1828,9 +1828,9 @@ function updateCommuneDisplay(commune) {
     communeDisplay.innerHTML = communeNameHTML + gpxButtonHTML + sunsetHTML;
     updateCommuneGpsRouteDisplay();
 
-    const exportGpxBtn = document.getElementById('export-gpx-btn');
-    if (exportGpxBtn) {
-        exportGpxBtn.addEventListener('click', exportCurrentFireGpx);
+    const exportKmlBtn = document.getElementById('export-kml-btn');
+    if (exportKmlBtn) {
+        exportKmlBtn.addEventListener('click', exportCurrentFireKml);
     }
 
     // On attache l'événement de clic au nouveau bouton
@@ -3246,7 +3246,7 @@ function escapeXml(value) {
         .replace(/'/g, '&apos;');
 }
 
-async function exportCurrentFireGpx() {
+async function exportCurrentFireKml() {
     if (!currentCommune) {
         alert('Aucun feu sélectionné.');
         return;
@@ -3264,35 +3264,51 @@ async function exportCurrentFireGpx() {
     const fireName = `${currentCommune.nom_standard || 'Feu'}${depLabel ? ` (${depLabel})` : ''}`;
     const nowIso = new Date().toISOString();
 
-    const gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="NPF-Q400 ${APP_VERSION}" xmlns="http://www.topografix.com/GPX/1/1">
-  <metadata>
+    /*
+     * v11.91 — Export KML.
+     * KML est souvent mieux reconnu par iOS et les applications cartographiques
+     * qu'un GPX généré par une PWA.
+     */
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
     <name>${escapeXml(fireName)}</name>
-    <time>${nowIso}</time>
-  </metadata>
-  <wpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}">
-    <name>${escapeXml(fireName)}</name>
-    <desc>${escapeXml(`Point feu exporté depuis NPF-Q400 ${APP_VERSION}`)}</desc>
-    <sym>Flag, Red</sym>
-    <type>Fire</type>
-  </wpt>
-</gpx>
+    <description>${escapeXml(`Point feu exporté depuis NPF-Q400 ${APP_VERSION} le ${nowIso}`)}</description>
+    <Style id="firePoint">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href>
+        </Icon>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1.0</scale>
+      </LabelStyle>
+    </Style>
+    <Placemark>
+      <name>${escapeXml(fireName)}</name>
+      <description>${escapeXml(`Coordonnées: ${lat.toFixed(6)}, ${lon.toFixed(6)}`)}</description>
+      <styleUrl>#firePoint</styleUrl>
+      <Point>
+        <coordinates>${lon.toFixed(7)},${lat.toFixed(7)},0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>
 `;
 
-    const fileName = `feu_${sanitizeFilePart(currentCommune.nom_standard)}${depLabel ? `_${sanitizeFilePart(depLabel)}` : ''}.gpx`;
-    /*
-     * v11.90 — compatibilité iPad/SDVFR.
-     * Certaines apps ne déclarent pas application/gpx+xml dans la feuille de partage iOS.
-     * On tente donc plusieurs types MIME, du plus spécifique au plus générique.
-     */
+    const fileName = `feu_${sanitizeFilePart(currentCommune.nom_standard)}${depLabel ? `_${sanitizeFilePart(depLabel)}` : ''}.kml`;
+
     const shareTypes = [
-        'application/gpx+xml',
-        'application/octet-stream',
-        'text/xml'
+        'application/vnd.google-earth.kml+xml',
+        'application/xml',
+        'text/xml',
+        'application/octet-stream'
     ];
 
     for (const mimeType of shareTypes) {
-        const blobForShare = new Blob([gpx], { type: mimeType });
+        const blobForShare = new Blob([kml], { type: mimeType });
         const fileForShare = new File([blobForShare], fileName, { type: mimeType });
 
         try {
@@ -3305,11 +3321,11 @@ async function exportCurrentFireGpx() {
                 return;
             }
         } catch (error) {
-            console.warn(`Partage GPX impossible avec ${mimeType}:`, error);
+            console.warn(`Partage KML impossible avec ${mimeType}:`, error);
         }
     }
 
-    const blob = new Blob([gpx], { type: 'application/octet-stream' });
+    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -3321,7 +3337,6 @@ async function exportCurrentFireGpx() {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
-
 
 function ensureOwnGpsAltitudeMarkerStyle() {
     const styleId = 'own-gps-altitude-marker-style';
