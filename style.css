@@ -3847,3 +3847,16 @@ body {
     padding: 6px 7px;
 }
 
+/* v11.99 — GPS altitude : espacement anti-chevauchement icône/étiquette */
+.own-gps-altitude-marker {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* v11.99 — recherche : conserver le clavier lors de l'effacement */
+#search-input,
+#clear-search {
+    touch-action: manipulation;
+}
+
