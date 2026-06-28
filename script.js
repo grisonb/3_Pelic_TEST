@@ -1811,7 +1811,7 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
-    const gpxButtonHTML = `<button id="export-kml-btn" class="export-kml-btn" type="button" title="Exporter le feu sélectionné en KML">📤 KML</button>`;
+    const gpxButtonHTML = `<button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le feu sélectionné en KML">📤 KML</button>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1830,7 +1830,7 @@ function updateCommuneDisplay(commune) {
 
     const exportKmlBtn = document.getElementById('export-kml-btn');
     if (exportKmlBtn) {
-        exportKmlBtn.addEventListener('click', exportCurrentFireKml);
+        exportKmlBtn.addEventListener('click', (event) => exportCurrentFireKml(event));
     }
 
     // On attache l'événement de clic au nouveau bouton
@@ -3246,44 +3246,65 @@ function escapeXml(value) {
         .replace(/'/g, '&apos;');
 }
 
-async function exportCurrentFireKml() {
-    if (!currentCommune) {
-        alert('Aucun feu sélectionné.');
+let exportKmlInProgress = false;
+let exportKmlLastActionTime = 0;
+
+async function exportCurrentFireKml(event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const now = Date.now();
+    if (exportKmlInProgress || now - exportKmlLastActionTime < 1200) {
         return;
     }
 
-    const lat = Number(currentCommune.latitude_mairie);
-    const lon = Number(currentCommune.longitude_mairie);
+    exportKmlInProgress = true;
+    exportKmlLastActionTime = now;
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        alert('Coordonnées du feu indisponibles.');
-        return;
+    const exportButton = document.getElementById('export-kml-btn');
+    if (exportButton) {
+        exportButton.disabled = true;
+        exportButton.classList.add('busy');
     }
 
-    /*
-     * v11.92 — KML minimal pour compatibilité SDVFR/ForeFlight/iOS.
-     * Structure volontairement simple :
-     * - un seul Placemark
-     * - pas de style
-     * - pas de title/text dans navigator.share
-     * - coordonnées KML dans l'ordre obligatoire longitude,latitude,altitude
-     */
-    const rawName = currentCommune.nom_standard || 'POINT_FDF';
-    const safeName = rawName
-        .toUpperCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^A-Z0-9_-]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '')
-        .slice(0, 30) || 'POINT_FDF';
+    try {
+        if (!currentCommune) {
+            alert('Aucun feu sélectionné.');
+            return;
+        }
 
-    const kml = `<?xml version="1.0" encoding="UTF-8"?>
+        const lat = Number(currentCommune.latitude_mairie);
+        const lon = Number(currentCommune.longitude_mairie);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            alert('Coordonnées du feu indisponibles.');
+            return;
+        }
+
+        /*
+         * v11.93 — KML minimal téléchargé, sans feuille de partage iOS.
+         * Objectif : éviter la réouverture de la feuille de partage iOS
+         * et fournir un vrai fichier .kml à ouvrir/importer ensuite depuis Fichiers.
+         * Coordonnées KML : longitude,latitude,altitude.
+         */
+        const rawName = currentCommune.nom_standard || 'POINT_Q400';
+        const safeName = rawName
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^A-Z0-9_-]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 30) || 'POINT_Q400';
+
+        const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <Placemark>
       <name>${escapeXml(safeName)}</name>
-      <description>Point exporté depuis NPF-Q400</description>
+      <description>Point exporte depuis NPF-Q400</description>
       <Point>
         <coordinates>${lon.toFixed(7)},${lat.toFixed(7)},0</coordinates>
       </Point>
@@ -3291,33 +3312,30 @@ async function exportCurrentFireKml() {
   </Document>
 </kml>`;
 
-    const fileName = `${safeName}.kml`;
-    const file = new File(
-        [kml],
-        fileName,
-        { type: 'application/vnd.google-earth.kml+xml' }
-    );
+        const fileName = `${safeName}.kml`;
+        const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
 
-    try {
-        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-            await navigator.share({
-                files: [file]
-            });
-            return;
-        }
-    } catch (error) {
-        console.warn('Partage KML indisponible, bascule téléchargement:', error);
+        link.href = url;
+        link.download = fileName;
+        link.rel = 'noopener';
+        link.style.display = 'none';
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
+    } finally {
+        setTimeout(() => {
+            exportKmlInProgress = false;
+            if (exportButton) {
+                exportButton.disabled = false;
+                exportButton.classList.remove('busy');
+            }
+        }, 900);
     }
-
-    const url = URL.createObjectURL(file);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    link.rel = 'noopener';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 
 function ensureOwnGpsAltitudeMarkerStyle() {
