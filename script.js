@@ -1529,9 +1529,17 @@ function setupEventListeners() {
     searchInput.addEventListener('focus', showFireHistoryFromSearch);
     searchInput.addEventListener('click', showFireHistoryFromSearch);
     document.addEventListener('pointerdown', (event) => {
-        if (event.target !== searchInput) {
-            setTimeout(collapseSearchInputSelection, 0);
+        if (event.target === searchInput) return;
+
+        /*
+         * v11.95 — iPad : ne pas laisser le gestionnaire global interférer
+         * avec le bouton X du feu en cours. Le clavier doit rester ouvert.
+         */
+        if (event.target && event.target.closest && event.target.closest('#clear-commune-btn')) {
+            return;
         }
+
+        setTimeout(collapseSearchInputSelection, 0);
     }, true);
     searchInput.addEventListener('pointerdown', () => {
         searchInput.disabled = false;
@@ -1850,7 +1858,7 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
-    const gpxButtonHTML = `<button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML puis utiliser la flèche de partage iOS">📤 KML</button>`;
+    const gpxButtonHTML = `<span class="fire-export-buttons"><button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML pour ForeFlight">KML FF</button><button id="export-sdvfr-csv-btn" class="export-sdvfr-csv-btn" type="button" title="Télécharger le fichier CSV pour SDVFR Next">CSV SDVFR</button></span>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1872,28 +1880,52 @@ function updateCommuneDisplay(commune) {
         exportKmlBtn.addEventListener('click', (event) => exportCurrentFireKml(event));
     }
 
+    const exportSdvfrCsvBtn = document.getElementById('export-sdvfr-csv-btn');
+    if (exportSdvfrCsvBtn) {
+        exportSdvfrCsvBtn.addEventListener('click', (event) => exportCurrentFireSdvfrCsv(event));
+    }
+
     // On attache l'événement de clic au nouveau bouton
     const clearCommuneBtn = document.getElementById('clear-commune-btn');
     if (clearCommuneBtn) {
-        clearCommuneBtn.addEventListener('pointerdown', (event) => {
+        const preserveSearchFocusBeforeClear = (event) => {
             /*
-             * v11.94 — iPad : conserver le clavier ouvert si l'utilisateur
-             * efface le feu en cours pendant qu'il saisit une commune.
+             * v11.95 — iPad : pointerdown seul ne suffit pas toujours.
+             * On intercepte touchstart + mousedown + pointerdown avant que Safari
+             * ne retire le focus du champ et ferme le clavier.
              */
             const searchInput = document.getElementById('search-input');
             if (document.activeElement === searchInput) {
+                clearCommuneBtn.dataset.keepSearchKeyboard = '1';
                 event.preventDefault();
                 event.stopPropagation();
             }
+        };
+
+        ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
+            clearCommuneBtn.addEventListener(eventName, preserveSearchFocusBeforeClear, { passive: false });
         });
+
         clearCommuneBtn.addEventListener('click', (event) => {
             const searchInput = document.getElementById('search-input');
-            const shouldKeepKeyboard = document.activeElement === searchInput;
+            const shouldKeepKeyboard = clearCommuneBtn.dataset.keepSearchKeyboard === '1' || document.activeElement === searchInput;
+
             event.preventDefault();
             event.stopPropagation();
+
             clearCurrentSelection();
+            clearCommuneBtn.dataset.keepSearchKeyboard = '0';
+
             if (shouldKeepKeyboard && searchInput) {
-                setTimeout(() => searchInput.focus(), 0);
+                setTimeout(() => {
+                    try {
+                        searchInput.focus({ preventScroll: true });
+                        const end = searchInput.value.length;
+                        searchInput.setSelectionRange(end, end);
+                    } catch (_) {
+                        searchInput.focus();
+                    }
+                }, 0);
             }
         });
     }
@@ -3396,6 +3428,102 @@ async function exportCurrentFireKml(event = null) {
         }, 900);
     }
 }
+
+function formatSdvfrCsvValue(value) {
+    return String(value ?? '')
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/;/g, ',')
+        .trim();
+}
+
+function buildSdvfrPointName(value) {
+    return (value || 'POINT_Q400')
+        .toString()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .slice(0, 30) || 'POINT_Q400';
+}
+
+let exportSdvfrCsvInProgress = false;
+let exportSdvfrCsvLastActionTime = 0;
+
+async function exportCurrentFireSdvfrCsv(event = null) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const now = Date.now();
+    if (exportSdvfrCsvInProgress || now - exportSdvfrCsvLastActionTime < 1200) {
+        return;
+    }
+
+    exportSdvfrCsvInProgress = true;
+    exportSdvfrCsvLastActionTime = now;
+
+    const exportButton = document.getElementById('export-sdvfr-csv-btn');
+    if (exportButton) {
+        exportButton.disabled = true;
+        exportButton.classList.add('busy');
+    }
+
+    try {
+        if (!currentCommune) {
+            alert('Aucun feu sélectionné.');
+            return;
+        }
+
+        const lat = Number(currentCommune.latitude_mairie);
+        const lon = Number(currentCommune.longitude_mairie);
+
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            alert('Coordonnées du feu indisponibles.');
+            return;
+        }
+
+        /*
+         * v11.96 — Export CSV SDVFR Next.
+         * Format validé :
+         * name;description;type;latitude;longitude;shape;color
+         * BELCODENE;Belcodene;FEU;43.427222;5.589444;diamond;yellow
+         */
+        const pointName = buildSdvfrPointName(currentCommune.nom_standard || 'POINT_Q400');
+        const description = formatSdvfrCsvValue(currentCommune.nom_standard || pointName);
+        const csv = [
+            'name;description;type;latitude;longitude;shape;color',
+            `${formatSdvfrCsvValue(pointName)};${description};FEU;${lat.toFixed(6)};${lon.toFixed(6)};diamond;yellow`
+        ].join('\n') + '\n';
+
+        const fileName = `Fichier_cibles_NEXT_${pointName}.csv`;
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+
+        link.href = url;
+        link.download = fileName;
+        link.rel = 'noopener';
+        link.style.display = 'none';
+
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 15000);
+    } finally {
+        setTimeout(() => {
+            exportSdvfrCsvInProgress = false;
+            if (exportButton) {
+                exportButton.disabled = false;
+                exportButton.classList.remove('busy');
+            }
+        }, 900);
+    }
+}
+
 
 function ensureOwnGpsAltitudeMarkerStyle() {
     const styleId = 'own-gps-altitude-marker-style';
