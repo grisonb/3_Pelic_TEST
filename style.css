@@ -3783,3 +3783,56 @@ body {
 
 /* v11.94 — recherche plus fluide + clavier conservé au clic sur X feu */
 
+/* v11.95 — iPad : conserver le clavier lors du X feu sélectionné */
+#clear-commune-btn {
+    touch-action: manipulation;
+}
+
+/* v11.96 — exports séparés : KML ForeFlight + CSV SDVFR */
+#commune-info-display .fire-export-buttons {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+#commune-info-display .export-kml-btn,
+#commune-info-display .export-sdvfr-csv-btn {
+    border: 1px solid rgba(0, 95, 170, 0.25);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #eef8ff 0%, #d8edff 100%);
+    color: #005a9c;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 7px 8px;
+    white-space: nowrap;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+    cursor: pointer;
+}
+
+#commune-info-display .export-kml-btn:active,
+#commune-info-display .export-sdvfr-csv-btn:active {
+    transform: translateY(1px);
+}
+
+#commune-info-display .export-kml-btn:disabled,
+#commune-info-display .export-kml-btn.busy,
+#commune-info-display .export-sdvfr-csv-btn:disabled,
+#commune-info-display .export-sdvfr-csv-btn.busy {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+@media (max-width: 620px) {
+    #commune-info-display .fire-export-buttons {
+        gap: 4px;
+    }
+
+    #commune-info-display .export-kml-btn,
+    #commune-info-display .export-sdvfr-csv-btn {
+        font-size: 11px;
+        padding: 6px 6px;
+    }
+}
+
