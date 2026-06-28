@@ -3866,3 +3866,19 @@ body {
     user-select: none;
 }
 
+/* v12.01 — X feu toujours à droite du bandeau */
+#commune-info-display .clear-commune-btn {
+    margin-left: auto !important;
+    order: 999;
+    flex: 0 0 auto;
+    padding-left: 10px;
+    padding-right: 2px;
+}
+
+/* v12.01 — étiquette GPS altitude placée au-dessus du point */
+.own-gps-altitude-marker {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
