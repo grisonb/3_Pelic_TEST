@@ -1347,6 +1347,32 @@ function clearCurrentSelection() {
     map.setView([46.6, 2.2], 5.5);
 }
 
+
+let searchInputClearRefocusTimer = null;
+
+function keepKeyboardAfterSearchClear() {
+    /*
+     * v11.99 — iPad : lorsque l'utilisateur efface la commune saisie
+     * avec le X de la barre de recherche, Safari peut retirer le focus.
+     * On réapplique le focus tant que la recherche est ouverte.
+     */
+    const searchInput = document.getElementById('search-input');
+    const searchContainer = document.getElementById('search-container');
+    if (!searchInput) return;
+    if (searchInput.value !== '') return;
+    if (searchContainer && searchContainer.style.display === 'none') return;
+
+    clearTimeout(searchInputClearRefocusTimer);
+    searchInputClearRefocusTimer = setTimeout(() => {
+        try {
+            searchInput.focus({ preventScroll: true });
+            searchInput.setSelectionRange(0, 0);
+        } catch (_) {
+            searchInput.focus();
+        }
+    }, 80);
+}
+
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -1478,6 +1504,9 @@ function setupEventListeners() {
         displayResults(scoredResults.slice(0, 10));
     };
 
+    searchInput.addEventListener('input', keepKeyboardAfterSearchClear);
+    searchInput.addEventListener('search', keepKeyboardAfterSearchClear);
+
     searchInput.addEventListener('input', () => {
         clearSearchBtn.style.display = searchInput.value.length > 0 ? 'block' : 'none';
 
@@ -1535,7 +1564,11 @@ function setupEventListeners() {
          * v11.95 — iPad : ne pas laisser le gestionnaire global interférer
          * avec le bouton X du feu en cours. Le clavier doit rester ouvert.
          */
-        if (event.target && event.target.closest && event.target.closest('#clear-commune-btn')) {
+        if (event.target && event.target.closest && (
+            event.target.closest('#clear-commune-btn') ||
+            event.target.closest('#clear-search') ||
+            event.target.closest('#search-container')
+        )) {
             return;
         }
 
@@ -1546,9 +1579,22 @@ function setupEventListeners() {
         searchInput.readOnly = false;
     });
 
-    clearSearchBtn.addEventListener('click', () => {
+    clearSearchBtn.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    }, { passive: false });
+
+    clearSearchBtn.addEventListener('touchstart', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    }, { passive: false });
+
+    clearSearchBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
         clearCurrentSelection();
         displayFireHistory();
+        keepKeyboardAfterSearchClear();
     });
 
     airportCountInput.addEventListener('change', () => {
@@ -3551,12 +3597,12 @@ function buildOwnGpsIcon(altitudeLabel = '--- ft') {
          * ces anciennes classes ajoutaient une grosse bulle blanche autour du marqueur.
          */
         className: 'own-gps-altitude-marker',
-        html: `<div style="display:flex;align-items:center;gap:5px;">
+        html: `<div style="display:flex;align-items:center;gap:12px;">
                 <div style="flex:0 0 auto;width:16px;height:16px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 0 0 2px rgba(124,58,237,.35),0 1px 5px rgba(0,0,0,.45);"></div>
                 <div style="background:#ffffff;border:1px solid #7c3aed;border-radius:8px;padding:3px 6px;font-size:11px;line-height:1.15;font-weight:700;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.25);white-space:nowrap;text-align:center;min-width:42px;">${safeAltitude}</div>
             </div>`,
-        iconSize: [82, 28],
-        iconAnchor: [12, 14]
+        iconSize: [96, 28],
+        iconAnchor: [8, 14]
     });
 }
 
