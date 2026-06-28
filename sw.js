@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-99-label-offset-search-clear-keyboard';
+const SW_VERSION = 'sw-v12-00-search-clear-button-fix';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
