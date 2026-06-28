@@ -3773,3 +3773,11 @@ body {
 /* v11.91 — export KML en remplacement du test GPX */
 
 /* v11.92 — KML minimal, partage fichier seul */
+
+/* v11.93 — KML : téléchargement seul + protection anti double clic */
+#commune-info-display .export-kml-btn:disabled,
+#commune-info-display .export-kml-btn.busy {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
