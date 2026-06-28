@@ -1858,7 +1858,7 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
-    const gpxButtonHTML = `<span class="fire-export-buttons"><button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML pour ForeFlight">KML FF</button><button id="export-sdvfr-csv-btn" class="export-sdvfr-csv-btn" type="button" title="Télécharger le fichier CSV pour SDVFR Next">CSV SDVFR</button></span>`;
+    const exportButtonsHTML = `<span class="fire-export-buttons"><button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML pour ForeFlight">ForeFlight</button><button id="export-sdvfr-csv-btn" class="export-sdvfr-csv-btn" type="button" title="Télécharger le fichier CSV pour SDVFR Next">SDVFR</button></span>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1872,7 +1872,7 @@ function updateCommuneDisplay(commune) {
             sunsetHTML = '<div class="sunset-info"></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>';
         }
     }
-    communeDisplay.innerHTML = communeNameHTML + gpxButtonHTML + sunsetHTML;
+    communeDisplay.innerHTML = communeNameHTML + sunsetHTML + exportButtonsHTML;
     updateCommuneGpsRouteDisplay();
 
     const exportKmlBtn = document.getElementById('export-kml-btn');
