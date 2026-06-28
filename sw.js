@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-91-fire-kml-export';
+const SW_VERSION = 'sw-v11-92-kml-minimal-share-file-only';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
