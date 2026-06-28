@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-90-gpx-share-compat';
+const SW_VERSION = 'sw-v11-91-fire-kml-export';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
