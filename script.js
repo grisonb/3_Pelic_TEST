@@ -3260,78 +3260,60 @@ async function exportCurrentFireKml() {
         return;
     }
 
-    const depLabel = formatCommuneDepartment(currentCommune);
-    const fireName = `${currentCommune.nom_standard || 'Feu'}${depLabel ? ` (${depLabel})` : ''}`;
-    const nowIso = new Date().toISOString();
-
     /*
-     * v11.91 — Export KML.
-     * KML est souvent mieux reconnu par iOS et les applications cartographiques
-     * qu'un GPX généré par une PWA.
+     * v11.92 — KML minimal pour compatibilité SDVFR/ForeFlight/iOS.
+     * Structure volontairement simple :
+     * - un seul Placemark
+     * - pas de style
+     * - pas de title/text dans navigator.share
+     * - coordonnées KML dans l'ordre obligatoire longitude,latitude,altitude
      */
+    const rawName = currentCommune.nom_standard || 'POINT_FDF';
+    const safeName = rawName
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .slice(0, 30) || 'POINT_FDF';
+
     const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>${escapeXml(fireName)}</name>
-    <description>${escapeXml(`Point feu exporté depuis NPF-Q400 ${APP_VERSION} le ${nowIso}`)}</description>
-    <Style id="firePoint">
-      <IconStyle>
-        <color>ff0000ff</color>
-        <scale>1.2</scale>
-        <Icon>
-          <href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href>
-        </Icon>
-      </IconStyle>
-      <LabelStyle>
-        <scale>1.0</scale>
-      </LabelStyle>
-    </Style>
     <Placemark>
-      <name>${escapeXml(fireName)}</name>
-      <description>${escapeXml(`Coordonnées: ${lat.toFixed(6)}, ${lon.toFixed(6)}`)}</description>
-      <styleUrl>#firePoint</styleUrl>
+      <name>${escapeXml(safeName)}</name>
+      <description>Point exporté depuis NPF-Q400</description>
       <Point>
         <coordinates>${lon.toFixed(7)},${lat.toFixed(7)},0</coordinates>
       </Point>
     </Placemark>
   </Document>
-</kml>
-`;
+</kml>`;
 
-    const fileName = `feu_${sanitizeFilePart(currentCommune.nom_standard)}${depLabel ? `_${sanitizeFilePart(depLabel)}` : ''}.kml`;
+    const fileName = `${safeName}.kml`;
+    const file = new File(
+        [kml],
+        fileName,
+        { type: 'application/vnd.google-earth.kml+xml' }
+    );
 
-    const shareTypes = [
-        'application/vnd.google-earth.kml+xml',
-        'application/xml',
-        'text/xml',
-        'application/octet-stream'
-    ];
-
-    for (const mimeType of shareTypes) {
-        const blobForShare = new Blob([kml], { type: mimeType });
-        const fileForShare = new File([blobForShare], fileName, { type: mimeType });
-
-        try {
-            if (navigator.canShare && navigator.canShare({ files: [fileForShare] }) && navigator.share) {
-                await navigator.share({
-                    title: fileName,
-                    text: `${fireName}\n${lat.toFixed(6)}, ${lon.toFixed(6)}`,
-                    files: [fileForShare]
-                });
-                return;
-            }
-        } catch (error) {
-            console.warn(`Partage KML impossible avec ${mimeType}:`, error);
+    try {
+        if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+            await navigator.share({
+                files: [file]
+            });
+            return;
         }
+    } catch (error) {
+        console.warn('Partage KML indisponible, bascule téléchargement:', error);
     }
 
-    const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(file);
     const link = document.createElement('a');
     link.href = url;
     link.download = fileName;
     link.rel = 'noopener';
-    link.title = `${fireName} ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
