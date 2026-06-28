@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-96-kml-ff-csv-sdvfr';
+const SW_VERSION = 'sw-v11-97-export-buttons-after-route';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
