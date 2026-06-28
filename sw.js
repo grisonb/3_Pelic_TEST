@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v11-97-export-buttons-after-route';
+const SW_VERSION = 'sw-v11-98-update-button-clean-reload';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
