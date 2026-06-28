@@ -3736,8 +3736,8 @@ body {
     -webkit-text-security: none;
 }
 
-/* v11.89 — bouton export GPX dans la pastille du feu sélectionné */
-#commune-info-display .export-gpx-btn {
+/* v11.89 — bouton export KML dans la pastille du feu sélectionné */
+#commune-info-display .export-kml-btn {
     border: 1px solid rgba(0, 95, 170, 0.25);
     border-radius: 999px;
     background: linear-gradient(180deg, #eef8ff 0%, #d8edff 100%);
@@ -3751,21 +3751,23 @@ body {
     cursor: pointer;
 }
 
-#commune-info-display .export-gpx-btn:active {
+#commune-info-display .export-kml-btn:active {
     transform: translateY(1px);
 }
 
 @media (max-width: 820px) {
-    #commune-info-display .export-gpx-btn {
+    #commune-info-display .export-kml-btn {
         font-size: 12px;
         padding: 7px 8px;
     }
 }
 
 @media (max-width: 620px) {
-    #commune-info-display .export-gpx-btn {
+    #commune-info-display .export-kml-btn {
         padding: 6px 7px;
     }
 }
 
 /* v11.90 — export GPX : essais de partage iOS avec MIME alternatifs */
+
+/* v11.91 — export KML en remplacement du test GPX */
