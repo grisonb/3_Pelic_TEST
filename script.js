@@ -984,6 +984,43 @@ async function loadCommunesAliases() {
     }
 }
 
+function shouldSearchCandidate(candidate, searchWords, searchCompact, departmentFilter = null) {
+    /*
+     * v11.94 — fluidité saisie.
+     * Sans filtre département, on évite de calculer Levenshtein/Soundex sur
+     * 35k communes + alias à chaque recherche. On garde la recherche exhaustive
+     * si un département est fourni, car le volume est alors faible.
+     */
+    if (departmentFilter) return true;
+    if (!candidate || !Array.isArray(searchWords) || !searchWords.length) return false;
+
+    const firstWord = searchWords[0] || '';
+    if (firstWord.length < 2) return false;
+
+    const normalizedName = candidate.normalized_name || simplifyString(candidate.nom_standard);
+    const compactName = candidate.search_compact || normalizedName.replace(/\s+/g, '');
+
+    if (searchCompact.length >= 4 && compactName.includes(searchCompact.slice(0, Math.min(5, searchCompact.length)))) {
+        return true;
+    }
+
+    const parts = Array.isArray(candidate.search_parts) && candidate.search_parts.length
+        ? candidate.search_parts
+        : normalizedName.split(' ').filter(Boolean);
+
+    const firstPrefix = firstWord.slice(0, 2);
+    if (parts.some(part => part.startsWith(firstPrefix) || firstWord.startsWith(part.slice(0, Math.min(3, part.length))))) {
+        return true;
+    }
+
+    const firstSoundex = soundex(firstWord);
+    const soundexParts = Array.isArray(candidate.soundex_parts) && candidate.soundex_parts.length
+        ? candidate.soundex_parts
+        : parts.map(part => soundex(part));
+
+    return soundexParts.includes(firstSoundex);
+}
+
 function scoreCommuneSearchCandidate(candidate, searchWords) {
     if (!candidate || !Array.isArray(searchWords) || !searchWords.length) return 999;
 
@@ -1056,11 +1093,11 @@ function searchAliasCommunes(searchWords, departmentFilter = null) {
     if (!Array.isArray(communeAliases) || !communeAliases.length) return [];
 
     const compactQuery = searchWords.join('');
-    if (!departmentFilter && compactQuery.length < 5) return [];
+    if (!departmentFilter && compactQuery.length < 6) return [];
 
     const candidates = departmentFilter
         ? communeAliases.filter(alias => alias.dep_code === departmentFilter)
-        : communeAliases;
+        : communeAliases.filter(alias => shouldSearchCandidate(alias, searchWords, compactQuery, departmentFilter));
 
     return candidates
         .map(alias => {
@@ -1417,9 +1454,11 @@ function setupEventListeners() {
             return;
         }
         const searchWords = simplifiedSearch.split(' ').filter(Boolean);
+        const searchCompact = searchWords.join('');
         const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
 
         const scoredResults = communesToSearch
+            .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
             .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords) }))
             .filter(c => c.score < 999);
 
@@ -1455,7 +1494,7 @@ function setupEventListeners() {
         const value = searchInput.value;
         const immediateDepartmentSearch = /\s(\d{1,3}|2A|2B)$/i.test(value);
 
-        searchInputDebounceTimer = setTimeout(runCommuneSearch, immediateDepartmentSearch ? 0 : 120);
+        searchInputDebounceTimer = setTimeout(runCommuneSearch, immediateDepartmentSearch ? 0 : 260);
     });
 
     const showFireHistoryFromSearch = () => {
@@ -1811,7 +1850,7 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
-    const gpxButtonHTML = `<button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le feu sélectionné en KML">📤 KML</button>`;
+    const gpxButtonHTML = `<button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML puis utiliser la flèche de partage iOS">📤 KML</button>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -1836,7 +1875,27 @@ function updateCommuneDisplay(commune) {
     // On attache l'événement de clic au nouveau bouton
     const clearCommuneBtn = document.getElementById('clear-commune-btn');
     if (clearCommuneBtn) {
-        clearCommuneBtn.addEventListener('click', clearCurrentSelection);
+        clearCommuneBtn.addEventListener('pointerdown', (event) => {
+            /*
+             * v11.94 — iPad : conserver le clavier ouvert si l'utilisateur
+             * efface le feu en cours pendant qu'il saisit une commune.
+             */
+            const searchInput = document.getElementById('search-input');
+            if (document.activeElement === searchInput) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+        clearCommuneBtn.addEventListener('click', (event) => {
+            const searchInput = document.getElementById('search-input');
+            const shouldKeepKeyboard = document.activeElement === searchInput;
+            event.preventDefault();
+            event.stopPropagation();
+            clearCurrentSelection();
+            if (shouldKeepKeyboard && searchInput) {
+                setTimeout(() => searchInput.focus(), 0);
+            }
+        });
     }
 }
 
