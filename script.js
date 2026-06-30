@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
-let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, currentCommune = null, selectedPelicanOACI = null;
+let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
@@ -168,6 +168,8 @@ const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
 const AIRPORT_PDF_DB_NAME = 'AirportPdfsDB';
 const AIRPORT_PDF_DB_VERSION = 1;
 let airportPdfDb = null;
+const WATER_POINTS_LAYER_KEY = 'showWaterPointsLayer';
+let showWaterPointsLayer = localStorage.getItem(WATER_POINTS_LAYER_KEY) === 'true';
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
 const FIRE_HISTORY_MAX_ITEMS = 20;
 const FORCE_DISPLAY_MODE = new URLSearchParams(window.location.search).get('force_display') === '1';
@@ -212,6 +214,10 @@ let mqttLoaderPromise = null;
 const pelicanAirports = [
     { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }, { oaci: "LFSJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }
 ];
+
+
+const waterPoints = [{"id":"AIGUEBLETTE","name":"Aigueblette","countryCode":"FR","lat":45.55,"lon":5.8},{"id":"AJACCIO","name":"Ajaccio","countryCode":"FR","lat":41.916667,"lon":8.75},{"id":"ANDANCE","name":"Andance","countryCode":"FR","lat":45.216667,"lon":4.8},{"id":"ANNECY","name":"Annecy","countryCode":"FR","lat":45.85,"lon":6.166667},{"id":"BAGES","name":"Bages","countryCode":"FR","lat":43.1,"lon":3.0},{"id":"BASSE_SEINE","name":"Basse Seine","countryCode":"FR","lat":49.433333,"lon":0.6},{"id":"BASTIA","name":"Bastia","countryCode":"FR","lat":42.516667,"lon":9.55},{"id":"BEAULIEU_MENTON","name":"Beaulieu-Menton","countryCode":"FR","lat":43.7,"lon":7.333333},{"id":"BEAUTIRAN","name":"Beautiran","countryCode":"FR","lat":44.716667,"lon":-0.45},{"id":"BEC_D_AMBES","name":"Bec D’Ambes","countryCode":"FR","lat":45.016667,"lon":-0.583333},{"id":"BERRE","name":"Berre","countryCode":"FR","lat":43.483333,"lon":5.1},{"id":"BISCAROSSE","name":"Biscarosse","countryCode":"FR","lat":44.35,"lon":-1.183333},{"id":"BORT_LES_ORGUES","name":"Bort Les Orgues","countryCode":"FR","lat":45.45,"lon":2.5},{"id":"BOULOGNE_SUR_GESSE","name":"Boulogne Sur Gesse","countryCode":"FR","lat":43.333333,"lon":0.666667},{"id":"BREST","name":"Brest","countryCode":"FR","lat":48.3,"lon":-4.433333},{"id":"CALVI","name":"Calvi","countryCode":"FR","lat":42.566667,"lon":8.783333},{"id":"CANNES_NICE","name":"Cannes-Nice","countryCode":"FR","lat":43.533333,"lon":7.083333},{"id":"CARRO","name":"Carro","countryCode":"FR","lat":43.35,"lon":5.016667},{"id":"CASTELLANE","name":"Castellane","countryCode":"FR","lat":43.9,"lon":6.533333},{"id":"CAZAUBON","name":"Cazaubon","countryCode":"FR","lat":43.933333,"lon":-0.05},{"id":"CAZAUX","name":"Cazaux","countryCode":"FR","lat":44.5,"lon":-1.15},{"id":"CHARMES","name":"Charmes","countryCode":"FR","lat":44.866667,"lon":4.85},{"id":"CHATEAUNEUF_DU_PAPE","name":"Chateauneuf Du Pape","countryCode":"FR","lat":44.033333,"lon":4.816667},{"id":"CHAUMARD","name":"Chaumard","countryCode":"FR","lat":47.15,"lon":3.9},{"id":"DER","name":"Der","countryCode":"FR","lat":48.583333,"lon":4.75},{"id":"DONGE","name":"Donge","countryCode":"FR","lat":47.3,"lon":-2.1},{"id":"DONZERE","name":"Donzere","countryCode":"FR","lat":44.45,"lon":4.7},{"id":"DUC","name":"Duc","countryCode":"FR","lat":47.95,"lon":-2.416667},{"id":"EGUZON","name":"Eguzon","countryCode":"FR","lat":46.4,"lon":1.616667},{"id":"FIGARI","name":"Figari","countryCode":"FR","lat":41.466667,"lon":9.066667},{"id":"FORET_D_ORIENT","name":"Foret D’Orient","countryCode":"FR","lat":48.266667,"lon":4.316667},{"id":"FOS","name":"Fos","countryCode":"FR","lat":43.4,"lon":4.933333},{"id":"GABAS","name":"Gabas","countryCode":"FR","lat":43.283333,"lon":-0.133333},{"id":"GOLFE_DU_MOBIHAN","name":"Golfe Du Mobihan","countryCode":"FR","lat":47.566667,"lon":-2.833333},{"id":"GRAU_DU_ROI","name":"Grau Du Roi","countryCode":"FR","lat":43.533333,"lon":4.116667},{"id":"GUERLEDAN","name":"Guerledan","countryCode":"FR","lat":48.2,"lon":-3.05},{"id":"HOURTIN","name":"Hourtin","countryCode":"FR","lat":45.133333,"lon":-1.116667},{"id":"HYERES","name":"Hyeres","countryCode":"FR","lat":43.066667,"lon":6.116667},{"id":"ILE_ROUSSE","name":"Ile Rousse","countryCode":"FR","lat":42.633333,"lon":8.95},{"id":"L_ESCOUROU","name":"L’Escourou","countryCode":"FR","lat":44.666667,"lon":0.35},{"id":"L_ESTRADE","name":"L’Estrade","countryCode":"FR","lat":43.333333,"lon":1.8},{"id":"LA_CIOTAT","name":"La Ciotat","countryCode":"FR","lat":43.166667,"lon":5.633333},{"id":"LA_HONCE","name":"La Honce","countryCode":"FR","lat":43.5,"lon":-1.383333},{"id":"LA_LIEZ","name":"La Liez","countryCode":"FR","lat":47.866667,"lon":5.4},{"id":"LA_MADINE","name":"La Madine","countryCode":"FR","lat":48.916667,"lon":5.733333},{"id":"LA_PIERRE_PERCEE","name":"La Pierre Percee","countryCode":"FR","lat":48.466667,"lon":6.916667},{"id":"LA_RANCE","name":"La Rance","countryCode":"FR","lat":48.43,"lon":-2.02},{"id":"LA_ROCHE_DE_GLUN","name":"La Roche De Glun","countryCode":"FR","lat":45.0,"lon":4.85},{"id":"LA_SALVETAT","name":"La Salvetat","countryCode":"FR","lat":43.6,"lon":2.616667},{"id":"LAC_LEMAN","name":"Lac Leman","countryCode":"FR","lat":46.416667,"lon":6.5},{"id":"LACANAU","name":"Lacanau","countryCode":"FR","lat":44.966667,"lon":-1.116667},{"id":"LAFFREY","name":"Laffrey","countryCode":"FR","lat":45.016667,"lon":5.783333},{"id":"LAVAUD","name":"Lavaud","countryCode":"FR","lat":45.816667,"lon":0.666667},{"id":"LE_BOURGET","name":"Le Bourget","countryCode":"FR","lat":45.733333,"lon":5.866667},{"id":"LE_BRUSC","name":"Le Brusc","countryCode":"FR","lat":43.1,"lon":5.8},{"id":"LE_LANVANDOU","name":"Le Lanvandou","countryCode":"FR","lat":43.133333,"lon":6.383333},{"id":"LE_STOCK","name":"Le Stock","countryCode":"FR","lat":48.766667,"lon":6.933333},{"id":"LE_VERDON","name":"Le Verdon","countryCode":"FR","lat":47.016667,"lon":-0.816667},{"id":"LEON","name":"Leon","countryCode":"FR","lat":43.9,"lon":-1.316667},{"id":"LES_MUREAUX","name":"Les Mureaux","countryCode":"FR","lat":49.0,"lon":1.933333},{"id":"LIBOURNE","name":"Libourne","countryCode":"FR","lat":44.916667,"lon":-0.316667},{"id":"LISSAC","name":"Lissac","countryCode":"FR","lat":45.1,"lon":1.45},{"id":"LORIENT","name":"Lorient","countryCode":"FR","lat":47.733333,"lon":-3.35},{"id":"MACON","name":"Macon","countryCode":"FR","lat":46.216667,"lon":4.8},{"id":"MARCKOLSHEIM","name":"Marckolsheim","countryCode":"FR","lat":48.183333,"lon":7.633333},{"id":"MAS_THIBERT","name":"Mas Thibert","countryCode":"FR","lat":43.566667,"lon":4.7},{"id":"MATEMALE","name":"Matemale","countryCode":"FR","lat":42.566667,"lon":2.1},{"id":"MELUN","name":"Melun","countryCode":"FR","lat":48.483333,"lon":2.683333},{"id":"MIMIZAN","name":"Mimizan","countryCode":"FR","lat":44.233333,"lon":-1.216667},{"id":"MOISSAC","name":"Moissac","countryCode":"FR","lat":44.083333,"lon":1.0},{"id":"MONTBEL","name":"Montbel","countryCode":"FR","lat":42.966667,"lon":1.95},{"id":"MONTELIMAR","name":"Montelimar","countryCode":"FR","lat":44.6,"lon":4.733333},{"id":"MONTEYNARD","name":"Monteynard","countryCode":"FR","lat":44.9,"lon":5.683333},{"id":"MORCENX","name":"Morcenx","countryCode":"FR","lat":44.033333,"lon":-0.85},{"id":"MORLAIX","name":"Morlaix","countryCode":"FR","lat":48.65,"lon":-3.866667},{"id":"NAUSSAC","name":"Naussac","countryCode":"FR","lat":44.75,"lon":3.8},{"id":"PINARELO_CIPRIANO","name":"Pinarelo-Cipriano","countryCode":"FR","lat":41.666667,"lon":9.383333},{"id":"PALADRU","name":"Paladru","countryCode":"FR","lat":45.45,"lon":5.533333},{"id":"PARELOUP","name":"Pareloup","countryCode":"FR","lat":44.216667,"lon":2.766667},{"id":"PAUILLAC","name":"Pauillac","countryCode":"FR","lat":45.166667,"lon":-0.716667},{"id":"PINCEMAILLE","name":"Pincemaille","countryCode":"FR","lat":47.466667,"lon":0.2},{"id":"PLOBSHEIM","name":"Plobsheim","countryCode":"FR","lat":48.433333,"lon":7.75},{"id":"POINTE_ROUGE","name":"Pointe Rouge","countryCode":"FR","lat":43.266667,"lon":5.333333},{"id":"PORT_DE_MARSEILLE","name":"Port De Marseille","countryCode":"FR","lat":43.333333,"lon":5.333333},{"id":"PORT_VENDRES","name":"Port Vendres","countryCode":"FR","lat":42.55,"lon":3.066667},{"id":"PORTO","name":"Porto","countryCode":"FR","lat":42.283333,"lon":8.666667},{"id":"PORTO_VECCHIO","name":"Porto Vecchio","countryCode":"FR","lat":41.6,"lon":9.3},{"id":"PROPRIANO","name":"Propriano","countryCode":"FR","lat":41.683333,"lon":8.9},{"id":"RHINAU","name":"Rhinau","countryCode":"FR","lat":48.35,"lon":7.75},{"id":"ROUCARIE","name":"Roucarie","countryCode":"FR","lat":44.083333,"lon":2.15},{"id":"SAGONE","name":"Sagone","countryCode":"FR","lat":42.1,"lon":8.7},{"id":"SALAGOU","name":"Salagou","countryCode":"FR","lat":43.65,"lon":3.383333},{"id":"SALSES","name":"Salses","countryCode":"FR","lat":42.816667,"lon":2.983333},{"id":"SANTA_MANZA","name":"Santa Manza","countryCode":"FR","lat":41.416667,"lon":9.233333},{"id":"SERRE_PONCON","name":"Serre Poncon","countryCode":"FR","lat":44.483333,"lon":6.3},{"id":"SOUSTON","name":"Souston","countryCode":"FR","lat":43.783333,"lon":-1.316667},{"id":"SAINT_CASSIEN","name":"Saint Cassien","countryCode":"FR","lat":43.6,"lon":6.816667},{"id":"SAINT_CHRISTOLY","name":"Saint Christoly","countryCode":"FR","lat":45.366667,"lon":-0.816667},{"id":"SAINT_ETIENNE_DE_CANTALES","name":"Saint Etienne De Cantales","countryCode":"FR","lat":44.933333,"lon":2.233333},{"id":"SAINT_ETIENNE_DES_SORTS","name":"Saint Etienne Des Sorts","countryCode":"FR","lat":44.183333,"lon":4.716667},{"id":"SAINT_FLORENT","name":"Saint Florent","countryCode":"FR","lat":42.7,"lon":9.3},{"id":"SAINT_MANDRIER","name":"Saint Mandrier","countryCode":"FR","lat":43.1,"lon":5.933333},{"id":"SAINT_MICHEL","name":"Saint Michel","countryCode":"FR","lat":48.35,"lon":-3.9},{"id":"SAINT_POINT","name":"Saint Point","countryCode":"FR","lat":46.816667,"lon":6.316667},{"id":"SAINT_RAPHAEL","name":"Saint Raphael","countryCode":"FR","lat":43.42,"lon":6.75},{"id":"SAINT_TROPEZ","name":"Saint Tropez","countryCode":"FR","lat":43.283333,"lon":6.616667},{"id":"SAINTE_CROIX","name":"Sainte Croix","countryCode":"FR","lat":43.75,"lon":6.166667},{"id":"THAU","name":"Thau","countryCode":"FR","lat":43.383333,"lon":3.616667},{"id":"URBINO","name":"Urbino","countryCode":"FR","lat":42.05,"lon":9.466667},{"id":"URT","name":"Urt","countryCode":"FR","lat":43.5,"lon":-1.283333},{"id":"VALLABREGUES","name":"Vallabregues","countryCode":"FR","lat":43.866667,"lon":4.633333},{"id":"VALRAS","name":"Valras","countryCode":"FR","lat":43.233333,"lon":3.283333},{"id":"VASSIVIERE","name":"Vassiviere","countryCode":"FR","lat":45.8,"lon":1.883333},{"id":"VICHY","name":"Vichy","countryCode":"FR","lat":46.133333,"lon":3.416667},{"id":"VIELLES_FORGES","name":"Vielles Forges","countryCode":"FR","lat":49.866667,"lon":4.616667},{"id":"VILLEFRANCHE_DE_PANAT","name":"Villefranche De Panat","countryCode":"FR","lat":44.1,"lon":2.7},{"id":"VILLEFRANCHE_SUR_SAONE","name":"Villefranche Sur Saone","countryCode":"FR","lat":46.033333,"lon":4.75},{"id":"VILLENEUVE_DE_LA_RAHO","name":"Villeneuve De La Raho","countryCode":"FR","lat":42.633333,"lon":2.9},{"id":"VINCA","name":"Vinca","countryCode":"FR","lat":42.65,"lon":2.533333},{"id":"VOLGELSHEIM","name":"Volgelsheim","countryCode":"FR","lat":48.066667,"lon":7.566667},{"id":"VOUGLANS","name":"Vouglans","countryCode":"FR","lat":46.433333,"lon":5.7},{"id":"WANTZENAU","name":"Wantzenau","countryCode":"FR","lat":48.633333,"lon":7.833333},{"id":"ZI_PORTUAIRE_FOS","name":"Zi Portuaire Fos","countryCode":"FR","lat":43.416667,"lon":4.85}];
+
 
 const otherAirports = [
     { oaci: "LFBC", name: "Cazaux", lat: 44.534, lon: -1.155 }, { oaci: "LFBH", name: "La Rochelle-Île de Ré", lat: 46.179, lon: -1.195 }, { oaci: "LFBF", name: "Toulouse-Francazal", lat: 43.546, lon: 1.365 }, { oaci: "LFBG", name: "Cognac-Châteaubernard", lat: 45.660, lon: -0.354 }, { oaci: "LFBI", name: "Poitiers-Biard", lat: 46.587, lon: 0.309 }, { oaci: "LFBK", name: "Saint-Brieuc-Armor", lat: 48.538, lon: -2.852 }, { oaci: "LFBO", name: "Toulouse-Blagnac", lat: 43.635, lon: 1.363 }, { oaci: "LFBS", name: "Chambéry-Savoie", lat: 45.640, lon: 5.881 }, { oaci: "LFBT", name: "Tarbes-Lourdes-Pyrénées", lat: 43.185, lon: -0.003 }, { oaci: "LFBU", name: "Angoulême-Cognac", lat: 45.729, lon: 0.220 }, { oaci: "LFBV", name: "Brive-Souillac", lat: 45.040, lon: 1.484 }, { oaci: "LFCU", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFLA", name: "Auxerre-Branches", lat: 47.848, lon: 3.497 }, { oaci: "LFLC", name: "Clermont-Ferrand-Auvergne", lat: 45.786, lon: 3.169 }, { oaci: "LFLD", name: "Bourges", lat: 47.059, lon: 2.370 }, { oaci: "LFLL", name: "Lyon-Saint Exupéry", lat: 45.725, lon: 5.081 }, { oaci: "LFLN", name: "Saint-Yan", lat: 46.409, lon: 4.013 }, { oaci: "LFLS", name: "Grenoble-Isère", lat: 45.363, lon: 5.331 }, { oaci: "LFLV", name: "Vichy-Charmeil", lat: 46.167, lon: 3.403 }, { oaci: "LFLW", name: "Aurillac", lat: 44.887, lon: 2.418 }, { oaci: "LFLY", name: "Lyon-Bron", lat: 45.729, lon: 4.945 }, { oaci: "LFLZ", name: "Le Puy-Loudes", lat: 45.079, lon: 3.762 }, { oaci: "LFMC", name: "Le Luc-Le Cannet", lat: 43.385, lon: 6.368 }, { oaci: "LFMI", name: "Istres-Le Tubé", lat: 43.524, lon: 4.944 }, { oaci: "LFMN", name: "Nice-Côte d'Azur", lat: 43.665, lon: 7.215 }, { oaci: "LFMQ", name: "Le Castellet", lat: 43.253, lon: 5.786 }, { oaci: "LFMV", name: "Avignon-Provence", lat: 43.906, lon: 4.902 }, { oaci: "LFMY", name: "Salon-de-Provence", lat: 43.606, lon: 5.110 }, { oaci: "LFOA", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFOB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFOC", name: "Châteaudun", lat: 48.058, lon: 1.378 }, { oaci: "LFOE", name: "Évreux-Fauville", lat: 49.028, lon: 1.218 }, { oaci: "LFOK", name: "Châlons-Vatry", lat: 48.776, lon: 4.185 }, { oaci: "LFOJ", name: "Orléans-Bricy", lat: 47.989, lon: 1.758 }, { oaci: "LFOP", name: "Rouen-Vallée de Seine", lat: 49.385, lon: 1.182 }, { oaci: "LFOQ", name: "Blois-Le Breuil", lat: 47.678, lon: 1.217 }, { oaci: "LFOR", name: "Chartres-Métropole", lat: 48.455, lon: 1.530 }, { oaci: "LFOT", name: "Tours-Val de Loire", lat: 47.432, lon: 0.722 }, { oaci: "LFOU", name: "Cholet-Le Pontreau", lat: 47.081, lon: -0.871 }, { oaci: "LFOV", name: "Laval-Entrammes", lat: 48.033, lon: -0.749 }, { oaci: "LFPB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFPC", name: "Creil", lat: 49.253, lon: 2.520 }, { oaci: "LFPG", name: "Paris-Charles-de-Gaulle", lat: 49.009, lon: 2.547 }, { oaci: "LFPO", name: "Paris-Orly", lat: 48.723, lon: 2.379 }, { oaci: "LFPV", name: "Villacoublay-Vélizy", lat: 48.773, lon: 2.203 }, { oaci: "LFRB", name: "Brest-Bretagne", lat: 48.447, lon: -4.418 }, { oaci: "LFRC", name: "Cherbourg-Manche", lat: 49.650, lon: -1.478 }, { oaci: "LFRD", name: "Dinard-Pleurtuit-Saint-Malo", lat: 48.587, lon: -2.080 }, { oaci: "LFRE", name: "La Baule-Escoublac", lat: 47.289, lon: -2.348 }, { oaci: "LFRF", name: "Granville-Mont-Saint-Michel", lat: 48.887, lon: -1.564 }, { oaci: "LFRG", name: "Deauville-Normandie", lat: 49.365, lon: 0.154 }, { oaci: "LFRH", name: "Lorient-Bretagne-Sud", lat: 47.760, lon: -3.440 }, { oaci: "LFRI", name: "La Roche-sur-Yon-Les Ajoncs", lat: 46.702, lon: -1.381 }, { oaci: "LFRJ", name: "Landivisiau", lat: 48.527, lon: -4.156 }, { oaci: "LFRK", name: "Caen-Carpiquet", lat: 49.173, lon: -0.450 }, { oaci: "LFRL", name: "Lanvéoc-Poulmic", lat: 48.278, lon: -4.437 }, { oaci: "LFRM", name: "Le Mans-Arnage", lat: 47.949, lon: 0.203 }, { oaci: "LFRN", name: "Rennes-Saint-Jacques", lat: 48.070, lon: -1.732 }, { oaci: "LFRO", name: "Lannion-Côte de Granit Rose", lat: 48.755, lon: -3.472 }, { oaci: "LFRQ", name: "Quimper-Pluguffan", lat: 47.975, lon: -4.167 }, { oaci: "LFRS", name: "Nantes-Atlantique", lat: 47.153, lon: -1.607 }, { oaci: "LFRT", name: "Saint-Nazaire-Montoir", lat: 47.312, lon: -2.152 }, { oaci: "LFRU", name: "Morlaix-Ploujean", lat: 48.604, lon: -3.818 }, { oaci: "LFSD", name: "Dijon-Longvic", lat: 47.268, lon: 5.088 }, { oaci: "LFSF", name: "Metz-Nancy-Lorraine", lat: 48.981, lon: 6.251 }, { oaci: "LFSH", name: "Haguenau", lat: 48.790, lon: 7.820 }, { oaci: "LFSK", name: "Colmar-Houssen", lat: 48.110, lon: 7.359 }, { oaci: "LFSO", name: "Nancy-Ochey", lat: 48.577, lon: 5.955 }, { oaci: "LFSQ", name: "Luxeuil-Saint-Sauveur", lat: 47.779, lon: 6.353 }, { oaci: "LFSR", name: "Reims-Prunay", lat: 49.207, lon: 4.148 }, { oaci: "LFST", name: "Strasbourg-Entzheim", lat: 48.542, lon: 7.628 }, { oaci: "LFSX", name: "Montbéliard-Courcelles", lat: 47.487, lon: 6.852 }, { oaci: "LFYR", name: "Romorantin-Pruniers", lat: 47.352, lon: 1.670 }, { oaci: "LFYD", name: "Dinard", lat: 48.587, lon: -2.080 }, { oaci: "LFXI", name: "Reims-Champagne", lat: 49.308, lon: 4.045 }, { oaci: "LFYL", name: "Lille-Lesquin", lat: 50.563, lon: 3.086 }, { oaci: "LFXM", name: "Melun-Villaroche", lat: 48.608, lon: 2.671 }, { oaci: "LFXO", name: "Beauvais-Tillé", lat: 49.454, lon: 2.112 }, { oaci: "LFXQ", name: "Saint-Omer-Wizernes", lat: 50.725, lon: 2.220 }, { oaci: "LFKS", name: "Solenzara", lat: 41.924, lon: 9.405 },
@@ -1170,6 +1176,7 @@ function initMap() {
     setupBaseTileLayer();
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
+    waterPointsLayer = L.layerGroup().addTo(map);
     userToTargetLayer = L.layerGroup().addTo(map);
     lftwRouteLayer = L.layerGroup().addTo(map);
     gaarLayer = L.layerGroup().addTo(map);
@@ -1333,6 +1340,7 @@ function clearCurrentSelection() {
     document.getElementById('results-list').style.display = 'none';
     clearSearchBtn.style.display = 'none';
     routesLayer.clearLayers();
+    if (waterPointsLayer) waterPointsLayer.clearLayers();
     userToTargetLayer.clearLayers();
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
@@ -1392,6 +1400,7 @@ function setupEventListeners() {
     const closeCalculatorButton = document.getElementById('close-calculator-btn');
     const departmentsLayerButton = document.getElementById('departments-layer-button');
     const communesLayerButton = document.getElementById('communes-layer-button');
+    const waterPointsButton = document.getElementById('water-points-button');
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
     const closeOfflineMapButton = document.getElementById('close-offline-map-btn');
@@ -1454,6 +1463,13 @@ function setupEventListeners() {
             map._communesZoomStyleBound = true;
             map.on('zoom move zoomend moveend', updateCommunesLayerAppearance);
         }
+    }
+
+    if (waterPointsButton) {
+        waterPointsButton.classList.toggle('active', showWaterPointsLayer);
+        waterPointsButton.addEventListener('click', () => {
+            toggleWaterPointsLayer();
+        });
     }
 
     let searchInputDebounceTimer = null;
@@ -2028,6 +2044,88 @@ function updateCommuneGpsRouteDisplay() {
     routeInfo.classList.remove('gps-feu-route-info-empty');
 }
 
+
+function getClosestWaterPoints(lat, lon, count = 3) {
+    return waterPoints
+        .map(point => ({
+            ...point,
+            distance: calculateDistanceInNm(lat, lon, point.lat, point.lon)
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, count);
+}
+
+function buildWaterPointIcon() {
+    /*
+     * v12.02 — icône plan d'eau.
+     * Choix retenu : goutte bleue 💧, cohérent avec les pélicandromes en mode eau.
+     */
+    return L.divIcon({
+        className: 'custom-marker-icon water-point-marker',
+        html: '💧',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+    });
+}
+
+function drawWaterPointMarkersForCommune(commune) {
+    if (!waterPointsLayer) return;
+    waterPointsLayer.clearLayers();
+
+    if (!showWaterPointsLayer || !commune) {
+        return;
+    }
+
+    const lat = Number(commune.latitude_mairie);
+    const lon = Number(commune.longitude_mairie);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return;
+    }
+
+    const closestWaterPoints = getClosestWaterPoints(lat, lon, 3);
+    const icon = buildWaterPointIcon();
+
+    closestWaterPoints.forEach(point => {
+        const marker = L.marker([point.lat, point.lon], {
+            icon,
+            interactive: true,
+            zIndexOffset: 450
+        });
+
+        const label = `<div class="water-point-label-name">${escapeHtml(point.name)}</div><div class="water-point-label-distance">${Math.round(point.distance)} Nm</div>`;
+
+        marker.bindTooltip(label, {
+            permanent: true,
+            direction: 'right',
+            offset: [16, 0],
+            className: 'water-point-tooltip'
+        });
+
+        marker.bindPopup(`<div class="water-point-popup"><b>${escapeHtml(point.name)}</b><br>${Math.round(point.distance)} Nm<br>${convertToDMM(point.lat, 'lat')}<br>${convertToDMM(point.lon, 'lon')}</div>`);
+        marker.addTo(waterPointsLayer);
+    });
+}
+
+function refreshWaterPointsButtonState() {
+    const button = document.getElementById('water-points-button');
+    if (button) {
+        button.classList.toggle('active', showWaterPointsLayer);
+    }
+}
+
+function toggleWaterPointsLayer(forceState = null) {
+    showWaterPointsLayer = forceState === null ? !showWaterPointsLayer : Boolean(forceState);
+    localStorage.setItem(WATER_POINTS_LAYER_KEY, showWaterPointsLayer ? 'true' : 'false');
+    refreshWaterPointsButtonState();
+
+    if (!currentCommune && showWaterPointsLayer) {
+        alert("Sélectionnez d'abord un feu ou une commune pour afficher les plans d'eau les plus proches.");
+    }
+
+    drawWaterPointMarkersForCommune(currentCommune);
+}
+
+
 function updateMapBingoDisplay() {
     const bingoDisplay = document.getElementById('bingo-map-display');
     if (!currentCommune) {
@@ -2083,6 +2181,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         allPoints.push([ap.lat, ap.lon]);
         drawRoute([lat, lon], [ap.lat, ap.lon], { oaci: ap.oaci });
     });
+
+    drawWaterPointMarkersForCommune(commune);
 
     const isLftwInClosest = closestAirports.some(ap => ap.oaci === 'LFTW');
     if (showLftwRoute && !isLftwInClosest) {
