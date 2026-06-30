@@ -2057,45 +2057,19 @@ function getClosestWaterPoints(lat, lon, count = 3) {
 
 function buildWaterPointIcon(isClosest = false) {
     /*
-     * v12.05 — plans d'eau :
-     * - tous les plans d'eau = petit point bleu, comme les aéroports noirs ;
-     * - les 3 plus proches d'un feu sélectionné = goutte bleue avec étiquette.
+     * v12.08 — plans d'eau :
+     * - tous les plans d'eau = petit point bleu ;
+     * - les 3 plus proches = même point bleu, très légèrement agrandi.
+     * La zone tactile reste plus large que le point visuel.
      */
-    if (isClosest) {
-        return L.divIcon({
-            className: 'custom-marker-icon water-point-marker water-point-marker-closest',
-            html: '💧',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
-        });
-    }
-
+    const size = isClosest ? 18 : 16;
+    const dotSize = isClosest ? 8 : 6;
     return L.divIcon({
-        className: 'water-point-dot-marker',
-        html: '<span></span>',
-        iconSize: [6, 6],
-        iconAnchor: [3, 3]
+        className: isClosest ? 'water-point-dot-marker water-point-dot-marker-closest' : 'water-point-dot-marker',
+        html: `<span style="width:${dotSize}px;height:${dotSize}px;"></span>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2]
     });
-}
-
-
-function getWaterPointTooltipPlacement(index) {
-    /*
-     * v12.07 — anti-chevauchement étiquettes plans d'eau.
-     * Leaflet ne sait pas empêcher parfaitement les chevauchements entre
-     * tooltips permanents et étiquettes existantes. On répartit donc les
-     * 3 étiquettes autour des points avec des directions/offets différents.
-     */
-    const placements = [
-        { direction: 'top', offset: [0, -12] },
-        { direction: 'right', offset: [14, -2] },
-        { direction: 'bottom', offset: [0, 12] }
-    ];
-    return placements[index % placements.length];
-}
-
-function getWaterPointTooltipClass(index) {
-    return `water-point-tooltip water-point-tooltip-${index + 1}`;
 }
 
 function drawWaterPointMarkersForCommune(commune) {
@@ -2114,17 +2088,15 @@ function drawWaterPointMarkersForCommune(commune) {
      */
     let closestWaterPointIds = new Set();
     let closestWaterPointDistances = new Map();
-    let closestWaterPointLabelIndexes = new Map();
 
     if (commune) {
         const lat = Number(commune.latitude_mairie);
         const lon = Number(commune.longitude_mairie);
 
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            getClosestWaterPoints(lat, lon, 3).forEach((point, index) => {
+            getClosestWaterPoints(lat, lon, 3).forEach(point => {
                 closestWaterPointIds.add(point.id);
                 closestWaterPointDistances.set(point.id, point.distance);
-                closestWaterPointLabelIndexes.set(point.id, index);
             });
         }
     }
@@ -2139,19 +2111,16 @@ function drawWaterPointMarkersForCommune(commune) {
 
         if (isClosest) {
             const distance = closestWaterPointDistances.get(point.id);
-            const labelIndex = closestWaterPointLabelIndexes.get(point.id) || 0;
-            const placement = getWaterPointTooltipPlacement(labelIndex);
             const label = `<div class="water-point-label-name">${escapeHtml(point.name)}</div><div class="water-point-label-distance">${Math.round(distance)} Nm</div>`;
 
             marker.bindTooltip(label, {
                 permanent: true,
-                direction: placement.direction,
-                offset: placement.offset,
-                className: getWaterPointTooltipClass(labelIndex)
+                direction: 'right',
+                offset: [10, 0],
+                className: 'water-point-tooltip'
             });
         }
-
-        marker.bindPopup(`<div class="water-point-popup"><b>${escapeHtml(point.name)}</b><br>${convertToDMM(point.lat, 'lat')}<br>${convertToDMM(point.lon, 'lon')}</div>`);
+        marker.bindPopup(`<div class="water-point-popup"><b>${escapeHtml(point.name)}</b></div>`);
         marker.addTo(waterPointsLayer);
     });
 }
