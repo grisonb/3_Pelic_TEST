@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-05-water-points-blue-dots-closest-drop';
+const SW_VERSION = 'sw-v12-06-smaller-blue-water-dots';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
