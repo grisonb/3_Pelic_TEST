@@ -4133,3 +4133,13 @@ body {
     color: #ffffff;
 }
 
+/* v12.12 — cartes offline groupées : OpenStreet_01...OpenStreet_05 = OpenStreet */
+.offline-map-group-line .offline-map-name-line strong {
+    color: #005a9c;
+}
+
+.offline-map-select-checkbox[data-partial="true"] {
+    outline: 2px solid #f59e0b;
+    outline-offset: 2px;
+}
+
