@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-07-water-label-anti-overlap';
+const SW_VERSION = 'sw-v12-08-water-dot-touch-airport-ring';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
