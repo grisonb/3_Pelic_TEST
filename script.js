@@ -2073,8 +2073,8 @@ function buildWaterPointIcon(isClosest = false) {
     return L.divIcon({
         className: 'water-point-dot-marker',
         html: '<span></span>',
-        iconSize: [8, 8],
-        iconAnchor: [4, 4]
+        iconSize: [6, 6],
+        iconAnchor: [3, 3]
     });
 }
 
