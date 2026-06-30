@@ -4005,3 +4005,20 @@ body {
     box-shadow: 0 0 0 1px rgba(0, 75, 140, 0.32), 0 1px 2px rgba(0,0,0,.32) !important;
 }
 
+/* v12.07 — étiquettes plans d'eau : répartition anti-chevauchement */
+.leaflet-tooltip.water-point-tooltip {
+    max-width: 125px;
+}
+
+.leaflet-tooltip.water-point-tooltip-1 {
+    transform: translate(-50%, -100%) translateY(-12px);
+}
+
+.leaflet-tooltip.water-point-tooltip-2 {
+    transform: translateX(14px) translateY(-4px);
+}
+
+.leaflet-tooltip.water-point-tooltip-3 {
+    transform: translate(-50%, 12px);
+}
+
