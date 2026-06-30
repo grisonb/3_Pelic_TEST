@@ -2063,8 +2063,8 @@ function buildWaterPointIcon() {
     return L.divIcon({
         className: 'custom-marker-icon water-point-marker',
         html: '💧',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
     });
 }
 
@@ -2114,7 +2114,7 @@ function drawWaterPointMarkersForCommune(commune) {
             marker.bindTooltip(label, {
                 permanent: true,
                 direction: 'right',
-                offset: [16, 0],
+                offset: [10, 0],
                 className: 'water-point-tooltip'
             });
         }
