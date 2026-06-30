@@ -3967,3 +3967,34 @@ body {
     padding: 3px 6px;
 }
 
+/* v12.05 — plans d'eau : points bleus + goutte pour les 3 plus proches */
+.water-point-dot-marker {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.water-point-dot-marker span {
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #0077c8;
+    border: 1px solid #ffffff;
+    box-shadow: 0 0 0 1px rgba(0, 75, 140, 0.35), 0 1px 3px rgba(0,0,0,.35);
+}
+
+.water-point-marker.water-point-marker-closest {
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 14px !important;
+    line-height: 18px !important;
+    border-width: 1px !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 5px rgba(0, 75, 140, 0.45) !important;
+}
+
+.leaflet-tooltip.water-point-tooltip {
+    z-index: 700;
+}
+
