@@ -4143,3 +4143,8 @@ body {
     outline-offset: 2px;
 }
 
+/* v12.13 — import gros ZIP : texte de progression plus lisible */
+#import-status-message {
+    line-height: 1.25;
+}
+
