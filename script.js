@@ -1340,7 +1340,7 @@ function clearCurrentSelection() {
     document.getElementById('results-list').style.display = 'none';
     clearSearchBtn.style.display = 'none';
     routesLayer.clearLayers();
-    if (waterPointsLayer) waterPointsLayer.clearLayers();
+    if (waterPointsLayer) drawWaterPointMarkersForCommune(null);
     userToTargetLayer.clearLayers();
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
@@ -2072,36 +2072,54 @@ function drawWaterPointMarkersForCommune(commune) {
     if (!waterPointsLayer) return;
     waterPointsLayer.clearLayers();
 
-    if (!showWaterPointsLayer || !commune) {
+    if (!showWaterPointsLayer) {
         return;
     }
 
-    const lat = Number(commune.latitude_mairie);
-    const lon = Number(commune.longitude_mairie);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        return;
+    /*
+     * v12.03 — Plan d'eau :
+     * - bouton actif = toutes les gouttes affichées partout en France ;
+     * - si un feu est sélectionné = les 3 plus proches reçoivent une étiquette nom + distance ;
+     * - aucun impact sur les calculs.
+     */
+    let closestWaterPointIds = new Set();
+    let closestWaterPointDistances = new Map();
+
+    if (commune) {
+        const lat = Number(commune.latitude_mairie);
+        const lon = Number(commune.longitude_mairie);
+
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            getClosestWaterPoints(lat, lon, 3).forEach(point => {
+                closestWaterPointIds.add(point.id);
+                closestWaterPointDistances.set(point.id, point.distance);
+            });
+        }
     }
 
-    const closestWaterPoints = getClosestWaterPoints(lat, lon, 3);
     const icon = buildWaterPointIcon();
 
-    closestWaterPoints.forEach(point => {
+    waterPoints.forEach(point => {
+        const isClosest = closestWaterPointIds.has(point.id);
         const marker = L.marker([point.lat, point.lon], {
             icon,
             interactive: true,
-            zIndexOffset: 450
+            zIndexOffset: isClosest ? 520 : 420
         });
 
-        const label = `<div class="water-point-label-name">${escapeHtml(point.name)}</div><div class="water-point-label-distance">${Math.round(point.distance)} Nm</div>`;
+        if (isClosest) {
+            const distance = closestWaterPointDistances.get(point.id);
+            const label = `<div class="water-point-label-name">${escapeHtml(point.name)}</div><div class="water-point-label-distance">${Math.round(distance)} Nm</div>`;
 
-        marker.bindTooltip(label, {
-            permanent: true,
-            direction: 'right',
-            offset: [16, 0],
-            className: 'water-point-tooltip'
-        });
+            marker.bindTooltip(label, {
+                permanent: true,
+                direction: 'right',
+                offset: [16, 0],
+                className: 'water-point-tooltip'
+            });
+        }
 
-        marker.bindPopup(`<div class="water-point-popup"><b>${escapeHtml(point.name)}</b><br>${Math.round(point.distance)} Nm<br>${convertToDMM(point.lat, 'lat')}<br>${convertToDMM(point.lon, 'lon')}</div>`);
+        marker.bindPopup(`<div class="water-point-popup"><b>${escapeHtml(point.name)}</b><br>${convertToDMM(point.lat, 'lat')}<br>${convertToDMM(point.lon, 'lon')}</div>`);
         marker.addTo(waterPointsLayer);
     });
 }
@@ -2117,10 +2135,6 @@ function toggleWaterPointsLayer(forceState = null) {
     showWaterPointsLayer = forceState === null ? !showWaterPointsLayer : Boolean(forceState);
     localStorage.setItem(WATER_POINTS_LAYER_KEY, showWaterPointsLayer ? 'true' : 'false');
     refreshWaterPointsButtonState();
-
-    if (!currentCommune && showWaterPointsLayer) {
-        alert("Sélectionnez d'abord un feu ou une commune pour afficher les plans d'eau les plus proches.");
-    }
 
     drawWaterPointMarkersForCommune(currentCommune);
 }
