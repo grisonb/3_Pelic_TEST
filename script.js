@@ -826,6 +826,19 @@ async function initializeApp() {
         currentCommune = JSON.parse(savedCommuneJSON);
         displayCommuneDetails(currentCommune, true);
     }
+
+    /*
+     * v12.13 — restauration plans d'eau au démarrage.
+     * Si le bouton Plan d'eau était actif avant fermeture, les points doivent
+     * réapparaître sans devoir désélectionner/résélectionner le bouton.
+     */
+    setTimeout(() => {
+        try {
+            refreshWaterPointsButtonState();
+            drawWaterPointMarkersForCommune(currentCommune);
+        } catch (_) {}
+    }, 250);
+
     if (communesLoadError) {
         setTimeout(() => {
             alert("Mode dégradé: base communes indisponible au démarrage. La carte reste utilisable, réessayez avec réseau pour la recherche commune.");
@@ -4301,6 +4314,23 @@ async function handleZipImport(file) {
     isZipImportRunning = true;
 
     const idle = (delay = 0) => new Promise((resolve) => setTimeout(resolve, delay));
+    const nextFrame = () => new Promise((resolve) => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => resolve());
+        } else {
+            setTimeout(resolve, 0);
+        }
+    });
+
+    const updateImportProgress = async (message, percent = null, forceFrame = false) => {
+        if (typeof percent === 'number') {
+            progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        }
+        statusMessage.textContent = message;
+        if (forceFrame) {
+            await nextFrame();
+        }
+    };
 
     const reopenDbCleanly = async () => {
         try {
@@ -4423,9 +4453,8 @@ async function handleZipImport(file) {
             throw new Error("Aucune tuile valide trouvée dans le ZIP. La structure doit être /zoom/colonne/ligne.png");
         }
 
-        statusMessage.textContent = `Préparation terminée. Importation de ${totalFiles} tuiles...`;
-        progressBar.style.width = '1%';
-        await idle(100);
+        await updateImportProgress(`Préparation terminée. Lecture de ${totalFiles} tuiles...`, 1, true);
+        await idle(120);
 
         const isLargeZip = file.size > 300 * 1024 * 1024;
         const batchSize = isLargeZip ? 35 : 120;
@@ -4467,24 +4496,29 @@ async function handleZipImport(file) {
             processedFiles += toWrite.length;
 
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
-            progressBar.style.width = `${percent}%`;
-            statusMessage.textContent = `Importation renforcée... ${processedFiles} / ${totalFiles} tuiles`;
+            await updateImportProgress(`Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`, percent, isLargeZip);
 
             if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
-                statusMessage.textContent = `Stabilisation base offline... ${processedFiles} / ${totalFiles}`;
+                await updateImportProgress(`Stabilisation base offline... ${processedFiles} / ${totalFiles}`, percent, true);
                 await reopenDbCleanly();
             }
 
-            await idle(isLargeZip ? 10 : 0);
+            await idle(isLargeZip ? 20 : 0);
         };
 
         for (let i = 0; i < tileFiles.length; i += 1) {
             const tileFile = tileFiles[i];
+
+            if (isLargeZip && (i === 0 || i % 10 === 0)) {
+                const readPercent = Math.min(96, Math.max(1, Math.round((i / totalFiles) * 100)));
+                await updateImportProgress(`Lecture ZIP... ${i + 1} / ${totalFiles} tuiles`, readPercent, true);
+            }
+
             let blob;
             try {
                 blob = await tileFile.async('blob');
             } catch (tileReadError) {
-                await idle(120);
+                await idle(160);
                 blob = await tileFile.async('blob');
             }
             const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
@@ -4501,19 +4535,16 @@ async function handleZipImport(file) {
             }
 
             const now = Date.now();
-            if (now - lastUiUpdate > 700) {
+            if (now - lastUiUpdate > (isLargeZip ? 350 : 700)) {
                 lastUiUpdate = now;
-                const percent = Math.min(99, Math.round((Math.max(processedFiles, i) / totalFiles) * 100));
-                progressBar.style.width = `${percent}%`;
-                statusMessage.textContent = `Importation... ${processedFiles} / ${totalFiles} tuiles`;
-                await idle(0);
+                const percent = Math.min(99, Math.round((Math.max(processedFiles, i + 1) / totalFiles) * 100));
+                await updateImportProgress(`Importation... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`, percent, true);
             }
         }
 
         await flushBatch();
 
-        statusMessage.textContent = `Importation de ${packName} terminée !`;
-        progressBar.style.width = '100%';
+        await updateImportProgress(`Importation de ${packName} terminée !`, 100, true);
 
         const installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const existingPack = installedPacks.find(p => p.name === packName);
