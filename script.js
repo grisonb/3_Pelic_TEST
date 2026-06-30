@@ -4307,8 +4307,21 @@ async function handleZipImport(file) {
             if (db) db.close();
         } catch (_) {}
         db = null;
-        await idle(120);
+        await idle(180);
         await initDB();
+    };
+
+    const getTileWriteTransaction = () => {
+        /*
+         * v12.11 — import gros volume renforcé.
+         * durability:'relaxed' accélère et stabilise les écritures IndexedDB quand le
+         * navigateur le supporte. Safari ignore parfois l'option : fallback standard.
+         */
+        try {
+            return db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
+        } catch (_) {
+            return db.transaction('tiles', 'readwrite');
+        }
     };
 
     const putTileBatch = (batch) => new Promise((resolve, reject) => {
@@ -4317,7 +4330,7 @@ async function handleZipImport(file) {
             return;
         }
 
-        const transaction = db.transaction('tiles', 'readwrite');
+        const transaction = getTileWriteTransaction();
         const store = transaction.objectStore('tiles');
 
         batch.forEach(tileData => {
@@ -4329,9 +4342,61 @@ async function handleZipImport(file) {
         transaction.onabort = () => reject(transaction.error || new Error('Transaction IndexedDB annulée'));
     });
 
+    const deleteExistingTilesForPack = (packNameToDelete, isLargeZipPack) => new Promise((resolve, reject) => {
+        /*
+         * Avant de réimporter un gros pack, on libère l'ancien contenu.
+         * C'est critique pour OpenStreet ~900 Mo : sans purge préalable,
+         * Safari/iPadOS peut atteindre le quota avant d'avoir remplacé les tuiles.
+         */
+        if (!db || !packNameToDelete) {
+            resolve(0);
+            return;
+        }
+
+        let deleted = 0;
+        const tx = getTileWriteTransaction();
+        const store = tx.objectStore('tiles');
+
+        const deleteCursor = (request) => {
+            request.onsuccess = event => {
+                const cursor = event.target.result;
+                if (!cursor) return;
+
+                const value = cursor.value || {};
+                const key = cursor.primaryKey || value.url || '';
+                const keyText = String(key);
+                const shouldDelete = value.packName === packNameToDelete
+                    || keyText.endsWith(`::${packNameToDelete}`)
+                    || (isLargeZipPack && keyText.includes('/'));
+
+                if (shouldDelete) {
+                    cursor.delete();
+                    deleted += 1;
+                }
+                cursor.continue();
+            };
+            request.onerror = () => reject(request.error);
+        };
+
+        try {
+            if (store.indexNames && store.indexNames.contains('packName')) {
+                deleteCursor(store.index('packName').openCursor(IDBKeyRange.only(packNameToDelete)));
+            } else {
+                deleteCursor(store.openCursor());
+            }
+        } catch (error) {
+            reject(error);
+            return;
+        }
+
+        tx.oncomplete = () => resolve(deleted);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('Transaction purge IndexedDB annulée'));
+    });
+
     try {
         /*
-         * v11.33 — évolution v11.31/v11.32.
+         * v12.11 — renforcement gros volumes à partir de v11.33.
          *
          * Symptôme validé :
          * - OpenStreet 900 Mo s'installe, mais peut planter en toute fin.
@@ -4363,8 +4428,27 @@ async function handleZipImport(file) {
         await idle(100);
 
         const isLargeZip = file.size > 300 * 1024 * 1024;
-        const batchSize = isLargeZip ? 100 : 150;
+        const batchSize = isLargeZip ? 35 : 120;
+        const reopenEveryTiles = isLargeZip ? 700 : 0;
         const usePackScopedKey = !isLargeZip;
+
+        const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
+        const alreadyInstalled = alreadyInstalledPacks.some(p => p && p.name === packName);
+        if (alreadyInstalled || isLargeZip) {
+            statusMessage.textContent = `Nettoyage préalable du pack ${packName}...`;
+            progressBar.style.width = '2%';
+            await idle(120);
+            try {
+                const deletedBeforeImport = await deleteExistingTilesForPack(packName, isLargeZip);
+                if (deletedBeforeImport > 0) {
+                    statusMessage.textContent = `Ancien pack nettoyé : ${deletedBeforeImport} tuiles supprimées.`;
+                    await idle(250);
+                }
+                await reopenDbCleanly();
+            } catch (cleanupError) {
+                console.warn('[Offline] Nettoyage préalable impossible, import poursuivi:', cleanupError);
+            }
+        }
         /*
          * v11.36 : les petits packs utilisent aussi un host dédié dans tileUrl.
          * L'index tileUrl du service worker tombe donc directement sur le bon pack
@@ -4384,14 +4468,25 @@ async function handleZipImport(file) {
 
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
             progressBar.style.width = `${percent}%`;
-            statusMessage.textContent = `Importation... ${processedFiles} / ${totalFiles} tuiles`;
+            statusMessage.textContent = `Importation renforcée... ${processedFiles} / ${totalFiles} tuiles`;
 
-            await idle(0);
+            if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
+                statusMessage.textContent = `Stabilisation base offline... ${processedFiles} / ${totalFiles}`;
+                await reopenDbCleanly();
+            }
+
+            await idle(isLargeZip ? 10 : 0);
         };
 
         for (let i = 0; i < tileFiles.length; i += 1) {
             const tileFile = tileFiles[i];
-            const blob = await tileFile.async('blob');
+            let blob;
+            try {
+                blob = await tileFile.async('blob');
+            } catch (tileReadError) {
+                await idle(120);
+                blob = await tileFile.async('blob');
+            }
             const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
 
             batch.push({
@@ -4440,7 +4535,11 @@ async function handleZipImport(file) {
         return;
 
     } catch (error) {
-        statusMessage.textContent = `Erreur: ${error.message}`;
+        const message = error && error.message ? error.message : String(error);
+        statusMessage.textContent = `Erreur: ${message}`;
+        if (/quota|storage|abort|transaction/i.test(message)) {
+            statusMessage.textContent += " — vérifiez l'espace iPad disponible, puis relancez après fermeture/réouverture de NPF.";
+        }
         console.error("Erreur d'importation ZIP:", error);
     } finally {
         isZipImportRunning = false;
