@@ -2522,6 +2522,22 @@ async function openAirportPdf(oaci) {
 window.openAirportPdf = openAirportPdf;
 window.deleteAirportPdf = deleteAirportPdf;
 
+
+function buildPermanentAirportDotIcon() {
+    /*
+     * v12.09 — points noirs aéroports :
+     * point noir + cerclage blanc + liseré noir extérieur.
+     * Correction : les points étaient dessinés par HTML inline, donc le CSS v12.08
+     * ne touchait pas la bonne classe.
+     */
+    return L.divIcon({
+        className: 'permanent-airport-black-dot-icon',
+        html: '<span></span>',
+        iconSize: [10, 10],
+        iconAnchor: [5, 5]
+    });
+}
+
 function drawPermanentAirportMarkers() {
     permanentAirportLayer.clearLayers();
 
