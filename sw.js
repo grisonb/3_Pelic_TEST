@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-12-offline-pack-groups';
+const SW_VERSION = 'sw-v12-13-offline-progress-waterpoints-startup';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
