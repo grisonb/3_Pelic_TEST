@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-10-airport-ring-real-circlemarker';
+const SW_VERSION = 'sw-v12-11-gaar-buttons-offline-large-import';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
