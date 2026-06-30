@@ -2055,16 +2055,26 @@ function getClosestWaterPoints(lat, lon, count = 3) {
         .slice(0, count);
 }
 
-function buildWaterPointIcon() {
+function buildWaterPointIcon(isClosest = false) {
     /*
-     * v12.02 — icône plan d'eau.
-     * Choix retenu : goutte bleue 💧, cohérent avec les pélicandromes en mode eau.
+     * v12.05 — plans d'eau :
+     * - tous les plans d'eau = petit point bleu, comme les aéroports noirs ;
+     * - les 3 plus proches d'un feu sélectionné = goutte bleue avec étiquette.
      */
+    if (isClosest) {
+        return L.divIcon({
+            className: 'custom-marker-icon water-point-marker water-point-marker-closest',
+            html: '💧',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+        });
+    }
+
     return L.divIcon({
-        className: 'custom-marker-icon water-point-marker',
-        html: '💧',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
+        className: 'water-point-dot-marker',
+        html: '<span></span>',
+        iconSize: [8, 8],
+        iconAnchor: [4, 4]
     });
 }
 
@@ -2097,14 +2107,12 @@ function drawWaterPointMarkersForCommune(commune) {
         }
     }
 
-    const icon = buildWaterPointIcon();
-
     waterPoints.forEach(point => {
         const isClosest = closestWaterPointIds.has(point.id);
         const marker = L.marker([point.lat, point.lon], {
-            icon,
+            icon: buildWaterPointIcon(isClosest),
             interactive: true,
-            zIndexOffset: isClosest ? 520 : 420
+            zIndexOffset: isClosest ? 540 : 420
         });
 
         if (isClosest) {
