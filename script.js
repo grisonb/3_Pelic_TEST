@@ -4524,7 +4524,9 @@ async function handleZipImport(file) {
         }
         localStorage.setItem('installedMapPacks', JSON.stringify(installedPacks));
 
-        await persistSimpleActiveOfflinePacks([packName]);
+        const importedGroupName = getOfflinePackGroupName(packName);
+        const importedGroupPacks = getInstalledPackNamesForGroup(importedGroupName);
+        await persistSimpleActiveOfflinePacks(importedGroupPacks.length ? importedGroupPacks : [packName]);
 
         if (isLargeZip) {
             reloadAfterOfflinePackChange(`Importation de ${packName} terminée. Rechargement mémoire...`);
@@ -4640,32 +4642,81 @@ function reloadAfterOfflinePackChange(message = 'Rechargement de la carte...') {
     }, 300);
 }
 
+
+function getOfflinePackGroupName(packName) {
+    /*
+     * v12.12 — groupes de packs offline.
+     * Exemple : OpenStreet_01, OpenStreet_02, ... => groupe OpenStreet.
+     * Permet d'activer/désactiver une carte découpée en plusieurs ZIP en un clic.
+     */
+    const name = String(packName || '').trim();
+    const match = name.match(/^(.+?)[_-](\d{2,3})$/);
+    return match ? match[1] : name;
+}
+
+function groupInstalledMapPacks(installedPacks = []) {
+    const groups = new Map();
+    installedPacks.forEach(pack => {
+        if (!pack || !pack.name) return;
+        const groupName = getOfflinePackGroupName(pack.name);
+        if (!groups.has(groupName)) {
+            groups.set(groupName, {
+                name: groupName,
+                packs: [],
+                date: pack.date || ''
+            });
+        }
+        const group = groups.get(groupName);
+        group.packs.push(pack);
+        group.date = pack.date || group.date;
+    });
+    return Array.from(groups.values()).map(group => {
+        group.packs.sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr', { numeric: true }));
+        return group;
+    });
+}
+
+function getInstalledPackNamesForGroup(groupName) {
+    const installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
+    return installedPacks
+        .filter(pack => pack && getOfflinePackGroupName(pack.name) === groupName)
+        .map(pack => pack.name);
+}
+
 function displayInstalledMaps() {
     /*
-     * v11.27 — affichage simple comme l'ancien module.
-     * On ne lance aucun scan de zoom et on ne fait aucune purge automatique.
+     * v12.12 — affichage par groupes.
+     * Les packs OpenStreet_01...OpenStreet_05 apparaissent comme une seule ligne OpenStreet.
      */
     const list = document.getElementById('installed-maps-list');
     if (!list) return;
 
     const installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
+    const groups = groupInstalledMapPacks(installedPacks);
     list.innerHTML = '';
 
-    if (installedPacks.length === 0) {
+    if (groups.length === 0) {
         list.innerHTML = '<li class="no-maps-placeholder">Aucun pack de cartes installé.</li>';
         return;
     }
 
-    installedPacks.forEach(pack => {
+    groups.forEach(group => {
         const li = document.createElement('li');
-        const isActive = Array.isArray(activeOfflinePacks) && activeOfflinePacks.includes(pack.name);
+        const packNames = group.packs.map(pack => pack.name);
+        const activeCount = packNames.filter(name => activeOfflinePacks.includes(name)).length;
+        const isActive = activeCount === packNames.length && packNames.length > 0;
+        const partiallyActive = activeCount > 0 && !isActive;
+        const packLabel = packNames.length > 1 ? `${packNames.length} fichiers` : '1 fichier';
+        const dateLabel = group.date ? `Installé le ${group.date}` : 'Installé';
+
+        li.className = packNames.length > 1 ? 'offline-map-group-line' : '';
         li.innerHTML = `
             <span class="offline-map-name-line">
-                <input type="checkbox" class="offline-map-select-checkbox" ${isActive ? 'checked' : ''} onchange="window.selectSimpleMapPack('${pack.name}', this.checked)">
-                <strong>${pack.name}</strong> (Installé le ${pack.date})${isActive ? ' — actif' : ''}
+                <input type="checkbox" class="offline-map-select-checkbox" ${isActive ? 'checked' : ''} data-partial="${partiallyActive ? 'true' : 'false'}" onchange="window.selectSimpleMapGroup('${group.name}', this.checked)">
+                <strong>${group.name}</strong> (${packLabel} — ${dateLabel})${isActive ? ' — actif' : partiallyActive ? ` — partiel ${activeCount}/${packNames.length}` : ''}
             </span>
             <div class="offline-map-actions">
-                <button class="delete-map-btn" onclick="window.deleteMapPack('${pack.name}')">Supprimer</button>
+                <button class="delete-map-btn" onclick="window.deleteMapGroup('${group.name}')">Supprimer</button>
             </div>
         `;
         list.appendChild(li);
@@ -4674,16 +4725,64 @@ function displayInstalledMaps() {
     updateOfflineStatus();
 }
 
-window.selectSimpleMapPack = async function(packName, checked = true) {
+window.selectSimpleMapGroup = async function(groupName, checked = true) {
+    const packNames = getInstalledPackNamesForGroup(groupName);
+    if (!packNames.length) {
+        alert(`Aucun pack trouvé pour ${groupName}.`);
+        displayInstalledMaps();
+        return;
+    }
+
     /*
-     * v11.43 — sélection carte offline par case à cocher à gauche du nom.
-     * Une seule carte offline active à la fois.
+     * v12.12 — une seule carte active à la fois, mais une carte peut être composée
+     * de plusieurs ZIP indépendants : OpenStreet_01...OpenStreet_05.
      */
-    await persistSimpleActiveOfflinePacks(checked ? [packName] : []);
-    reloadAfterOfflinePackChange(checked ? `Carte ${packName} sélectionnée. Rechargement...` : 'Carte offline désactivée. Rechargement...');
+    await persistSimpleActiveOfflinePacks(checked ? packNames : []);
+    reloadAfterOfflinePackChange(
+        checked
+            ? `Carte ${groupName} sélectionnée (${packNames.length} fichier(s)). Rechargement...`
+            : 'Carte offline désactivée. Rechargement...'
+    );
 };
 
-window.deleteMapPack = async function(packName) {
+window.selectSimpleMapPack = async function(packName, checked = true) {
+    const groupName = getOfflinePackGroupName(packName);
+    return window.selectSimpleMapGroup(groupName, checked);
+};
+
+
+
+window.deleteMapGroup = async function(groupName) {
+    const packNames = getInstalledPackNamesForGroup(groupName);
+    if (!packNames.length) {
+        alert(`Aucun pack trouvé pour ${groupName}.`);
+        displayInstalledMaps();
+        return;
+    }
+
+    if (packNames.length === 1) {
+        return window.deleteMapPack(packNames[0]);
+    }
+
+    if (!confirm(`Supprimer définitivement la carte "${groupName}" (${packNames.length} fichiers) ?`)) {
+        return;
+    }
+
+    for (const packName of packNames) {
+        await window.deleteMapPack(packName, { silent: true, noReload: true });
+    }
+
+    if (activeOfflinePacks.some(name => packNames.includes(name))) {
+        await persistSimpleActiveOfflinePacks([]);
+        reloadAfterOfflinePackChange(`Carte ${groupName} supprimée. Rechargement...`);
+        return;
+    }
+
+    displayInstalledMaps();
+    alert(`Carte "${groupName}" supprimée (${packNames.length} fichiers).`);
+};
+
+window.deleteMapPack = async function(packName, options = {}) {
     if (!confirm(`Voulez-vous vraiment supprimer le pack de cartes "${packName}" ?\nCette opération peut prendre du temps.`)) {
         return;
     }
@@ -4710,7 +4809,7 @@ window.deleteMapPack = async function(packName) {
             transaction.onabort = () => reject(transaction.error || new Error('Transaction suppression annulée'));
         });
 
-        alert(`${deletedCount} tuiles du pack "${packName}" ont été supprimées.`);
+        if (!options.silent) alert(`${deletedCount} tuiles du pack "${packName}" ont été supprimées.`);
 
         let installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         installedPacks = installedPacks.filter(p => p.name !== packName);
@@ -4718,11 +4817,13 @@ window.deleteMapPack = async function(packName) {
 
         if (Array.isArray(activeOfflinePacks) && activeOfflinePacks.includes(packName)) {
             await persistSimpleActiveOfflinePacks([]);
-            reloadAfterOfflinePackChange(`Pack ${packName} supprimé. Rechargement...`);
-            return;
+            if (!options.noReload) {
+                reloadAfterOfflinePackChange(`Pack ${packName} supprimé. Rechargement...`);
+                return;
+            }
         }
 
-        displayInstalledMaps();
+        if (!options.noReload) displayInstalledMaps();
 
     } catch (error) {
         alert(`Erreur lors de la suppression du pack : ${error.message}`);
