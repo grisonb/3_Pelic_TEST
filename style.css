@@ -4066,3 +4066,23 @@ body {
     box-shadow: 0 0 0 1px rgba(0,0,0,.55), 0 1px 3px rgba(0,0,0,.35) !important;
 }
 
+/* v12.09 — correction réelle des points noirs aéroports */
+.permanent-airport-black-dot-icon {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.permanent-airport-black-dot-icon span,
+.permanent-airport-black-dot-icon div,
+.permanent-airport-black-dot-visual {
+    display: block !important;
+    width: 7px !important;
+    height: 7px !important;
+    border-radius: 50% !important;
+    background: #111 !important;
+    border: 1px solid #fff !important;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.65), 0 1px 3px rgba(0,0,0,.35) !important;
+    box-sizing: border-box !important;
+}
+
