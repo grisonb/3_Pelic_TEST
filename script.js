@@ -2078,6 +2078,26 @@ function buildWaterPointIcon(isClosest = false) {
     });
 }
 
+
+function getWaterPointTooltipPlacement(index) {
+    /*
+     * v12.07 — anti-chevauchement étiquettes plans d'eau.
+     * Leaflet ne sait pas empêcher parfaitement les chevauchements entre
+     * tooltips permanents et étiquettes existantes. On répartit donc les
+     * 3 étiquettes autour des points avec des directions/offets différents.
+     */
+    const placements = [
+        { direction: 'top', offset: [0, -12] },
+        { direction: 'right', offset: [14, -2] },
+        { direction: 'bottom', offset: [0, 12] }
+    ];
+    return placements[index % placements.length];
+}
+
+function getWaterPointTooltipClass(index) {
+    return `water-point-tooltip water-point-tooltip-${index + 1}`;
+}
+
 function drawWaterPointMarkersForCommune(commune) {
     if (!waterPointsLayer) return;
     waterPointsLayer.clearLayers();
@@ -2094,15 +2114,17 @@ function drawWaterPointMarkersForCommune(commune) {
      */
     let closestWaterPointIds = new Set();
     let closestWaterPointDistances = new Map();
+    let closestWaterPointLabelIndexes = new Map();
 
     if (commune) {
         const lat = Number(commune.latitude_mairie);
         const lon = Number(commune.longitude_mairie);
 
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            getClosestWaterPoints(lat, lon, 3).forEach(point => {
+            getClosestWaterPoints(lat, lon, 3).forEach((point, index) => {
                 closestWaterPointIds.add(point.id);
                 closestWaterPointDistances.set(point.id, point.distance);
+                closestWaterPointLabelIndexes.set(point.id, index);
             });
         }
     }
@@ -2117,13 +2139,15 @@ function drawWaterPointMarkersForCommune(commune) {
 
         if (isClosest) {
             const distance = closestWaterPointDistances.get(point.id);
+            const labelIndex = closestWaterPointLabelIndexes.get(point.id) || 0;
+            const placement = getWaterPointTooltipPlacement(labelIndex);
             const label = `<div class="water-point-label-name">${escapeHtml(point.name)}</div><div class="water-point-label-distance">${Math.round(distance)} Nm</div>`;
 
             marker.bindTooltip(label, {
                 permanent: true,
-                direction: 'right',
-                offset: [10, 0],
-                className: 'water-point-tooltip'
+                direction: placement.direction,
+                offset: placement.offset,
+                className: getWaterPointTooltipClass(labelIndex)
             });
         }
 
