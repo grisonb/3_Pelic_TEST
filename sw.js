@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-02-water-points-layer';
+const SW_VERSION = 'sw-v12-03-all-water-points-label-closest';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
