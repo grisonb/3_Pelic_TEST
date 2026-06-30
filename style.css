@@ -4022,3 +4022,47 @@ body {
     transform: translate(-50%, 12px);
 }
 
+/* v12.08 — plans d'eau : retour étiquettes à droite + points proches légèrement agrandis */
+.water-point-dot-marker {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.water-point-dot-marker span {
+    display: block;
+    margin: 5px auto 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #0077c8;
+    border: 1px solid #ffffff;
+    box-shadow: 0 0 0 1px rgba(0, 75, 140, 0.35), 0 1px 3px rgba(0,0,0,.35);
+}
+
+.water-point-dot-marker.water-point-dot-marker-closest span {
+    margin-top: 5px;
+    width: 8px !important;
+    height: 8px !important;
+    background: #0094e8;
+    box-shadow: 0 0 0 1px rgba(0, 75, 140, 0.45), 0 1px 4px rgba(0,0,0,.38);
+}
+
+/* neutralisation de la répartition v12.07 */
+.leaflet-tooltip.water-point-tooltip-1,
+.leaflet-tooltip.water-point-tooltip-2,
+.leaflet-tooltip.water-point-tooltip-3 {
+    transform: none !important;
+}
+
+/* v12.08 — points noirs aéroports : blanc + liseré noir, comme les points bleus */
+.permanent-airport-marker,
+.custom-marker-icon.permanent-airport-marker,
+.airport-black-dot,
+.custom-marker-icon.airport-black-dot {
+    background: #111 !important;
+    border: 1px solid #fff !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.55), 0 1px 3px rgba(0,0,0,.35) !important;
+}
+
