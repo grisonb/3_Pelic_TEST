@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-06-smaller-blue-water-dots';
+const SW_VERSION = 'sw-v12-07-water-label-anti-overlap';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
