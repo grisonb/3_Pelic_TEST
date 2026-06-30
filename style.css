@@ -3882,3 +3882,67 @@ body {
     box-shadow: none !important;
 }
 
+/* v12.02 — bouton Plan d'eau : 6 boutons en grille */
+#ui-overlay {
+    max-width: min(820px, calc(100vw - 24px)) !important;
+}
+
+.extra-controls,
+.extra-controls-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+
+#water-points-button.active {
+    background-color: var(--water-color);
+    border-color: var(--water-color);
+    color: white;
+}
+
+/* v12.02 — marqueurs et étiquettes des plans d'eau */
+.water-point-marker {
+    background: linear-gradient(180deg, #14b8ff 0%, #0077c8 100%) !important;
+    border: 2px solid #fff !important;
+    box-shadow: 0 2px 7px rgba(0, 75, 140, 0.45) !important;
+    color: white !important;
+    font-size: 17px !important;
+    line-height: 24px !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+
+.leaflet-tooltip.water-point-tooltip {
+    background: rgba(232, 247, 255, 0.96);
+    border: 1px solid #0094d8;
+    border-radius: 6px;
+    color: #004b78;
+    box-shadow: 0 1px 5px rgba(0,0,0,.22);
+    padding: 4px 7px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.leaflet-tooltip.water-point-tooltip::before {
+    border-right-color: #0094d8;
+}
+
+.water-point-label-name {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.water-point-label-distance {
+    font-size: 11px;
+    color: #005a9c;
+}
+
+@media (max-width: 760px) {
+    .extra-controls,
+    .extra-controls-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
