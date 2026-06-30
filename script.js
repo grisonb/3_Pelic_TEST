@@ -2564,12 +2564,40 @@ function drawPermanentAirportMarkers() {
             return;
         }
 
-        const marker = L.circleMarker([airport.lat, airport.lon], {
-            radius: 2.5,
-            fillColor: 'black',
+        /*
+         * v12.10 — points noirs aéroports réellement cerclés :
+         * les aéroports non pélicandromes étaient des L.circleMarker avec
+         * un gros trait transparent pour la zone tactile. Le CSS ne pouvait
+         * donc pas modifier leur rendu. On dessine maintenant :
+         * - un cercle externe noir ;
+         * - un cercle blanc ;
+         * - un point noir central ;
+         * - un cercle transparent séparé pour conserver une grande zone tactile.
+         */
+        L.circleMarker([airport.lat, airport.lon], {
+            radius: 5,
+            color: '#111111',
+            weight: 1,
+            fillColor: '#ffffff',
             fillOpacity: 1,
+            interactive: false
+        }).addTo(permanentAirportLayer);
+
+        L.circleMarker([airport.lat, airport.lon], {
+            radius: 3,
+            color: '#ffffff',
+            weight: 1,
+            fillColor: '#111111',
+            fillOpacity: 1,
+            interactive: false
+        }).addTo(permanentAirportLayer);
+
+        const marker = L.circleMarker([airport.lat, airport.lon], {
+            radius: 10,
+            fillColor: 'transparent',
+            fillOpacity: 0,
             color: 'transparent',
-            weight: 15,
+            weight: 1,
             opacity: 0
         }).bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div></div>`);
         marker.addTo(permanentAirportLayer);
