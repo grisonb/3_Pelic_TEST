@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-11-gaar-buttons-offline-large-import';
+const SW_VERSION = 'sw-v12-12-offline-pack-groups';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
