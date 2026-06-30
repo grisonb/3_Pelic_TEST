@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-09-airport-black-dot-ring';
+const SW_VERSION = 'sw-v12-10-airport-ring-real-circlemarker';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
