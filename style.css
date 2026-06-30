@@ -3946,3 +3946,8 @@ body {
     }
 }
 
+/* v12.03 — Plan d'eau : toutes les gouttes visibles, étiquettes seulement sur les 3 plus proches */
+.water-point-marker {
+    opacity: 0.88;
+}
+
