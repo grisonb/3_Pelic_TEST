@@ -1,0 +1,101 @@
+NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
+
+But du fichier
+-------------
+Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
+Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
+
+Version actuelle TEST : v12.16
+Date de génération : 2026-07-01
+
+Règle de méthode
+----------------
+- Tester en dépôt TEST avant production.
+- Ne jamais modifier l'import offline, le service worker ou IndexedDB en production sans validation TEST.
+- Quand une version fonctionne, elle devient la nouvelle base.
+- Conserver ce fichier et l'enrichir à chaque version.
+
+Historique résumé
+-----------------
+
+v11.42 — Restauration ouverture hors ligne
+- Base : v11.41 / v2026.33.
+- Modification : cache applicatif app shell dans sw.js.
+- Pourquoi : l'application ne s'ouvrait pas sans connexion.
+- Résultat validé : mode hors ligne fonctionnel.
+
+v11.43 — Sélection carte offline + derniers feux
+- Modification : sélection de la carte offline par case à cocher à gauche du nom.
+- Modification : suppression individuelle et globale des derniers feux.
+- Modification : reprise plus rapide après arrière-plan via invalidateSize/redraw.
+- Pourquoi : rendre la sélection plus simple et gérer l'historique des feux.
+
+v11.44 — Boutons rouges derniers feux
+- Modification : bouton individuel de suppression en rond rouge.
+- Modification : bouton global rouge “Tout effacer”.
+- Pourquoi : rendre les actions destructives plus visibles.
+
+v11.50 — Bandeau BINGO compact
+- État reconstitué depuis les fichiers fournis.
+- Version utilisée comme base correcte après perte partielle d'historique.
+- Pourquoi : l'historique de chat avait divergé et il fallait repartir de la bonne version.
+
+v11.51 / v11.52 — Corrections smartphone
+- Modification : bandeau BINGO/BASE plus compact.
+- Modification : texte du bandeau condensé pour éviter la coupure en portrait.
+- Pourquoi : le bandeau occupait trop d'espace et le texte était tronqué.
+
+v12.11 — Import gros volume renforcé
+- Modification : transactions IndexedDB avec durability relaxed si supporté.
+- Modification : lots d'écriture plus prudents pour gros ZIP.
+- Pourquoi : OpenStreet ~900 Mo pouvait planter ou ralentir fortement en fin d'installation.
+
+v12.12 — Groupes de packs offline
+- Modification : regroupement des ZIP OpenStreet_01, OpenStreet_02, etc.
+- Modification : activation/désactivation d'une carte multi-ZIP en une seule ligne.
+- Pourquoi : permettre le téléchargement/import d'une carte en plusieurs ZIP.
+
+v12.13 — Progression offline + points d'eau + écran de reprise
+- Modification : version TEST offline_progress_waterpoints_startup.
+- Modification : conservation de l'app shell et des icônes dans sw.js.
+- Pourquoi : améliorer le démarrage PWA et conserver les évolutions fonctionnelles.
+
+v12.14 — Tentative accélération IGN
+- Modification : distinction prévue entre OpenStreet et IGN.
+- Modification : host logique prévu pour IGN.
+- Pourquoi : IGN en gros ZIP était très lent alors qu'OpenStreet fonctionnait.
+- Limite constatée : la distinction IGN n'était pas complète.
+
+v12.15 — Suppression packs + host IGN corrigé
+- Modification : suppression robuste des groupes multi-ZIP.
+- Modification : moins de confirmations répétées lors de la suppression.
+- Modification : IGN_01, IGN_02, IGN_part04 reconnus comme même groupe.
+- Modification : host local stable “ign.tile.openstreetmap.org”.
+- Pourquoi : les packs installés ne se désinstallaient pas correctement et IGN devait être isolé d'OpenStreet.
+- Limite constatée : la première carte importée charge vite, la deuxième devient très lente, quel que soit l'ordre.
+
+v12.16 — Suspension de carte pendant import
+- Modification : ajout de suspendOfflineMapRenderingDuringImport().
+- Modification : au début d'un import ZIP, le pack offline actif est temporairement désactivé.
+- Modification : la couche tuiles Leaflet est retirée pendant l'écriture IndexedDB.
+- Modification : le service worker reçoit OFFLINE_ACTIVE_PACKS_CHANGED avec une liste vide.
+- Pourquoi : quand une première carte est active, Leaflet et le service worker lisent les tuiles dans IndexedDB pendant que le deuxième import écrit massivement. Sur Safari/iPadOS, cette concurrence lecture/écriture ralentit fortement, voire bloque l'import.
+- Effet attendu : le deuxième gros import doit être beaucoup plus rapide.
+- Risque : pendant l'import, la carte peut disparaître temporairement. C'est volontaire. À la fin, la carte importée est réactivée et l'application recharge.
+
+Ordre de fichiers à fournir désormais
+-------------------------------------
+À la demande de l'utilisateur, toujours donner les fichiers dans cet ordre :
+1. index.html
+2. manifest.json
+3. script.js
+4. style.css
+5. sw.js
+6. NPF_Q400_MODIFICATIONS.txt si modifié
+
+Rappel de diagnostic actuel
+---------------------------
+- IGN importé en premier : fonctionne parfaitement.
+- OpenStreet importé en second : devient lent/bloqué.
+- Avant, OpenStreet en premier fonctionnait et IGN en second devenait lent.
+- Conclusion : ce n'est pas un problème spécifique IGN ou OpenStreet ; c'est un problème de deuxième gros import avec une carte déjà active et une IndexedDB déjà sollicitée.
