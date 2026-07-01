@@ -1248,25 +1248,30 @@ function enforceOfflineZoomLimit() {
 
 function normalizeOfflineTileHostPrefix(packName) {
     /*
-     * v11.36 — affichage OACI rapide.
+     * v12.15 — host logique stable par groupe.
      *
-     * Le service worker recherche les tuiles via l'index tileUrl.
-     * Si OpenStreet et OACI utilisent tous les deux https://a.tile.../z/x/y.png,
-     * l'index contient plusieurs enregistrements pour le même tileUrl et Safari
-     * peut parcourir lentement les tuiles OpenStreet avant de trouver OACI.
+     * Un pack découpé en plusieurs ZIP doit utiliser le même host fictif :
+     * IGN_01 / IGN_02 / IGN_03 => ign.tile.openstreetmap.org
      *
-     * Solution : les petits packs comme OACI utilisent un sous-domaine fictif
-     * mais toujours intercepté par le service worker :
-     * https://oaci.tile.openstreetmap.org/z/x/y.png
-     *
-     * OpenStreet garde https://a.tile... car c'est la combinaison qui importe
-     * correctement les 900 Mo.
+     * Sinon Leaflet ne demande les tuiles que sur le host du premier pack actif,
+     * et IndexedDB doit chercher dans des clés incohérentes.
      */
     const raw = String(packName || '').trim();
-    const simplified = raw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, '');
+    const groupName = typeof getOfflinePackGroupName === 'function'
+        ? getOfflinePackGroupName(raw)
+        : raw;
 
-    if (!raw || /open\s*street|openstreet|osm/.test(simplified)) {
+    const simplified = String(groupName || raw || '')
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, '');
+
+    if (!simplified || /open\s*street|openstreet|\bosm\b/.test(simplified)) {
         return 'a';
+    }
+
+    if (/\bign\b|scan25|scan\s*25|oaci\s*ign/.test(simplified)) {
+        return 'ign';
     }
 
     if (/oaci|carte\s*oaci/.test(simplified)) {
@@ -4493,18 +4498,19 @@ async function handleZipImport(file) {
          * - clé pack-scopée pour éviter les collisions entre ZIP/hosts.
          */
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
-        const batchSize = useConservativeLargeImport ? 35 : (isLargeZip ? 120 : 160);
+        const batchSize = useConservativeLargeImport ? 35 : (isIgnPack ? 320 : (isLargeZip ? 180 : 200));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : 0;
         const usePackScopedKey = !isOpenStreetPack;
+        const tileReadMode = isIgnPack ? 'arraybuffer' : 'blob';
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const alreadyInstalled = alreadyInstalledPacks.some(p => p && p.name === packName);
-        if (alreadyInstalled || isLargeZip) {
+        if (alreadyInstalled || (isLargeZip && isOpenStreetPack)) {
             statusMessage.textContent = `Nettoyage préalable du pack ${packName}...`;
             progressBar.style.width = '2%';
             await idle(120);
             try {
-                const deletedBeforeImport = await deleteExistingTilesForPack(packName, isLargeZip);
+                const deletedBeforeImport = await deleteExistingTilesForPack(packName, isLargeZip && isOpenStreetPack);
                 if (deletedBeforeImport > 0) {
                     statusMessage.textContent = `Ancien pack nettoyé : ${deletedBeforeImport} tuiles supprimées.`;
                     await idle(250);
@@ -4552,10 +4558,10 @@ async function handleZipImport(file) {
 
             let blob;
             try {
-                blob = await tileFile.async('blob');
+                blob = await tileFile.async(tileReadMode);
             } catch (tileReadError) {
                 await idle(160);
-                blob = await tileFile.async('blob');
+                blob = await tileFile.async(tileReadMode);
             }
             const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
 
@@ -4712,13 +4718,22 @@ function reloadAfterOfflinePackChange(message = 'Rechargement de la carte...') {
 
 function getOfflinePackGroupName(packName) {
     /*
-     * v12.12 — groupes de packs offline.
-     * Exemple : OpenStreet_01, OpenStreet_02, ... => groupe OpenStreet.
-     * Permet d'activer/désactiver une carte découpée en plusieurs ZIP en un clic.
+     * v12.15 — groupes de packs offline plus tolérants.
+     * Exemples :
+     * OpenStreet_01, OpenStreet-02, IGN_001, IGN 03, IGN_part04 => groupe IGN.
      */
     const name = String(packName || '').trim();
-    const match = name.match(/^(.+?)[_-](\d{2,3})$/);
-    return match ? match[1] : name;
+    const cleaned = name
+        .replace(/\s*\(\d+\)\s*$/i, '')
+        .replace(/\s+(copy|copie)\s*$/i, '')
+        .trim();
+
+    const match = cleaned.match(/^(.+?)(?:[\s_-]*(?:part|partie|zip)?[\s_-]*)(\d{1,3})$/i);
+    if (match && match[1].trim().length >= 2) {
+        return match[1].replace(/[\s_-]+$/g, '').trim();
+    }
+
+    return cleaned;
 }
 
 function groupInstalledMapPacks(installedPacks = []) {
@@ -4827,75 +4842,142 @@ window.deleteMapGroup = async function(groupName) {
         return;
     }
 
-    if (packNames.length === 1) {
-        return window.deleteMapPack(packNames[0]);
-    }
-
-    if (!confirm(`Supprimer définitivement la carte "${groupName}" (${packNames.length} fichiers) ?`)) {
+    if (!confirm(`Supprimer définitivement la carte "${groupName}" (${packNames.length} fichier(s)) ?\nCette opération peut prendre du temps sur iPad.`)) {
         return;
     }
 
-    for (const packName of packNames) {
-        await window.deleteMapPack(packName, { silent: true, noReload: true });
+    const statusMessage = document.getElementById('import-status-message') || document.getElementById('offline-status');
+    const progressSection = document.getElementById('import-progress-section');
+    const progressBar = document.getElementById('import-progress-bar');
+
+    if (progressSection) progressSection.style.display = 'block';
+    if (progressBar) progressBar.style.width = '0%';
+
+    let totalDeleted = 0;
+    for (let i = 0; i < packNames.length; i += 1) {
+        const packName = packNames[i];
+        if (statusMessage) {
+            statusMessage.textContent = `Suppression ${i + 1}/${packNames.length} : ${packName}...`;
+        }
+        if (progressBar) {
+            progressBar.style.width = `${Math.round((i / packNames.length) * 100)}%`;
+        }
+
+        const deleted = await window.deleteMapPack(packName, {
+            silent: true,
+            noReload: true,
+            alreadyConfirmed: true
+        });
+        totalDeleted += Number(deleted || 0);
+
+        await new Promise(resolve => setTimeout(resolve, 40));
     }
+
+    if (progressBar) progressBar.style.width = '100%';
 
     if (activeOfflinePacks.some(name => packNames.includes(name))) {
         await persistSimpleActiveOfflinePacks([]);
-        reloadAfterOfflinePackChange(`Carte ${groupName} supprimée. Rechargement...`);
-        return;
     }
 
     displayInstalledMaps();
-    alert(`Carte "${groupName}" supprimée (${packNames.length} fichiers).`);
+
+    if (statusMessage) {
+        statusMessage.textContent = `Carte "${groupName}" supprimée : ${totalDeleted} tuile(s).`;
+    }
+    alert(`Carte "${groupName}" supprimée (${packNames.length} fichier(s), ${totalDeleted} tuile(s)).`);
 };
 
 window.deleteMapPack = async function(packName, options = {}) {
-    if (!confirm(`Voulez-vous vraiment supprimer le pack de cartes "${packName}" ?\nCette opération peut prendre du temps.`)) {
-        return;
+    if (!options.alreadyConfirmed && !options.silent) {
+        if (!confirm(`Voulez-vous vraiment supprimer le pack de cartes "${packName}" ?\nCette opération peut prendre du temps.`)) {
+            return 0;
+        }
     }
 
     try {
-        const transaction = db.transaction('tiles', 'readwrite');
-        const store = transaction.objectStore('tiles');
-        const index = store.index('packName');
-        const request = index.openKeyCursor(IDBKeyRange.only(packName));
+        const deletedCount = await deleteTilesForPackName(packName);
 
-        let deletedCount = 0;
-        request.onsuccess = event => {
-            const cursor = event.target.result;
-            if (cursor) {
-                store.delete(cursor.primaryKey);
-                deletedCount++;
-                cursor.continue();
-            }
-        };
-
-        await new Promise((resolve, reject) => {
-            transaction.oncomplete = resolve;
-            transaction.onerror = () => reject(transaction.error);
-            transaction.onabort = () => reject(transaction.error || new Error('Transaction suppression annulée'));
-        });
-
-        if (!options.silent) alert(`${deletedCount} tuiles du pack "${packName}" ont été supprimées.`);
+        if (!options.silent) {
+            alert(`${deletedCount} tuiles du pack "${packName}" ont été supprimées.`);
+        }
 
         let installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         installedPacks = installedPacks.filter(p => p.name !== packName);
         localStorage.setItem('installedMapPacks', JSON.stringify(installedPacks));
 
         if (Array.isArray(activeOfflinePacks) && activeOfflinePacks.includes(packName)) {
-            await persistSimpleActiveOfflinePacks([]);
+            await persistSimpleActiveOfflinePacks(activeOfflinePacks.filter(name => name !== packName));
             if (!options.noReload) {
                 reloadAfterOfflinePackChange(`Pack ${packName} supprimé. Rechargement...`);
-                return;
+                return deletedCount;
             }
         }
 
         if (!options.noReload) displayInstalledMaps();
+        return deletedCount;
 
     } catch (error) {
-        alert(`Erreur lors de la suppression du pack : ${error.message}`);
+        alert(`Erreur lors de la suppression du pack : ${error.message || error}`);
         console.error("Erreur de suppression:", error);
+        return 0;
     }
+};
+
+function deleteTilesForPackName(packName) {
+    /*
+     * v12.15 — suppression robuste.
+     * On utilise l'index packName s'il existe, sinon scan complet.
+     * Le scan complet est plus lent mais permet de supprimer les anciens packs
+     * importés avant la création/fiabilisation de l'index.
+     */
+    return new Promise((resolve, reject) => {
+        if (!db || !packName) {
+            resolve(0);
+            return;
+        }
+
+        let deleted = 0;
+        let tx;
+
+        try {
+            try {
+                tx = db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
+            } catch (_) {
+                tx = db.transaction('tiles', 'readwrite');
+            }
+
+            const store = tx.objectStore('tiles');
+            const hasPackNameIndex = store.indexNames && store.indexNames.contains('packName');
+            const request = hasPackNameIndex
+                ? store.index('packName').openCursor(IDBKeyRange.only(packName))
+                : store.openCursor();
+
+            request.onsuccess = event => {
+                const cursor = event.target.result;
+                if (!cursor) return;
+
+                const value = cursor.value || {};
+                const primaryKey = cursor.primaryKey || value.url || '';
+                const shouldDelete = value.packName === packName
+                    || String(primaryKey).endsWith(`::${packName}`)
+                    || String(value.url || '').endsWith(`::${packName}`);
+
+                if (shouldDelete) {
+                    cursor.delete();
+                    deleted += 1;
+                }
+                cursor.continue();
+            };
+
+            request.onerror = () => reject(request.error || new Error('Erreur curseur suppression'));
+
+            tx.oncomplete = () => resolve(deleted);
+            tx.onerror = () => reject(tx.error || new Error('Erreur transaction suppression'));
+            tx.onabort = () => reject(tx.error || new Error('Transaction suppression annulée'));
+        } catch (error) {
+            reject(error);
+        }
+    });
 };
 
 // =========================================================================
