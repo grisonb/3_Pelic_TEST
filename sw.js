@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-16-import-suspend-map';
+const SW_VERSION = 'sw-v12-17-sw-close-chunk-delete';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -83,11 +83,39 @@ self.addEventListener('activate', event => {
     })());
 });
 
+
+async function closeOfflineDBForHeavyWrite() {
+    /*
+     * v12.17 — libère la connexion IndexedDB du service worker avant gros import/suppression.
+     * Safari/iPadOS ralentit fortement si le SW garde une connexion de lecture
+     * pendant que la page écrit ou supprime massivement.
+     */
+    memoryTileCache.clear();
+    offlineSettingsLoadedAt = 0;
+
+    try {
+        if (dbPromise) {
+            const db = await dbPromise.catch(() => null);
+            if (db && typeof db.close === 'function') db.close();
+        }
+    } catch (_) {}
+
+    dbPromise = null;
+}
+
 self.addEventListener('message', event => {
     const data = event.data || {};
 
     if (data.type === 'SKIP_WAITING') {
         self.skipWaiting();
+        return;
+    }
+
+    if (data.type === 'OFFLINE_IMPORT_START' || data.type === 'OFFLINE_MASS_DELETE_START') {
+        activeOfflinePacks = [];
+        offlineTilesEnabled = false;
+        offlineSettingsLoadedAt = Date.now();
+        closeOfflineDBForHeavyWrite();
         return;
     }
 
