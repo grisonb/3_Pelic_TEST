@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.19
+Version actuelle TEST : v12.20
 Date de génération : 2026-07-01
 
 Règle de méthode
@@ -131,4 +131,15 @@ v12.19 — Reset complet offline + mode sécurisé OACI
 - Modification import OACI : si une tuile échoue deux fois à la lecture, elle est ignorée au lieu de faire planter tout l'import.
 - Risque : OACI peut être un peu plus lente, mais doit cesser de planter à 51/3347.
 - Recommandation : si la base actuelle est déjà bloquée, utiliser d'abord “Tout réinitialiser”, puis réinstaller les cartes.
+
+v12.20 — Nouvelle base IndexedDB offline
+- Constat utilisateur : reset complet bloqué vers la moitié avec “Suppression bloquée”.
+- Diagnostic : indexedDB.deleteDatabase('OfflineTilesDB') reste bloqué si Safari/iPadOS ou l'ancien service worker garde une connexion ouverte. Tant que cette connexion existe, la suppression complète ne peut pas aboutir.
+- Décision : ne plus dépendre de la suppression de l'ancienne base. La v12.20 abandonne l'ancienne base OfflineTilesDB et utilise une nouvelle base OfflineTilesDB_v12_20 côté script.js et sw.js.
+- Modification script.js : ajout de OFFLINE_DB_NAME = 'OfflineTilesDB_v12_20' et ouverture IndexedDB via cette constante.
+- Modification sw.js : DB_NAME = 'OfflineTilesDB_v12_20'.
+- Modification reset : le bouton “Tout réinitialiser” devient un reset logique. Il vide les listes locales, désactive les packs actifs, nettoie les caches de tuiles, crée/ouvre la nouvelle base et recharge. L'ancienne base est seulement supprimée en tentative non bloquante.
+- Pourquoi : retrouver une application utilisable même si l'ancienne base est verrouillée.
+- Limite : les anciennes tuiles peuvent rester dans les données Safari du site et consommer de l'espace. Si le quota iPad devient insuffisant, il faudra supprimer les données du site NPF-Q400 dans Réglages Safari.
+- Test conseillé : installer v12.20, faire MAJ, fermer/réouvrir, cliquer “Tout réinitialiser”, puis réimporter OpenStreet, IGN et OACI.
 
