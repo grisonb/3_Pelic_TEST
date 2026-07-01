@@ -4356,6 +4356,12 @@ async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline e
     } catch (_) {}
 
     try {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_IMPORT_START' });
+        }
+    } catch (_) {}
+
+    try {
         if (map && baseTileLayer) {
             map.removeLayer(baseTileLayer);
             baseTileLayer = null;
@@ -4549,10 +4555,10 @@ async function handleZipImport(file) {
          * - clé pack-scopée pour éviter les collisions entre ZIP/hosts.
          */
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
-        const batchSize = useConservativeLargeImport ? 35 : (isIgnPack ? 320 : (isLargeZip ? 180 : 200));
+        const batchSize = useConservativeLargeImport ? 35 : (!isOpenStreetPack ? 320 : (isLargeZip ? 180 : 200));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : 0;
         const usePackScopedKey = !isOpenStreetPack;
-        const tileReadMode = isIgnPack ? 'arraybuffer' : 'blob';
+        const tileReadMode = !isOpenStreetPack ? 'arraybuffer' : 'blob';
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const alreadyInstalled = alreadyInstalledPacks.some(p => p && p.name === packName);
@@ -4904,6 +4910,13 @@ window.deleteMapGroup = async function(groupName) {
     if (progressSection) progressSection.style.display = 'block';
     if (progressBar) progressBar.style.width = '0%';
 
+    try {
+        await suspendOfflineMapRenderingDuringImport(`Suppression ${groupName}`);
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_MASS_DELETE_START' });
+        }
+    } catch (_) {}
+
     let totalDeleted = 0;
     for (let i = 0; i < packNames.length; i += 1) {
         const packName = packNames[i];
@@ -4917,7 +4930,17 @@ window.deleteMapGroup = async function(groupName) {
         const deleted = await window.deleteMapPack(packName, {
             silent: true,
             noReload: true,
-            alreadyConfirmed: true
+            alreadyConfirmed: true,
+            onProgress: (deletedSoFar, mode, loops) => {
+                if (statusMessage) {
+                    statusMessage.textContent = `Suppression ${i + 1}/${packNames.length} : ${packName} — ${deletedSoFar} tuiles (${mode})`;
+                }
+                if (progressBar) {
+                    const basePercent = (i / packNames.length) * 100;
+                    const chunkPercent = Math.min(1, loops / 50) * (100 / packNames.length);
+                    progressBar.style.width = `${Math.min(99, Math.round(basePercent + chunkPercent))}%`;
+                }
+            }
         });
         totalDeleted += Number(deleted || 0);
 
@@ -4946,7 +4969,7 @@ window.deleteMapPack = async function(packName, options = {}) {
     }
 
     try {
-        const deletedCount = await deleteTilesForPackName(packName);
+        const deletedCount = await deleteTilesForPackName(packName, options.onProgress || null);
 
         if (!options.silent) {
             alert(`${deletedCount} tuiles du pack "${packName}" ont été supprimées.`);
@@ -4974,21 +4997,32 @@ window.deleteMapPack = async function(packName, options = {}) {
     }
 };
 
-function deleteTilesForPackName(packName) {
+async function deleteTilesForPackName(packName, onProgress = null) {
     /*
-     * v12.15 — suppression robuste.
-     * On utilise l'index packName s'il existe, sinon scan complet.
-     * Le scan complet est plus lent mais permet de supprimer les anciens packs
-     * importés avant la création/fiabilisation de l'index.
+     * v12.17 — suppression par petits blocs.
+     *
+     * Symptôme :
+     * la suppression d'un gros pack semblait bloquée, car une seule énorme
+     * transaction IndexedDB empêchait l'interface de se rafraîchir.
+     *
+     * Correction :
+     * - suppression par lots ;
+     * - réouverture de transactions courtes ;
+     * - callback de progression entre les lots ;
+     * - fallback scan complet si l'index packName ne retourne rien.
      */
-    return new Promise((resolve, reject) => {
-        if (!db || !packName) {
-            resolve(0);
-            return;
-        }
+    if (!db || !packName) return 0;
 
-        let deleted = 0;
+    const CHUNK_SIZE = 750;
+    let totalDeleted = 0;
+
+    const sleep = (delay = 0) => new Promise(resolve => setTimeout(resolve, delay));
+
+    const deleteChunk = (mode = 'index') => new Promise((resolve, reject) => {
         let tx;
+        let deletedThisChunk = 0;
+        let foundAny = false;
+        let reachedEnd = false;
 
         try {
             try {
@@ -4998,37 +5032,89 @@ function deleteTilesForPackName(packName) {
             }
 
             const store = tx.objectStore('tiles');
-            const hasPackNameIndex = store.indexNames && store.indexNames.contains('packName');
-            const request = hasPackNameIndex
+            const canUseIndex = mode === 'index' && store.indexNames && store.indexNames.contains('packName');
+            const request = canUseIndex
                 ? store.index('packName').openCursor(IDBKeyRange.only(packName))
                 : store.openCursor();
 
             request.onsuccess = event => {
                 const cursor = event.target.result;
-                if (!cursor) return;
+
+                if (!cursor) {
+                    reachedEnd = true;
+                    return;
+                }
 
                 const value = cursor.value || {};
                 const primaryKey = cursor.primaryKey || value.url || '';
-                const shouldDelete = value.packName === packName
-                    || String(primaryKey).endsWith(`::${packName}`)
-                    || String(value.url || '').endsWith(`::${packName}`);
+                const shouldDelete = canUseIndex
+                    ? true
+                    : (
+                        value.packName === packName
+                        || String(primaryKey).endsWith(`::${packName}`)
+                        || String(value.url || '').endsWith(`::${packName}`)
+                    );
 
                 if (shouldDelete) {
+                    foundAny = true;
                     cursor.delete();
-                    deleted += 1;
+                    deletedThisChunk += 1;
+                    totalDeleted += 1;
                 }
+
+                if (deletedThisChunk >= CHUNK_SIZE) {
+                    return;
+                }
+
                 cursor.continue();
             };
 
             request.onerror = () => reject(request.error || new Error('Erreur curseur suppression'));
 
-            tx.oncomplete = () => resolve(deleted);
+            tx.oncomplete = () => resolve({
+                deleted: deletedThisChunk,
+                foundAny,
+                done: reachedEnd || deletedThisChunk === 0
+            });
             tx.onerror = () => reject(tx.error || new Error('Erreur transaction suppression'));
             tx.onabort = () => reject(tx.error || new Error('Transaction suppression annulée'));
         } catch (error) {
             reject(error);
         }
     });
+
+    const runMode = async (mode) => {
+        let loops = 0;
+        while (true) {
+            const result = await deleteChunk(mode);
+            loops += 1;
+
+            if (typeof onProgress === 'function') {
+                try {
+                    onProgress(totalDeleted, mode, loops);
+                } catch (_) {}
+            }
+
+            await sleep(40);
+
+            if (result.done) break;
+            if (loops > 20000) {
+                throw new Error(`Suppression interrompue par sécurité (${packName})`);
+            }
+        }
+    };
+
+    await runMode('index');
+
+    /*
+     * Si l'index packName ne trouve rien, on tente un scan complet.
+     * Utile pour d'anciens imports ou des entrées mal indexées.
+     */
+    if (totalDeleted === 0) {
+        await runMode('scan');
+    }
+
+    return totalDeleted;
 };
 
 // =========================================================================
