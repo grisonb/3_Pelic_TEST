@@ -4148,3 +4148,23 @@ body {
     line-height: 1.25;
 }
 
+/* v12.19 — bouton reset complet stockage offline */
+.offline-map-reset-line {
+    background: #fff4f4;
+    border: 1px solid rgba(227, 0, 27, 0.25);
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+
+.offline-map-reset-line small {
+    color: #8a1f2a;
+    font-weight: 600;
+}
+
+.offline-full-reset-btn {
+    background: #b00020 !important;
+    color: #ffffff !important;
+    border-color: #b00020 !important;
+    font-weight: 900 !important;
+}
+
