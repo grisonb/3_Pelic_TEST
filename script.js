@@ -1293,6 +1293,11 @@ function isIgnOfflinePackName(packName) {
     return /\bign\b|scan25|scan\s*25|oaci\s*ign/.test(simplified);
 }
 
+function isOaciOfflinePackName(packName) {
+    const simplified = String(packName || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, '');
+    return /\boaci\b|carte\s*oaci/.test(simplified);
+}
+
 function buildOfflineTileUrlForPack(tilePath, packName, isLargeZip = false) {
     /*
      * v12.14 — correction IGN multi-ZIP.
@@ -4356,12 +4361,6 @@ async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline e
     } catch (_) {}
 
     try {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_IMPORT_START' });
-        }
-    } catch (_) {}
-
-    try {
         if (map && baseTileLayer) {
             map.removeLayer(baseTileLayer);
             baseTileLayer = null;
@@ -4376,6 +4375,39 @@ async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline e
     } catch (_) {}
 
     await new Promise(resolve => setTimeout(resolve, 250));
+}
+
+
+async function releaseOfflineDatabaseForHeavyOperation(reason = 'Opération offline lourde') {
+    /*
+     * v12.18 — libération réelle IndexedDB avant import/suppression.
+     *
+     * v12.17 envoyait un message au service worker, mais postMessage n'est pas
+     * awaitable : l'import/suppression pouvait démarrer avant que le SW ait fermé
+     * sa connexion IndexedDB.
+     *
+     * Ici on :
+     * - suspend la carte ;
+     * - demande au SW de fermer sa connexion ;
+     * - ferme aussi la connexion IndexedDB de la page ;
+     * - attend brièvement ;
+     * - rouvre une connexion propre côté page.
+     */
+    await suspendOfflineMapRenderingDuringImport(reason);
+
+    try {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_IMPORT_START' });
+        }
+    } catch (_) {}
+
+    try {
+        if (db) db.close();
+    } catch (_) {}
+    db = null;
+
+    await new Promise(resolve => setTimeout(resolve, 900));
+    await initDB();
 }
 
 async function handleZipImport(file) {
@@ -4399,7 +4431,7 @@ async function handleZipImport(file) {
     statusMessage.textContent = `Ouverture du ZIP ${packName}...`;
     isZipImportRunning = true;
 
-    await suspendOfflineMapRenderingDuringImport(`Import ${packName}`);
+    await releaseOfflineDatabaseForHeavyOperation(`Import ${packName}`);
 
     const idle = (delay = 0) => new Promise((resolve) => setTimeout(resolve, delay));
     const nextFrame = () => new Promise((resolve) => {
@@ -4546,6 +4578,7 @@ async function handleZipImport(file) {
         const isLargeZip = file.size > 300 * 1024 * 1024;
         const isOpenStreetPack = isOpenStreetOfflinePackName(packName);
         const isIgnPack = isIgnOfflinePackName(packName);
+        const isOaciPack = isOaciOfflinePackName(packName);
 
         /*
          * v12.14 — OpenStreet reste sur le profil conservateur validé.
@@ -4555,10 +4588,17 @@ async function handleZipImport(file) {
          * - clé pack-scopée pour éviter les collisions entre ZIP/hosts.
          */
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
-        const batchSize = useConservativeLargeImport ? 35 : (!isOpenStreetPack ? 320 : (isLargeZip ? 180 : 200));
+        const batchSize = useConservativeLargeImport
+            ? 35
+            : (isIgnPack ? 320 : (isOaciPack ? 60 : (isLargeZip ? 160 : 180)));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : 0;
         const usePackScopedKey = !isOpenStreetPack;
-        const tileReadMode = !isOpenStreetPack ? 'arraybuffer' : 'blob';
+        /*
+         * v12.18 : arraybuffer reste réservé à IGN, où il a été bénéfique.
+         * OACI revient en blob avec petits lots, car en 3e carte elle bloquait
+         * dès le début de lecture après le passage en arraybuffer généralisé.
+         */
+        const tileReadMode = isIgnPack ? 'arraybuffer' : 'blob';
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const alreadyInstalled = alreadyInstalledPacks.some(p => p && p.name === packName);
@@ -4605,8 +4645,16 @@ async function handleZipImport(file) {
             await idle(useConservativeLargeImport ? 20 : 0);
         };
 
+        await updateImportProgress(`Début lecture des tuiles ${packName}...`, 2, true);
+        await idle(120);
+
         for (let i = 0; i < tileFiles.length; i += 1) {
             const tileFile = tileFiles[i];
+
+            if (!useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
+                const readPercent = Math.min(95, Math.max(2, Math.round((i / totalFiles) * 100)));
+                await updateImportProgress(`Lecture tuiles... ${i + 1} / ${totalFiles}`, readPercent, true);
+            }
 
             if (useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
                 const readPercent = Math.min(96, Math.max(1, Math.round((i / totalFiles) * 100)));
@@ -4911,10 +4959,11 @@ window.deleteMapGroup = async function(groupName) {
     if (progressBar) progressBar.style.width = '0%';
 
     try {
-        await suspendOfflineMapRenderingDuringImport(`Suppression ${groupName}`);
+        await releaseOfflineDatabaseForHeavyOperation(`Suppression ${groupName}`);
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_MASS_DELETE_START' });
         }
+        await new Promise(resolve => setTimeout(resolve, 500));
     } catch (_) {}
 
     let totalDeleted = 0;
@@ -4999,32 +5048,50 @@ window.deleteMapPack = async function(packName, options = {}) {
 
 async function deleteTilesForPackName(packName, onProgress = null) {
     /*
-     * v12.17 — suppression par petits blocs.
+     * v12.18 — suppression par getAllKeys + lots courts.
      *
-     * Symptôme :
-     * la suppression d'un gros pack semblait bloquée, car une seule énorme
-     * transaction IndexedDB empêchait l'interface de se rafraîchir.
+     * v12.17 utilisait un curseur et s'arrêtait volontairement par chunk.
+     * Sur Safari/iPadOS, cette méthode peut rester silencieuse au premier curseur
+     * sur une très grosse IndexedDB.
      *
-     * Correction :
-     * - suppression par lots ;
-     * - réouverture de transactions courtes ;
-     * - callback de progression entre les lots ;
-     * - fallback scan complet si l'index packName ne retourne rien.
+     * Nouvelle méthode :
+     * - récupérer jusqu'à 500 clés du pack par l'index packName ;
+     * - supprimer ces clés dans une transaction courte ;
+     * - recommencer jusqu'à zéro clé ;
+     * - fallback scan complet si l'index ne trouve rien.
      */
     if (!db || !packName) return 0;
 
-    const CHUNK_SIZE = 750;
+    const CHUNK_SIZE = 500;
     let totalDeleted = 0;
-
     const sleep = (delay = 0) => new Promise(resolve => setTimeout(resolve, delay));
 
-    const deleteChunk = (mode = 'index') => new Promise((resolve, reject) => {
-        let tx;
-        let deletedThisChunk = 0;
-        let foundAny = false;
-        let reachedEnd = false;
+    const getKeysByIndex = () => new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction('tiles', 'readonly');
+            const store = tx.objectStore('tiles');
+
+            if (!(store.indexNames && store.indexNames.contains('packName')) || typeof store.index('packName').getAllKeys !== 'function') {
+                resolve(null);
+                return;
+            }
+
+            const req = store.index('packName').getAllKeys(IDBKeyRange.only(packName), CHUNK_SIZE);
+            req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
+            req.onerror = () => reject(req.error || new Error('Erreur getAllKeys suppression'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    const deleteKeys = (keys = []) => new Promise((resolve, reject) => {
+        if (!keys.length) {
+            resolve(0);
+            return;
+        }
 
         try {
+            let tx;
             try {
                 tx = db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
             } catch (_) {
@@ -5032,14 +5099,32 @@ async function deleteTilesForPackName(packName, onProgress = null) {
             }
 
             const store = tx.objectStore('tiles');
-            const canUseIndex = mode === 'index' && store.indexNames && store.indexNames.contains('packName');
-            const request = canUseIndex
-                ? store.index('packName').openCursor(IDBKeyRange.only(packName))
-                : store.openCursor();
+            keys.forEach(key => store.delete(key));
 
-            request.onsuccess = event => {
+            tx.oncomplete = () => resolve(keys.length);
+            tx.onerror = () => reject(tx.error || new Error('Erreur suppression clés'));
+            tx.onabort = () => reject(tx.error || new Error('Transaction suppression annulée'));
+        } catch (error) {
+            reject(error);
+        }
+    });
+
+    const scanAndDeleteChunk = () => new Promise((resolve, reject) => {
+        try {
+            let tx;
+            try {
+                tx = db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
+            } catch (_) {
+                tx = db.transaction('tiles', 'readwrite');
+            }
+
+            const store = tx.objectStore('tiles');
+            const req = store.openCursor();
+            let deleted = 0;
+            let reachedEnd = false;
+
+            req.onsuccess = event => {
                 const cursor = event.target.result;
-
                 if (!cursor) {
                     reachedEnd = true;
                     return;
@@ -5047,71 +5132,68 @@ async function deleteTilesForPackName(packName, onProgress = null) {
 
                 const value = cursor.value || {};
                 const primaryKey = cursor.primaryKey || value.url || '';
-                const shouldDelete = canUseIndex
-                    ? true
-                    : (
-                        value.packName === packName
-                        || String(primaryKey).endsWith(`::${packName}`)
-                        || String(value.url || '').endsWith(`::${packName}`)
-                    );
+                const shouldDelete = value.packName === packName
+                    || String(primaryKey).endsWith(`::${packName}`)
+                    || String(value.url || '').endsWith(`::${packName}`);
 
                 if (shouldDelete) {
-                    foundAny = true;
                     cursor.delete();
-                    deletedThisChunk += 1;
-                    totalDeleted += 1;
+                    deleted += 1;
                 }
 
-                if (deletedThisChunk >= CHUNK_SIZE) {
-                    return;
-                }
-
+                if (deleted >= CHUNK_SIZE) return;
                 cursor.continue();
             };
 
-            request.onerror = () => reject(request.error || new Error('Erreur curseur suppression'));
-
-            tx.oncomplete = () => resolve({
-                deleted: deletedThisChunk,
-                foundAny,
-                done: reachedEnd || deletedThisChunk === 0
-            });
-            tx.onerror = () => reject(tx.error || new Error('Erreur transaction suppression'));
-            tx.onabort = () => reject(tx.error || new Error('Transaction suppression annulée'));
+            req.onerror = () => reject(req.error || new Error('Erreur scan suppression'));
+            tx.oncomplete = () => resolve({ deleted, done: reachedEnd || deleted === 0 });
+            tx.onerror = () => reject(tx.error || new Error('Erreur transaction scan suppression'));
+            tx.onabort = () => reject(tx.error || new Error('Transaction scan suppression annulée'));
         } catch (error) {
             reject(error);
         }
     });
 
-    const runMode = async (mode) => {
-        let loops = 0;
+    let loops = 0;
+    while (true) {
+        loops += 1;
+
+        const keys = await getKeysByIndex();
+        if (keys === null) break;
+        if (!keys.length) break;
+
+        const deleted = await deleteKeys(keys);
+        totalDeleted += deleted;
+
+        if (typeof onProgress === 'function') {
+            onProgress(totalDeleted, 'index-keys', loops);
+        }
+
+        await sleep(60);
+
+        if (loops > 20000) {
+            throw new Error(`Suppression interrompue par sécurité (${packName})`);
+        }
+    }
+
+    if (totalDeleted === 0) {
+        loops = 0;
         while (true) {
-            const result = await deleteChunk(mode);
             loops += 1;
+            const result = await scanAndDeleteChunk();
+            totalDeleted += result.deleted || 0;
 
             if (typeof onProgress === 'function') {
-                try {
-                    onProgress(totalDeleted, mode, loops);
-                } catch (_) {}
+                onProgress(totalDeleted, 'scan', loops);
             }
 
-            await sleep(40);
+            await sleep(60);
 
             if (result.done) break;
             if (loops > 20000) {
-                throw new Error(`Suppression interrompue par sécurité (${packName})`);
+                throw new Error(`Suppression scan interrompue par sécurité (${packName})`);
             }
         }
-    };
-
-    await runMode('index');
-
-    /*
-     * Si l'index packName ne trouve rien, on tente un scan complet.
-     * Utile pour d'anciens imports ou des entrées mal indexées.
-     */
-    if (totalDeleted === 0) {
-        await runMode('scan');
     }
 
     return totalDeleted;
