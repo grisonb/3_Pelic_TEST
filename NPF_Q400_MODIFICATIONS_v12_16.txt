@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.17
+Version actuelle TEST : v12.18
 Date de génération : 2026-07-01
 
 Règle de méthode
@@ -110,4 +110,14 @@ v12.17 — Troisième import + suppression par blocs
 - Modification script.js : les cartes non OpenStreet, dont IGN et OACI, utilisent le mode lecture arraybuffer et des lots plus larges.
 - Pourquoi : éviter les conflits lecture/écriture/suppression IndexedDB et rendre visible l'avancement de la suppression.
 - Effet attendu : OACI en troisième doit être plus fluide ; suppression IGN doit afficher une progression et finir.
+
+v12.18 — Libération IndexedDB attendue + OACI repassée en blob
+- Constat utilisateur : suppression IGN affiche le message mais ne démarre pas ; OACI bloque à “Préparation terminée...” en troisième carte.
+- Diagnostic : v12.17 envoyait un postMessage au service worker, mais sans attendre que le service worker ferme réellement sa connexion IndexedDB. L'opération lourde pouvait donc démarrer trop tôt.
+- Modification script.js : ajout de releaseOfflineDatabaseForHeavyOperation(), qui suspend la carte, prévient le service worker, ferme la connexion IndexedDB de la page, attend 900 ms, puis rouvre une connexion propre.
+- Modification import : OpenStreet reste en profil conservateur ; IGN garde arraybuffer ; OACI revient en blob avec lots plus petits, car l'arraybuffer généralisé pouvait bloquer OACI au début de lecture.
+- Modification import : affichage d'un message “Début lecture des tuiles...” puis progression toutes les 10 tuiles pour voir si le blocage est en lecture ZIP ou en écriture IndexedDB.
+- Modification suppression : remplacement de la suppression curseur par une suppression getAllKeys + lots de 500 clés ; fallback scan complet si besoin.
+- Modification sw.js : OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START utilise event.waitUntil(closeOfflineDBForHeavyWrite()) pour fiabiliser la fermeture IndexedDB côté service worker.
+- Pourquoi : traiter les deux blocages observés, suppression silencieuse et import OACI bloqué immédiatement après préparation.
 
