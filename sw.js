@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-15-offline-delete-ign-fast';
+const SW_VERSION = 'sw-v12-16-import-suspend-map';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
