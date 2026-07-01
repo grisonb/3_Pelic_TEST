@@ -4323,6 +4323,55 @@ async function purgeInactivePacksCache() {
     alert(`Purge terminée: ${deletedCount} tuiles supprimées (${inactiveNames.length} pack(s)).`);
 }
 
+
+async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline en cours') {
+    /*
+     * v12.16 — accélération du deuxième gros import.
+     *
+     * Symptôme confirmé :
+     * - première carte importée : rapide ;
+     * - deuxième carte importée : très lente ou bloquée.
+     *
+     * Cause probable :
+     * pendant le deuxième import, Leaflet + le service worker continuent à lire
+     * les tuiles de la carte active dans la même IndexedDB pendant que l'import
+     * écrit massivement. Sur Safari/iPadOS, lecture + écriture simultanées sur une
+     * grosse IndexedDB ralentissent très fortement les transactions.
+     *
+     * Correction :
+     * - désactiver temporairement la carte offline active ;
+     * - retirer la couche tuiles de Leaflet ;
+     * - informer le service worker qu'il ne doit plus chercher de pack actif ;
+     * - laisser l'import écrire seul dans IndexedDB.
+     *
+     * À la fin de l'import, le nouveau groupe importé est réactivé par le code existant.
+     */
+    try {
+        activeOfflinePacks = [];
+        localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([]));
+    } catch (_) {}
+
+    try {
+        notifyServiceWorkerActivePacks([]);
+    } catch (_) {}
+
+    try {
+        if (map && baseTileLayer) {
+            map.removeLayer(baseTileLayer);
+            baseTileLayer = null;
+        }
+    } catch (_) {}
+
+    try {
+        const statusEl = document.getElementById('offline-status');
+        if (statusEl) {
+            statusEl.textContent = `${reason} — carte suspendue pour accélérer l'écriture.`;
+        }
+    } catch (_) {}
+
+    await new Promise(resolve => setTimeout(resolve, 250));
+}
+
 async function handleZipImport(file) {
     if (!file) return;
     if (isZipImportRunning) {
@@ -4343,6 +4392,8 @@ async function handleZipImport(file) {
     progressBar.style.width = '0%';
     statusMessage.textContent = `Ouverture du ZIP ${packName}...`;
     isZipImportRunning = true;
+
+    await suspendOfflineMapRenderingDuringImport(`Import ${packName}`);
 
     const idle = (delay = 0) => new Promise((resolve) => setTimeout(resolve, delay));
     const nextFrame = () => new Promise((resolve) => {
