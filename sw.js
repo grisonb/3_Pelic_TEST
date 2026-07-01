@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-18-db-release-oaci-delete';
+const SW_VERSION = 'sw-v12-19-oaci-safe-reset';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -111,7 +111,7 @@ self.addEventListener('message', event => {
         return;
     }
 
-    if (data.type === 'OFFLINE_IMPORT_START' || data.type === 'OFFLINE_MASS_DELETE_START') {
+    if (data.type === 'OFFLINE_IMPORT_START' || data.type === 'OFFLINE_MASS_DELETE_START' || data.type === 'OFFLINE_FACTORY_RESET') {
         activeOfflinePacks = [];
         offlineTilesEnabled = false;
         offlineSettingsLoadedAt = Date.now();
