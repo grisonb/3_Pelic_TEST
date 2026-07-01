@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-13-offline-progress-waterpoints-startup';
+const SW_VERSION = 'sw-v12-14-ign-import-fast';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
