@@ -1277,8 +1277,34 @@ function normalizeOfflineTileHostPrefix(packName) {
     return compact || 'pack';
 }
 
+
+function isOpenStreetOfflinePackName(packName) {
+    const simplified = String(packName || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, '');
+    return /open\s*street|openstreet|\bosm\b/.test(simplified);
+}
+
+function isIgnOfflinePackName(packName) {
+    const simplified = String(packName || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, '');
+    return /\bign\b|scan25|scan\s*25|oaci\s*ign/.test(simplified);
+}
+
 function buildOfflineTileUrlForPack(tilePath, packName, isLargeZip = false) {
-    const hostPrefix = isLargeZip ? 'a' : normalizeOfflineTileHostPrefix(packName);
+    /*
+     * v12.14 — correction IGN multi-ZIP.
+     *
+     * Avant, tous les gros ZIP forçaient le host "a.tile.openstreetmap.org".
+     * Résultat : OpenStreet et IGN pouvaient partager le même tileUrl z/x/y,
+     * ce qui ralentissait fortement la recherche et pouvait provoquer des collisions.
+     *
+     * Maintenant :
+     * - OpenStreet/OSM reste sur "a" ;
+     * - IGN obtient son propre host fictif "ign" ;
+     * - les autres packs gardent un host dérivé de leur nom.
+     *
+     * Le service worker intercepte *.tile.openstreetmap.org, donc ce host fictif
+     * sert seulement de clé logique locale.
+     */
+    const hostPrefix = normalizeOfflineTileHostPrefix(packName);
     return `https://${hostPrefix}.tile.openstreetmap.org/${tilePath}`;
 }
 
@@ -4396,8 +4422,7 @@ async function handleZipImport(file) {
                 const key = cursor.primaryKey || value.url || '';
                 const keyText = String(key);
                 const shouldDelete = value.packName === packNameToDelete
-                    || keyText.endsWith(`::${packNameToDelete}`)
-                    || (isLargeZipPack && keyText.includes('/'));
+                    || keyText.endsWith(`::${packNameToDelete}`);
 
                 if (shouldDelete) {
                     cursor.delete();
@@ -4457,9 +4482,20 @@ async function handleZipImport(file) {
         await idle(120);
 
         const isLargeZip = file.size > 300 * 1024 * 1024;
-        const batchSize = isLargeZip ? 35 : 120;
-        const reopenEveryTiles = isLargeZip ? 700 : 0;
-        const usePackScopedKey = !isLargeZip;
+        const isOpenStreetPack = isOpenStreetOfflinePackName(packName);
+        const isIgnPack = isIgnOfflinePackName(packName);
+
+        /*
+         * v12.14 — OpenStreet reste sur le profil conservateur validé.
+         * IGN, même en gros ZIP, passe sur un profil plus rapide :
+         * - plus gros lots IndexedDB ;
+         * - pas de fermeture/réouverture toutes les 700 tuiles ;
+         * - clé pack-scopée pour éviter les collisions entre ZIP/hosts.
+         */
+        const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
+        const batchSize = useConservativeLargeImport ? 35 : (isLargeZip ? 120 : 160);
+        const reopenEveryTiles = useConservativeLargeImport ? 700 : 0;
+        const usePackScopedKey = !isOpenStreetPack;
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const alreadyInstalled = alreadyInstalledPacks.some(p => p && p.name === packName);
@@ -4496,20 +4532,20 @@ async function handleZipImport(file) {
             processedFiles += toWrite.length;
 
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
-            await updateImportProgress(`Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`, percent, isLargeZip);
+            await updateImportProgress(`Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`, percent, useConservativeLargeImport);
 
             if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
                 await updateImportProgress(`Stabilisation base offline... ${processedFiles} / ${totalFiles}`, percent, true);
                 await reopenDbCleanly();
             }
 
-            await idle(isLargeZip ? 20 : 0);
+            await idle(useConservativeLargeImport ? 20 : 0);
         };
 
         for (let i = 0; i < tileFiles.length; i += 1) {
             const tileFile = tileFiles[i];
 
-            if (isLargeZip && (i === 0 || i % 10 === 0)) {
+            if (useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
                 const readPercent = Math.min(96, Math.max(1, Math.round((i / totalFiles) * 100)));
                 await updateImportProgress(`Lecture ZIP... ${i + 1} / ${totalFiles} tuiles`, readPercent, true);
             }
@@ -4535,7 +4571,7 @@ async function handleZipImport(file) {
             }
 
             const now = Date.now();
-            if (now - lastUiUpdate > (isLargeZip ? 350 : 700)) {
+            if (now - lastUiUpdate > (useConservativeLargeImport ? 350 : 700)) {
                 lastUiUpdate = now;
                 const percent = Math.min(99, Math.round((Math.max(processedFiles, i + 1) / totalFiles) * 100));
                 await updateImportProgress(`Importation... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`, percent, true);
