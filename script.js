@@ -153,7 +153,7 @@ let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
 let db; // Variable pour la connexion à la base de données IndexedDB
-const OFFLINE_DB_NAME = 'OfflineTilesDB_v12_20';
+const OFFLINE_DB_NAME = 'OfflineTilesDB_v12_21';
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
 const DEFAULT_OFFLINE_TILES_ENABLED = true;
 const MAP_SOURCE_MODE_KEY = 'mapSourceMode';
