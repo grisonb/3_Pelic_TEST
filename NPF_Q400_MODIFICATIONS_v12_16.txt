@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.16
+Version actuelle TEST : v12.17
 Date de génération : 2026-07-01
 
 Règle de méthode
@@ -99,3 +99,15 @@ Rappel de diagnostic actuel
 - OpenStreet importé en second : devient lent/bloqué.
 - Avant, OpenStreet en premier fonctionnait et IGN en second devenait lent.
 - Conclusion : ce n'est pas un problème spécifique IGN ou OpenStreet ; c'est un problème de deuxième gros import avec une carte déjà active et une IndexedDB déjà sollicitée.
+
+v12.17 — Troisième import + suppression par blocs
+- Constat utilisateur : IGN en premier fonctionne, OpenStreet en second fonctionne avec v12.16, mais OACI installée en troisième rame. La suppression d'IGN n'avance pas non plus.
+- Diagnostic : après deux gros imports, IndexedDB est volumineuse. Même si la carte Leaflet est suspendue, le service worker peut garder une connexion IndexedDB ouverte et son cache mémoire. Les suppressions en une grosse transaction donnent aussi l'impression de bloquer car l'interface ne se rafraîchit pas.
+- Modification script.js : suspendOfflineMapRenderingDuringImport() envoie maintenant OFFLINE_IMPORT_START au service worker.
+- Modification sw.js : réception de OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START, vidage du cache mémoire, désactivation temporaire des packs actifs côté SW, fermeture de la connexion IndexedDB du SW.
+- Modification script.js : la suppression de pack se fait par blocs de 750 tuiles avec transactions courtes et progression affichée.
+- Modification script.js : fallback scan complet si l'index packName ne trouve rien, pour supprimer d'anciens packs mal indexés.
+- Modification script.js : les cartes non OpenStreet, dont IGN et OACI, utilisent le mode lecture arraybuffer et des lots plus larges.
+- Pourquoi : éviter les conflits lecture/écriture/suppression IndexedDB et rendre visible l'avancement de la suppression.
+- Effet attendu : OACI en troisième doit être plus fluide ; suppression IGN doit afficher une progression et finir.
+
