@@ -153,6 +153,7 @@ let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
 let db; // Variable pour la connexion à la base de données IndexedDB
+const OFFLINE_DB_NAME = 'OfflineTilesDB_v12_20';
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
 const DEFAULT_OFFLINE_TILES_ENABLED = true;
 const MAP_SOURCE_MODE_KEY = 'mapSourceMode';
@@ -4066,7 +4067,7 @@ function initDB() {
             return;
         }
 
-        const request = indexedDB.open('OfflineTilesDB', 3);
+        const request = indexedDB.open(OFFLINE_DB_NAME, 3);
 
         request.onupgradeneeded = event => {
             const dbInstance = event.target.result;
@@ -4967,16 +4968,24 @@ window.selectSimpleMapPack = async function(packName, checked = true) {
 
 window.resetAllOfflineMapsStorage = async function() {
     /*
-     * v12.19 — reset complet stockage offline.
+     * v12.20 — reset sans deleteDatabase bloquant.
      *
-     * Les suppressions pack par pack peuvent rester bloquées si IndexedDB est
-     * verrouillée ou très fragmentée après plusieurs gros imports.
-     * Cette action supprime toute la base OfflineTilesDB et repart proprement.
+     * Le deleteDatabase('OfflineTilesDB') peut rester bloqué si Safari/iPadOS ou
+     * l'ancien service worker garde encore une connexion ouverte.
+     *
+     * La v12.20 abandonne donc l'ancienne base et utilise une nouvelle base :
+     * OfflineTilesDB_v12_20.
+     *
+     * Conséquence :
+     * - le reset fonctionne même si l'ancienne base est verrouillée ;
+     * - les anciennes tuiles peuvent rester dans les données Safari du site ;
+     * - si l'espace iPad devient insuffisant, il faudra effacer les données du site
+     *   depuis Réglages Safari.
      */
     const confirmed = confirm(
-        'Réinitialiser TOUT le stockage des cartes offline ?\n\n' +
-        'Cela supprimera OpenStreet, IGN, OACI et tous les packs de cartes installés.\n' +
-        "L'application sera ensuite rechargée." 
+        'Réinitialiser la liste des cartes offline ?\n\n' +
+        'La v12.20 utilise une nouvelle base offline propre.\n' +
+        'Les anciennes données verrouillées seront ignorées.'
     );
     if (!confirmed) return;
 
@@ -4985,8 +4994,8 @@ window.resetAllOfflineMapsStorage = async function() {
     const progressBar = document.getElementById('import-progress-bar');
 
     if (progressSection) progressSection.style.display = 'block';
-    if (progressBar) progressBar.style.width = '5%';
-    if (statusMessage) statusMessage.textContent = 'Réinitialisation stockage offline...';
+    if (progressBar) progressBar.style.width = '10%';
+    if (statusMessage) statusMessage.textContent = 'Réinitialisation logique du stockage offline...';
 
     try {
         await suspendOfflineMapRenderingDuringImport('Réinitialisation stockage offline');
@@ -5002,32 +5011,35 @@ window.resetAllOfflineMapsStorage = async function() {
         } catch (_) {}
         db = null;
 
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        if (progressBar) progressBar.style.width = '25%';
+        if (progressBar) progressBar.style.width = '35%';
 
         try {
             await clearTileCaches();
         } catch (_) {}
 
-        if (progressBar) progressBar.style.width = '40%';
+        if (progressBar) progressBar.style.width = '60%';
 
-        await new Promise((resolve, reject) => {
-            const req = indexedDB.deleteDatabase('OfflineTilesDB');
-
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error || new Error('Suppression IndexedDB impossible'));
-            req.onblocked = () => reject(new Error('Suppression bloquée : fermez complètement NPF-Q400 puis rouvrez et relancez la réinitialisation.'));
-        });
-
-        if (progressBar) progressBar.style.width = '80%';
+        /*
+         * Tentative non bloquante de supprimer l'ancienne base historique.
+         * Si elle est bloquée, on n'échoue plus : la nouvelle base v12.20 sera utilisée.
+         */
+        try {
+            if (typeof indexedDB !== 'undefined') {
+                const legacyReq = indexedDB.deleteDatabase('OfflineTilesDB');
+                legacyReq.onerror = () => {};
+                legacyReq.onblocked = () => {};
+            }
+        } catch (_) {}
 
         localStorage.removeItem('installedMapPacks');
         localStorage.removeItem(OFFLINE_ACTIVE_PACKS_KEY);
         localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, String(DEFAULT_OFFLINE_TILES_ENABLED));
         activeOfflinePacks = [];
 
+        await initDB();
+
         if (progressBar) progressBar.style.width = '100%';
-        if (statusMessage) statusMessage.textContent = 'Stockage offline réinitialisé. Rechargement...';
+        if (statusMessage) statusMessage.textContent = 'Stockage offline réinitialisé sur nouvelle base. Rechargement...';
 
         setTimeout(() => {
             const refreshUrl = new URL(window.location.href);
@@ -5040,7 +5052,7 @@ window.resetAllOfflineMapsStorage = async function() {
         if (statusMessage) statusMessage.textContent = `Réinitialisation impossible : ${message}`;
         alert(`Réinitialisation impossible : ${message}`);
     }
-};
+};;
 
 
 window.deleteMapGroup = async function(groupName) {
