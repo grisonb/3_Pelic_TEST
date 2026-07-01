@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.18
+Version actuelle TEST : v12.19
 Date de génération : 2026-07-01
 
 Règle de méthode
@@ -120,4 +120,15 @@ v12.18 — Libération IndexedDB attendue + OACI repassée en blob
 - Modification suppression : remplacement de la suppression curseur par une suppression getAllKeys + lots de 500 clés ; fallback scan complet si besoin.
 - Modification sw.js : OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START utilise event.waitUntil(closeOfflineDBForHeavyWrite()) pour fiabiliser la fermeture IndexedDB côté service worker.
 - Pourquoi : traiter les deux blocages observés, suppression silencieuse et import OACI bloqué immédiatement après préparation.
+
+v12.19 — Reset complet offline + mode sécurisé OACI
+- Constat utilisateur : suppression IGN bloquée sur “Suppression 1/7 : IGN-01...” ; import OACI bloque/crashe à “Lecture tuiles 51/3347”.
+- Diagnostic suppression : la base IndexedDB est probablement verrouillée ou trop fragmentée pour une suppression pack par pack fiable après plusieurs gros imports.
+- Modification UI : ajout d'un bouton “Tout réinitialiser” dans la gestion des cartes offline. Il supprime toute la base OfflineTilesDB et tous les packs offline, puis recharge l'application.
+- Pourquoi : fournir une méthode de réparation fiable quand les suppressions pack par pack ne démarrent pas.
+- Diagnostic OACI : OACI plantait très tôt en troisième import, probablement par pression mémoire/IndexedDB après IGN + OpenStreet.
+- Modification import OACI : mode sécurisé avec lots de 10 tuiles, réouverture IndexedDB toutes les 200 tuiles, lecture blob, progression toutes les 10 tuiles.
+- Modification import OACI : si une tuile échoue deux fois à la lecture, elle est ignorée au lieu de faire planter tout l'import.
+- Risque : OACI peut être un peu plus lente, mais doit cesser de planter à 51/3347.
+- Recommandation : si la base actuelle est déjà bloquée, utiliser d'abord “Tout réinitialiser”, puis réinstaller les cartes.
 
