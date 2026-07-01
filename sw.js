@@ -1,6 +1,6 @@
-const SW_VERSION = 'sw-v12-19-oaci-safe-reset';
+const SW_VERSION = 'sw-v12-20-new-offline-db';
 
-const DB_NAME = 'OfflineTilesDB';
+const DB_NAME = 'OfflineTilesDB_v12_20';
 const DB_VERSION = 3;
 
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
