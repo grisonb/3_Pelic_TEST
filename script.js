@@ -4590,15 +4590,16 @@ async function handleZipImport(file) {
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
         const batchSize = useConservativeLargeImport
             ? 35
-            : (isIgnPack ? 320 : (isOaciPack ? 60 : (isLargeZip ? 160 : 180)));
-        const reopenEveryTiles = useConservativeLargeImport ? 700 : 0;
+            : (isIgnPack ? 320 : (isOaciPack ? 10 : (isLargeZip ? 160 : 180)));
+        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 200 : 0);
         const usePackScopedKey = !isOpenStreetPack;
         /*
-         * v12.18 : arraybuffer reste réservé à IGN, où il a été bénéfique.
-         * OACI revient en blob avec petits lots, car en 3e carte elle bloquait
-         * dès le début de lecture après le passage en arraybuffer généralisé.
+         * v12.19 : OACI passe en mode sécurisé.
+         * Symptôme : blocage/crash vers Lecture tuiles 51/3347 quand OACI est la 3e carte.
+         * Mesure : petits lots de 10, réouverture périodique IndexedDB, lecture blob.
          */
         const tileReadMode = isIgnPack ? 'arraybuffer' : 'blob';
+        let skippedTiles = 0;
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const alreadyInstalled = alreadyInstalledPacks.some(p => p && p.name === packName);
@@ -4665,8 +4666,17 @@ async function handleZipImport(file) {
             try {
                 blob = await tileFile.async(tileReadMode);
             } catch (tileReadError) {
-                await idle(160);
-                blob = await tileFile.async(tileReadMode);
+                await idle(isOaciPack ? 300 : 160);
+                try {
+                    blob = await tileFile.async(tileReadMode);
+                } catch (secondTileReadError) {
+                    if (isOaciPack) {
+                        skippedTiles += 1;
+                        await updateImportProgress(`OACI : tuile ignorée ${i + 1} / ${totalFiles} (${skippedTiles} erreur(s))`, null, true);
+                        continue;
+                    }
+                    throw secondTileReadError;
+                }
             }
             const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
 
@@ -4691,7 +4701,7 @@ async function handleZipImport(file) {
 
         await flushBatch();
 
-        await updateImportProgress(`Importation de ${packName} terminée !`, 100, true);
+        await updateImportProgress(skippedTiles > 0 ? `Importation de ${packName} terminée — ${skippedTiles} tuile(s) ignorée(s).` : `Importation de ${packName} terminée !`, 100, true);
 
         const installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
         const existingPack = installedPacks.find(p => p.name === packName);
@@ -4882,6 +4892,21 @@ function displayInstalledMaps() {
     const groups = groupInstalledMapPacks(installedPacks);
     list.innerHTML = '';
 
+    if (groups.length > 0) {
+        const resetLi = document.createElement('li');
+        resetLi.className = 'offline-map-reset-line';
+        resetLi.innerHTML = `
+            <span class="offline-map-name-line">
+                <strong>Réparation stockage offline</strong><br>
+                <small>À utiliser si une suppression reste bloquée.</small>
+            </span>
+            <div class="offline-map-actions">
+                <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Tout réinitialiser</button>
+            </div>
+        `;
+        list.appendChild(resetLi);
+    }
+
     if (groups.length === 0) {
         list.innerHTML = '<li class="no-maps-placeholder">Aucun pack de cartes installé.</li>';
         return;
@@ -4937,6 +4962,85 @@ window.selectSimpleMapPack = async function(packName, checked = true) {
     return window.selectSimpleMapGroup(groupName, checked);
 };
 
+
+
+
+window.resetAllOfflineMapsStorage = async function() {
+    /*
+     * v12.19 — reset complet stockage offline.
+     *
+     * Les suppressions pack par pack peuvent rester bloquées si IndexedDB est
+     * verrouillée ou très fragmentée après plusieurs gros imports.
+     * Cette action supprime toute la base OfflineTilesDB et repart proprement.
+     */
+    const confirmed = confirm(
+        'Réinitialiser TOUT le stockage des cartes offline ?\n\n' +
+        'Cela supprimera OpenStreet, IGN, OACI et tous les packs de cartes installés.\n' +
+        "L'application sera ensuite rechargée." 
+    );
+    if (!confirmed) return;
+
+    const progressSection = document.getElementById('import-progress-section');
+    const statusMessage = document.getElementById('import-status-message') || document.getElementById('offline-status');
+    const progressBar = document.getElementById('import-progress-bar');
+
+    if (progressSection) progressSection.style.display = 'block';
+    if (progressBar) progressBar.style.width = '5%';
+    if (statusMessage) statusMessage.textContent = 'Réinitialisation stockage offline...';
+
+    try {
+        await suspendOfflineMapRenderingDuringImport('Réinitialisation stockage offline');
+
+        try {
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_FACTORY_RESET' });
+            }
+        } catch (_) {}
+
+        try {
+            if (db) db.close();
+        } catch (_) {}
+        db = null;
+
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        if (progressBar) progressBar.style.width = '25%';
+
+        try {
+            await clearTileCaches();
+        } catch (_) {}
+
+        if (progressBar) progressBar.style.width = '40%';
+
+        await new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('OfflineTilesDB');
+
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error || new Error('Suppression IndexedDB impossible'));
+            req.onblocked = () => reject(new Error('Suppression bloquée : fermez complètement NPF-Q400 puis rouvrez et relancez la réinitialisation.'));
+        });
+
+        if (progressBar) progressBar.style.width = '80%';
+
+        localStorage.removeItem('installedMapPacks');
+        localStorage.removeItem(OFFLINE_ACTIVE_PACKS_KEY);
+        localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, String(DEFAULT_OFFLINE_TILES_ENABLED));
+        activeOfflinePacks = [];
+
+        if (progressBar) progressBar.style.width = '100%';
+        if (statusMessage) statusMessage.textContent = 'Stockage offline réinitialisé. Rechargement...';
+
+        setTimeout(() => {
+            const refreshUrl = new URL(window.location.href);
+            refreshUrl.searchParams.set('appv', APP_VERSION);
+            refreshUrl.searchParams.set('ts', Date.now().toString());
+            window.location.replace(refreshUrl.toString());
+        }, 700);
+    } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        if (statusMessage) statusMessage.textContent = `Réinitialisation impossible : ${message}`;
+        alert(`Réinitialisation impossible : ${message}`);
+    }
+};
 
 
 window.deleteMapGroup = async function(groupName) {
