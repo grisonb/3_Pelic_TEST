@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-17-sw-close-chunk-delete';
+const SW_VERSION = 'sw-v12-18-db-release-oaci-delete';
 
 const DB_NAME = 'OfflineTilesDB';
 const DB_VERSION = 3;
@@ -115,7 +115,11 @@ self.addEventListener('message', event => {
         activeOfflinePacks = [];
         offlineTilesEnabled = false;
         offlineSettingsLoadedAt = Date.now();
-        closeOfflineDBForHeavyWrite();
+        if (event.waitUntil) {
+            event.waitUntil(closeOfflineDBForHeavyWrite());
+        } else {
+            closeOfflineDBForHeavyWrite();
+        }
         return;
     }
 
