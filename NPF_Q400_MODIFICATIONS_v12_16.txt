@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.20
+Version actuelle TEST : v12.21
 Date de génération : 2026-07-01
 
 Règle de méthode
@@ -142,4 +142,12 @@ v12.20 — Nouvelle base IndexedDB offline
 - Pourquoi : retrouver une application utilisable même si l'ancienne base est verrouillée.
 - Limite : les anciennes tuiles peuvent rester dans les données Safari du site et consommer de l'espace. Si le quota iPad devient insuffisant, il faudra supprimer les données du site NPF-Q400 dans Réglages Safari.
 - Test conseillé : installer v12.20, faire MAJ, fermer/réouvrir, cliquer “Tout réinitialiser”, puis réimporter OpenStreet, IGN et OACI.
+
+v12.21 — Version de récupération service worker
+- Constat utilisateur : après installation v12.20, la carte ne charge pas ; les icônes sont visibles mais les boutons ne fonctionnent pas.
+- Diagnostic : très probablement mélange de fichiers ou ancien service worker encore actif après les essais de suppression IndexedDB. Le HTML/CSS s'affiche mais le JavaScript applicatif ne s'initialise pas correctement.
+- Modification index.html : ajout d'une séquence de récupération exécutée une seule fois en v12.21. Elle désenregistre les anciens service workers, supprime les caches app-shell NPF-Q400, puis recharge une URL fraîche.
+- Modification script.js/sw.js : nouvelle base IndexedDB OfflineTilesDB_v12_21 pour éviter toute base verrouillée précédente.
+- Pourquoi : repartir sur un couple index/script/sw cohérent et éviter les anciens caches après blocage.
+- Test conseillé : remplacer les fichiers, ouvrir avec connexion, laisser l'application recharger automatiquement une fois, puis cliquer MAJ et fermer/réouvrir.
 
