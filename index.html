@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.25-osm-smooth-import">
-    <link rel="manifest" href="manifest.json?appv=v12.25-osm-smooth-import">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.25-osm-smooth-import">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.25-osm-smooth-import">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.25-osm-smooth-import">
+    <link rel="stylesheet" href="style.css?appv=v12.26-base-oaci-input">
+    <link rel="manifest" href="manifest.json?appv=v12.26-base-oaci-input">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.26-base-oaci-input">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.26-base-oaci-input">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.26-base-oaci-input">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.25';
+        const APP_VERSION = 'v12.26';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -64,10 +64,10 @@
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
         /*
-         * v12.25 — récupération après service worker / IndexedDB bloqué.
+         * v12.26 — récupération après service worker / IndexedDB bloqué.
          * Si l'app affiche les icônes mais que les boutons ne répondent plus,
          * on peut avoir un ancien service worker actif ou un mélange de fichiers.
-         * Cette séquence s'exécute une seule fois pour la version v12.25 :
+         * Cette séquence s'exécute une seule fois pour la version v12.26 :
          * - désenregistre les anciens service workers ;
          * - supprime les caches app-shell ;
          * - recharge une URL fraîche ;
@@ -284,7 +284,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.25-osm-smooth-import"></script>
+    <script src="script.js?appv=v12.26-base-oaci-input"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -325,7 +325,7 @@
                     <div class="header-section previ-shared-header-section">
                         <div class="header-item"><label id="previ-bloc-depart-label">BLOC DÉPART</label><div id="previ-bloc-depart" class="input-wrapper time-input-wrapper" data-sync-target="bloc-depart"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                         <div class="header-item"><label>FUEL Départ</label><div id="previ-fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg" data-sync-target="fuel-depart"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
-                        <div class="header-item"><label id="previ-cs-base-label">CS BASE (LFTW)</label><div class="input-wrapper"><input type="text" id="previ-cs-lftw-display" class="display-input" readonly></div></div>
+                        <div class="header-item base-oaci-header-item"><label id="previ-cs-base-label">Base</label><div class="input-wrapper base-oaci-input-wrapper"><input type="text" id="previ-base-oaci-input" class="display-input base-oaci-input" inputmode="text" maxlength="4" placeholder="OACI" autocomplete="off" autocapitalize="characters" spellcheck="false"><input type="text" id="previ-cs-lftw-display" class="display-input base-sunset-hidden" readonly tabindex="-1" aria-hidden="true"></div></div>
                         <div class="header-item"><label>TMD</label><div id="previ-tmd" class="input-wrapper time-input-wrapper" data-sync-target="tmd"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                         <div class="header-item"><label>LIMITE HDV</label><div id="previ-limite-hdv" class="input-wrapper time-input-wrapper" data-sync-target="limite-hdv"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                     </div>
@@ -366,7 +366,7 @@
                     <div class="header-section">
                         <div class="header-item"><label id="bloc-depart-label">BLOC DÉPART</label><div id="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                         <div class="header-item"><label>FUEL Départ</label><div id="fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
-                        <div class="header-item"><label id="cs-base-label">CS BASE (LFTW)</label><div class="input-wrapper"><input type="text" id="cs-lftw-display" class="display-input" readonly></div></div>
+                        <div class="header-item base-oaci-header-item"><label id="cs-base-label">Base</label><div class="input-wrapper base-oaci-input-wrapper"><input type="text" id="base-oaci-input" class="display-input base-oaci-input" inputmode="text" maxlength="4" placeholder="OACI" autocomplete="off" autocapitalize="characters" spellcheck="false"><input type="text" id="cs-lftw-display" class="display-input base-sunset-hidden" readonly tabindex="-1" aria-hidden="true"></div></div>
                         <div class="header-item"><label>TMD</label><div id="tmd" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                         <div class="header-item"><label>LIMITE HDV</label><div id="limite-hdv" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                     </div>
