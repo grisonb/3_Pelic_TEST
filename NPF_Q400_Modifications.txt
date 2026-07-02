@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.27
+Version actuelle TEST : v12.28
 Date de génération : 2026-07-02
 
 Règle de méthode
@@ -204,4 +204,15 @@ v12.27 — Alignement bandeau PREVI / BLOC-FUEL
 - Modification style.css : le bandeau PREVI reprend le même principe visuel que le bandeau BLOC/FUEL : pleine largeur, fond identique, bord inférieur identique, padding identique.
 - Modification responsive : alignement aussi conservé sur iPad/smartphone avec les paddings mobiles existants.
 - Non modifié : multi-vols Bloc/Fuel, déroutement “vide retardant”, et import OpenStreet.
+
+v12.28 — Bloc/Fuel multi-vols première version
+- Ajout dans l'onglet BLOC/FUEL d'une barre “Vol n°” avec sélection, Nouveau, Clôturer/Réouvrir et Supprimer.
+- Un vol correspond à un bloc départ et à ses lignes bloc arrivée/fuel.
+- Les vols sont conservés localement dans calculator_flights_v12_28.
+- À l'ouverture, l'application restaure le dernier vol actif.
+- Si tous les vols sont clôturés, la clôture du dernier vol ouvre automatiquement un nouveau vol vierge.
+- Les vols clôturés restent sélectionnables et modifiables.
+- La limite HDV affichée dans le tableau du vol actif prend en compte le cumul des temps de vol des vols précédents.
+- Le bouton corbeille global supprime désormais tous les vols et repart à Vol n°1.
+- Limite volontaire : première version prudente. Le suivi global multi-vols sera à valider en usage avant ajout du déroutement “vide retardant”.
 
