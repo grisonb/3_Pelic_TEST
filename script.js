@@ -1882,6 +1882,7 @@ function setupEventListeners() {
         });
     }
 
+    setupBaseOaciInputs();
     updateBaseLabels();
     updateLftwButtonState();
     updateGaarButtonState();
@@ -2379,6 +2380,101 @@ function getClosestAirports(lat, lon, count) { const customPelican = otherAirpor
 function getAirportByOaci(oaci) {
     return [...pelicanAirports, ...otherAirports].find(ap => ap.oaci === oaci) || null;
 }
+
+function normalizeOaciCodeInput(value) {
+    return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+}
+
+function updateBaseOaciInputs() {
+    const inputs = [
+        document.getElementById('base-oaci-input'),
+        document.getElementById('previ-base-oaci-input')
+    ].filter(Boolean);
+
+    inputs.forEach(input => {
+        if (document.activeElement !== input) {
+            input.value = selectedBaseOACI;
+        }
+        input.classList.remove('base-oaci-invalid');
+        input.title = `Base actuelle : ${selectedBaseOACI}`;
+    });
+}
+
+function applyBaseOaciFromInput(input, { silent = false } = {}) {
+    if (!input) return false;
+
+    const requestedOaci = normalizeOaciCodeInput(input.value);
+    input.value = requestedOaci;
+
+    if (!requestedOaci || requestedOaci.length !== 4) {
+        input.classList.add('base-oaci-invalid');
+        if (!silent) alert('Code OACI base incomplet. Exemple : LFTW.');
+        updateBaseOaciInputs();
+        return false;
+    }
+
+    const airport = getAirportByOaci(requestedOaci);
+    if (!airport) {
+        input.classList.add('base-oaci-invalid');
+        if (!silent) alert(`Base ${requestedOaci} inconnue dans la base terrains.`);
+        updateBaseOaciInputs();
+        return false;
+    }
+
+    selectedBaseOACI = requestedOaci;
+    saveState();
+    updateBaseLabels();
+    updateCalculatorData();
+    if (typeof window.updateBaseSunsetDisplay === 'function') {
+        window.updateBaseSunsetDisplay();
+    }
+    refreshUI();
+    return true;
+}
+
+function setupBaseOaciInputs() {
+    const inputs = [
+        document.getElementById('base-oaci-input'),
+        document.getElementById('previ-base-oaci-input')
+    ].filter(Boolean);
+
+    inputs.forEach(input => {
+        if (input.dataset.baseOaciBound === '1') return;
+        input.dataset.baseOaciBound = '1';
+
+        input.addEventListener('input', () => {
+            input.value = normalizeOaciCodeInput(input.value);
+            input.classList.remove('base-oaci-invalid');
+        });
+
+        input.addEventListener('change', () => {
+            applyBaseOaciFromInput(input);
+        });
+
+        input.addEventListener('blur', () => {
+            if (normalizeOaciCodeInput(input.value) !== selectedBaseOACI) {
+                applyBaseOaciFromInput(input);
+            } else {
+                updateBaseOaciInputs();
+            }
+        });
+
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                applyBaseOaciFromInput(input);
+                input.blur();
+            } else if (event.key === 'Escape') {
+                input.value = selectedBaseOACI;
+                input.classList.remove('base-oaci-invalid');
+                input.blur();
+            }
+        });
+    });
+
+    updateBaseOaciInputs();
+}
+
 function updateBaseLabels() {
     const routeButton = document.getElementById('lftw-route-button');
     if (routeButton) {
@@ -2386,9 +2482,10 @@ function updateBaseLabels() {
         routeButton.title = `Afficher/Masquer la route vers la base ${selectedBaseOACI}`;
     }
     const csBaseLabel = document.getElementById('cs-base-label');
-    if (csBaseLabel) csBaseLabel.textContent = `CS BASE (${selectedBaseOACI})`;
+    if (csBaseLabel) csBaseLabel.textContent = 'Base';
     const previCsBaseLabel = document.getElementById('previ-cs-base-label');
-    if (previCsBaseLabel) previCsBaseLabel.textContent = `CS BASE (${selectedBaseOACI})`;
+    if (previCsBaseLabel) previCsBaseLabel.textContent = 'Base';
+    updateBaseOaciInputs();
     document.querySelectorAll('.base-bingo-label').forEach(el => {
         el.textContent = 'BINGO BASE';
     });
@@ -3338,8 +3435,9 @@ window.toggleCustomPelican = oaci => {
     refreshUI();
 };
 window.setBaseAirport = oaci => {
-    if (!getAirportByOaci(oaci)) return;
-    selectedBaseOACI = oaci;
+    const normalizedOaci = normalizeOaciCodeInput(oaci);
+    if (!getAirportByOaci(normalizedOaci)) return;
+    selectedBaseOACI = normalizedOaci;
     saveState();
     updateBaseLabels();
     updateCalculatorData();
@@ -7363,7 +7461,7 @@ function initializeCalculator() {
                 const now = new Date();
                 const times = SunCalc.getTimes(now, baseAirport.lat, baseAirport.lon);
                 const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-                csLftwDisplay.value = sunsetString;
+                if (csLftwDisplay) csLftwDisplay.value = sunsetString;
                 const previCsDisplay = document.getElementById('previ-cs-lftw-display');
                 if (previCsDisplay) previCsDisplay.value = sunsetString;
                 return;
@@ -7371,7 +7469,7 @@ function initializeCalculator() {
                 // ignore
             }
         }
-        csLftwDisplay.value = '--:--';
+        if (csLftwDisplay) csLftwDisplay.value = '--:--';
         const previCsDisplay = document.getElementById('previ-cs-lftw-display');
         if (previCsDisplay) previCsDisplay.value = '--:--';
     }
