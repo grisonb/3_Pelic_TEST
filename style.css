@@ -4168,3 +4168,38 @@ body {
     font-weight: 900 !important;
 }
 
+/* v12.22 — chat : fermeture plus visible + bouton reconnecter */
+#chat-minimize-button {
+    background: #b00020 !important;
+    color: #ffffff !important;
+    border-color: #b00020 !important;
+    width: 46px !important;
+    min-width: 46px !important;
+    height: 34px !important;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+}
+
+#chat-minimize-button::after {
+    content: " Fermer";
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.chat-reconnect-button {
+    border: 1px solid #0d6efd;
+    background: #ffffff;
+    color: #0d4f8b;
+    border-radius: 8px;
+    height: 34px;
+    padding: 0 10px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.chat-reconnect-button:disabled {
+    opacity: .65;
+    cursor: wait;
+}
+
