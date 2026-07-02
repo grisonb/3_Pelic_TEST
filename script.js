@@ -5522,6 +5522,11 @@ const calculateRotationTime = (dist) => {
 };
 let masterRecalculate = () => {};
 let isFuelSurFeuManual = false, isSuiviConsoManual = false, isSuiviDureeManual = false;
+const MULTI_FLIGHT_STORAGE_KEY = 'calculator_flights_v12_28';
+const ACTIVE_FLIGHT_ID_STORAGE_KEY = 'calculator_active_flight_id_v12_28';
+let dailyFlights = [];
+let activeFlightId = null;
+let isApplyingFlightState = false;
 const parseTime = (timeString) => { if (!timeString || !timeString.includes(':')) return null; const parts = timeString.split(':'); return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10); };
 const formatTime = (totalMinutes) => { if (totalMinutes === null || isNaN(totalMinutes) || totalMinutes < 0) return ''; const roundedMinutes = Math.round(totalMinutes); const hours = Math.floor(roundedMinutes / 60); const minutes = roundedMinutes % 60; return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`; };
 const parseNumeric = (numericString) => { if (!numericString) return null; const value = parseInt(numericString.replace(/[^0-9]/g, ''), 10); return isNaN(value) ? null : value; };
@@ -5644,7 +5649,7 @@ function recalculateBlocFuel() {
 
     let previousBlocArrivee = blocDepart;
     let previousFuelPelic = fuelDepart;
-    let cumulativeTpsVol = 0;
+    let cumulativeTpsVol = getCumulativeHdvBeforeActiveFlight();
 
     const tableRows = document.querySelectorAll('#bloc-fuel tbody tr');
     tableRows.forEach((row) => {
@@ -7578,23 +7583,210 @@ function initializeCalculator() {
         });
     });
 
-    function saveCalculatorState() {
+
+    function createEmptyFlight(number = 1) {
+        return {
+            id: `flight_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+            number,
+            closed: false,
+            state: {
+                'bloc-depart': '',
+                'fuel-depart': '3400 kg',
+                'tmd': '21:30',
+                'limite-hdv': '08:00',
+                calculator_table_data: []
+            }
+        };
+    }
+
+    function normalizeFlightNumbers() {
+        dailyFlights.forEach((flight, index) => {
+            flight.number = index + 1;
+        });
+    }
+
+    function readCalculatorStateFromDom() {
         const state = {};
         document.querySelectorAll('#calculator-modal .input-wrapper').forEach(wrapper => {
             if (wrapper.id) {
-                state[wrapper.id] = wrapper.querySelector('.display-input').value;
+                state[wrapper.id] = wrapper.querySelector('.display-input')?.value || '';
             }
         });
+
         const tableData = [];
         document.querySelectorAll('#bloc-fuel tbody tr').forEach(row => {
-            tableData.push({
-                time: row.querySelector('.time-input-wrapper .display-input').value,
-                fuel: row.querySelector('.numeric-input-wrapper .display-input').value,
-                oaci: row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || ''
-            });
+            const time = row.querySelector('.time-input-wrapper .display-input')?.value || '';
+            const fuel = row.querySelector('.numeric-input-wrapper .display-input')?.value || '';
+            const oaci = row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || '';
+            if (time || fuel || oaci) {
+                tableData.push({ time, fuel, oaci });
+            }
         });
         state.calculator_table_data = tableData;
+        return state;
+    }
+
+    function getFlightDurationFromState(state) {
+        if (!state) return 0;
+
+        let previousBlocArrivee = parseTime(state['bloc-depart']);
+        let cumulative = 0;
+
+        (state.calculator_table_data || []).forEach(rowData => {
+            const blocArrivee = parseTime(rowData.time);
+            if (blocArrivee !== null && previousBlocArrivee !== null) {
+                const delta = blocArrivee - previousBlocArrivee;
+                if (delta > 0) cumulative += delta;
+            }
+            if (blocArrivee !== null) previousBlocArrivee = blocArrivee;
+        });
+
+        return cumulative;
+    }
+
+    function getActiveFlightIndex() {
+        return dailyFlights.findIndex(flight => flight.id === activeFlightId);
+    }
+
+    function getCumulativeHdvBeforeActiveFlight() {
+        const activeIndex = getActiveFlightIndex();
+        if (activeIndex <= 0) return 0;
+
+        return dailyFlights
+            .slice(0, activeIndex)
+            .reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+    }
+
+    function persistFlights() {
+        normalizeFlightNumbers();
+        localStorage.setItem(MULTI_FLIGHT_STORAGE_KEY, JSON.stringify(dailyFlights));
+        if (activeFlightId) {
+            localStorage.setItem(ACTIVE_FLIGHT_ID_STORAGE_KEY, activeFlightId);
+        }
+    }
+
+    function updateActiveFlightStateFromDom() {
+        if (!activeFlightId || isApplyingFlightState) return;
+        const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+        if (!activeFlight) return;
+        activeFlight.state = readCalculatorStateFromDom();
+        persistFlights();
+    }
+
+    function ensureFlightsLoadedFromStorage() {
+        try {
+            const savedFlights = JSON.parse(localStorage.getItem(MULTI_FLIGHT_STORAGE_KEY) || 'null');
+            if (Array.isArray(savedFlights) && savedFlights.length) {
+                dailyFlights = savedFlights;
+            }
+        } catch (_) {
+            dailyFlights = [];
+        }
+
+        if (!dailyFlights.length) {
+            let legacyState = {};
+            try {
+                legacyState = JSON.parse(localStorage.getItem('calculator_state') || '{}') || {};
+            } catch (_) {
+                legacyState = {};
+            }
+            dailyFlights = [createEmptyFlight(1)];
+            dailyFlights[0].state = {
+                'bloc-depart': legacyState['bloc-depart'] || '',
+                'fuel-depart': legacyState['fuel-depart'] || '3400 kg',
+                'tmd': legacyState['tmd'] || '21:30',
+                'limite-hdv': legacyState['limite-hdv'] || '08:00',
+                'deroutement-heure-wrapper': legacyState['deroutement-heure-wrapper'] || '',
+                'deroutement-fuel-wrapper': legacyState['deroutement-fuel-wrapper'] || '',
+                'fuel-sur-feu-wrapper': legacyState['fuel-sur-feu-wrapper'] || '',
+                'suivi-conso-rotation-wrapper': legacyState['suivi-conso-rotation-wrapper'] || '',
+                'suivi-duree-rotation-wrapper': legacyState['suivi-duree-rotation-wrapper'] || '',
+                calculator_table_data: legacyState.calculator_table_data || []
+            };
+        }
+
+        normalizeFlightNumbers();
+
+        const savedActiveId = localStorage.getItem(ACTIVE_FLIGHT_ID_STORAGE_KEY);
+        activeFlightId = dailyFlights.some(flight => flight.id === savedActiveId)
+            ? savedActiveId
+            : dailyFlights[dailyFlights.length - 1].id;
+
+        persistFlights();
+    }
+
+    function refreshFlightSelector() {
+        const select = document.getElementById('flight-select');
+        const closeButton = document.getElementById('close-flight-btn');
+        if (!select) return;
+
+        select.innerHTML = '';
+        dailyFlights.forEach(flight => {
+            const option = document.createElement('option');
+            option.value = flight.id;
+            option.textContent = `Vol n°${flight.number}${flight.closed ? ' — clôturé' : ' — en cours'}`;
+            select.appendChild(option);
+        });
+        select.value = activeFlightId || '';
+
+        const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+        if (closeButton) {
+            closeButton.textContent = activeFlight?.closed ? 'Réouvrir' : 'Clôturer';
+        }
+    }
+
+    function applyFlightStateToDom(state) {
+        isApplyingFlightState = true;
+        try {
+            const tableBody = document.querySelector('#bloc-fuel tbody');
+            tableBody.innerHTML = '';
+
+            initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
+            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3400 kg');
+            initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
+            initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
+
+            initializeTimeInput(document.getElementById('previ-bloc-depart'), state['bloc-depart']);
+            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['fuel-depart'] || '3400 kg');
+            initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
+            initializeTimeInput(document.getElementById('previ-limite-hdv'), state['limite-hdv'] || '08:00');
+
+            refreshSharedHeaderMirrorValues();
+            initializeTimeInput(document.getElementById('deroutement-heure-wrapper'), state['deroutement-heure-wrapper']);
+            initializeNumericInput(document.getElementById('deroutement-fuel-wrapper'), state['deroutement-fuel-wrapper']);
+            initializeNumericInput(document.getElementById('fuel-sur-feu-wrapper'), state['fuel-sur-feu-wrapper']);
+            initializeNumericInput(document.getElementById('suivi-conso-rotation-wrapper'), state['suivi-conso-rotation-wrapper']);
+            initializeTimeInput(document.getElementById('suivi-duree-rotation-wrapper'), state['suivi-duree-rotation-wrapper']);
+
+            const tableData = state.calculator_table_data || [];
+            tableData.forEach(rowData => addNewRow(tableBody, rowData, false));
+
+            const rowsToAdd = Math.max(6, tableBody.rows.length + 1) - tableBody.rows.length;
+            for (let i = 0; i < rowsToAdd; i++) {
+                addNewRow(tableBody, null, i === rowsToAdd - 1);
+            }
+        } finally {
+            isApplyingFlightState = false;
+        }
+
+        updateBlocDepartAirportLabel();
+        refreshBlocFuelAirportOaciCells();
+        refreshSharedHeaderMirrorValues();
+        masterRecalculate();
+    }
+
+    function loadActiveFlightState() {
+        ensureFlightsLoadedFromStorage();
+        const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId) || dailyFlights[dailyFlights.length - 1];
+        activeFlightId = activeFlight.id;
+        applyFlightStateToDom(activeFlight.state || createEmptyFlight(activeFlight.number).state);
+        refreshFlightSelector();
+    }
+
+    function saveCalculatorState() {
+        const state = readCalculatorStateFromDom();
         localStorage.setItem('calculator_state', JSON.stringify(state));
+        updateActiveFlightStateFromDom();
     }
 
     function initializeTimeInput(wrapper, initialValue = '') {
@@ -8055,37 +8247,7 @@ function initializeCalculator() {
     };
 
     function loadCalculatorState() {
-        const tableBody = document.querySelector('#bloc-fuel tbody');
-        tableBody.innerHTML = '';
-        const savedStateJSON = localStorage.getItem('calculator_state');
-        let state = {};
-        if (savedStateJSON) { state = JSON.parse(savedStateJSON); }
-        initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
-        initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3400 kg');
-        initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
-        initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
-
-        initializeTimeInput(document.getElementById('previ-bloc-depart'), state['bloc-depart']);
-        initializeNumericInput(document.getElementById('previ-fuel-depart'), state['fuel-depart'] || '3400 kg');
-        initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
-        initializeTimeInput(document.getElementById('previ-limite-hdv'), state['limite-hdv'] || '08:00');
-        refreshSharedHeaderMirrorValues();
-        initializeTimeInput(document.getElementById('deroutement-heure-wrapper'), state['deroutement-heure-wrapper']);
-        initializeNumericInput(document.getElementById('deroutement-fuel-wrapper'), state['deroutement-fuel-wrapper']);
-        initializeNumericInput(document.getElementById('fuel-sur-feu-wrapper'), state['fuel-sur-feu-wrapper']);
-        initializeNumericInput(document.getElementById('suivi-conso-rotation-wrapper'), state['suivi-conso-rotation-wrapper']);
-        initializeTimeInput(document.getElementById('suivi-duree-rotation-wrapper'), state['suivi-duree-rotation-wrapper']);
-
-        const tableData = state.calculator_table_data || [];
-        tableData.forEach(rowData => {
-            addNewRow(tableBody, rowData, false);
-        });
-
-        const rowsToAdd = Math.max(6, tableBody.rows.length + 1) - tableBody.rows.length;
-        for (let i = 0; i < rowsToAdd; i++) {
-             const isLastRow = (i === rowsToAdd - 1);
-             addNewRow(tableBody, null, isLastRow);
-        }
+        loadActiveFlightState();
     }
 
     loadCalculatorState();
@@ -8145,9 +8307,84 @@ function initializeCalculator() {
         });
     });
 
+    const flightSelect = document.getElementById('flight-select');
+    const newFlightButton = document.getElementById('new-flight-btn');
+    const closeFlightButton = document.getElementById('close-flight-btn');
+    const deleteFlightButton = document.getElementById('delete-flight-btn');
+
+    if (flightSelect) {
+        flightSelect.addEventListener('change', () => {
+            updateActiveFlightStateFromDom();
+            activeFlightId = flightSelect.value;
+            persistFlights();
+            loadActiveFlightState();
+        });
+    }
+
+    if (newFlightButton) {
+        newFlightButton.addEventListener('click', () => {
+            updateActiveFlightStateFromDom();
+            const newFlight = createEmptyFlight(dailyFlights.length + 1);
+            const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+            if (activeFlight) {
+                newFlight.state['tmd'] = activeFlight.state?.['tmd'] || document.getElementById('tmd')?.querySelector('.display-input')?.value || '21:30';
+                newFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '08:00';
+                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
+            }
+            dailyFlights.push(newFlight);
+            activeFlightId = newFlight.id;
+            persistFlights();
+            loadActiveFlightState();
+        });
+    }
+
+    if (closeFlightButton) {
+        closeFlightButton.addEventListener('click', () => {
+            updateActiveFlightStateFromDom();
+            const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+            if (!activeFlight) return;
+            activeFlight.closed = !activeFlight.closed;
+            persistFlights();
+            refreshFlightSelector();
+
+            if (activeFlight.closed) {
+                const allClosed = dailyFlights.every(flight => flight.closed);
+                if (allClosed) {
+                    const nextFlight = createEmptyFlight(dailyFlights.length + 1);
+                    nextFlight.state['tmd'] = activeFlight.state?.['tmd'] || '21:30';
+                    nextFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || '08:00';
+                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3400 kg';
+                    dailyFlights.push(nextFlight);
+                    activeFlightId = nextFlight.id;
+                    persistFlights();
+                    loadActiveFlightState();
+                }
+            }
+        });
+    }
+
+    if (deleteFlightButton) {
+        deleteFlightButton.addEventListener('click', () => {
+            if (!confirm('Supprimer ce vol ?')) return;
+            dailyFlights = dailyFlights.filter(flight => flight.id !== activeFlightId);
+            if (!dailyFlights.length) {
+                dailyFlights = [createEmptyFlight(1)];
+            }
+            normalizeFlightNumbers();
+            activeFlightId = dailyFlights[Math.min(dailyFlights.length - 1, 0)].id;
+            persistFlights();
+            loadActiveFlightState();
+        });
+    }
+
     resetButton.addEventListener('click', () => {
-        if (confirm("Voulez-vous vraiment remettre tout le tableau à zéro ?")) {
+        if (confirm("Voulez-vous vraiment supprimer tous les vols et remettre le Bloc/Fuel à zéro ?")) {
             localStorage.removeItem('calculator_state');
+            localStorage.removeItem(MULTI_FLIGHT_STORAGE_KEY);
+            localStorage.removeItem(ACTIVE_FLIGHT_ID_STORAGE_KEY);
+            dailyFlights = [createEmptyFlight(1)];
+            activeFlightId = dailyFlights[0].id;
+            persistFlights();
             loadCalculatorState();
             masterRecalculate();
         }
