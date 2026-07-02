@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-27-previ-header-align';
+const SW_VERSION = 'sw-v12-28-bloc-fuel-multivol';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
