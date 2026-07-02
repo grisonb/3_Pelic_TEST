@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.26
+Version actuelle TEST : v12.27
 Date de génération : 2026-07-02
 
 Règle de méthode
@@ -197,4 +197,11 @@ v12.26 — Cellule Base OACI
 - Modification script.js : les deux cellules Base restent synchronisées.
 - Modification style.css : style spécifique pour saisie Base et état invalide.
 - Non modifié : import cartes OpenStreet mis de côté ; multi-vols Bloc/Fuel et déroutement “vide retardant” seront traités ensuite.
+
+v12.27 — Alignement bandeau PREVI / BLOC-FUEL
+- Constat utilisateur : dans l'onglet PREVI. NBR ROTATIONS, le bandeau supérieur ne touche pas la zone des titres d'onglets et ne touche pas les bords, contrairement à l'onglet BLOC/FUEL.
+- Modification style.css : suppression de la marge spécifique de .previ-shared-header-section.
+- Modification style.css : le bandeau PREVI reprend le même principe visuel que le bandeau BLOC/FUEL : pleine largeur, fond identique, bord inférieur identique, padding identique.
+- Modification responsive : alignement aussi conservé sur iPad/smartphone avec les paddings mobiles existants.
+- Non modifié : multi-vols Bloc/Fuel, déroutement “vide retardant”, et import OpenStreet.
 
