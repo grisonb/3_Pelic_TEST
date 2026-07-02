@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-24-chat-validate-osm-fast';
+const SW_VERSION = 'sw-v12-25-osm-smooth-import';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
