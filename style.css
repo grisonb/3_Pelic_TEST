@@ -4257,3 +4257,25 @@ body {
     box-shadow: 0 0 0 3px rgba(13, 110, 253, .18);
 }
 
+/* v12.26 — cellule Base OACI dans les deux premiers onglets */
+.base-oaci-input-wrapper {
+    position: relative;
+}
+
+.base-oaci-input {
+    text-align: center;
+    font-weight: 900;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+
+.base-oaci-input.base-oaci-invalid {
+    border-color: #b00020 !important;
+    background: #fff2f4 !important;
+    color: #b00020 !important;
+}
+
+.base-sunset-hidden {
+    display: none !important;
+}
+
