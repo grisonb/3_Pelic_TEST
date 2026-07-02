@@ -5,8 +5,8 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.21
-Date de génération : 2026-07-01
+Version actuelle TEST : v12.22
+Date de génération : 2026-07-02
 
 Règle de méthode
 ----------------
@@ -150,4 +150,15 @@ v12.21 — Version de récupération service worker
 - Modification script.js/sw.js : nouvelle base IndexedDB OfflineTilesDB_v12_21 pour éviter toute base verrouillée précédente.
 - Pourquoi : repartir sur un couple index/script/sw cohérent et éviter les anciens caches après blocage.
 - Test conseillé : remplacer les fichiers, ouvrir avec connexion, laisser l'application recharger automatiquement une fois, puis cliquer MAJ et fermer/réouvrir.
+
+v12.22 — Stabilisation offline, reprise iPad, chat
+- Constat utilisateur : suppression OpenStreet trop lente/inutilisable ; message “importation en cours” puis suppression extrêmement lente ; OACI redevient lent après nettoyage ; reprise iPad après veille un peu lente ; besoin d'un bouton chat Reconnecter et d'une fermeture plus visible.
+- Modification script.js : remise à zéro de isZipImportRunning au chargement pour éviter qu'un import interrompu bloque les actions suivantes.
+- Modification script.js : OpenStreet passe en suppression logique. L'application retire le groupe OpenStreet de la liste et le désactive sans parcourir physiquement 1 Go de tuiles IndexedDB.
+- Pourquoi : la suppression physique d'OpenStreet est trop lourde et instable sur iPad/Safari ; “Vider le cache” reste la méthode de nettoyage lourd.
+- Modification import OACI : lots augmentés de 10 à 35 et réouverture IndexedDB toutes les 350 tuiles pour accélérer sans revenir au mode trop agressif qui plantait.
+- Modification reprise veille : plusieurs invalidateSize/redraw espacés après focus/pageshow/visibilitychange.
+- Modification chat : ajout d'un bouton “↻ Reconnecter” pour forcer la reconnexion après changement de pseudo ou de canal.
+- Modification chat : bouton de fermeture rendu rouge et plus visible.
+- Non inclus volontairement : Base OACI saisissable, multi-vols Bloc/Fuel, et déroutement “vide retardant”. Ces fonctions seront traitées ensuite par versions séparées pour éviter les régressions.
 
