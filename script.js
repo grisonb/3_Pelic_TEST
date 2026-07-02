@@ -121,6 +121,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 9000);
 })();
 
+
+// v12.22 — reprise iPad plus progressive après veille.
+(function setupNpfFastResumeAfterWake() {
+    const invalidateDelays = [80, 250, 600, 1200, 2200];
+
+    const refreshMapAfterWake = () => {
+        invalidateDelays.forEach(delay => {
+            setTimeout(() => {
+                try {
+                    if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                        map.invalidateSize(true);
+                    }
+                    if (typeof baseTileLayer !== 'undefined' && map && baseTileLayer) {
+                        baseTileLayer.redraw();
+                    }
+                } catch (_) {}
+            }, delay);
+        });
+    };
+
+    window.addEventListener('focus', refreshMapAfterWake);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshMapAfterWake();
+    });
+    window.addEventListener('pageshow', refreshMapAfterWake);
+})();
+
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
@@ -191,6 +218,11 @@ let offlineOnlineFallbackMode = DEFAULT_OFFLINE_ONLINE_FALLBACK;
 let activeOfflinePacks = [];
 let isMapSourceSwitching = false;
 let isZipImportRunning = false;
+
+// v12.22 — sécurité : un import interrompu ne doit pas bloquer les suppressions suivantes.
+try {
+    sessionStorage.removeItem('npfZipImportRunning');
+} catch (_) {}
 const CHAT_STORAGE_KEY = 'teamChatConfig';
 const CHAT_HISTORY_KEY = 'teamChatHistory';
 let chatClient = null;
@@ -4431,6 +4463,7 @@ async function handleZipImport(file) {
     progressBar.style.width = '0%';
     statusMessage.textContent = `Ouverture du ZIP ${packName}...`;
     isZipImportRunning = true;
+    try { sessionStorage.setItem('npfZipImportRunning', '1'); } catch (_) {}
 
     await releaseOfflineDatabaseForHeavyOperation(`Import ${packName}`);
 
@@ -4591,8 +4624,8 @@ async function handleZipImport(file) {
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
         const batchSize = useConservativeLargeImport
             ? 35
-            : (isIgnPack ? 320 : (isOaciPack ? 10 : (isLargeZip ? 160 : 180)));
-        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 200 : 0);
+            : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180)));
+        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
         const usePackScopedKey = !isOpenStreetPack;
         /*
          * v12.19 : OACI passe en mode sécurisé.
@@ -4734,6 +4767,7 @@ async function handleZipImport(file) {
         console.error("Erreur d'importation ZIP:", error);
     } finally {
         isZipImportRunning = false;
+        try { sessionStorage.removeItem('npfZipImportRunning'); } catch (_) {}
         setTimeout(() => { progressSection.style.display = 'none'; }, 7000);
     }
 }
@@ -4966,6 +5000,36 @@ window.selectSimpleMapPack = async function(packName, checked = true) {
 
 
 
+
+function removeInstalledOfflinePacksLogically(packNames = []) {
+    const targetSet = new Set((packNames || []).filter(Boolean));
+    if (!targetSet.size) return 0;
+
+    let installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
+    const beforeCount = installedPacks.length;
+    installedPacks = installedPacks.filter(pack => !pack || !targetSet.has(pack.name));
+    localStorage.setItem('installedMapPacks', JSON.stringify(installedPacks));
+
+    if (Array.isArray(activeOfflinePacks) && activeOfflinePacks.some(name => targetSet.has(name))) {
+        activeOfflinePacks = activeOfflinePacks.filter(name => !targetSet.has(name));
+        localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
+        notifyServiceWorkerActivePacks(activeOfflinePacks);
+    }
+
+    return beforeCount - installedPacks.length;
+}
+
+function shouldUseLogicalDeleteForOfflineGroup(groupName, packNames = []) {
+    /*
+     * v12.22 — OpenStreet est trop volumineux pour une suppression physique fiable
+     * sur iPad/Safari. On retire donc le pack de la liste active/installée, sans
+     * parcourir 1 Go de tuiles dans IndexedDB.
+     */
+    if (isOpenStreetOfflinePackName(groupName)) return true;
+    return (packNames || []).some(name => isOpenStreetOfflinePackName(name));
+}
+
+
 window.resetAllOfflineMapsStorage = async function() {
     /*
      * v12.20 — reset sans deleteDatabase bloquant.
@@ -5060,6 +5124,17 @@ window.deleteMapGroup = async function(groupName) {
     if (!packNames.length) {
         alert(`Aucun pack trouvé pour ${groupName}.`);
         displayInstalledMaps();
+        return;
+    }
+
+    if (shouldUseLogicalDeleteForOfflineGroup(groupName, packNames)) {
+        if (!confirm(`Retirer "${groupName}" de l'application ?\n\nOpenStreet est très volumineux : la suppression physique des tuiles peut bloquer l'iPad.\nCette action désactive la carte et la retire de la liste installée.`)) {
+            return;
+        }
+
+        const removedCount = removeInstalledOfflinePacksLogically(packNames);
+        displayInstalledMaps();
+        alert(`Carte "${groupName}" retirée (${removedCount} fichier(s)).\nLes anciennes tuiles pourront rester dans le stockage Safari jusqu'à un nettoyage système.`);
         return;
     }
 
@@ -5868,6 +5943,14 @@ function initializeTeamChat() {
     locationShareButton.style.cursor = 'pointer';
     locationShareButton.style.whiteSpace = 'nowrap';
     clearButton.parentNode.insertBefore(locationShareButton, clearButton);
+
+    const reconnectButton = document.createElement('button');
+    reconnectButton.id = 'chat-reconnect-button';
+    reconnectButton.type = 'button';
+    reconnectButton.textContent = '↻ Reconnecter';
+    reconnectButton.title = 'Forcer la reconnexion après changement de canal ou pseudo';
+    reconnectButton.className = 'chat-reconnect-button';
+    clearButton.parentNode.insertBefore(reconnectButton, clearButton);
 
     const CHAT_CLIENT_ID_KEY = 'teamChatClientId';
     const CHAT_OUTBOX_KEY = 'teamChatOutbox';
@@ -6975,6 +7058,19 @@ function initializeTeamChat() {
         clearLocalHistory();
         appendChatMessage('Système', `Historique local supprimé + ${historyIds.length} message(s) canal nettoyé(s).`, new Date().toISOString(), true);
         closeClearModal();
+    });
+
+    reconnectButton.addEventListener('click', async () => {
+        reconnectButton.disabled = true;
+        reconnectButton.textContent = '↻ ...';
+        try {
+            disconnectFromChat();
+            await new Promise(resolve => setTimeout(resolve, 450));
+            await connectToChat();
+        } finally {
+            reconnectButton.disabled = false;
+            reconnectButton.textContent = '↻ Reconnecter';
+        }
     });
 
     connectButton.addEventListener('click', () => {
