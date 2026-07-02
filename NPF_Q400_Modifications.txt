@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.22
+Version actuelle TEST : v12.24
 Date de génération : 2026-07-02
 
 Règle de méthode
@@ -161,4 +161,21 @@ v12.22 — Stabilisation offline, reprise iPad, chat
 - Modification chat : ajout d'un bouton “↻ Reconnecter” pour forcer la reconnexion après changement de pseudo ou de canal.
 - Modification chat : bouton de fermeture rendu rouge et plus visible.
 - Non inclus volontairement : Base OACI saisissable, multi-vols Bloc/Fuel, et déroutement “vide retardant”. Ces fonctions seront traitées ensuite par versions séparées pour éviter les régressions.
+
+v12.23 — Chat auto-reconnect + fermeture plus propre
+- Constat utilisateur : le bouton fermeture chat de v12.22 n'est pas esthétique ; le bouton Reconnecter fonctionne mais il serait préférable de reconnecter automatiquement quand le canal ou le pseudo change.
+- Modification script.js : le bouton de fermeture chat affiche désormais “✕ Fermer” au lieu d'un symbole moins + ajout CSS.
+- Modification script.js : ajout d'une reconnexion automatique après modification du canal ou du pseudo, avec temporisation 1,2 s pour éviter une reconnexion à chaque lettre.
+- Modification script.js : si le chat n'est pas connecté, la modification canal/pseudo est simplement mémorisée ; si le chat est connecté ou en connexion, l'app déconnecte puis reconnecte automatiquement.
+- Modification style.css : fermeture en bouton pilule blanc/rouge plus propre, suppression du pseudo-texte CSS précédent.
+- Non modifié : import OpenStreet. Le mode OpenStreet reste volontairement conservateur car c'est le pack de 1 Go le plus risqué pour Safari/iPadOS. À réévaluer après un test complet de durée.
+
+v12.24 — Chat Valider + OpenStreet découpé plus rapide
+- Constat utilisateur : l'auto-reconnexion chat n'est pas souhaitée ; il faut un bouton “Valider” qui se dégrise quand canal/pseudo change. OpenStreet était rapide quelques versions avant ; les ZIP actuels ne sont pas volumineux mais l'import est redevenu très long.
+- Modification chat : suppression de la reconnexion automatique à chaque changement stabilisé.
+- Modification chat : ajout d'un bouton “Valider”, grisé par défaut, qui se dégrise uniquement quand le canal ou le pseudo diffère de la configuration validée.
+- Modification chat : au clic Valider, la configuration est mémorisée et le chat se déconnecte/reconnecte si nécessaire.
+- Modification OpenStreet : pour les ZIP OpenStreet non volumineux (<300 Mo), on évite la libération lourde IndexedDB avec attente de 900 ms avant import.
+- Modification OpenStreet : lots d'écriture non-gros OpenStreet portés à 260 tuiles pour revenir vers un profil plus rapide.
+- Pourquoi : les ZIP OpenStreet découpés ne doivent pas subir le profil très conservateur prévu pour un gros ZIP unique d'environ 1 Go.
 
