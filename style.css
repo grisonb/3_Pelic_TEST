@@ -4279,3 +4279,31 @@ body {
     display: none !important;
 }
 
+/* v12.27 — alignement bandeau PREVI avec BLOC/FUEL */
+.previ-shared-header-section {
+    margin: 0 !important;
+    border-bottom: 2px solid var(--border-color) !important;
+    padding: 20px !important;
+    background-color: var(--background-color) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+
+#previ-rotations > .header-section.previ-shared-header-section,
+#bloc-fuel > .header-section {
+    align-self: stretch !important;
+}
+
+@media (max-width: 760px) {
+    .previ-shared-header-section {
+        padding: 10px !important;
+        border-bottom-width: 1px !important;
+    }
+}
+
+@media (max-width: 380px) {
+    .previ-shared-header-section {
+        padding: 8px !important;
+    }
+}
+
