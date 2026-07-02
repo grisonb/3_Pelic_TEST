@@ -4466,10 +4466,10 @@ async function handleZipImport(file) {
     try { sessionStorage.setItem('npfZipImportRunning', '1'); } catch (_) {}
 
     /*
-     * v12.24 — OpenStreet en ZIP découpés était redevenu trop lent.
-     * Pour les ZIP OpenStreet non volumineux, on évite la libération lourde IndexedDB
-     * avec attente de 900 ms qui pénalisait chaque fichier. Le profil lourd reste
-     * conservé pour les très gros ZIP et pour les cas à risque.
+     * v12.25 — OpenStreet en ZIP découpés : import progressif.
+     * Le profil v12.24 en lots de 260 donnait des paliers longs 251/511/771...
+     * On garde l'absence de libération lourde IndexedDB, mais on réduit les lots
+     * pour éviter les pauses longues sur iPad/Safari.
      */
     const earlyPackNameForImport = packName;
     const earlyIsOpenStreetPack = isOpenStreetOfflinePackName(earlyPackNameForImport);
@@ -4637,8 +4637,8 @@ async function handleZipImport(file) {
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
         const batchSize = useConservativeLargeImport
             ? 35
-            : (isIgnPack ? 320 : (isOaciPack ? 35 : (isOpenStreetPack ? 260 : (isLargeZip ? 160 : 180))));
-        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
+            : (isIgnPack ? 320 : (isOaciPack ? 35 : (isOpenStreetPack ? 70 : (isLargeZip ? 160 : 180))));
+        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : (isOpenStreetPack && !isLargeZip ? 420 : 0));
         const usePackScopedKey = !isOpenStreetPack;
         /*
          * v12.19 : OACI passe en mode sécurisé.
@@ -4683,7 +4683,13 @@ async function handleZipImport(file) {
             processedFiles += toWrite.length;
 
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
-            await updateImportProgress(`Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`, percent, useConservativeLargeImport);
+            await updateImportProgress(
+                isOpenStreetPack && !isLargeZip
+                    ? `OpenStreet : écriture progressive ${processedFiles} / ${totalFiles} tuiles`
+                    : `Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`,
+                percent,
+                useConservativeLargeImport || (isOpenStreetPack && !isLargeZip)
+            );
 
             if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
                 await updateImportProgress(`Stabilisation base offline... ${processedFiles} / ${totalFiles}`, percent, true);
