@@ -4307,3 +4307,69 @@ body {
     }
 }
 
+/* v12.28 — Bloc/Fuel multi-vols */
+.flight-manager-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #f8fbff;
+    border-bottom: 1px solid var(--border-color);
+    box-sizing: border-box;
+    flex-wrap: wrap;
+}
+
+.flight-manager-bar label {
+    font-weight: 900;
+    color: var(--primary-color);
+    text-transform: uppercase;
+}
+
+#flight-select {
+    min-width: 170px;
+    height: 36px;
+    border: 1px solid var(--border-color);
+    border-radius: 9px;
+    padding: 0 10px;
+    font-weight: 800;
+    background: #fff;
+}
+
+.flight-manager-bar button {
+    height: 36px;
+    border: 1px solid var(--primary-color);
+    border-radius: 9px;
+    padding: 0 12px;
+    background: #fff;
+    color: var(--primary-color);
+    font-weight: 900;
+    cursor: pointer;
+}
+
+#close-flight-btn {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+#delete-flight-btn {
+    border-color: #b00020;
+    color: #b00020;
+}
+
+@media (max-width: 760px) {
+    .flight-manager-bar {
+        gap: 6px;
+        padding: 8px 10px;
+    }
+
+    #flight-select {
+        min-width: 135px;
+        flex: 1 1 135px;
+    }
+
+    .flight-manager-bar button {
+        padding: 0 8px;
+        font-size: 12px;
+    }
+}
+
