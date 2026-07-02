@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-21-rescue-sw-reset';
+const SW_VERSION = 'sw-v12-22-offline-chat-resume';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
