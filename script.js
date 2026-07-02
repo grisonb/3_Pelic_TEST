@@ -4465,7 +4465,20 @@ async function handleZipImport(file) {
     isZipImportRunning = true;
     try { sessionStorage.setItem('npfZipImportRunning', '1'); } catch (_) {}
 
-    await releaseOfflineDatabaseForHeavyOperation(`Import ${packName}`);
+    /*
+     * v12.24 — OpenStreet en ZIP découpés était redevenu trop lent.
+     * Pour les ZIP OpenStreet non volumineux, on évite la libération lourde IndexedDB
+     * avec attente de 900 ms qui pénalisait chaque fichier. Le profil lourd reste
+     * conservé pour les très gros ZIP et pour les cas à risque.
+     */
+    const earlyPackNameForImport = packName;
+    const earlyIsOpenStreetPack = isOpenStreetOfflinePackName(earlyPackNameForImport);
+    const earlyIsLargeZip = file.size > 300 * 1024 * 1024;
+    if (earlyIsOpenStreetPack && !earlyIsLargeZip) {
+        await suspendOfflineMapRenderingDuringImport(`Import ${packName}`);
+    } else {
+        await releaseOfflineDatabaseForHeavyOperation(`Import ${packName}`);
+    }
 
     const idle = (delay = 0) => new Promise((resolve) => setTimeout(resolve, delay));
     const nextFrame = () => new Promise((resolve) => {
@@ -4624,7 +4637,7 @@ async function handleZipImport(file) {
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
         const batchSize = useConservativeLargeImport
             ? 35
-            : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180)));
+            : (isIgnPack ? 320 : (isOaciPack ? 35 : (isOpenStreetPack ? 260 : (isLargeZip ? 160 : 180))));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
         const usePackScopedKey = !isOpenStreetPack;
         /*
@@ -5944,13 +5957,14 @@ function initializeTeamChat() {
     locationShareButton.style.whiteSpace = 'nowrap';
     clearButton.parentNode.insertBefore(locationShareButton, clearButton);
 
-    const reconnectButton = document.createElement('button');
-    reconnectButton.id = 'chat-reconnect-button';
-    reconnectButton.type = 'button';
-    reconnectButton.textContent = '↻ Reconnecter';
-    reconnectButton.title = 'Forcer la reconnexion après changement de canal ou pseudo';
-    reconnectButton.className = 'chat-reconnect-button';
-    clearButton.parentNode.insertBefore(reconnectButton, clearButton);
+    const validateChatConfigButton = document.createElement('button');
+    validateChatConfigButton.id = 'chat-validate-config-button';
+    validateChatConfigButton.type = 'button';
+    validateChatConfigButton.textContent = 'Valider';
+    validateChatConfigButton.title = 'Valider le changement de canal ou pseudo';
+    validateChatConfigButton.className = 'chat-validate-config-button';
+    validateChatConfigButton.disabled = true;
+    clearButton.parentNode.insertBefore(validateChatConfigButton, clearButton);
 
     const CHAT_CLIENT_ID_KEY = 'teamChatClientId';
     const CHAT_OUTBOX_KEY = 'teamChatOutbox';
@@ -5979,7 +5993,9 @@ function initializeTeamChat() {
     let locationPublishTimer = null;
     let lastLocationPublishAt = 0;
     const remoteLocationMarkers = new Map();
-    minimizeButton.textContent = '—';
+    minimizeButton.textContent = '✕ Fermer';
+    minimizeButton.title = 'Fermer la fenêtre chat';
+    minimizeButton.setAttribute('aria-label', 'Fermer la fenêtre chat');
 
     const defaultConfig = { room: 'Milan', user: '' };
     const savedConfig = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || 'null') || defaultConfig;
@@ -6013,6 +6029,58 @@ function initializeTeamChat() {
             room: (roomInput.value || '').trim().replace(/[^a-zA-Z0-9-_]/g, ''),
             user: (userInput.value || '').trim().slice(0, 24)
         }));
+    };
+
+    let lastValidatedChatConfig = {
+        room: (roomInput.value || '').trim().replace(/[^a-zA-Z0-9-_]/g, ''),
+        user: (userInput.value || '').trim()
+    };
+
+    const getCurrentChatConfig = () => ({
+        room: (roomInput.value || '').trim().replace(/[^a-zA-Z0-9-_]/g, ''),
+        user: (userInput.value || '').trim()
+    });
+
+    const updateChatValidateButtonState = () => {
+        /*
+         * v12.24 — plus de reconnexion automatique.
+         * Le bouton Valider se dégrise uniquement quand canal ou pseudo change.
+         */
+        const current = getCurrentChatConfig();
+        const changed = current.room !== lastValidatedChatConfig.room || current.user !== lastValidatedChatConfig.user;
+        const valid = !!current.room && !!current.user;
+
+        validateChatConfigButton.disabled = !(changed && valid);
+        validateChatConfigButton.classList.toggle('is-dirty', changed && valid);
+    };
+
+    const applyChatConfigValidation = async () => {
+        const current = getCurrentChatConfig();
+        if (!current.room || !current.user) {
+            setConnectionState(false, 'Canal/pseudo requis');
+            return;
+        }
+
+        persistConfig();
+        validateChatConfigButton.disabled = true;
+        validateChatConfigButton.textContent = 'Validation...';
+
+        try {
+            if (chatConnected || isChatConnecting || chatClient) {
+                appendChatMessage('Système', 'Paramètres chat validés — reconnexion...', new Date().toISOString(), true);
+                disconnectFromChat();
+                await new Promise(resolve => setTimeout(resolve, 450));
+                await connectToChat();
+            }
+
+            lastValidatedChatConfig = current;
+            updateChatValidateButtonState();
+        } catch (error) {
+            appendChatMessage('Système', `Validation chat impossible: ${error.message || error}`, new Date().toISOString(), true);
+        } finally {
+            validateChatConfigButton.textContent = 'Valider';
+            updateChatValidateButtonState();
+        }
     };
 
     const saveMessageInHistory = (entry) => {
@@ -6778,6 +6846,8 @@ function initializeTeamChat() {
                 hasAnnouncedConnection = true;
                 setConnectionState(true);
                 isChatConnecting = false;
+                lastValidatedChatConfig = getCurrentChatConfig();
+                updateChatValidateButtonState();
                 console.info(`[Chat] Connecté au canal "${roomName}" (${CHAT_BROKER_URL}).`);
 
                 while (pendingChatMessages.length) {
@@ -7060,18 +7130,12 @@ function initializeTeamChat() {
         closeClearModal();
     });
 
-    reconnectButton.addEventListener('click', async () => {
-        reconnectButton.disabled = true;
-        reconnectButton.textContent = '↻ ...';
-        try {
-            disconnectFromChat();
-            await new Promise(resolve => setTimeout(resolve, 450));
-            await connectToChat();
-        } finally {
-            reconnectButton.disabled = false;
-            reconnectButton.textContent = '↻ Reconnecter';
-        }
-    });
+    roomInput.addEventListener('input', updateChatValidateButtonState);
+    roomInput.addEventListener('change', updateChatValidateButtonState);
+    userInput.addEventListener('input', updateChatValidateButtonState);
+    userInput.addEventListener('change', updateChatValidateButtonState);
+    validateChatConfigButton.addEventListener('click', applyChatConfigValidation);
+    updateChatValidateButtonState();
 
     connectButton.addEventListener('click', () => {
         if (chatConnected || isChatConnecting) {
