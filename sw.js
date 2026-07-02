@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-25-osm-smooth-import';
+const SW_VERSION = 'sw-v12-26-base-oaci-input';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
