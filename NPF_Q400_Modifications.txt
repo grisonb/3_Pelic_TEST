@@ -5,8 +5,8 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.28
-Date de génération : 2026-07-02
+Version actuelle TEST : v12.29
+Date de génération : 2026-07-03
 
 Règle de méthode
 ----------------
@@ -215,4 +215,14 @@ v12.28 — Bloc/Fuel multi-vols première version
 - La limite HDV affichée dans le tableau du vol actif prend en compte le cumul des temps de vol des vols précédents.
 - Le bouton corbeille global supprime désormais tous les vols et repart à Vol n°1.
 - Limite volontaire : première version prudente. Le suivi global multi-vols sera à valider en usage avant ajout du déroutement “vide retardant”.
+
+v12.29 — Déroutement vide retardant
+- Ajout dans l'onglet DEROUT./GAAR d'une case “Vide retardant”.
+- Si la case est décochée : fonctionnement inchangé, calcul depuis la position GPS vers le feu.
+- Si la case est cochée : la première rotation utilise le trajet position GPS actuelle → pélicandrome sélectionné → feu.
+- Le pélicandrome utilisé est celui déjà sélectionné dans l'application, pas le plus proche automatiquement.
+- Le calcul de temps inclut un forfait de 20 min au pélicandrome, cohérent avec le forfait de rotation existant.
+- Le calcul carburant “Fuel mini 1 largage / Base ou Pélic” utilise la consommation du trajet GPS → Pélic → Feu + forfait largage + BINGO.
+- Les rotations suivantes restent calculées avec la logique normale feu ↔ pélicandrome.
+- La case est mémorisée localement.
 
