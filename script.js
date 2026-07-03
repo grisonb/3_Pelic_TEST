@@ -5650,19 +5650,17 @@ function recalculateBlocFuel() {
 
     const blocDepart = parseTime(blocDepartWrapper?.querySelector('.display-input')?.value || '');
     const fuelDepart = parseNumeric(fuelDepartWrapper?.querySelector('.display-input')?.value || '');
-    const limiteHDV = parseTime(limiteHdvWrapper?.querySelector('.display-input')?.value || '');
+    const limiteHDV = (typeof getEffectiveLimitHdvForActiveFlight === 'function')
+        ? getEffectiveLimitHdvForActiveFlight()
+        : parseTime(limiteHdvWrapper?.querySelector('.display-input')?.value || '');
 
+    /*
+     * v12.31 : le champ LIMITE HDV du vol actif affiche déjà le restant journée
+     * avant ce vol. Le cumul du tableau repart donc à 0 pour le vol actif.
+     */
     let previousBlocArrivee = blocDepart;
     let previousFuelPelic = fuelDepart;
     let cumulativeTpsVol = 0;
-
-    try {
-        if (typeof getCumulativeHdvBeforeActiveFlight === 'function') {
-            cumulativeTpsVol = getCumulativeHdvBeforeActiveFlight();
-        }
-    } catch (_) {
-        cumulativeTpsVol = 0;
-    }
 
     const tableRows = document.querySelectorAll('#bloc-fuel tbody tr');
     tableRows.forEach((row) => {
@@ -7722,13 +7720,42 @@ function initializeCalculator() {
         return dailyFlights.findIndex(flight => flight.id === activeFlightId);
     }
 
-    function getCumulativeHdvBeforeActiveFlight() {
-        const activeIndex = getActiveFlightIndex();
-        if (activeIndex <= 0) return 0;
+    function getGlobalLimitHdvMinutes() {
+        /*
+         * v12.31 — Limite HDV multi-vols :
+         * la limite saisie du Vol n°1 devient la limite journée de référence.
+         * Les vols suivants affichent la limite restante avant le vol actif.
+         */
+        const firstFlight = dailyFlights[0];
+        const firstLimit = parseTime(firstFlight?.state?.['limite-hdv']);
+        if (firstLimit !== null) return firstLimit;
 
-        return dailyFlights
-            .slice(0, activeIndex)
-            .reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+        const activeLimit = parseTime(document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '');
+        return activeLimit !== null ? activeLimit : parseTime('08:00');
+    }
+
+    function getEffectiveLimitHdvForActiveFlight() {
+        const globalLimit = getGlobalLimitHdvMinutes();
+        const before = getCumulativeHdvBeforeActiveFlight();
+        if (globalLimit === null) return null;
+        return Math.max(0, globalLimit - before);
+    }
+
+    function updateDisplayedLimitHdvForActiveFlight() {
+        const effectiveLimit = getEffectiveLimitHdvForActiveFlight();
+        const effectiveLabel = formatTime(effectiveLimit) || '00:00';
+
+        const mainWrapper = document.getElementById('limite-hdv');
+        const previWrapper = document.getElementById('previ-limite-hdv');
+
+        [mainWrapper, previWrapper].forEach(wrapper => {
+            const input = wrapper?.querySelector('.display-input');
+            const engine = wrapper?.querySelector('.engine-input');
+            if (!input) return;
+            input.value = effectiveLabel;
+            input.dataset.effectiveMultiflightLimit = effectiveLabel;
+            if (engine) engine.value = effectiveLabel;
+        });
     }
 
     function persistFlights() {
@@ -7743,7 +7770,18 @@ function initializeCalculator() {
         if (!activeFlightId || isApplyingFlightState) return;
         const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
         if (!activeFlight) return;
-        activeFlight.state = readCalculatorStateFromDom();
+        const nextState = readCalculatorStateFromDom();
+
+        /*
+         * v12.31 : pour les vols n°2 et suivants, le champ LIMITE HDV affiché
+         * est le restant journée. On ne doit pas l'utiliser comme nouvelle limite
+         * globale, sinon elle baisse à chaque changement de vol.
+         */
+        if (getActiveFlightIndex() > 0 && dailyFlights[0]?.state?.['limite-hdv']) {
+            nextState['limite-hdv'] = dailyFlights[0].state['limite-hdv'];
+        }
+
+        activeFlight.state = nextState;
         persistFlights();
     }
 
@@ -7845,6 +7883,7 @@ function initializeCalculator() {
 
         updateBlocDepartAirportLabel();
         refreshBlocFuelAirportOaciCells();
+        updateDisplayedLimitHdvForActiveFlight();
         refreshSharedHeaderMirrorValues();
         masterRecalculate();
     }
@@ -8516,7 +8555,15 @@ function initializeCalculator() {
         }
     });
 
-    masterRecalculate = () => { recalculateBlocFuel(); updatePreviTab(); updateSuiviTab(); updateDeroutementTab(); };
+    masterRecalculate = () => {
+        if (!isApplyingFlightState && typeof updateDisplayedLimitHdvForActiveFlight === 'function') {
+            updateDisplayedLimitHdvForActiveFlight();
+        }
+        recalculateBlocFuel();
+        updatePreviTab();
+        updateSuiviTab();
+        updateDeroutementTab();
+    };
 
     masterRecalculate();
 }
