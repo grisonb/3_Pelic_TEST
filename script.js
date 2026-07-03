@@ -5644,44 +5644,64 @@ Calcul : ((${formatTime(params.csFeuTime) || 'N/A'} - ${formatTime(current.time)
 }
 
 function recalculateBlocFuel() {
-    const blocDepart = parseTime(document.getElementById('bloc-depart').querySelector('.display-input').value);
-    const fuelDepart = parseNumeric(document.getElementById('fuel-depart').querySelector('.display-input').value);
-    const limiteHDV = parseTime(document.getElementById('limite-hdv').querySelector('.display-input').value);
+    const blocDepartWrapper = document.getElementById('bloc-depart');
+    const fuelDepartWrapper = document.getElementById('fuel-depart');
+    const limiteHdvWrapper = document.getElementById('limite-hdv');
+
+    const blocDepart = parseTime(blocDepartWrapper?.querySelector('.display-input')?.value || '');
+    const fuelDepart = parseNumeric(fuelDepartWrapper?.querySelector('.display-input')?.value || '');
+    const limiteHDV = parseTime(limiteHdvWrapper?.querySelector('.display-input')?.value || '');
 
     let previousBlocArrivee = blocDepart;
     let previousFuelPelic = fuelDepart;
-    let cumulativeTpsVol = getCumulativeHdvBeforeActiveFlight();
+    let cumulativeTpsVol = 0;
+
+    try {
+        if (typeof getCumulativeHdvBeforeActiveFlight === 'function') {
+            cumulativeTpsVol = getCumulativeHdvBeforeActiveFlight();
+        }
+    } catch (_) {
+        cumulativeTpsVol = 0;
+    }
 
     const tableRows = document.querySelectorAll('#bloc-fuel tbody tr');
     tableRows.forEach((row) => {
-        const blocArrivee = parseTime(row.querySelector('.time-input-wrapper .display-input').value);
-        const fuelPelic = parseNumeric(row.querySelector('.numeric-input-wrapper .display-input').value);
+        const blocArrivee = parseTime(row.querySelector('.time-input-wrapper .display-input')?.value || '');
+        const fuelPelic = parseNumeric(row.querySelector('.numeric-input-wrapper .display-input')?.value || '');
+
+        const dureeCell = row.querySelector('.duree-rotation-cell');
+        const fuelCell = row.querySelector('.fuel-rotation-cell');
+        const tpsVolCell = row.querySelector('.tps-vol-cell');
+        const tpsRestantCell = row.querySelector('.tps-vol-restant-cell');
 
         let dureeRotation = null;
         if (blocArrivee !== null && previousBlocArrivee !== null) {
             dureeRotation = blocArrivee - previousBlocArrivee;
         }
+
         let fuelRotation = null;
         if (fuelPelic !== null && previousFuelPelic !== null) {
             fuelRotation = previousFuelPelic - fuelPelic;
         }
 
-        row.querySelector('.duree-rotation-cell').textContent = formatTime(dureeRotation) || '--';
-        row.querySelector('.fuel-rotation-cell').textContent = (fuelRotation === null) ? '--' : fuelRotation;
+        if (dureeCell) dureeCell.textContent = formatTime(dureeRotation) || '--';
+        if (fuelCell) fuelCell.textContent = (fuelRotation === null) ? '--' : `${fuelRotation}`;
 
         if (blocArrivee !== null) {
             if (dureeRotation !== null && dureeRotation > 0) {
                 cumulativeTpsVol += dureeRotation;
             }
+
             let tpsVolRestant = null;
             if (limiteHDV !== null) {
                 tpsVolRestant = limiteHDV - cumulativeTpsVol;
             }
-            row.querySelector('.tps-vol-cell').textContent = formatTime(cumulativeTpsVol) || '00:00';
-            row.querySelector('.tps-vol-restant-cell').textContent = formatTime(tpsVolRestant) || '--';
+
+            if (tpsVolCell) tpsVolCell.textContent = formatTime(cumulativeTpsVol) || '00:00';
+            if (tpsRestantCell) tpsRestantCell.textContent = formatTime(tpsVolRestant) || '--';
         } else {
-            row.querySelector('.tps-vol-cell').textContent = '--';
-            row.querySelector('.tps-vol-restant-cell').textContent = '--';
+            if (tpsVolCell) tpsVolCell.textContent = '--';
+            if (tpsRestantCell) tpsRestantCell.textContent = '--';
         }
 
         if (blocArrivee !== null) previousBlocArrivee = blocArrivee;
@@ -8091,8 +8111,20 @@ function initializeCalculator() {
         }
     }
     function closeFuelSplitModal() {
-        const { modal } = getFuelSplitModalElements();
-        if (modal) modal.style.display = 'none';
+        const { modal, leftInput, rightInput, totalInput } = getFuelSplitModalElements();
+
+        try {
+            [leftInput, rightInput, totalInput].forEach(input => {
+                if (input && typeof input.blur === 'function') input.blur();
+            });
+        } catch (_) {}
+
+        if (modal) {
+            modal.style.setProperty('display', 'none', 'important');
+            modal.classList.remove('active', 'open', 'show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
         resetFuelSplitKeyboardOffset();
         activeFuelSplitInput = null;
     }
@@ -8160,19 +8192,36 @@ function initializeCalculator() {
         });
 
         if (validateBtn) {
-            validateBtn.addEventListener('click', () => {
+            validateBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
                 if (!activeFuelSplitInput) {
                     closeFuelSplitModal();
                     return;
                 }
+
+                const targetInput = activeFuelSplitInput;
                 const total = cleanFuelDigits(totalInput?.value || '');
-                activeFuelSplitInput.value = total ? `${parseInt(total, 10)} kg` : '';
-                syncSharedHeaderFromWrapper(activeFuelSplitInput.closest('.input-wrapper'));
+                targetInput.value = total ? `${parseInt(total, 10)} kg` : '';
+
+                const targetWrapper = targetInput.closest('.input-wrapper');
+                syncSharedHeaderFromWrapper(targetWrapper);
                 refreshSharedHeaderMirrorValues();
+
+                /*
+                 * v12.30 — correction Bloc/Fuel multi-vols :
+                 * on force le recalcul immédiat avant fermeture de la fenêtre carburant,
+                 * puis on sauvegarde le vol actif. Cela évite les colonnes dérivées vides.
+                 */
+                try { recalculateBlocFuel(); } catch (_) {}
                 masterRecalculate();
                 saveCalculatorState();
+
                 closeFuelSplitModal();
-            });
+                setTimeout(closeFuelSplitModal, 80);
+                setTimeout(closeFuelSplitModal, 250);
+            }, { capture: true });
         }
 
         if (clearBtn) {
@@ -8203,7 +8252,9 @@ function initializeCalculator() {
         if (rightInput) rightInput.value = '';
         totalInput.value = cleanFuelDigits(displayInput?.value || '');
         resetFuelSplitKeyboardOffset();
+        modal.style.removeProperty('display');
         modal.style.display = 'flex';
+        modal.removeAttribute('aria-hidden');
 
         /*
          * Focus immédiat : indispensable sur iPad/iPhone pour ouvrir le clavier
@@ -8280,6 +8331,27 @@ function initializeCalculator() {
         initializeNumericInput(numericWrapper, data ? data.fuel : '');
         row.dataset.airportOaci = data?.oaci || '';
         updateRowAirportOaci(row);
+
+        const forceRowRecalculateAndSave = () => {
+            /*
+             * v12.30 — sécurité : une modification dans une ligne BLOC/FUEL doit
+             * toujours recalculer les colonnes Durée/Fuel/Tps de vol.
+             */
+            try { updateRowAirportOaci(row); } catch (_) {}
+            try { recalculateBlocFuel(); } catch (_) {}
+            masterRecalculate();
+            saveCalculatorState();
+        };
+
+        [
+            timeWrapper.querySelector('.display-input'),
+            timeWrapper.querySelector('.engine-input'),
+            numericWrapper.querySelector('.display-input')
+        ].filter(Boolean).forEach(input => {
+            input.addEventListener('change', forceRowRecalculateAndSave);
+            input.addEventListener('input', forceRowRecalculateAndSave);
+            input.addEventListener('blur', forceRowRecalculateAndSave);
+        });
 
         const checkAndAddRow = () => {
             if (row.nextSibling) {
