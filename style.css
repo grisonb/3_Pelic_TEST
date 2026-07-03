@@ -4373,3 +4373,27 @@ body {
     }
 }
 
+/* v12.29 — Déroutement vide retardant */
+.derout-empty-retardant-line {
+    align-items: center;
+}
+
+.derout-empty-retardant-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 900;
+    color: var(--primary-color);
+    background: #f2f8ff;
+    border: 1px solid #cfe2ff;
+    border-radius: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+.derout-empty-retardant-toggle input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary-color);
+}
+
