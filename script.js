@@ -5524,6 +5524,7 @@ let masterRecalculate = () => {};
 let isFuelSurFeuManual = false, isSuiviConsoManual = false, isSuiviDureeManual = false;
 const MULTI_FLIGHT_STORAGE_KEY = 'calculator_flights_v12_28';
 const ACTIVE_FLIGHT_ID_STORAGE_KEY = 'calculator_active_flight_id_v12_28';
+const DEROUT_EMPTY_RETARDANT_KEY = 'derout_empty_retardant_v12_29';
 let dailyFlights = [];
 let activeFlightId = null;
 let isApplyingFlightState = false;
@@ -5862,9 +5863,35 @@ function updateDeroutementTab() {
     const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
     const limiteHDV = parseTime(document.getElementById('limite-hdv').querySelector('.display-input').value);
     const hasGpsPosition = !!(userMarker && userMarker.getLatLng());
+    const userLatLng = hasGpsPosition ? userMarker.getLatLng() : null;
+    const selectedPelicForDeroutement = selectedPelicanOACI ? getAirportByOaci(selectedPelicanOACI) : null;
+    const isEmptyRetardant = document.getElementById('derout-empty-retardant-checkbox')?.checked === true;
+
     const distGpsFeu = hasGpsPosition ? CALCULATOR_DATA.distGpsFeu : null;
-    const transitTimeFromGps = distGpsFeu !== null ? Math.round(calculateTransitTime(distGpsFeu)) : null;
-    const consoTransitFromGps = distGpsFeu !== null ? calculateFuelToGo(distGpsFeu) : null;
+    const distGpsPelic = (hasGpsPosition && selectedPelicForDeroutement)
+        ? Math.round(calculateDistanceInNm(userLatLng.lat, userLatLng.lng, selectedPelicForDeroutement.lat, selectedPelicForDeroutement.lon))
+        : null;
+    const distFirstPelicFeu = selectedPelicForDeroutement ? CALCULATOR_DATA.distPelicFeu : null;
+
+    const firstLegDistance = (isEmptyRetardant && distGpsPelic !== null && distFirstPelicFeu !== null)
+        ? distGpsPelic + distFirstPelicFeu
+        : distGpsFeu;
+
+    const transitTimeFromGps = firstLegDistance !== null
+        ? (
+            isEmptyRetardant
+                ? Math.round(calculateTransitTime(distGpsPelic)) + 20 + Math.round(calculateTransitTime(distFirstPelicFeu))
+                : Math.round(calculateTransitTime(distGpsFeu))
+        )
+        : null;
+
+    const consoTransitFromGps = firstLegDistance !== null
+        ? (
+            isEmptyRetardant
+                ? calculateFuelToGo(distGpsPelic) + calculateFuelToGo(distFirstPelicFeu)
+                : calculateFuelToGo(distGpsFeu)
+        )
+        : null;
 
     const bingoBaseDisplay = document.getElementById('derout-bingo-base');
     if (bingoBase === 700) { bingoBaseDisplay.innerHTML = '-- kg'; } else { bingoBaseDisplay.innerHTML = `${selectedBaseOACI} / ${CALCULATOR_DATA.distBaseFeu} Nm /&nbsp;<b>${bingoBase} kg</b>`; }
@@ -5875,23 +5902,40 @@ function updateDeroutementTab() {
     const fuelMiniPelic = consoTransitFromGps !== null ? consoTransitFromGps + 250 + bingoPelic : null;
     document.getElementById('derout-fuel-mini-base').textContent = fuelMiniBase !== null ? `${fuelMiniBase} kg` : '-- kg';
     document.getElementById('derout-fuel-mini-pelic').textContent = fuelMiniPelic !== null ? `${fuelMiniPelic} kg` : '-- kg';
+    const deroutFirstLegLabel = isEmptyRetardant
+        ? `GPS → Pélic (${selectedPelicForDeroutement ? selectedPelicForDeroutement.oaci : 'PÉLIC'}) → Feu`
+        : 'GPS → Feu';
+    const deroutFirstLegDetail = isEmptyRetardant
+        ? `Distance GPS → Pélic : ${distGpsPelic ?? 'N/A'} Nm\nDistance Pélic → Feu : ${distFirstPelicFeu ?? 'N/A'} Nm\nForfait remplissage Pélic : 20 min`
+        : `Distance GPS → Feu : ${distGpsFeu ?? 'N/A'} Nm`;
+
     setHelp('derout-fuel-mini-base-help', consoTransitFromGps !== null
-        ? `Formule : Conso GPS → Feu + Forfait largage + BINGO Base\n\nRègle conso GPS → Feu :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase}`
-        : 'Distance GPS → Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
+        ? `Formule : Conso ${deroutFirstLegLabel} + Forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase}`
+        : (isEmptyRetardant && !selectedPelicForDeroutement)
+            ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
+            : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
     setHelp('derout-fuel-mini-pelic-help', consoTransitFromGps !== null
-        ? `Formule : Conso GPS → Feu + Forfait largage + BINGO Pélic.\n\nRègle conso GPS → Feu :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic}`
-        : 'Distance GPS → Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
+        ? `Formule : Conso ${deroutFirstLegLabel} + Forfait largage + BINGO Pélic.\n\n${deroutFirstLegDetail}\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic}`
+        : (isEmptyRetardant && !selectedPelicForDeroutement)
+            ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
+            : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
 
     const heureSurFeu = (heureActuelle !== null && transitTimeFromGps !== null) ? heureActuelle + transitTimeFromGps : null;
     document.getElementById('derout-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
     document.getElementById('derout-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
     setHelp('derout-heure-sur-feu-help', transitTimeFromGps !== null
-        ? `Formule : Heure actuelle + Durée transit GPS → Feu\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'}`
-        : 'Distance GPS → Feu indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
+        ? `Formule : Heure actuelle + Durée ${deroutFirstLegLabel}\n\n${deroutFirstLegDetail}\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'}`
+        : (isEmptyRetardant && !selectedPelicForDeroutement)
+            ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
+            : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
 
-    if (fuelActuel === null || heureActuelle === null || consoTransitFromGps === null || transitTimeFromGps === null) {
+    if (fuelActuel === null || heureActuelle === null || consoTransitFromGps === null || transitTimeFromGps === null || (isEmptyRetardant && !selectedPelicForDeroutement)) {
         resultsContainer.querySelectorAll('.value').forEach(el => { el.textContent = '--'; el.className = 'value rotation-value-default'; });
-        resultsContainer.querySelectorAll('.formula-help-icon').forEach(icon => icon.onclick = () => alert("Données insuffisantes pour le calcul."));
+        resultsContainer.querySelectorAll('.formula-help-icon').forEach(icon => icon.onclick = () => alert(
+            isEmptyRetardant && !selectedPelicForDeroutement
+                ? 'Mode vide retardant : sélectionnez un pélicandrome.'
+                : "Données insuffisantes pour le calcul."
+        ));
         return;
     }
 
@@ -7442,6 +7486,16 @@ function initializeCalculator() {
     const onglets = document.querySelectorAll('.onglet-bouton');
     const csLftwDisplay = document.getElementById('cs-lftw-display');
     const refreshGpsBtn = document.getElementById('refresh-gps-btn');
+    const deroutEmptyRetardantCheckbox = document.getElementById('derout-empty-retardant-checkbox');
+
+    if (deroutEmptyRetardantCheckbox) {
+        deroutEmptyRetardantCheckbox.checked = localStorage.getItem(DEROUT_EMPTY_RETARDANT_KEY) === 'true';
+        deroutEmptyRetardantCheckbox.addEventListener('change', () => {
+            localStorage.setItem(DEROUT_EMPTY_RETARDANT_KEY, deroutEmptyRetardantCheckbox.checked ? 'true' : 'false');
+            masterRecalculate();
+        });
+    }
+
     refreshGpsBtn.addEventListener('click', () => {
         if (!navigator.geolocation) {
             alert("La géolocalisation n'est pas supportée par votre navigateur.");
