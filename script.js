@@ -7720,6 +7720,15 @@ function initializeCalculator() {
         return dailyFlights.findIndex(flight => flight.id === activeFlightId);
     }
 
+    function getCumulativeHdvBeforeActiveFlight() {
+        const activeIndex = getActiveFlightIndex();
+        if (activeIndex <= 0) return 0;
+
+        return dailyFlights
+            .slice(0, activeIndex)
+            .reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+    }
+
     function getGlobalLimitHdvMinutes() {
         /*
          * v12.31 — Limite HDV multi-vols :
@@ -7736,7 +7745,12 @@ function initializeCalculator() {
 
     function getEffectiveLimitHdvForActiveFlight() {
         const globalLimit = getGlobalLimitHdvMinutes();
-        const before = getCumulativeHdvBeforeActiveFlight();
+        let before = 0;
+        try {
+            before = getCumulativeHdvBeforeActiveFlight();
+        } catch (_) {
+            before = 0;
+        }
         if (globalLimit === null) return null;
         return Math.max(0, globalLimit - before);
     }
@@ -7831,6 +7845,11 @@ function initializeCalculator() {
         const select = document.getElementById('flight-select');
         const closeButton = document.getElementById('close-flight-btn');
         if (!select) return;
+
+        if (!Array.isArray(dailyFlights) || !dailyFlights.length) {
+            dailyFlights = [createEmptyFlight(1)];
+            activeFlightId = dailyFlights[0].id;
+        }
 
         select.innerHTML = '';
         dailyFlights.forEach(flight => {
