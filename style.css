@@ -4454,3 +4454,26 @@ body {
     }
 }
 
+/* v12.34 — Feux de l'historique affichés sur la carte */
+.fire-history-map-marker {
+    background-color: #d90429 !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 0 2px rgba(217, 4, 41, 0.35), 0 2px 7px rgba(0,0,0,0.45) !important;
+    cursor: pointer;
+}
+
+.fire-history-map-tooltip {
+    background: rgba(255, 245, 245, 0.96) !important;
+    border: 1px solid #d90429 !important;
+    border-radius: 7px !important;
+    color: #7f0015 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,.25) !important;
+}
+
+.custom-marker-icon.fire-marker {
+    width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+}
+
