@@ -504,9 +504,9 @@ function buildFireHistoryIcon() {
     return L.divIcon({
         className: 'custom-marker-icon fire-marker fire-history-map-marker',
         html: '🔥',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -18]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -14]
     });
 }
 
@@ -562,13 +562,26 @@ function drawFireHistoryMarkers() {
 
         marker.bindTooltip(name, {
             direction: 'top',
-            offset: [0, -18],
+            offset: [0, -14],
             opacity: 0.95,
             className: 'fire-history-map-tooltip'
         });
 
-        marker.bindPopup(`<b>${escapeHtml(name)}</b><br>Cliquer pour sélectionner ce feu`);
-        marker.on('click', () => selectFireFromHistoryMap(item));
+        marker.bindPopup(() => {
+            const container = document.createElement('div');
+            container.className = 'fire-history-map-popup';
+            container.innerHTML = `<b>${escapeHtml(name)}</b>`;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = 'Sélectionner';
+            button.className = 'fire-history-map-select-btn';
+            button.addEventListener('click', () => {
+                selectFireFromHistoryMap(item);
+                try { map.closePopup(); } catch (_) {}
+            });
+            container.appendChild(button);
+            return container;
+        });
         marker.addTo(fireHistoryLayer);
     });
 }
@@ -2348,9 +2361,9 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     const fireIcon = L.divIcon({
         className: 'custom-marker-icon fire-marker',
         html: '🔥',
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-        popupAnchor: [0, -18]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -14]
     });
     L.marker([lat, lon], { icon: fireIcon }).bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`).addTo(routesLayer);
 
@@ -2824,7 +2837,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] }) });
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML }) });
             marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div></div>`);
             marker.addTo(permanentAirportLayer);
             return;
@@ -2874,7 +2887,7 @@ function drawPermanentAirportMarkers() {
         const isWater = waterAirports.has(airport.oaci);
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
-        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] });
+        const icon = L.divIcon({ className: iconClass, html: iconHTML });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
