@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-28-bloc-fuel-multivol';
+const SW_VERSION = 'sw-v12-29-deroutement-vide-retardant';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
