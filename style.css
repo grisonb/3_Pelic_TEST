@@ -4408,3 +4408,49 @@ body {
     border-bottom: 1px solid var(--border-color);
 }
 
+/* v12.33 — Statut GPS DEROUTEMENT/GAAR */
+.derout-gps-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.derout-gps-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-weight: 900;
+    font-size: 13px;
+    border: 1px solid var(--border-color);
+    background: #fff;
+}
+
+.derout-gps-status-ok {
+    color: #0f5132;
+    background: #eaf7ef;
+    border-color: #badbcc;
+}
+
+.derout-gps-status-missing {
+    color: #842029;
+    background: #fff3f3;
+    border-color: #f5c2c7;
+}
+
+@media (max-width: 760px) {
+    .derout-gps-status-row {
+        align-items: stretch;
+    }
+
+    .derout-gps-status-row #refresh-gps-btn,
+    .derout-gps-status {
+        width: 100%;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+}
+
