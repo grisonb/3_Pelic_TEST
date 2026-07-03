@@ -4095,7 +4095,7 @@ function updateUserPosition(pos) {
     const motionHeading = Number.isFinite(rawHeading) ? rawHeading : estimatedMotion.heading;
     const motionSpeed = Number.isFinite(rawSpeed) ? rawSpeed : estimatedMotion.speed;
     updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
-    lastPosition = { lat: latitude, lng: longitude };
+    lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs };
     saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
 
     if (!userMarker) {
@@ -5845,6 +5845,9 @@ function updateSuiviTab() {
 }
 
 function updateDeroutementTab() {
+    if (typeof updateDeroutementGpsStatus === 'function') {
+        updateDeroutementGpsStatus();
+    }
     const resultsContainer = document.getElementById('derout-rotation-results-container');
     const setHelp = (id, formula) => {
         const icon = document.getElementById(id);
@@ -7506,6 +7509,35 @@ function initializeCalculator() {
     const refreshGpsBtn = document.getElementById('refresh-gps-btn');
     const deroutEmptyRetardantCheckbox = document.getElementById('derout-empty-retardant-checkbox');
 
+    function getCurrentGpsAgeLabel() {
+        if (!lastPosition || !lastPosition.timestamp) return null;
+        const ageMs = Date.now() - Number(lastPosition.timestamp);
+        if (!Number.isFinite(ageMs) || ageMs < 0) return null;
+        const ageMinutes = Math.floor(ageMs / 60000);
+        if (ageMinutes < 1) return 'moins d’1 min';
+        if (ageMinutes < 60) return `${ageMinutes} min`;
+        const ageHours = Math.floor(ageMinutes / 60);
+        const remainingMinutes = ageMinutes % 60;
+        return remainingMinutes ? `${ageHours} h ${remainingMinutes} min` : `${ageHours} h`;
+    }
+
+    function updateDeroutementGpsStatus(extraText = '') {
+        const status = document.getElementById('derout-gps-status');
+        if (!status) return;
+
+        if (!lastPosition || !lastPosition.timestamp) {
+            status.textContent = extraText || 'GPS non actualisé';
+            status.className = 'derout-gps-status derout-gps-status-missing';
+            return;
+        }
+
+        const updatedAt = new Date(Number(lastPosition.timestamp));
+        const hhmm = updatedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const ageLabel = getCurrentGpsAgeLabel();
+        status.textContent = `${extraText || 'GPS actualisé'} à ${hhmm}${ageLabel ? ` — ${ageLabel}` : ''}`;
+        status.className = 'derout-gps-status derout-gps-status-ok';
+    }
+
     if (deroutEmptyRetardantCheckbox) {
         deroutEmptyRetardantCheckbox.checked = localStorage.getItem(DEROUT_EMPTY_RETARDANT_KEY) === 'true';
         deroutEmptyRetardantCheckbox.addEventListener('change', () => {
@@ -7513,6 +7545,8 @@ function initializeCalculator() {
             masterRecalculate();
         });
     }
+
+    updateDeroutementGpsStatus();
 
     refreshGpsBtn.addEventListener('click', () => {
         if (!navigator.geolocation) {
@@ -7523,8 +7557,11 @@ function initializeCalculator() {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 updateUserPosition(pos);
+                updateDeroutementGpsStatus('GPS actualisé manuellement');
+                masterRecalculate();
             },
             () => {
+                updateDeroutementGpsStatus('GPS non actualisé');
                 alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
