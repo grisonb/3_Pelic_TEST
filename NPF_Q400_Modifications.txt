@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.29
+Version actuelle TEST : v12.30
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -225,4 +225,12 @@ v12.29 — Déroutement vide retardant
 - Le calcul carburant “Fuel mini 1 largage / Base ou Pélic” utilise la consommation du trajet GPS → Pélic → Feu + forfait largage + BINGO.
 - Les rotations suivantes restent calculées avec la logique normale feu ↔ pélicandrome.
 - La case est mémorisée localement.
+
+v12.30 — Correctifs Bloc/Fuel après multi-vols
+- Constat utilisateur : dans BLOC/FUEL, après validation d'un fuel saisi, la fenêtre Fuel reste ouverte alors que la valeur est prise en compte.
+- Correction script.js : fermeture renforcée de la fenêtre Fuel après validation, avec blur des champs, aria-hidden et display:none prioritaire.
+- Constat utilisateur : les colonnes Durée rotation, Fuel rotation, Tps de vol et Tps de vol restant restent vides malgré la saisie du bloc arrivée.
+- Correction script.js : recalcul forcé des lignes BLOC/FUEL après validation Fuel et après toute modification d'une ligne.
+- Correction script.js : recalculateBlocFuel rendu plus robuste avec sélecteurs protégés et valeurs “--” explicites.
+- Objectif : conserver la logique multi-vols v12.28/v12.29 mais rétablir le comportement immédiat du tableau Bloc/Fuel.
 
