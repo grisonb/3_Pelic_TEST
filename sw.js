@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-31-hdv-multivol-order';
+const SW_VERSION = 'sw-v12-32-multivol-runtime-fix';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
