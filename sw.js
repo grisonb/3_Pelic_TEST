@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-35-fire-history-popup-size';
+const SW_VERSION = 'sw-v12-36-icon-size-hard-fix';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
