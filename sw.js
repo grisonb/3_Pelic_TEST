@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-32-multivol-runtime-fix';
+const SW_VERSION = 'sw-v12-33-gps-status-deroutement';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
