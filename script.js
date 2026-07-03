@@ -158,7 +158,7 @@ let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirpor
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null, accuracyCircle = null, headingLayer = null, lastPosition = null;
 let ownGpsVectorLayer = null, ownGpsVectorMarkers = [];
-let userToTargetLayer = null, lftwRouteLayer = null;
+let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
 let showLftwRoute = true;
 let departmentsLayerGroup = null;
 let departmentsLabelsLayer = null;
@@ -494,9 +494,83 @@ function saveFireHistory(commune) {
 
     try {
         localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+        drawFireHistoryMarkers();
     } catch (error) {
         console.warn('Impossible de mémoriser le feu:', error);
     }
+}
+
+function buildFireHistoryIcon() {
+    return L.divIcon({
+        className: 'custom-marker-icon fire-marker fire-history-map-marker',
+        html: '🔥',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -18]
+    });
+}
+
+function selectFireFromHistoryMap(item) {
+    const normalized = normalizeHistoryCommune(item);
+    if (!normalized) return;
+
+    currentCommune = normalized;
+    localStorage.setItem('currentCommune', JSON.stringify(normalized));
+    displayCommuneDetails(normalized, false);
+
+    if (map && Number.isFinite(Number(normalized.latitude_mairie)) && Number.isFinite(Number(normalized.longitude_mairie))) {
+        map.panTo([Number(normalized.latitude_mairie), Number(normalized.longitude_mairie)]);
+    }
+}
+
+function drawFireHistoryMarkers() {
+    if (!map || !fireHistoryLayer) return;
+
+    fireHistoryLayer.clearLayers();
+
+    const history = getFireHistory();
+    const currentLat = currentCommune ? Number(currentCommune.latitude_mairie) : null;
+    const currentLon = currentCommune ? Number(currentCommune.longitude_mairie) : null;
+
+    history.forEach((item) => {
+        const lat = Number(item.latitude_mairie);
+        const lon = Number(item.longitude_mairie);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+
+        /*
+         * Le feu actuellement sélectionné est déjà dessiné dans routesLayer.
+         * On évite donc de superposer deux flammes au même endroit.
+         */
+        if (
+            Number.isFinite(currentLat)
+            && Number.isFinite(currentLon)
+            && Math.abs(lat - currentLat) < 0.00001
+            && Math.abs(lon - currentLon) < 0.00001
+        ) {
+            return;
+        }
+
+        const name = item.dep_code
+            ? `${item.nom_standard || item.name || 'Feu'} (${item.dep_code})`
+            : (item.nom_standard || item.name || 'Feu');
+
+        const marker = L.marker([lat, lon], {
+            icon: buildFireHistoryIcon(),
+            title: name,
+            keyboard: false
+        });
+
+        marker.bindTooltip(name, {
+            direction: 'top',
+            offset: [0, -18],
+            opacity: 0.95,
+            className: 'fire-history-map-tooltip'
+        });
+
+        marker.bindPopup(`<b>${escapeHtml(name)}</b><br>Cliquer pour sélectionner ce feu`);
+        marker.on('click', () => selectFireFromHistoryMap(item));
+        marker.addTo(fireHistoryLayer);
+    });
 }
 
 function clearFireHistory() {
@@ -505,6 +579,7 @@ function clearFireHistory() {
     } catch (_) {}
 
     displayFireHistory();
+    drawFireHistoryMarkers();
 }
 
 function displayFireHistory() {
@@ -573,11 +648,13 @@ window.deleteFireHistoryItem = function(index) {
     history.splice(index, 1);
     localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(history));
     displayFireHistory();
+    drawFireHistoryMarkers();
 };
 
 window.clearFireHistory = function() {
     if (!confirm('Effacer tous les derniers feux mémorisés ?')) return;
     localStorage.removeItem(FIRE_HISTORY_STORAGE_KEY);
+    drawFireHistoryMarkers();
 
     const resultsList = document.getElementById('results-list');
     if (resultsList) {
@@ -1222,6 +1299,7 @@ function initMap() {
     setupBaseTileLayer();
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
+    fireHistoryLayer = L.layerGroup().addTo(map);
     waterPointsLayer = L.layerGroup().addTo(map);
     userToTargetLayer = L.layerGroup().addTo(map);
     lftwRouteLayer = L.layerGroup().addTo(map);
@@ -1231,6 +1309,7 @@ function initMap() {
     communesLayerGroup = L.layerGroup();
     communesLabelsLayer = L.layerGroup();
     drawPermanentAirportMarkers();
+    drawFireHistoryMarkers();
     redrawGaarCircuits();
 
     if (areDepartmentsVisible) {
@@ -1427,6 +1506,7 @@ function clearCurrentSelection() {
     lftwRouteLayer.clearLayers();
     drawPermanentAirportMarkers();
     currentCommune = null;
+    drawFireHistoryMarkers();
     localStorage.removeItem('currentCommune');
     updateBaseLabels();
     updateCalculatorData();
@@ -2255,6 +2335,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     lftwRouteLayer.clearLayers();
     resetRouteTooltipOffsets();
     drawPermanentAirportMarkers();
+    drawFireHistoryMarkers();
 
     updateCommuneDisplay(commune);
 
@@ -2264,7 +2345,13 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     document.getElementById('clear-search').style.display = 'block';
 
     const allPoints = [[lat, lon]];
-    const fireIcon = L.divIcon({ className: 'custom-marker-icon fire-marker', html: '🔥' });
+    const fireIcon = L.divIcon({
+        className: 'custom-marker-icon fire-marker',
+        html: '🔥',
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+        popupAnchor: [0, -18]
+    });
     L.marker([lat, lon], { icon: fireIcon }).bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`).addTo(routesLayer);
 
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
@@ -2737,7 +2824,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML }) });
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] }) });
             marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div></div>`);
             marker.addTo(permanentAirportLayer);
             return;
@@ -2787,7 +2874,7 @@ function drawPermanentAirportMarkers() {
         const isWater = waterAirports.has(airport.oaci);
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
-        const icon = L.divIcon({ className: iconClass, html: iconHTML });
+        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
@@ -3964,7 +4051,11 @@ function buildOwnGpsIcon(altitudeLabel = '--- ft') {
                 <div style="width:16px;height:16px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 0 0 2px rgba(124,58,237,.35),0 1px 5px rgba(0,0,0,.45);"></div>
             </div>`,
         iconSize: [74, 52],
-        iconAnchor: [37, 47]
+        /*
+         * v12.34 — ancrage au centre du point violet, pas en bas de l'icône.
+         * Les vecteurs GPS et temps partent ainsi visuellement du milieu du point.
+         */
+        iconAnchor: [37, 35]
     });
 }
 
