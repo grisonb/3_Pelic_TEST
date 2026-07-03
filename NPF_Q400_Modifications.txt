@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.33
+Version actuelle TEST : v12.34
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -257,4 +257,14 @@ v12.33 — Statut GPS DEROUTEMENT/GAAR
 - Après actualisation manuelle, les calculs DEROUT./GAAR sont recalculés immédiatement.
 - La position GPS mémorise désormais aussi son timestamp dans lastPosition pour afficher l'âge de la position utilisée.
 - Objectif : rendre visible si le calcul utilise une position récente ou ancienne.
+
+v12.34 — Feux de l'historique sur carte + centrage vecteurs
+- Ajout d'un calque fireHistoryLayer pour afficher sur la carte les feux présents dans l'historique de recherche.
+- Chaque feu historique est représenté par une flamme rouge.
+- Clic sur une flamme historique : le feu est sélectionné comme feu courant et les calculs/routes sont recalculés.
+- Le feu courant n'est pas doublonné : s'il est sélectionné, il reste affiché comme feu courant, pas comme historique superposé.
+- Suppression d'un feu historique ou effacement complet : mise à jour immédiate des flammes sur la carte.
+- Correction des ancres Leaflet des flammes : l'ancrage est au centre de l'icône, pour que les vecteurs passent par le milieu.
+- Correction des ancres Leaflet des icônes pélicandromes personnalisées : ancrage au centre.
+- Correction de l'ancre de l'icône GPS altitude : le vecteur GPS/temps part visuellement du centre du point violet, pas du côté/bas de l'icône.
 
