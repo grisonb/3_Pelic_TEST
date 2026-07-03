@@ -4513,3 +4513,45 @@ body {
     font-size: 1em !important;
 }
 
+/* v12.36 — correctif fort tailles icônes carte */
+/* On sort les feux historiques/actifs de .custom-marker-icon pour éviter les anciens 32 px. */
+.active-fire-map-marker,
+.fire-history-map-marker {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.active-fire-map-marker span,
+.fire-history-map-marker span {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 18px !important;
+    height: 18px !important;
+    line-height: 18px !important;
+    border-radius: 50% !important;
+    background: #d90429 !important;
+    border: 2px solid #ffffff !important;
+    box-shadow: 0 0 0 2px rgba(217, 4, 41, 0.28), 0 1px 5px rgba(0,0,0,0.42) !important;
+    color: #fff !important;
+    font-size: 12px !important;
+    box-sizing: border-box !important;
+}
+
+/* Retour forcé des pélicandromes à une taille compacte. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base {
+    width: 20px !important;
+    height: 20px !important;
+    line-height: 20px !important;
+    font-size: 12px !important;
+    border-width: 2px !important;
+    box-sizing: border-box !important;
+}
+
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    line-height: 16px !important;
+}
+
