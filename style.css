@@ -4402,3 +4402,9 @@ body {
     display: none !important;
 }
 
+/* v12.31 — ordre BLOC/FUEL : header puis Vol n° */
+#bloc-fuel .flight-manager-bar {
+    border-top: 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
