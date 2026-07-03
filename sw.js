@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-34-fire-history-map-center';
+const SW_VERSION = 'sw-v12-35-fire-history-popup-size';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
