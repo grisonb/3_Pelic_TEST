@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.32
+Version actuelle TEST : v12.33
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -249,4 +249,12 @@ v12.32 — Correctif runtime multi-vols
 - Correction script.js : sécurisation de getEffectiveLimitHdvForActiveFlight pour éviter qu'une erreur de cumul bloque toute l'interface.
 - Correction script.js : sécurité supplémentaire dans refreshFlightSelector pour recréer un Vol n°1 si le stockage local est vide ou incohérent.
 - Aucun changement de mise en page autre que le numéro de version.
+
+v12.33 — Statut GPS DEROUTEMENT/GAAR
+- Renommage du bouton “Rafraîchir GPS” en “Actualiser position GPS”.
+- Ajout d'un statut visible dans DEROUT./GAAR : “GPS non actualisé” ou “GPS actualisé à HH:MM — âge”.
+- Le bouton force toujours une position fraîche avec maximumAge: 0.
+- Après actualisation manuelle, les calculs DEROUT./GAAR sont recalculés immédiatement.
+- La position GPS mémorise désormais aussi son timestamp dans lastPosition pour afficher l'âge de la position utilisée.
+- Objectif : rendre visible si le calcul utilise une position récente ou ancienne.
 
