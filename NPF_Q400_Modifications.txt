@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.31
+Version actuelle TEST : v12.32
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -242,4 +241,12 @@ v12.31 — Ordre Bloc/Fuel + Limite HDV multi-vols
 - Modification script.js : le tableau du vol actif calcule ensuite le temps de vol restant à partir de cette limite restante, sans double déduction.
 - Constat utilisateur : il faut inverser la ligne “Vol n°...” et la ligne “Bloc départ / Fuel départ / Base / TMD / Limite HDV”.
 - Modification index.html/style.css : dans BLOC/FUEL, la ligne Bloc départ/Fuel départ/Base/TMD/Limite HDV est désormais au-dessus de la barre Vol n°.
+
+v12.32 — Correctif runtime multi-vols
+- Constat utilisateur : après v12.31, le menu Vol n° n'est plus renseigné, les boutons Nouveau/Clôturer/Supprimer sont inactifs et les colonnes Bloc/Fuel ne se remplissent plus.
+- Diagnostic : la fonction getCumulativeHdvBeforeActiveFlight avait été supprimée involontairement lors de la correction Limite HDV v12.31, ce qui provoquait une erreur JavaScript à l'initialisation du module Bloc/Fuel.
+- Correction script.js : restauration de getCumulativeHdvBeforeActiveFlight.
+- Correction script.js : sécurisation de getEffectiveLimitHdvForActiveFlight pour éviter qu'une erreur de cumul bloque toute l'interface.
+- Correction script.js : sécurité supplémentaire dans refreshFlightSelector pour recréer un Vol n°1 si le stockage local est vide ou incohérent.
+- Aucun changement de mise en page autre que le numéro de version.
 
