@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.30
+Version actuelle TEST : v12.31
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -233,4 +233,12 @@ v12.30 — Correctifs Bloc/Fuel après multi-vols
 - Correction script.js : recalcul forcé des lignes BLOC/FUEL après validation Fuel et après toute modification d'une ligne.
 - Correction script.js : recalculateBlocFuel rendu plus robuste avec sélecteurs protégés et valeurs “--” explicites.
 - Objectif : conserver la logique multi-vols v12.28/v12.29 mais rétablir le comportement immédiat du tableau Bloc/Fuel.
+
+v12.31 — Ordre Bloc/Fuel + Limite HDV multi-vols
+- Constat utilisateur : dans l'onglet Vol n°2, la limite HDV affichée à 08:00 n'est pas actualisée avec le temps de vol du Vol n°1.
+- Modification script.js : la limite HDV du Vol n°1 sert de limite journée de référence.
+- Modification script.js : pour les vols suivants, le champ LIMITE HDV affiche la limite restante avant le vol actif, c'est-à-dire limite journée moins les temps de vol des vols précédents.
+- Modification script.js : le tableau du vol actif calcule ensuite le temps de vol restant à partir de cette limite restante, sans double déduction.
+- Constat utilisateur : il faut inverser la ligne “Vol n°...” et la ligne “Bloc départ / Fuel départ / Base / TMD / Limite HDV”.
+- Modification index.html/style.css : dans BLOC/FUEL, la ligne Bloc départ/Fuel départ/Base/TMD/Limite HDV est désormais au-dessus de la barre Vol n°.
 
