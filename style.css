@@ -4397,3 +4397,8 @@ body {
     accent-color: var(--primary-color);
 }
 
+/* v12.30 — fermeture robuste fenêtre Fuel */
+.fuel-split-modal[aria-hidden="true"] {
+    display: none !important;
+}
+
