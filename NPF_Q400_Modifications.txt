@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.35
+Version actuelle TEST : v12.36
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -276,4 +276,12 @@ v12.35 — Taille feux historiques + sélection par popup
 - Constat utilisateur : un clic sur un feu historique ne doit pas sélectionner immédiatement le feu.
 - Modification script.js : un clic sur une flamme historique ouvre désormais une étiquette avec le nom du feu et un bouton “Sélectionner”.
 - Le feu est sélectionné uniquement après appui sur “Sélectionner”.
+
+v12.36 — Correctif fort tailles icônes carte
+- Constat utilisateur : en v12.35, la taille des icônes n'a pas changé visuellement ; les feux restent trop gros et les pélicandromes restent trop gros.
+- Cause probable : anciennes classes .custom-marker-icon et règles Leaflet/globales 32 px encore prioritaires selon l'ordre CSS/cache.
+- Modification script.js : les flammes historiques et le feu actif utilisent désormais des classes dédiées, sans .custom-marker-icon, pour éviter l'héritage 32 px.
+- Modification script.js/style.css : flammes feu forcées à 18 px avec ancrage central 9/9.
+- Modification script.js/style.css : pélicandromes forcés à 20 px avec ancrage central 10/10.
+- Le comportement popup “nom du feu + bouton Sélectionner” est conservé.
 
