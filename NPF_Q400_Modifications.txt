@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.34
+Version actuelle TEST : v12.35
 Date de génération : 2026-07-03
 
 Règle de méthode
@@ -267,4 +267,13 @@ v12.34 — Feux de l'historique sur carte + centrage vecteurs
 - Correction des ancres Leaflet des flammes : l'ancrage est au centre de l'icône, pour que les vecteurs passent par le milieu.
 - Correction des ancres Leaflet des icônes pélicandromes personnalisées : ancrage au centre.
 - Correction de l'ancre de l'icône GPS altitude : le vecteur GPS/temps part visuellement du centre du point violet, pas du côté/bas de l'icône.
+
+v12.35 — Taille feux historiques + sélection par popup
+- Constat utilisateur : les icônes feu sont trop grandes.
+- Modification script.js/style.css : les flammes feu passent à 24 px, avec ancrage central conservé.
+- Constat utilisateur : les icônes pélicandromes ont grossi en v12.34.
+- Modification script.js/style.css : retour à la taille normale des icônes pélicandromes.
+- Constat utilisateur : un clic sur un feu historique ne doit pas sélectionner immédiatement le feu.
+- Modification script.js : un clic sur une flamme historique ouvre désormais une étiquette avec le nom du feu et un bouton “Sélectionner”.
+- Le feu est sélectionné uniquement après appui sur “Sélectionner”.
 
