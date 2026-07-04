@@ -1,6 +1,5 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
@@ -444,3 +443,14 @@ v12.53 — Bouton Lignes HT déplacé sur la carte
 - Modification script.js : logique fonctionnelle inchangée ; le même identifiant `high-voltage-lines-button` pilote toujours l’activation/désactivation du calque.
 - Modification sw.js / manifest.json : passage de version v12.52 à v12.53 pour forcer la prise en compte des nouveaux fichiers.
 - Aucun changement sur l’import ZIP offline, confirmé fonctionnel après suppression/réinstallation de l’application.
+
+
+v12.54 — Ouverture centrée sur la position GPS
+- Constat utilisateur : souhait d'ouvrir systématiquement la carte centrée sur la position GPS, avec un zoom léger.
+- Modification script.js : ajout d'un recentrage automatique GPS au démarrage avec zoom 10.
+- Comportement : si une dernière position GPS est stockée, la carte peut se centrer provisoirement dessus pour ouvrir rapidement.
+- Comportement : dès qu'une position GPS réelle est reçue, la carte se recentre une seule fois dessus au démarrage.
+- Sécurité d'usage : le recentrage automatique ne suit pas l'utilisateur en permanence ; après le premier recentrage GPS réel, l'utilisateur peut déplacer la carte librement.
+- Cas dégradé : si le GPS est refusé ou indisponible et qu'aucune dernière position n'est stockée, l'ancien centrage France reste utilisé.
+- Modification index.html / manifest.json / sw.js : passage de version v12.53 à v12.54 pour forcer la prise en compte des nouveaux fichiers.
+- Aucun changement sur l'import ZIP offline ni sur le calque Lignes HT.
