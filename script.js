@@ -8041,6 +8041,41 @@ function initializeCalculator() {
         if (closeButton) {
             closeButton.textContent = activeFlight?.closed ? 'Réouvrir' : 'Clôturer';
         }
+
+        updateActiveFlightLockState();
+    }
+
+    function updateActiveFlightLockState() {
+        const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+        const isClosed = !!activeFlight?.closed;
+        const blocFuelPanel = document.getElementById('bloc-fuel');
+        const lockStatus = document.getElementById('flight-lock-status');
+
+        if (blocFuelPanel) {
+            blocFuelPanel.classList.toggle('flight-locked', isClosed);
+        }
+
+        if (lockStatus) {
+            lockStatus.textContent = isClosed ? 'Vol clôturé — verrouillé' : '';
+            lockStatus.style.display = isClosed ? 'inline-flex' : 'none';
+        }
+
+        /*
+         * v12.44 — verrouillage réel des vols clôturés :
+         * les champs du vol restent lisibles mais ne doivent plus être modifiables
+         * tant que l'utilisateur n'a pas cliqué sur “Réouvrir”.
+         */
+        const editableSelectors = [
+            '#bloc-fuel .header-section .input-wrapper',
+            '#bloc-fuel .table-wrapper .input-wrapper'
+        ];
+
+        editableSelectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(wrapper => {
+                wrapper.classList.toggle('locked-input-wrapper', isClosed);
+                wrapper.setAttribute('aria-disabled', isClosed ? 'true' : 'false');
+            });
+        });
     }
 
     function applyFlightStateToDom(state) {
@@ -8081,6 +8116,7 @@ function initializeCalculator() {
         refreshBlocFuelAirportOaciCells();
         updateDisplayedLimitHdvForActiveFlight();
         refreshSharedHeaderMirrorValues();
+        updateActiveFlightLockState();
         masterRecalculate();
     }
 
@@ -8832,6 +8868,7 @@ function initializeCalculator() {
                 event.preventDefault();
                 event.stopPropagation();
             }
+            if (wrapper.closest('#bloc-fuel') && wrapper.classList.contains('locked-input-wrapper')) return;
             openRltMassModal(wrapper);
         };
 
@@ -9008,6 +9045,7 @@ function initializeCalculator() {
             activeFlight.closed = !activeFlight.closed;
             persistFlights();
             refreshFlightSelector();
+            updateActiveFlightLockState();
 
             if (activeFlight.closed) {
                 const allClosed = dailyFlights.every(flight => flight.closed);
