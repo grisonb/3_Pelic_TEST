@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.39
+Version actuelle TEST : v12.41
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -311,4 +310,24 @@ v12.39 — Correction démarrage hors ligne après modification
 - La récupération manuelle reste disponible via le bouton MAJ / forceRecoveryReload.
 - sw.js conserve la logique v12.38 : il refuse de remplacer l'ancien cache si les fichiers cœur ne sont pas précachés correctement.
 - Objectif : conserver un cache fonctionnel tant qu'une nouvelle version n'est pas installée proprement.
+
+v12.40 — Colonne Masse Rlt Bloc/Fuel
+- Ajout dans l'onglet BLOC/FUEL d'une colonne “Masse Rlt” après la colonne OACI.
+- Chaque cellule Masse Rlt fonctionne comme la saisie Fuel : appui sur la cellule pour ouvrir une fenêtre dédiée.
+- Ajout d'une fenêtre “Masse retardant” avec trois champs : Volume × Densité = Masse.
+- Si Volume et Densité sont saisis, la Masse est calculée automatiquement.
+- Si Masse et Densité sont saisies, le Volume est calculé automatiquement.
+- Validation : la masse calculée/saisie est affichée en kg dans la colonne Masse Rlt.
+- Les données Volume, Densité et Masse sont sauvegardées avec chaque ligne Bloc/Fuel et dans chaque vol multi-vols.
+
+v12.41 — Correction Masse Rlt : largeur et calcul
+- Constat utilisateur : la colonne OACI est trop large et la colonne Masse Rlt trop étroite.
+- Modification style.css : réduction forcée de la colonne OACI à 52 px.
+- Modification style.css : élargissement de la colonne Masse Rlt à 128 px.
+- Constat utilisateur : la fenêtre Masse retardant déborde horizontalement.
+- Modification style.css : fenêtre élargie et grille corrigée avec champs à largeur contrôlée, sans débordement.
+- Constat utilisateur : le calcul affichait 864 kg pour Volume 8000 et Densité 1,08.
+- Modification script.js : calcul rendu déterministe ; Volume + Densité recalculent toujours la Masse.
+- Exemple attendu : 8000 × 1,08 = 8640 kg.
+- Si Masse + Densité sont saisies sans Volume, le Volume est recalculé.
 
