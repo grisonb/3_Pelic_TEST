@@ -5129,3 +5129,21 @@ body {
 .leaflet-tooltip.fire-active-map-tooltip {
     color: #7f0015 !important;
 }
+
+
+/* v12.52 — calque lignes haute tension RTE */
+#high-voltage-lines-button.active {
+    background-color: #d8232a;
+    border-color: #d8232a;
+    color: #ffffff;
+}
+
+#high-voltage-lines-button.loading {
+    opacity: 0.68;
+    cursor: wait;
+}
+
+.leaflet-pane.highVoltageLinesPane,
+.leaflet-high-voltage-lines-pane {
+    pointer-events: none;
+}
