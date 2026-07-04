@@ -4883,10 +4883,19 @@ async function handleZipImport(file) {
          * - clé pack-scopée pour éviter les collisions entre ZIP/hosts.
          */
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
+        const useSplitZipFastProfile = isOpenStreetPack && !isLargeZip;
+
+        /*
+         * v12.48 — retour profil rapide ZIP fractionné.
+         * Le mode ZIP fractionné fonctionnait bien car chaque fichier est déjà
+         * assez petit pour éviter le profil ultra-conservateur.
+         * On ré-augmente donc les lots IndexedDB et on supprime la réouverture
+         * périodique pour les ZIP OpenStreet fractionnés.
+         */
         const batchSize = useConservativeLargeImport
             ? 35
-            : (isIgnPack ? 320 : (isOaciPack ? 35 : (isOpenStreetPack ? 70 : (isLargeZip ? 160 : 180))));
-        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : (isOpenStreetPack && !isLargeZip ? 420 : 0));
+            : (useSplitZipFastProfile ? 260 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
+        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
         const usePackScopedKey = !isOpenStreetPack;
         /*
          * v12.19 : OACI passe en mode sécurisé.
@@ -4932,11 +4941,11 @@ async function handleZipImport(file) {
 
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
             await updateImportProgress(
-                isOpenStreetPack && !isLargeZip
-                    ? `OpenStreet : écriture progressive ${processedFiles} / ${totalFiles} tuiles`
+                useSplitZipFastProfile
+                    ? `ZIP fractionné rapide : ${processedFiles} / ${totalFiles} tuiles`
                     : `Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`,
                 percent,
-                useConservativeLargeImport || (isOpenStreetPack && !isLargeZip)
+                useConservativeLargeImport
             );
 
             if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
@@ -4953,7 +4962,7 @@ async function handleZipImport(file) {
         for (let i = 0; i < tileFiles.length; i += 1) {
             const tileFile = tileFiles[i];
 
-            if (!useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
+            if (!useConservativeLargeImport && !useSplitZipFastProfile && (i === 0 || i % 10 === 0)) {
                 const readPercent = Math.min(95, Math.max(2, Math.round((i / totalFiles) * 100)));
                 await updateImportProgress(`Lecture tuiles... ${i + 1} / ${totalFiles}`, readPercent, true);
             }
@@ -4993,10 +5002,16 @@ async function handleZipImport(file) {
             }
 
             const now = Date.now();
-            if (now - lastUiUpdate > (useConservativeLargeImport ? 350 : 700)) {
+            if (now - lastUiUpdate > (useConservativeLargeImport ? 350 : (useSplitZipFastProfile ? 1200 : 700))) {
                 lastUiUpdate = now;
                 const percent = Math.min(99, Math.round((Math.max(processedFiles, i + 1) / totalFiles) * 100));
-                await updateImportProgress(`Importation... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`, percent, true);
+                await updateImportProgress(
+                    useSplitZipFastProfile
+                        ? `ZIP fractionné rapide... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`
+                        : `Importation... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`,
+                    percent,
+                    !useSplitZipFastProfile
+                );
             }
         }
 
