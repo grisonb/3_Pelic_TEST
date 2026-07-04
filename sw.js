@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-53-bouton-lignes-ht';
+const SW_VERSION = 'sw-v12-54-centrage-gps';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
