@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.49
+Version actuelle TEST : v12.50
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -401,3 +400,16 @@ v12.49 — ZIP fractionné TURBO + popup feu Supprimer
 - Feux historiques : popup enrichie avec bouton “Sélectionner” et bouton “Supprimer”.
 - Supprimer enlève le feu de l'historique et retire immédiatement l'icône de la carte.
 
+
+
+v12.50 — Import ZIP fluide + étiquette feu intégrée
+- Constat utilisateur : les ZIP fractionnés font environ 180 Mo et le blocage arrive tous les 1008 tuiles.
+- Diagnostic : v12.49 écrivait les ZIP OpenStreet non volumineux par grosses transactions IndexedDB d'environ 1000 tuiles. Avec une lecture par 48, le premier palier tombait à 1008 tuiles.
+- Modification script.js : remplacement du profil “TURBO” par un profil “ZIP fractionné fluide”.
+- Modification script.js : lecture parallèle conservée mais réduite à 24 tuiles à la fois.
+- Modification script.js : écriture IndexedDB réduite à des transactions de 120 tuiles pour éviter les longues pauses Safari/iPadOS.
+- Modification script.js : rafraîchissement UI forcé après les écritures des ZIP fractionnés pour éviter l'impression de blocage.
+- Modification script.js : lecture des ZIP fractionnés en Blob au lieu de Uint8Array afin de conserver un type directement exploitable pour les réponses tuiles.
+- Modification script.js/style.css : l'étiquette du nom du feu est maintenant intégrée à l'icône Leaflet, collée à droite de la flamme, au lieu d'un tooltip séparé au-dessus.
+- Modification script.js : l'icône du feu actif ouvre une popup avec bouton “Supprimer”.
+- Comportement suppression : supprime le feu de l'historique, retire l'icône active de la carte et efface la sélection courante.
