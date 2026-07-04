@@ -522,14 +522,35 @@ function saveFireHistory(commune) {
     }
 }
 
-function buildFireHistoryIcon() {
+function buildFireDisplayName(item) {
+    const normalized = normalizeHistoryCommune(item) || item || {};
+    const name = normalized.dep_code
+        ? `${normalized.nom_standard || normalized.name || 'Feu'} (${normalized.dep_code})`
+        : (normalized.nom_standard || normalized.name || 'Feu');
+    return String(name || 'Feu');
+}
+
+function buildFireMapIcon(label, markerClassName = 'fire-history-map-marker') {
+    /*
+     * v12.50 — l'étiquette du feu est intégrée dans l'icône Leaflet.
+     * Cela évite l'étiquette séparée qui flotte au-dessus de la flamme et donne
+     * un ensemble icône + nom plus compact et plus stable au zoom/pan.
+     */
     return L.divIcon({
-        className: 'fire-history-map-marker fire-touch-hitbox',
-        html: '<span>🔥</span>',
+        className: `${markerClassName} fire-touch-hitbox fire-with-label`,
+        html: `<span class="fire-marker-glyph">🔥</span><span class="fire-marker-label">${escapeHtml(label || 'Feu')}</span>`,
         iconSize: [34, 34],
         iconAnchor: [17, 17],
         popupAnchor: [0, -18]
     });
+}
+
+function buildFireHistoryIcon(label = 'Feu') {
+    return buildFireMapIcon(label, 'fire-history-map-marker');
+}
+
+function buildActiveFireIcon(label = 'Feu') {
+    return buildFireMapIcon(label, 'active-fire-map-marker');
 }
 
 function selectFireFromHistoryMap(item) {
@@ -572,22 +593,12 @@ function drawFireHistoryMarkers() {
             return;
         }
 
-        const name = item.dep_code
-            ? `${item.nom_standard || item.name || 'Feu'} (${item.dep_code})`
-            : (item.nom_standard || item.name || 'Feu');
+        const name = buildFireDisplayName(item);
 
         const marker = L.marker([lat, lon], {
-            icon: buildFireHistoryIcon(),
+            icon: buildFireHistoryIcon(name),
             title: name,
             keyboard: false
-        });
-
-        marker.bindTooltip(name, {
-            permanent: true,
-            direction: 'top',
-            offset: [0, -6],
-            opacity: 0.95,
-            className: 'fire-history-map-tooltip fire-history-map-tooltip-permanent'
         });
 
         marker.bindPopup(() => {
@@ -2399,22 +2410,32 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     document.getElementById('clear-search').style.display = 'block';
 
     const allPoints = [[lat, lon]];
-    const fireIcon = L.divIcon({
-        className: 'active-fire-map-marker fire-touch-hitbox',
-        html: '<span>🔥</span>',
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -18]
-    });
-    L.marker([lat, lon], { icon: fireIcon })
-        .bindTooltip(`${name}${commune.dep_code ? ` (${commune.dep_code})` : ''}`, {
-            permanent: true,
-            direction: 'top',
-            offset: [0, -6],
-            opacity: 0.95,
-            className: 'fire-history-map-tooltip fire-history-map-tooltip-permanent fire-active-map-tooltip'
+    const fireLabel = buildFireDisplayName(commune);
+    const fireIcon = buildActiveFireIcon(fireLabel);
+    L.marker([lat, lon], { icon: fireIcon, title: fireLabel, keyboard: false })
+        .bindPopup(() => {
+            const container = document.createElement('div');
+            container.className = 'fire-history-map-popup active-fire-map-popup';
+            container.innerHTML = `<b>${escapeHtml(fireLabel)}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`;
+
+            const actions = document.createElement('div');
+            actions.className = 'fire-history-map-popup-actions';
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.textContent = 'Supprimer';
+            deleteButton.className = 'fire-history-map-delete-btn';
+            deleteButton.title = 'Supprimer ce feu de la carte et de l’historique';
+            deleteButton.addEventListener('click', () => {
+                deleteFireHistoryItemByCommune(commune);
+                clearCurrentSelection();
+                try { map.closePopup(); } catch (_) {}
+            });
+
+            actions.appendChild(deleteButton);
+            container.appendChild(actions);
+            return container;
         })
-        .bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`)
         .addTo(routesLayer);
 
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
@@ -4934,16 +4955,17 @@ async function handleZipImport(file) {
          */
         const batchSize = useConservativeLargeImport
             ? 35
-            : (useSplitZipFastProfile ? 1000 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
+            : (useSplitZipFastProfile ? 120 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
-        const splitZipReadConcurrency = useSplitZipFastProfile ? 48 : 1;
+        const splitZipReadConcurrency = useSplitZipFastProfile ? 24 : 1;
+        const splitZipUiYieldEveryTiles = useSplitZipFastProfile ? 480 : 0;
         const usePackScopedKey = !isOpenStreetPack;
         /*
          * v12.19 : OACI passe en mode sécurisé.
          * Symptôme : blocage/crash vers Lecture tuiles 51/3347 quand OACI est la 3e carte.
          * Mesure : petits lots de 10, réouverture périodique IndexedDB, lecture blob.
          */
-        const tileReadMode = useSplitZipFastProfile ? 'uint8array' : (isIgnPack ? 'arraybuffer' : 'blob');
+        const tileReadMode = useSplitZipFastProfile ? 'blob' : (isIgnPack ? 'arraybuffer' : 'blob');
         let skippedTiles = 0;
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
@@ -4983,10 +5005,10 @@ async function handleZipImport(file) {
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
             await updateImportProgress(
                 useSplitZipFastProfile
-                    ? `ZIP fractionné rapide : ${processedFiles} / ${totalFiles} tuiles`
+                    ? `ZIP fractionné fluide : ${processedFiles} / ${totalFiles} tuiles`
                     : `Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`,
                 percent,
-                useConservativeLargeImport
+                useConservativeLargeImport || useSplitZipFastProfile
             );
 
             if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
@@ -5002,11 +5024,11 @@ async function handleZipImport(file) {
 
         if (useSplitZipFastProfile) {
             /*
-             * v12.49 — ZIP fractionné TURBO :
-             * 180 Mo n'est pas un gros ZIP pour l'iPad ; le ralentissement venait
-             * surtout de la lecture strictement séquentielle tuile par tuile.
-             * On lit donc plusieurs tuiles en parallèle, en Uint8Array, puis on écrit
-             * dans IndexedDB par gros lots.
+             * v12.50 — ZIP fractionné FLUIDE :
+             * Le blocage utilisateur arrivait tous les 1008 fichiers car le profil
+             * v12.49 attendait environ 1000 tuiles avant une seule grosse transaction
+             * IndexedDB. On garde la lecture parallèle, mais on écrit en transactions
+             * courtes et régulières pour éviter les longues pauses Safari/iPadOS.
              */
             for (let i = 0; i < tileFiles.length; i += splitZipReadConcurrency) {
                 const slice = tileFiles.slice(i, i + splitZipReadConcurrency);
@@ -5035,6 +5057,10 @@ async function handleZipImport(file) {
 
                 if (batch.length >= batchSize) {
                     await flushBatch();
+                    if (splitZipUiYieldEveryTiles && processedFiles > 0 && processedFiles % splitZipUiYieldEveryTiles === 0) {
+                        await updateImportProgress(`Import fluide : ${processedFiles} / ${totalFiles} tuiles`, Math.min(99, Math.round((processedFiles / totalFiles) * 100)), true);
+                        await idle(8);
+                    }
                 }
 
                 const now = Date.now();
@@ -5043,9 +5069,9 @@ async function handleZipImport(file) {
                     const readCount = Math.min(i + splitZipReadConcurrency, totalFiles);
                     const percent = Math.min(99, Math.round((Math.max(processedFiles, readCount) / totalFiles) * 100));
                     await updateImportProgress(
-                        `ZIP fractionné TURBO : lu ${readCount} / ${totalFiles}, écrit ${processedFiles}`,
+                        `ZIP fractionné fluide : lu ${readCount} / ${totalFiles}, écrit ${processedFiles}`,
                         percent,
-                        false
+                        true
                     );
                 }
             }
