@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.52-lignes-ht">
-    <link rel="manifest" href="manifest.json?appv=v12.52-lignes-ht">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.52-lignes-ht">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.52-lignes-ht">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.52-lignes-ht">
+    <link rel="stylesheet" href="style.css?appv=v12.53-bouton-lignes-ht">
+    <link rel="manifest" href="manifest.json?appv=v12.53-bouton-lignes-ht">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.53-bouton-lignes-ht">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.53-bouton-lignes-ht">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.53-bouton-lignes-ht">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.52';
+        const APP_VERSION = 'v12.53';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -167,6 +167,18 @@
         </div>
     </div>
     <div id="map"></div>
+    <div id="left-map-action-buttons">
+        <button id="high-voltage-lines-button" class="left-map-action-button high-voltage-map-button" title="Afficher/Masquer les lignes haute tension RTE" aria-label="Afficher/Masquer les lignes haute tension RTE">
+            <span class="powerline-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 64" focusable="false" role="img">
+                    <path class="powerline-tower" d="M32 6 L18 58 H46 Z M32 6 V58 M23 38 H41 M26 26 H38 M20 18 H44"/>
+                    <path class="powerline-wire" d="M4 18 C15 14 22 14 32 18 C42 22 49 22 60 18"/>
+                    <path class="powerline-wire" d="M7 27 C17 24 24 24 32 27 C40 30 47 30 57 27"/>
+                </svg>
+            </span>
+            <span class="powerline-label">HT</span>
+        </button>
+    </div>
     <div id="main-action-buttons">
         <button id="toggle-search-button" title="Rechercher une commune"><img class="map-action-icon search-commune-icon" src="icons/search-commune-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
         <button id="calculator-button" title="Ouvrir le calculateur de mission" aria-label="Calculateur"><img class="map-action-icon calculator-fms-icon" src="icons/calculator-fms-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
@@ -238,7 +250,6 @@
                 <button id="departments-layer-button" class="toggle-button" title="Afficher/Masquer les contours de départements">Départements</button>
                 <button id="communes-layer-button" class="toggle-button" title="Afficher/Masquer les contours de communes">Communes</button>
                 <button id="water-points-button" class="toggle-button" title="Afficher/Masquer les 3 plans d'eau les plus proches">Plan<br>d'eau</button>
-                <button id="high-voltage-lines-button" class="toggle-button" title="Afficher/Masquer les lignes haute tension RTE">Lignes<br>HT</button>
                 <button id="offline-maps-button" class="toggle-button" title="Gérer les cartes hors-ligne">Cartes</button>
             </div>
 
@@ -256,7 +267,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.52-lignes-ht"></script>
+    <script src="script.js?appv=v12.53-bouton-lignes-ht"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
