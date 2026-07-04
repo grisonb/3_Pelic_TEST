@@ -561,10 +561,11 @@ function drawFireHistoryMarkers() {
         });
 
         marker.bindTooltip(name, {
+            permanent: true,
             direction: 'top',
             offset: [0, -14],
             opacity: 0.95,
-            className: 'fire-history-map-tooltip'
+            className: 'fire-history-map-tooltip fire-history-map-tooltip-permanent'
         });
 
         marker.bindPopup(() => {
@@ -2365,7 +2366,16 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         iconAnchor: [7, 7],
         popupAnchor: [0, -9]
     });
-    L.marker([lat, lon], { icon: fireIcon }).bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`).addTo(routesLayer);
+    L.marker([lat, lon], { icon: fireIcon })
+        .bindTooltip(`${name}${commune.dep_code ? ` (${commune.dep_code})` : ''}`, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -14],
+            opacity: 0.95,
+            className: 'fire-history-map-tooltip fire-history-map-tooltip-permanent fire-active-map-tooltip'
+        })
+        .bindPopup(`<b>${name}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`)
+        .addTo(routesLayer);
 
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(lat, lon, numAirports);
