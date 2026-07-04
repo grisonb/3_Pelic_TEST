@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.48
+Version actuelle TEST : v12.49
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -387,4 +386,17 @@ v12.48 — Retour profil rapide ZIP fractionné cartes offline
 - Réduction des rafraîchissements d'affichage pendant l'import pour éviter de ralentir Safari/iPad.
 - Les gros ZIP OpenStreet restent sur le profil conservateur de sécurité.
 - Les profils OACI et IGN sont conservés.
+
+v12.49 — ZIP fractionné TURBO + popup feu Supprimer
+- Constat utilisateur : les ZIP font environ 180 Mo ; le profil restait trop lent.
+- Modification script.js : création d'un mode “ZIP fractionné TURBO” pour les ZIP OpenStreet non volumineux.
+- Lecture des tuiles par paquets parallèles de 48 au lieu d'une lecture strictement séquentielle.
+- Lecture des tuiles en Uint8Array pour éviter le coût de création de Blob tuile par tuile.
+- Écriture IndexedDB par gros lots de 1000 tuiles pour les ZIP fractionnés.
+- Rafraîchissement d'écran limité pendant l'import pour ne pas ralentir Safari/iPad.
+- Les gros ZIP OpenStreet restent en mode conservateur.
+- Les profils OACI/IGN restent séparés.
+- Feux : étiquette permanente rapprochée de l'icône.
+- Feux historiques : popup enrichie avec bouton “Sélectionner” et bouton “Supprimer”.
+- Supprimer enlève le feu de l'historique et retire immédiatement l'icône de la carte.
 
