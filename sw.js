@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-40-masse-rlt';
+const SW_VERSION = 'sw-v12-41-masse-rlt-layout-calc';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
