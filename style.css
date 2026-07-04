@@ -4555,3 +4555,38 @@ body {
     line-height: 16px !important;
 }
 
+/* v12.37 — taille mini icônes carte, alignée sur version pérenne */
+.active-fire-map-marker,
+.fire-history-map-marker {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+.active-fire-map-marker span,
+.fire-history-map-marker span {
+    width: 14px !important;
+    height: 14px !important;
+    line-height: 14px !important;
+    font-size: 9px !important;
+    border-width: 1px !important;
+    box-shadow: 0 0 0 1px rgba(217, 4, 41, 0.35), 0 1px 3px rgba(0,0,0,0.38) !important;
+}
+
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-active,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-water,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    width: 14px !important;
+    height: 14px !important;
+    line-height: 14px !important;
+    font-size: 9px !important;
+    border-width: 1px !important;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.30) !important;
+    box-sizing: border-box !important;
+}
+
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    line-height: 12px !important;
+    font-size: 12px !important;
+}
+
