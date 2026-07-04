@@ -502,11 +502,11 @@ function saveFireHistory(commune) {
 
 function buildFireHistoryIcon() {
     return L.divIcon({
-        className: 'fire-history-map-marker',
+        className: 'fire-history-map-marker fire-touch-hitbox',
         html: '<span>🔥</span>',
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
-        popupAnchor: [0, -9]
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        popupAnchor: [0, -18]
     });
 }
 
@@ -2360,11 +2360,11 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 
     const allPoints = [[lat, lon]];
     const fireIcon = L.divIcon({
-        className: 'active-fire-map-marker',
+        className: 'active-fire-map-marker fire-touch-hitbox',
         html: '<span>🔥</span>',
-        iconSize: [14, 14],
-        iconAnchor: [7, 7],
-        popupAnchor: [0, -9]
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        popupAnchor: [0, -18]
     });
     L.marker([lat, lon], { icon: fireIcon })
         .bindTooltip(`${name}${commune.dep_code ? ` (${commune.dep_code})` : ''}`, {
@@ -4093,23 +4093,28 @@ function buildOwnGpsIcon(altitudeLabel = '--- ft') {
     const safeAltitude = escapeHtml(altitudeLabel || '--- ft');
 
     return L.divIcon({
-        /*
-         * Classe volontairement indépendante de custom-marker-icon / own-gps-marker :
-         * ces anciennes classes ajoutaient une grosse bulle blanche autour du marqueur.
-         */
-        className: 'own-gps-altitude-marker',
-        html: `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
-                <div style="background:#ffffff;border:1px solid #7c3aed;border-radius:8px;padding:3px 6px;font-size:11px;line-height:1.15;font-weight:700;color:#111;box-shadow:0 1px 5px rgba(0,0,0,.25);white-space:nowrap;text-align:center;min-width:42px;">${safeAltitude}</div>
-                <div style="width:16px;height:16px;border-radius:50%;background:#7c3aed;border:2px solid #fff;box-shadow:0 0 0 2px rgba(124,58,237,.35),0 1px 5px rgba(0,0,0,.45);"></div>
-            </div>`,
-        iconSize: [74, 52],
-        /*
-         * v12.34 — ancrage au centre du point violet, pas en bas de l'icône.
-         * Les vecteurs GPS et temps partent ainsi visuellement du milieu du point.
-         */
-        iconAnchor: [37, 35]
+        className: 'own-gps-altitude-marker own-gps-plane-icon',
+        html: `<div class="own-gps-plane-altitude">${safeAltitude}</div>
+               <div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈</span></div>`,
+        iconSize: [74, 58],
+        iconAnchor: [37, 38]
     });
 }
+
+function applyOwnGpsPlaneHeading(courseDegrees) {
+    if (!userMarker || !Number.isFinite(courseDegrees)) return;
+    const element = userMarker.getElement && userMarker.getElement();
+    const plane = element ? element.querySelector('.own-gps-plane-body') : null;
+    if (!plane) return;
+
+    /*
+     * Le symbole ✈ pointe visuellement vers le NE dans la police emoji.
+     * On compense par -45° pour que 0° corresponde au nord.
+     */
+    plane.style.transform = `rotate(${courseDegrees - 45}deg)`;
+}
+
+
 
 
 function calculateDestinationLatLng(lat, lon, bearingDeg, distanceMeters) {
@@ -4249,6 +4254,8 @@ function updateUserPosition(pos) {
         userMarker.setIcon(buildOwnGpsIcon(ownAltitudeLabel));
         userMarker.bindPopup(`Votre position<br>${escapeHtml(ownAltitudeLabel)}`);
     }
+
+    applyOwnGpsPlaneHeading(motionHeading);
 
     updateNearestCommuneDisplay(latitude, longitude);
 
