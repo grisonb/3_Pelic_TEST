@@ -435,3 +435,11 @@ v12.52 — Calque lignes haute tension RTE
 - Style : 400 kV et 225 kV en trait plus épais ; 90 kV et 63 kV en pointillé plus fin.
 - Modification sw.js : ajout du GeoJSON lignes HT dans le cache applicatif pour usage hors ligne après mise à jour.
 - Moteur d'import ZIP non modifié en v12.52, car l'utilisateur a confirmé que le téléchargement/import fonctionne parfaitement après suppression puis réinstallation de l'application.
+
+v12.53 — Bouton Lignes HT déplacé sur la carte
+- Modification index.html : retrait du bouton “Lignes HT” de la grille de recherche/options.
+- Modification index.html : ajout d’un bouton carte fixe à gauche, en opposition visuelle au bouton loupe situé à droite.
+- Modification style.css : ajout d’un style dédié au bouton carte Lignes HT, avec icône SVG de poteau électrique et badge “HT”.
+- Modification script.js : logique fonctionnelle inchangée ; le même identifiant `high-voltage-lines-button` pilote toujours l’activation/désactivation du calque.
+- Modification sw.js / manifest.json : passage de version v12.52 à v12.53 pour forcer la prise en compte des nouveaux fichiers.
+- Aucun changement sur l’import ZIP offline, confirmé fonctionnel après suppression/réinstallation de l’application.
