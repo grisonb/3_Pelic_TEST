@@ -8606,22 +8606,22 @@ function initializeCalculator() {
         const density = parseDecimalInput(densityInput.value);
         const mass = parseDecimalInput(massInput.value);
 
-        if (activeRltMassLastEdited === 'mass' && mass !== null && density !== null && density > 0) {
+        /*
+         * v12.41 — règle déterministe :
+         * - si Volume + Densité existent : la Masse est toujours recalculée.
+         * - si Masse + Densité existent et Volume est absent ou si la Masse vient
+         *   d'être modifiée : le Volume est recalculé.
+         *
+         * Exemple attendu : 8000 L × 1,08 kg/L = 8640 kg.
+         */
+        if (volume !== null && density !== null) {
+            const calculatedMass = volume * density;
+            massInput.value = formatDecimalValue(calculatedMass, 0);
+            return;
+        }
+
+        if (mass !== null && density !== null && density > 0) {
             volumeInput.value = formatDecimalValue(mass / density, 1);
-            return;
-        }
-
-        if (activeRltMassLastEdited === 'volume' && volume !== null && density !== null) {
-            massInput.value = formatDecimalValue(volume * density, 0);
-            return;
-        }
-
-        if (activeRltMassLastEdited === 'density') {
-            if (volume !== null && density !== null) {
-                massInput.value = formatDecimalValue(volume * density, 0);
-            } else if (mass !== null && density !== null && density > 0) {
-                volumeInput.value = formatDecimalValue(mass / density, 1);
-            }
         }
     }
 
@@ -8664,11 +8664,16 @@ function initializeCalculator() {
 
                 syncRltMassModalFromInputs();
 
-                const volume = parseDecimalInput(volumeInput?.value);
+                let volume = parseDecimalInput(volumeInput?.value);
                 const density = parseDecimalInput(densityInput?.value);
                 let mass = parseDecimalInput(massInput?.value);
-                if ((mass === null || !Number.isFinite(mass)) && volume !== null && density !== null) {
+
+                if (volume !== null && density !== null) {
                     mass = volume * density;
+                    if (massInput) massInput.value = formatDecimalValue(mass, 0);
+                } else if (mass !== null && density !== null && density > 0) {
+                    volume = mass / density;
+                    if (volumeInput) volumeInput.value = formatDecimalValue(volume, 1);
                 }
 
                 activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 1) : '';
