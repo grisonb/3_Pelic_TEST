@@ -7571,6 +7571,7 @@ function initializeCalculator() {
     let isSharedHeaderSyncing = false;
     let activeRltMassWrapper = null;
     let activeRltMassLastEdited = null;
+    let activeRltMassCalculationMode = null;
 
     function getSharedHeaderMainId(wrapper) {
         if (!wrapper) return '';
@@ -8562,6 +8563,48 @@ function initializeCalculator() {
         return Number.isFinite(number) ? number : null;
     }
 
+    function normalizeRltDensityInput(value) {
+        const raw = String(value || '').replace(',', '.').replace(/[^0-9.]/g, '');
+
+        /*
+         * v12.42 — densité retardant :
+         * l'usage attendu est toujours 1.06 à 1.10.
+         * On garde donc le préfixe visuel "1." et l'utilisateur ne saisit
+         * que la partie décimale si besoin.
+         */
+        const digits = raw.replace(/\D/g, '');
+
+        if (!digits) return '1.';
+
+        let decimals = '';
+        if (digits.startsWith('1')) {
+            decimals = digits.slice(1);
+        } else {
+            decimals = digits;
+        }
+
+        decimals = decimals.slice(0, 3);
+        return `1.${decimals}`;
+    }
+
+    function parseRltDensityInput(value) {
+        const normalized = String(value || '').trim().replace(',', '.');
+        if (normalized === '1.' || normalized === '1') return null;
+        const density = parseDecimalInput(normalized);
+        if (density === null || density <= 0) return null;
+        return density;
+    }
+
+    function markRltCalculatedField(fieldName) {
+        const { volumeInput, densityInput, massInput } = getRltMassModalElements();
+        [volumeInput, densityInput, massInput].filter(Boolean).forEach(input => {
+            input.classList.remove('rlt-calculated-field');
+        });
+
+        if (fieldName === 'volume') volumeInput?.classList.add('rlt-calculated-field');
+        if (fieldName === 'mass') massInput?.classList.add('rlt-calculated-field');
+    }
+
     function formatDecimalValue(value, decimals = 2) {
         if (!Number.isFinite(value)) return '';
         return value.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',');
@@ -8596,33 +8639,59 @@ function initializeCalculator() {
         }
         activeRltMassWrapper = null;
         activeRltMassLastEdited = null;
+        activeRltMassCalculationMode = null;
+        markRltCalculatedField(null);
     }
 
     function syncRltMassModalFromInputs() {
         const { volumeInput, densityInput, massInput } = getRltMassModalElements();
         if (!volumeInput || !densityInput || !massInput) return;
 
+        if (!densityInput.value || densityInput.value === '1') {
+            densityInput.value = '1.';
+        }
+
         const volume = parseDecimalInput(volumeInput.value);
-        const density = parseDecimalInput(densityInput.value);
+        const density = parseRltDensityInput(densityInput.value);
         const mass = parseDecimalInput(massInput.value);
 
-        /*
-         * v12.41 — règle déterministe :
-         * - si Volume + Densité existent : la Masse est toujours recalculée.
-         * - si Masse + Densité existent et Volume est absent ou si la Masse vient
-         *   d'être modifiée : le Volume est recalculé.
-         *
-         * Exemple attendu : 8000 L × 1,08 kg/L = 8640 kg.
-         */
-        if (volume !== null && density !== null) {
-            const calculatedMass = volume * density;
-            massInput.value = formatDecimalValue(calculatedMass, 0);
+        if (density === null) {
+            markRltCalculatedField(null);
             return;
         }
 
-        if (mass !== null && density !== null && density > 0) {
-            volumeInput.value = formatDecimalValue(mass / density, 1);
+        /*
+         * v12.42 :
+         * - mode normal : Volume + Densité => Masse calculée sur fond vert pastel.
+         * - mode prévision : Masse + Densité => Volume calculé sur fond vert pastel.
+         */
+        if (activeRltMassLastEdited === 'mass') {
+            activeRltMassCalculationMode = 'massToVolume';
+        } else if (activeRltMassLastEdited === 'volume') {
+            activeRltMassCalculationMode = 'volumeToMass';
         }
+
+        if (activeRltMassCalculationMode === 'massToVolume' && mass !== null) {
+            volumeInput.value = formatDecimalValue(mass / density, 1);
+            markRltCalculatedField('volume');
+            return;
+        }
+
+        if (volume !== null) {
+            massInput.value = formatDecimalValue(volume * density, 0);
+            activeRltMassCalculationMode = 'volumeToMass';
+            markRltCalculatedField('mass');
+            return;
+        }
+
+        if (mass !== null) {
+            volumeInput.value = formatDecimalValue(mass / density, 1);
+            activeRltMassCalculationMode = 'massToVolume';
+            markRltCalculatedField('volume');
+            return;
+        }
+
+        markRltCalculatedField(null);
     }
 
     function setupRltMassModalOnce() {
@@ -8633,7 +8702,12 @@ function initializeCalculator() {
         const bindInput = (input, field) => {
             if (!input) return;
             input.addEventListener('input', () => {
-                input.value = String(input.value || '').replace(',', '.').replace(/[^0-9.]/g, '');
+                if (field === 'density') {
+                    input.value = normalizeRltDensityInput(input.value);
+                    try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+                } else {
+                    input.value = String(input.value || '').replace(',', '.').replace(/[^0-9.]/g, '');
+                }
                 activeRltMassLastEdited = field;
                 syncRltMassModalFromInputs();
             });
@@ -8665,15 +8739,20 @@ function initializeCalculator() {
                 syncRltMassModalFromInputs();
 
                 let volume = parseDecimalInput(volumeInput?.value);
-                const density = parseDecimalInput(densityInput?.value);
+                const density = parseRltDensityInput(densityInput?.value);
                 let mass = parseDecimalInput(massInput?.value);
 
-                if (volume !== null && density !== null) {
-                    mass = volume * density;
-                    if (massInput) massInput.value = formatDecimalValue(mass, 0);
-                } else if (mass !== null && density !== null && density > 0) {
-                    volume = mass / density;
-                    if (volumeInput) volumeInput.value = formatDecimalValue(volume, 1);
+                if (density !== null) {
+                    if (activeRltMassCalculationMode === 'massToVolume' && mass !== null) {
+                        volume = mass / density;
+                        if (volumeInput) volumeInput.value = formatDecimalValue(volume, 1);
+                    } else if (volume !== null) {
+                        mass = volume * density;
+                        if (massInput) massInput.value = formatDecimalValue(mass, 0);
+                    } else if (mass !== null) {
+                        volume = mass / density;
+                        if (volumeInput) volumeInput.value = formatDecimalValue(volume, 1);
+                    }
                 }
 
                 activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 1) : '';
@@ -8692,9 +8771,11 @@ function initializeCalculator() {
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
                 if (volumeInput) volumeInput.value = '';
-                if (densityInput) densityInput.value = '';
+                if (densityInput) densityInput.value = '1.';
                 if (massInput) massInput.value = '';
                 activeRltMassLastEdited = null;
+                activeRltMassCalculationMode = null;
+                markRltCalculatedField(null);
             });
         }
 
@@ -8714,8 +8795,11 @@ function initializeCalculator() {
         activeRltMassLastEdited = null;
 
         if (volumeInput) volumeInput.value = wrapper.dataset.volume || '';
-        if (densityInput) densityInput.value = wrapper.dataset.density || '';
+        if (densityInput) densityInput.value = wrapper.dataset.density || '1.';
         if (massInput) massInput.value = wrapper.dataset.mass || String(wrapper.querySelector('.display-input')?.value || '').replace(/[^0-9]/g, '');
+
+        activeRltMassCalculationMode = null;
+        markRltCalculatedField(null);
 
         modal.style.removeProperty('display');
         modal.style.display = 'flex';
