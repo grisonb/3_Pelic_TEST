@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.38
+Version actuelle TEST : v12.39
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -301,4 +301,13 @@ v12.38 — Consolidation offline + calque départements
 - Modification script.js : le calque départements tente d'abord Cache Storage, puis réseau, puis erreur explicite.
 - Limite importante : si un appareil n'a jamais ouvert l'application en ligne après cette mise à jour, le fichier départements ne peut pas apparaître hors ligne par magie.
 - Après ouverture en ligne de la v12.38, le calque départements doit pouvoir se lancer hors ligne sans avoir été activé manuellement auparavant, sous réserve que le pré-cache ait bien réussi.
+
+v12.39 — Correction démarrage hors ligne après modification
+- Diagnostic : l'application contenait encore un bloc de récupération automatique v12.38 exécuté une fois par version.
+- Ce bloc désenregistrait le service worker, supprimait les caches app-shell et rechargeait une URL fraîche.
+- Conséquence : après une modification/version, un lancement hors ligne pouvait échouer car l'application supprimait elle-même son cache local.
+- Modification index.html : suppression/désactivation de cette purge automatique au démarrage.
+- La récupération manuelle reste disponible via le bouton MAJ / forceRecoveryReload.
+- sw.js conserve la logique v12.38 : il refuse de remplacer l'ancien cache si les fichiers cœur ne sont pas précachés correctement.
+- Objectif : conserver un cache fonctionnel tant qu'une nouvelle version n'est pas installée proprement.
 
