@@ -8672,7 +8672,7 @@ function initializeCalculator() {
         }
 
         if (activeRltMassCalculationMode === 'massToVolume' && mass !== null) {
-            volumeInput.value = formatDecimalValue(mass / density, 1);
+            volumeInput.value = formatDecimalValue(mass / density, 0);
             markRltCalculatedField('volume');
             return;
         }
@@ -8685,7 +8685,7 @@ function initializeCalculator() {
         }
 
         if (mass !== null) {
-            volumeInput.value = formatDecimalValue(mass / density, 1);
+            volumeInput.value = formatDecimalValue(mass / density, 0);
             activeRltMassCalculationMode = 'massToVolume';
             markRltCalculatedField('volume');
             return;
@@ -8705,6 +8705,8 @@ function initializeCalculator() {
                 if (field === 'density') {
                     input.value = normalizeRltDensityInput(input.value);
                     try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
+                } else if (field === 'volume') {
+                    input.value = String(input.value || '').replace(/[^0-9]/g, '');
                 } else {
                     input.value = String(input.value || '').replace(',', '.').replace(/[^0-9.]/g, '');
                 }
@@ -8755,7 +8757,7 @@ function initializeCalculator() {
                     }
                 }
 
-                activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 1) : '';
+                activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 0) : '';
                 activeRltMassWrapper.dataset.density = density !== null ? formatDecimalValue(density, 3) : '';
                 activeRltMassWrapper.dataset.mass = mass !== null ? String(Math.round(mass)) : '';
 
