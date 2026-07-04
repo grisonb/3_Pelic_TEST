@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-51-fire-tooltip-fastzip';
+const SW_VERSION = 'sw-v12-52-lignes-ht';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -9,6 +9,7 @@ const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
 
 const APP_SHELL_CACHE = `npf-q400-app-shell-${SW_VERSION}`;
 const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
+const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
 const APP_SHELL_URLS = [
     './',
     './index.html',
@@ -21,6 +22,7 @@ const APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
+    HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
@@ -221,7 +223,8 @@ function isAppShellRequest(request) {
             'suncalc.js',
             'jszip.min.js',
             'communes.json',
-            'communes_aliases.json'
+            'communes_aliases.json',
+            'lignes_ht_rte_simplifiees.geojson'
         ].includes(filename) || parsed.pathname.includes('/icons/');
     } catch (_) {
         return false;
