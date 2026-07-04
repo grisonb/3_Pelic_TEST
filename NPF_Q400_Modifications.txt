@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.47
+Version actuelle TEST : v12.48
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -377,4 +377,13 @@ v12.47 — Taille étiquettes feu
 - Modification style.css : augmentation légère des étiquettes feu permanentes.
 - Taille cible : intermédiaire entre v12.45 et v12.46.
 - Aucun autre comportement modifié : zone tactile des feux, popup “Sélectionner” et icône GPS avion conservées.
+
+v12.48 — Retour profil rapide ZIP fractionné cartes offline
+- Constat utilisateur : le téléchargement/import des cartes est redevenu très lent alors que le mode ZIP fractionné fonctionnait correctement.
+- Modification script.js : ajout d'un profil “ZIP fractionné rapide” pour les packs OpenStreet non volumineux.
+- Les ZIP fractionnés OpenStreet repassent en lots IndexedDB de 260 tuiles au lieu de 70.
+- Suppression de la réouverture périodique IndexedDB pour les ZIP fractionnés OpenStreet.
+- Réduction des rafraîchissements d'affichage pendant l'import pour éviter de ralentir Safari/iPad.
+- Les gros ZIP OpenStreet restent sur le profil conservateur de sécurité.
+- Les profils OACI et IGN sont conservés.
 
