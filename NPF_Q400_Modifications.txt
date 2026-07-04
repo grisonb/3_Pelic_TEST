@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.43
+Version actuelle TEST : v12.44
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -349,4 +348,12 @@ v12.43 — Bloc/Fuel boutons + Volume entier Masse Rlt
 - Modification style.css : bouton Supprimer en fond rouge avec texte blanc.
 - Demande précédente intégrée : Volume Masse Rlt sans décimale, y compris quand il est calculé depuis Masse / Densité.
 - Modification script.js : saisie Volume limitée à des entiers.
+
+v12.44 — Verrouillage des vols clôturés
+- Constat utilisateur : un vol clôturé restait modifiable sans cliquer sur “Réouvrir”.
+- Modification script.js : ajout d'un état visuel et fonctionnel de verrouillage pour le vol actif lorsqu'il est clôturé.
+- Les cellules Bloc/Fuel et les champs du bandeau sont lisibles mais non modifiables tant que le vol est clôturé.
+- Les boutons de gestion restent actifs : sélection du vol, Nouveau, Réouvrir, Supprimer.
+- Ajout d'un indicateur “Vol clôturé — verrouillé”.
+- Le bouton Clôturer devient toujours “Réouvrir” sur un vol clôturé ; la modification redevient possible uniquement après clic sur Réouvrir.
 
