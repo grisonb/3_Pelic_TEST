@@ -4923,3 +4923,83 @@ body {
     border-color: #c1121f !important;
 }
 
+/* v12.46 — étiquettes feu réduites et zone tactile agrandie */
+.leaflet-tooltip.fire-history-map-tooltip-permanent {
+    font-size: 8px !important;
+    padding: 3px 6px !important;
+    border-width: 1px !important;
+    border-radius: 6px !important;
+    line-height: 1.05 !important;
+}
+
+.active-fire-map-marker.fire-touch-hitbox,
+.fire-history-map-marker.fire-touch-hitbox {
+    width: 34px !important;
+    height: 34px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.active-fire-map-marker.fire-touch-hitbox span,
+.fire-history-map-marker.fire-touch-hitbox span {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 14px !important;
+    height: 14px !important;
+    line-height: 14px !important;
+    font-size: 9px !important;
+}
+
+/* v12.46 — icône GPS avion orientable */
+.own-gps-plane-icon {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.own-gps-plane-body {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 34px;
+    height: 34px;
+    margin-left: -17px;
+    margin-top: -11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform-origin: center center;
+    border-radius: 50%;
+    background: rgba(102, 43, 232, 0.13);
+    border: 2px solid rgba(102, 43, 232, 0.90);
+    box-shadow: 0 1px 6px rgba(0,0,0,.30);
+    box-sizing: border-box;
+}
+
+.own-gps-plane-shape {
+    display: inline-block;
+    color: #662be8;
+    font-size: 22px;
+    line-height: 1;
+    text-shadow: 0 1px 2px rgba(255,255,255,.90);
+}
+
+.own-gps-plane-altitude {
+    position: absolute;
+    left: 50%;
+    top: -11px;
+    transform: translateX(-50%);
+    background: #ffffff;
+    color: #111827;
+    border: 2px solid #662be8;
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 950;
+    white-space: nowrap;
+    box-shadow: 0 1px 5px rgba(0,0,0,.25);
+}
+
