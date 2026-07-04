@@ -4859,3 +4859,50 @@ body {
     transform: translateY(1px);
 }
 
+/* v12.44 — verrouillage des vols clôturés Bloc/Fuel */
+#bloc-fuel.flight-locked .header-section,
+#bloc-fuel.flight-locked .table-wrapper {
+    position: relative;
+}
+
+#bloc-fuel.flight-locked .locked-input-wrapper {
+    pointer-events: none !important;
+    opacity: 0.72;
+    filter: grayscale(0.15);
+}
+
+#bloc-fuel.flight-locked .locked-input-wrapper .display-input {
+    background: #f3f4f6 !important;
+    color: #4b5563 !important;
+    cursor: not-allowed !important;
+}
+
+.flight-lock-status {
+    display: none;
+    align-items: center;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #fff3cd;
+    border: 1px solid #ffda6a;
+    color: #7a5200;
+    font-size: 14px;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+#bloc-fuel.flight-locked #close-flight-btn {
+    background: var(--success-color) !important;
+    border-color: var(--success-color) !important;
+    color: #ffffff !important;
+}
+
+#bloc-fuel.flight-locked #new-flight-btn,
+#bloc-fuel.flight-locked #delete-flight-btn,
+#bloc-fuel.flight-locked #flight-select,
+#bloc-fuel.flight-locked #close-flight-btn {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    filter: none !important;
+}
+
