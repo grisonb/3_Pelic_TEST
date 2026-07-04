@@ -7569,6 +7569,8 @@ function escapeHtml(value) {
 
 function initializeCalculator() {
     let isSharedHeaderSyncing = false;
+    let activeRltMassWrapper = null;
+    let activeRltMassLastEdited = null;
 
     function getSharedHeaderMainId(wrapper) {
         if (!wrapper) return '';
@@ -7859,9 +7861,13 @@ function initializeCalculator() {
         document.querySelectorAll('#bloc-fuel tbody tr').forEach(row => {
             const time = row.querySelector('.time-input-wrapper .display-input')?.value || '';
             const fuel = row.querySelector('.numeric-input-wrapper .display-input')?.value || '';
+            const rltWrapper = row.querySelector('.rlt-mass-input-wrapper');
+            const rltMass = rltWrapper?.querySelector('.display-input')?.value || '';
+            const rltVolume = rltWrapper?.dataset.volume || '';
+            const rltDensity = rltWrapper?.dataset.density || '';
             const oaci = row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || '';
-            if (time || fuel || oaci) {
-                tableData.push({ time, fuel, oaci });
+            if (time || fuel || oaci || rltMass || rltVolume || rltDensity) {
+                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity });
             }
         });
         state.calculator_table_data = tableData;
@@ -8547,16 +8553,226 @@ function initializeCalculator() {
         if (clearBtn) { clearBtn.addEventListener('click', () => { displayInput.value = ''; masterRecalculate(); saveCalculatorState(); }); }
     }
 
+
+    function parseDecimalInput(value) {
+        if (value === null || value === undefined) return null;
+        const normalized = String(value).trim().replace(',', '.').replace(/[^0-9.]/g, '');
+        if (!normalized) return null;
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function formatDecimalValue(value, decimals = 2) {
+        if (!Number.isFinite(value)) return '';
+        return value.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',');
+    }
+
+    function formatKgValue(value) {
+        if (!Number.isFinite(value)) return '';
+        return `${Math.round(value)} kg`;
+    }
+
+    function getRltMassModalElements() {
+        return {
+            modal: document.getElementById('rlt-mass-modal'),
+            volumeInput: document.getElementById('rlt-volume-input'),
+            densityInput: document.getElementById('rlt-density-input'),
+            massInput: document.getElementById('rlt-mass-input'),
+            validateBtn: document.getElementById('rlt-mass-validate-btn'),
+            clearBtn: document.getElementById('rlt-mass-clear-btn'),
+            cancelBtn: document.getElementById('rlt-mass-cancel-btn'),
+            closeBtn: document.getElementById('rlt-mass-close-btn')
+        };
+    }
+
+    function closeRltMassModal() {
+        const { modal, volumeInput, densityInput, massInput } = getRltMassModalElements();
+        try {
+            [volumeInput, densityInput, massInput].forEach(input => input && input.blur && input.blur());
+        } catch (_) {}
+        if (modal) {
+            modal.style.setProperty('display', 'none', 'important');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        activeRltMassWrapper = null;
+        activeRltMassLastEdited = null;
+    }
+
+    function syncRltMassModalFromInputs() {
+        const { volumeInput, densityInput, massInput } = getRltMassModalElements();
+        if (!volumeInput || !densityInput || !massInput) return;
+
+        const volume = parseDecimalInput(volumeInput.value);
+        const density = parseDecimalInput(densityInput.value);
+        const mass = parseDecimalInput(massInput.value);
+
+        if (activeRltMassLastEdited === 'mass' && mass !== null && density !== null && density > 0) {
+            volumeInput.value = formatDecimalValue(mass / density, 1);
+            return;
+        }
+
+        if (activeRltMassLastEdited === 'volume' && volume !== null && density !== null) {
+            massInput.value = formatDecimalValue(volume * density, 0);
+            return;
+        }
+
+        if (activeRltMassLastEdited === 'density') {
+            if (volume !== null && density !== null) {
+                massInput.value = formatDecimalValue(volume * density, 0);
+            } else if (mass !== null && density !== null && density > 0) {
+                volumeInput.value = formatDecimalValue(mass / density, 1);
+            }
+        }
+    }
+
+    function setupRltMassModalOnce() {
+        const { modal, volumeInput, densityInput, massInput, validateBtn, clearBtn, cancelBtn, closeBtn } = getRltMassModalElements();
+        if (!modal || modal.dataset.bound === '1') return;
+        modal.dataset.bound = '1';
+
+        const bindInput = (input, field) => {
+            if (!input) return;
+            input.addEventListener('input', () => {
+                input.value = String(input.value || '').replace(',', '.').replace(/[^0-9.]/g, '');
+                activeRltMassLastEdited = field;
+                syncRltMassModalFromInputs();
+            });
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    validateBtn?.click();
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeRltMassModal();
+                }
+            });
+        };
+
+        bindInput(volumeInput, 'volume');
+        bindInput(densityInput, 'density');
+        bindInput(massInput, 'mass');
+
+        if (validateBtn) {
+            validateBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!activeRltMassWrapper) {
+                    closeRltMassModal();
+                    return;
+                }
+
+                syncRltMassModalFromInputs();
+
+                const volume = parseDecimalInput(volumeInput?.value);
+                const density = parseDecimalInput(densityInput?.value);
+                let mass = parseDecimalInput(massInput?.value);
+                if ((mass === null || !Number.isFinite(mass)) && volume !== null && density !== null) {
+                    mass = volume * density;
+                }
+
+                activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 1) : '';
+                activeRltMassWrapper.dataset.density = density !== null ? formatDecimalValue(density, 3) : '';
+                activeRltMassWrapper.dataset.mass = mass !== null ? String(Math.round(mass)) : '';
+
+                const displayInput = activeRltMassWrapper.querySelector('.display-input');
+                if (displayInput) displayInput.value = mass !== null ? formatKgValue(mass) : '';
+
+                masterRecalculate();
+                saveCalculatorState();
+                closeRltMassModal();
+            }, { capture: true });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (volumeInput) volumeInput.value = '';
+                if (densityInput) densityInput.value = '';
+                if (massInput) massInput.value = '';
+                activeRltMassLastEdited = null;
+            });
+        }
+
+        if (cancelBtn) cancelBtn.addEventListener('click', closeRltMassModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeRltMassModal);
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) closeRltMassModal();
+        });
+    }
+
+    function openRltMassModal(wrapper) {
+        const { modal, volumeInput, densityInput, massInput } = getRltMassModalElements();
+        if (!modal || !wrapper) return;
+
+        setupRltMassModalOnce();
+        activeRltMassWrapper = wrapper;
+        activeRltMassLastEdited = null;
+
+        if (volumeInput) volumeInput.value = wrapper.dataset.volume || '';
+        if (densityInput) densityInput.value = wrapper.dataset.density || '';
+        if (massInput) massInput.value = wrapper.dataset.mass || String(wrapper.querySelector('.display-input')?.value || '').replace(/[^0-9]/g, '');
+
+        modal.style.removeProperty('display');
+        modal.style.display = 'flex';
+        modal.removeAttribute('aria-hidden');
+
+        setTimeout(() => {
+            try {
+                if (volumeInput && !volumeInput.value) volumeInput.focus({ preventScroll: false });
+                else if (massInput) massInput.focus({ preventScroll: false });
+            } catch (_) {}
+        }, 50);
+    }
+
+    function initializeRltMassInput(wrapper, data = {}) {
+        if (!wrapper) return;
+        const displayInput = wrapper.querySelector('.display-input');
+        const clearBtn = wrapper.querySelector('.clear-btn');
+
+        wrapper.dataset.volume = data?.rltVolume || '';
+        wrapper.dataset.density = data?.rltDensity || '';
+        wrapper.dataset.mass = data?.rltMass ? String(data.rltMass).replace(/[^0-9]/g, '') : '';
+        if (displayInput) displayInput.value = data?.rltMass || '';
+
+        setupRltMassModalOnce();
+
+        const open = (event) => {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            openRltMassModal(wrapper);
+        };
+
+        wrapper.addEventListener('click', open);
+        if (displayInput) displayInput.addEventListener('click', open);
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                wrapper.dataset.volume = '';
+                wrapper.dataset.density = '';
+                wrapper.dataset.mass = '';
+                if (displayInput) displayInput.value = '';
+                masterRecalculate();
+                saveCalculatorState();
+            });
+        }
+    }
+
     const addNewRow = (tableBody, data, isLastRow = false) => {
         const row = document.createElement('tr');
-        row.innerHTML = `<td><div class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></td><td><div class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></td><td class="airport-oaci-cell">--</td><td class="duree-rotation-cell"></td><td class="fuel-rotation-cell"></td><td class="tps-vol-cell"></td><td class="tps-vol-restant-cell"></td>`;
+        row.innerHTML = `<td><div class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></td><td><div class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></td><td class="airport-oaci-cell">--</td><td><div class="input-wrapper rlt-mass-input-wrapper" data-unit="kg"><input type="text" class="display-input" readonly placeholder="[kg]"><span class="clear-btn">&times;</span></div></td><td class="duree-rotation-cell"></td><td class="fuel-rotation-cell"></td><td class="tps-vol-cell"></td><td class="tps-vol-restant-cell"></td>`;
         tableBody.appendChild(row);
 
         const timeWrapper = row.querySelector('.time-input-wrapper');
         const numericWrapper = row.querySelector('.numeric-input-wrapper');
+        const rltMassWrapper = row.querySelector('.rlt-mass-input-wrapper');
 
         initializeTimeInput(timeWrapper, data ? data.time : '');
         initializeNumericInput(numericWrapper, data ? data.fuel : '');
+        initializeRltMassInput(rltMassWrapper, data || {});
         row.dataset.airportOaci = data?.oaci || '';
         updateRowAirportOaci(row);
 
@@ -8574,7 +8790,8 @@ function initializeCalculator() {
         [
             timeWrapper.querySelector('.display-input'),
             timeWrapper.querySelector('.engine-input'),
-            numericWrapper.querySelector('.display-input')
+            numericWrapper.querySelector('.display-input'),
+            rltMassWrapper.querySelector('.display-input')
         ].filter(Boolean).forEach(input => {
             input.addEventListener('change', forceRowRecalculateAndSave);
             input.addEventListener('input', forceRowRecalculateAndSave);
