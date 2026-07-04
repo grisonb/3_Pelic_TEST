@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-46-fire-touch-gps-plane';
+const SW_VERSION = 'sw-v12-47-fire-label-size';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
