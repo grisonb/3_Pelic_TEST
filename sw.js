@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-38-offline-consolidation';
+const SW_VERSION = 'sw-v12-39-offline-launch-fix';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
