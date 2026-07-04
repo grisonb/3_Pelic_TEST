@@ -4906,3 +4906,20 @@ body {
     filter: none !important;
 }
 
+/* v12.45 — étiquette permanente des feux historiques */
+.leaflet-tooltip.fire-history-map-tooltip-permanent {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border: 2px solid #c1121f !important;
+    border-radius: 8px !important;
+    color: #8a0012 !important;
+    font-weight: 950 !important;
+    font-size: 12px !important;
+    padding: 5px 9px !important;
+    box-shadow: 0 2px 7px rgba(0,0,0,.25) !important;
+    white-space: nowrap !important;
+}
+
+.leaflet-tooltip.fire-active-map-tooltip {
+    border-color: #c1121f !important;
+}
+
