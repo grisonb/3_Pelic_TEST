@@ -1,415 +1,500 @@
-NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
+      
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NPF-Q400-TEST</title>
+    <link rel="stylesheet" href="leaflet.css">
+    <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v12.50-zip-fluid-fire-label-delete">
+    <link rel="manifest" href="manifest.json?appv=v12.50-zip-fluid-fire-label-delete">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.50-zip-fluid-fire-label-delete">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.50-zip-fluid-fire-label-delete">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.50-zip-fluid-fire-label-delete">
+    <meta name="theme-color" content="#0b2f6b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NPF-Q400-TEST">
 
-But du fichier
--------------
-Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
-Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
+    <style id="early-boot-style">
+        html, body {
+            min-height: 100%;
+            background: #dbeafe;
+        }
+        #app-boot-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #eaf4ff 0%, #cfe7ff 100%);
+            color: #0b2f6b;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-weight: 800;
+            letter-spacing: .02em;
+            text-align: center;
+        }
+        #app-boot-screen .boot-card {
+            padding: 18px 22px;
+            border-radius: 18px;
+            background: rgba(255,255,255,.86);
+            box-shadow: 0 8px 24px rgba(0,0,0,.18);
+            border: 1px solid rgba(255,255,255,.9);
+        }
+        #app-boot-screen .boot-version {
+            margin-top: 5px;
+            font-size: 12px;
+            opacity: .68;
+        }
+        body.app-ready #app-boot-screen {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .18s ease;
+        }
+    </style>
 
-Version actuelle TEST : v12.50
-Date de génération : 2026-07-04
+    <script>
+        const APP_VERSION = 'v12.50';
+        const APP_VERSION_STORAGE_KEY = 'appVersion';
+        const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
+        window.APP_VERSION = APP_VERSION;
+        const shouldDisableServiceWorker = false;
+        window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
-Règle de méthode
-----------------
-- Tester en dépôt TEST avant production.
-- Ne jamais modifier l'import offline, le service worker ou IndexedDB en production sans validation TEST.
-- Quand une version fonctionne, elle devient la nouvelle base.
-- Conserver ce fichier et l'enrichir à chaque version.
+        /*
+         * v12.49 — correction démarrage hors ligne.
+         * Purge automatique désactivée.
+         *
+         * Le bloc précédent désenregistrait le service worker et supprimait les
+         * caches app-shell une fois par version. Hors ligne, cela cassait le
+         * lancement après modification.
+         *
+         * La récupération reste possible manuellement via le bouton MAJ /
+         * forceRecoveryReload, mais l'application ne supprime plus son cache
+         * toute seule au démarrage.
+         */
 
-Historique résumé
------------------
+        window.forceRecoveryReload = async () => {
+            /*
+             * v11.98 — MAJ propre.
+             * Ancien comportement observé : 2 clics MAJ nécessaires, puis bouton
+             * qui tourne en boucle jusqu'à fermeture/réouverture de la PWA.
+             *
+             * Nouvelle stratégie :
+             * - supprimer uniquement les caches app-shell NPF-Q400 ;
+             * - désenregistrer l'ancien service worker ;
+             * - recharger une URL fraîche avec appv + ts.
+             * Les tuiles offline IndexedDB ne sont pas supprimées.
+             */
+            const forceButton = document.getElementById('force-update-button');
+            if (forceButton) {
+                forceButton.disabled = true;
+                forceButton.textContent = '⏳ MAJ...';
+            }
 
-v11.42 — Restauration ouverture hors ligne
-- Base : v11.41 / v2026.33.
-- Modification : cache applicatif app shell dans sw.js.
-- Pourquoi : l'application ne s'ouvrait pas sans connexion.
-- Résultat validé : mode hors ligne fonctionnel.
+            try {
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                        cacheNames
+                            .filter(name => name.startsWith('npf-q400-app-shell-'))
+                            .map(name => caches.delete(name))
+                    );
+                }
+            } catch (error) {
+                console.log('Nettoyage cache app-shell impossible:', error);
+            }
 
-v11.43 — Sélection carte offline + derniers feux
-- Modification : sélection de la carte offline par case à cocher à gauche du nom.
-- Modification : suppression individuelle et globale des derniers feux.
-- Modification : reprise plus rapide après arrière-plan via invalidateSize/redraw.
-- Pourquoi : rendre la sélection plus simple et gérer l'historique des feux.
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(registration => registration.unregister()));
+                }
+            } catch (error) {
+                console.log('Désenregistrement service worker impossible:', error);
+            }
 
-v11.44 — Boutons rouges derniers feux
-- Modification : bouton individuel de suppression en rond rouge.
-- Modification : bouton global rouge “Tout effacer”.
-- Pourquoi : rendre les actions destructives plus visibles.
+            const refreshUrl = new URL(window.location.href);
+            refreshUrl.pathname = refreshUrl.pathname.replace(/[^/]*$/, 'index.html');
+            refreshUrl.searchParams.set('appv', APP_VERSION);
+            refreshUrl.searchParams.set('ts', Date.now().toString());
+            window.location.replace(refreshUrl.toString());
+        };
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try {
+                    const previousVersion = localStorage.getItem(APP_VERSION_STORAGE_KEY);
+                    if (previousVersion !== APP_VERSION) {
+                        localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
+                        sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
+                    }
+                } catch (e) {
+                    console.log('Version refresh warning:', e);
+                }
 
-v11.50 — Bandeau BINGO compact
-- État reconstitué depuis les fichiers fournis.
-- Version utilisée comme base correcte après perte partielle d'historique.
-- Pourquoi : l'historique de chat avait divergé et il fallait repartir de la bonne version.
+                try {
+                    const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+                    console.log('Service Worker enregistré:', reg);
+                } catch (err) {
+                    console.log('Erreur enregistrement Service Worker:', err);
+                }
+            });
+        }
 
-v11.51 / v11.52 — Corrections smartphone
-- Modification : bandeau BINGO/BASE plus compact.
-- Modification : texte du bandeau condensé pour éviter la coupure en portrait.
-- Pourquoi : le bandeau occupait trop d'espace et le texte était tronqué.
+        document.addEventListener('DOMContentLoaded', () => {
+            const mainVersionDisplay = document.getElementById('app-version-display');
+            if (mainVersionDisplay) {
+                mainVersionDisplay.textContent = APP_VERSION;
+            }
 
-v12.11 — Import gros volume renforcé
-- Modification : transactions IndexedDB avec durability relaxed si supporté.
-- Modification : lots d'écriture plus prudents pour gros ZIP.
-- Pourquoi : OpenStreet ~900 Mo pouvait planter ou ralentir fortement en fin d'installation.
+            const earlyForceButton = document.getElementById('force-update-button');
+            if (earlyForceButton) {
+                earlyForceButton.addEventListener('click', () => {
+                    window.forceRecoveryReload();
+                });
+            }
+        });
+    </script>
+</head>
+<body>
 
-v12.12 — Groupes de packs offline
-- Modification : regroupement des ZIP OpenStreet_01, OpenStreet_02, etc.
-- Modification : activation/désactivation d'une carte multi-ZIP en une seule ligne.
-- Pourquoi : permettre le téléchargement/import d'une carte en plusieurs ZIP.
+    <div id="app-boot-screen" aria-live="polite">
+        <div class="boot-card">
+            <div>Chargement NPF-Q400…</div>
+            <div class="boot-version">reprise application</div>
+        </div>
+    </div>
+    <div id="map"></div>
+    <div id="main-action-buttons">
+        <button id="toggle-search-button" title="Rechercher une commune"><img class="map-action-icon search-commune-icon" src="icons/search-commune-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
+        <button id="calculator-button" title="Ouvrir le calculateur de mission" aria-label="Calculateur"><img class="map-action-icon calculator-fms-icon" src="icons/calculator-fms-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
+        <button id="bloc-fuel-shortcut-button" title="Ouvrir directement BLOC / FUEL" aria-label="BLOC / FUEL"><img class="bloc-fuel-shortcut-img" src="icons/bloc-fuel-shortcut-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
+        <button id="gps-feu-button" title="Créer un feu à ma position"><span class="gps-feu-icon-glyph" aria-hidden="true">🎯</span></button>
+        <button id="center-gps-button" title="Recentrer la carte sur ma position GPS"><img class="map-action-icon center-gps-icon" src="icons/center-gps-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
+        <button id="chat-toggle-button" title="Ouvrir/Fermer le chat équipe">💬<span id="chat-alert-badge" style="display:none;">0</span><span id="chat-offline-badge" aria-hidden="true">✕</span></button>
+        <div id="app-version-display" class="version-display">--</div>
+        <button id="force-update-button" class="force-update-button" type="button" title="Forcer la mise à jour complète">🔄 MAJ</button>
+    </div>
+      <div id="bingo-map-display" style="display: none;">
+        <span id="map-bingo-lftw"></span>
+        <span id="map-bingo-pelic"></span>
+    </div>
+    <div id="commune-info-display"></div>
+    <div id="nearest-commune-display" style="display: none;"></div>
+    <div id="team-chat-panel" style="display: none;">
+        <div class="chat-header">
+            <span id="chat-online-users">Vus <30 min: --</span>
+            <div class="chat-header-actions">
+                <span id="chat-connection-state">Hors ligne</span>
+                <button id="chat-clear-button" title="Supprimer les messages">🗑️</button>
+                <button id="chat-minimize-button" title="Réduire/Agrandir le chat">—</button>
+            </div>
+        </div>
+        <div class="chat-config-row">
+            <input type="text" id="chat-room-input" maxlength="32" placeholder="Canal sans espace (ex: GAAR-ALPHA)">
+            <input type="text" id="chat-user-input" maxlength="24" placeholder="Votre pseudo">
+            <button id="chat-connect-button">Connexion</button>
+        </div>
+        <div id="chat-messages"></div>
+        <div class="chat-send-row">
+            <input type="text" id="chat-message-input" maxlength="280" placeholder="Message..." autocomplete="one-time-code" autocorrect="off" autocapitalize="sentences" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+            <button id="chat-send-button">Envoyer</button>
+        </div>
+    </div>
 
-v12.13 — Progression offline + points d'eau + écran de reprise
-- Modification : version TEST offline_progress_waterpoints_startup.
-- Modification : conservation de l'app shell et des icônes dans sw.js.
-- Pourquoi : améliorer le démarrage PWA et conserver les évolutions fonctionnelles.
+    <div id="chat-clear-modal" class="chat-clear-modal" style="display: none;">
+        <div class="chat-clear-modal-content">
+            <h3>Suppression des messages</h3>
+            <p>Choisissez l’action à effectuer :</p>
+            <div class="chat-clear-modal-actions">
+                <button id="chat-clear-local-button" class="chat-clear-option">Supprimer localement</button>
+                <button id="chat-clear-channel-button" class="chat-clear-option chat-clear-option-danger">Local + canal</button>
+                <button id="chat-clear-cancel-button" class="chat-clear-option">Annuler</button>
+            </div>
+        </div>
+    </div>
+    <div id="ui-overlay">
+        <div id="status-message">Chargement des données...</div>
+        <button id="boot-force-update-button" type="button" style="display:none;">🔄 Forcer MAJ</button>
+        <div id="search-section" style="display: none;">
+            <div class="controls-container">
+                <div class="search-wrapper">
+                    <input type="text" id="search-input" placeholder="Rechercher une commune..." autocomplete="off">
+                    <span id="clear-search">×</span>
+                </div>
+                <button id="live-gps-button" title="Activer/Désactiver le suivi GPS">🛰️</button>
+                <div class="airport-controls">
+                    <label for="airport-count">Nbr Pélic.</label>
+                    <input type="number" id="airport-count" value="3" min="0" max="10">
+                </div>
+            </div>
+            <ul id="results-list" style="display: none;"></ul>
+               
+<div class="extra-controls extra-controls-grid">
+                <button id="lftw-route-button" class="toggle-button active" title="Afficher/Masquer la route vers la base">Route BASE<br>LFTW</button>
+                <button id="gaar-mode-button" class="toggle-button" title="Afficher/Masquer les circuits GAAR">Circuits<br>GAAR</button>
+                <button id="departments-layer-button" class="toggle-button" title="Afficher/Masquer les contours de départements">Départements</button>
+                <button id="communes-layer-button" class="toggle-button" title="Afficher/Masquer les contours de communes">Communes</button>
+                <button id="water-points-button" class="toggle-button" title="Afficher/Masquer les 3 plans d'eau les plus proches">Plan<br>d'eau</button>
+                <button id="offline-maps-button" class="toggle-button" title="Gérer les cartes hors-ligne">Cartes</button>
+            </div>
 
-v12.14 — Tentative accélération IGN
-- Modification : distinction prévue entre OpenStreet et IGN.
-- Modification : host logique prévu pour IGN.
-- Pourquoi : IGN en gros ZIP était très lent alors qu'OpenStreet fonctionnait.
-- Limite constatée : la distinction IGN n'était pas complète.
+  
+                
+<div id="gaar-controls" style="display: none;">
+                <button id="edit-circuits-button" class="gaar-action-button gaar-edit-button">Modifier Circuits</button>
+                <button id="delete-circuits-btn" class="gaar-action-button gaar-delete-button">Supprimer Circuits</button>
+                <p id="gaar-status"></p>
+            </div>
 
-v12.15 — Suppression packs + host IGN corrigé
-- Modification : suppression robuste des groupes multi-ZIP.
-- Modification : moins de confirmations répétées lors de la suppression.
-- Modification : IGN_01, IGN_02, IGN_part04 reconnus comme même groupe.
-- Modification : host local stable “ign.tile.openstreetmap.org”.
-- Pourquoi : les packs installés ne se désinstallaient pas correctement et IGN devait être isolé d'OpenStreet.
-- Limite constatée : la première carte importée charge vite, la deuxième devient très lente, quel que soit l'ordre.
+            <div id="offline-status"></div>
+        </div>
+    </div>
+    <script src="leaflet.min.js"></script>
+    <script src="suncalc.js"></script>
+    <script src="jszip.min.js"></script>
+    <script src="script.js?appv=v12.50-zip-fluid-fire-label-delete"></script>
+    
+    <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
+        <div class="fuel-split-modal-content">
+            <button id="fuel-split-close-btn" class="fuel-split-close-btn" type="button" title="Fermer">&times;</button>
+            <h3>Saisie carburant</h3>
+            <div class="fuel-split-tanks-row">
+                <label class="fuel-split-field">
+                    <span>G</span>
+                    <input type="text" id="fuel-split-left" inputmode="numeric" autocomplete="off">
+                </label>
+                <label class="fuel-split-field">
+                    <span>D</span>
+                    <input type="text" id="fuel-split-right" inputmode="numeric" autocomplete="off">
+                </label>
+            </div>
+            <label class="fuel-split-total-field">
+                <span>TOTAL</span>
+                <input type="text" id="fuel-split-total" inputmode="numeric" autocomplete="off">
+            </label>
+            <div class="fuel-split-actions">
+                <button type="button" id="fuel-split-clear-btn">Effacer</button>
+                <button type="button" id="fuel-split-cancel-btn">Annuler</button>
+                <button type="button" id="fuel-split-validate-btn">Valider</button>
+            </div>
+        </div>
+    </div>
+    <div id="calculator-modal" style="display: none;">
+        <div class="main-container">
+            <button id="close-calculator-btn">&times;</button>
+            <div class="onglets-navigation">
+                <button class="onglet-bouton active" data-onglet="previ-rotations">PREVI. NBR ROTATIONS</button>
+                <button class="onglet-bouton" data-onglet="bloc-fuel">BLOC / FUEL</button>
+                <button class="onglet-bouton" data-onglet="suivi-rotations">SUIVI ROTATIONS</button>
+                <button class="onglet-bouton" data-onglet="deroutement">DEROUT. / GAAR</button>
+            </div>
+            <div class="onglets-conteneur">
+                <div class="onglet-panneau active" id="previ-rotations">
+                    <div class="header-section previ-shared-header-section">
+                        <div class="header-item"><label id="previ-bloc-depart-label">BLOC DÉPART</label><div id="previ-bloc-depart" class="input-wrapper time-input-wrapper" data-sync-target="bloc-depart"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>FUEL Départ</label><div id="previ-fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg" data-sync-target="fuel-depart"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
+                        <div class="header-item base-oaci-header-item"><label id="previ-cs-base-label">Base</label><div class="input-wrapper base-oaci-input-wrapper"><input type="text" id="previ-base-oaci-input" class="display-input base-oaci-input" inputmode="text" maxlength="4" placeholder="OACI" autocomplete="off" autocapitalize="characters" spellcheck="false"><input type="text" id="previ-cs-lftw-display" class="display-input base-sunset-hidden" readonly tabindex="-1" aria-hidden="true"></div></div>
+                        <div class="header-item"><label>TMD</label><div id="previ-tmd" class="input-wrapper time-input-wrapper" data-sync-target="tmd"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>LIMITE HDV</label><div id="previ-limite-hdv" class="input-wrapper time-input-wrapper" data-sync-target="limite-hdv"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                    </div>
 
-v12.16 — Suspension de carte pendant import
-- Modification : ajout de suspendOfflineMapRenderingDuringImport().
-- Modification : au début d'un import ZIP, le pack offline actif est temporairement désactivé.
-- Modification : la couche tuiles Leaflet est retirée pendant l'écriture IndexedDB.
-- Modification : le service worker reçoit OFFLINE_ACTIVE_PACKS_CHANGED avec une liste vide.
-- Pourquoi : quand une première carte est active, Leaflet et le service worker lisent les tuiles dans IndexedDB pendant que le deuxième import écrit massivement. Sur Safari/iPadOS, cette concurrence lecture/écriture ralentit fortement, voire bloque l'import.
-- Effet attendu : le deuxième gros import doit être beaucoup plus rapide.
-- Risque : pendant l'import, la carte peut disparaître temporairement. C'est volontaire. À la fin, la carte importée est réactivée et l'application recharge.
+                    <div class="analyse-grid">
+                        <div class="analyse-col">
+                            <span id="previ-bingo-base" class="previ-hidden-bingo-value">-- kg</span>
+                            <div class="rotations-group">
+                                <h3 class="analyse-col-title">NBR ROTATIONS POSSIBLES</h3>
+                                <div id="previ-rotation-results-container">
+                                    <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="tmd"><span class="label">TMD :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="analyse-col">
+                            <span id="previ-bingo-pelic" class="previ-hidden-bingo-value">-- kg</span>
+                            <div class="rotations-group previ-details-group">
+                                <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                <div class="result-line"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">Durée transit :<span id="duree-transit-help" class="formula-help-icon">?</span></span><span class="value" id="duree-transit">--:--</span></div>
+                                <div class="result-line"><span class="label">Conso. transit :<span id="conso-aller-feu-help" class="formula-help-icon">?</span></span><span class="value" id="conso-aller-feu">-- kg</span></div>
+                                <div class="result-line"><span class="label">Fuel sur Feu :<span id="fuel-sur-feu-help" class="formula-help-icon">?</span></span><div style="display: flex; align-items: center;"><div id="fuel-sur-feu-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="fuel-sur-feu-manual-btn">AUTO</button></div></div>
+                                <div class="result-line"><span class="label">Durée Rotation :<span id="duree-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="duree-rotation">--:--</span></div>
+                                <div class="result-line"><span class="label">Conso. Rotation :<span id="conso-par-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="conso-par-rotation">-- kg</span></div>
+                                <div class="result-line"><span class="label">CS sur feu :</span><span class="value" id="cs-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">TMD :</span><span class="value" id="tmd-display">--:--</span></div>
+                                <div class="result-line"><span class="label">HdV restant :</span><span class="value" id="hdv-restant-display">--:--</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                  
+<div class="onglet-panneau" id="bloc-fuel">
+                    <div class="header-section">
+                        <div class="header-item"><label id="bloc-depart-label">BLOC DÉPART</label><div id="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>FUEL Départ</label><div id="fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
+                        <div class="header-item base-oaci-header-item"><label id="cs-base-label">Base</label><div class="input-wrapper base-oaci-input-wrapper"><input type="text" id="base-oaci-input" class="display-input base-oaci-input" inputmode="text" maxlength="4" placeholder="OACI" autocomplete="off" autocapitalize="characters" spellcheck="false"><input type="text" id="cs-lftw-display" class="display-input base-sunset-hidden" readonly tabindex="-1" aria-hidden="true"></div></div>
+                        <div class="header-item"><label>TMD</label><div id="tmd" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                        <div class="header-item"><label>LIMITE HDV</label><div id="limite-hdv" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                    </div>
+                    <div class="flight-manager-bar" id="flight-manager-bar">
+                        <label for="flight-select">Vol n°</label>
+                        <select id="flight-select" aria-label="Sélection du vol"></select>
+                        <button id="new-flight-btn" type="button">Nouveau</button>
+                        <button id="close-flight-btn" type="button">Clôturer</button>
+                        <button id="delete-flight-btn" type="button">Supprimer</button>
+                        <span id="flight-lock-status" class="flight-lock-status" aria-live="polite"></span>
+                    </div>
+                    <div class="table-wrapper"><table class="table-section"><thead><tr><th>BLOC Arrivée</th><th>FUEL Pélic.</th><th>OACI</th><th>Masse<br>Rlt</th><th>Durée<br>Rotations</th><th>Fuel<br>Rotations</th><th>Tps de Vol</th><th>Tps de Vol Restant</th></tr></thead><tbody></tbody></table></div>
+                </div>
+                  
+<div class="onglet-panneau" id="suivi-rotations">
+                    <div class="analyse-grid">
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="suivi-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group">
+                                <h3 class="analyse-col-title">Nbr Rotations Restantes</h3>
+                                    
+<div id="suivi-rotation-results-container">
+                                    <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="tmd"><span class="label">TMD :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                </div>
+                                  
+                            </div>
+                        </div>
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="suivi-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group">
+                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                <div class="result-line"><span class="label">Fuel Pélic. Actuel :</span><span class="value" id="suivi-fuel-actuel">-- kg</span></div>
+                                <div class="result-line"><span class="label">Heure sur Feu :<span id="suivi-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="suivi-heure-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="suivi-cs-sur-feu">--:--</span></div>
+                               <div class="result-line"><span class="label">Conso. Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-conso-rotation-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly><span class="clear-btn">&times;</span></div><button class="manual-btn" id="suivi-conso-rotation-manual-btn">AUTO</button></div></div>
+                                <div class="result-line"><span class="label">Durée Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-duree-rotation-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input manual-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div><button class="manual-btn" id="suivi-duree-rotation-manual-btn">AUTO</button></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="placeholder-message" style="display: none;">Veuillez saisir au moins une ligne dans l'onglet "BLOC / FUEL" pour activer le suivi.</div>
+                </div>
+                  
+<div class="onglet-panneau" id="deroutement">
+                    <div class="analyse-grid">
+                         <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="derout-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group">
+                                <h3 class="analyse-col-title">Nbr Rotations Possibles</h3>
+                                <div id="derout-rotation-results-container">
+                                    <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="tmd"><span class="label">TMD :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                    <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="analyse-col">
+                            <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="derout-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group">
+                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
+                                <div class="result-line"><span class="label">Fuel actuel :</span><div id="deroutement-fuel-wrapper" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric"><span class="clear-btn">&times;</span></div></div>
+                                <div class="result-line"><span class="label">Heure actuelle :</span><div id="deroutement-heure-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                                <div class="result-line derout-empty-retardant-line"><span class="label">Vide retardant :</span><label class="derout-empty-retardant-toggle"><input type="checkbox" id="derout-empty-retardant-checkbox"><span>Retour Pélic avant feu</span></label></div>
+                                <div class="result-line"><span class="label">Heure sur Feu :<span id="derout-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="derout-heure-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="derout-cs-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 largage / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
+                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-pelic-label">Fuel mini 1 largage / Pélic :</span><span id="derout-fuel-mini-pelic-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
+                                <div class="derout-gps-status-row"><button id="refresh-gps-btn">🛰️ Actualiser position GPS</button><span id="derout-gps-status" class="derout-gps-status">GPS non actualisé</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-Ordre de fichiers à fournir désormais
--------------------------------------
-À la demande de l'utilisateur, toujours donner les fichiers dans cet ordre :
-1. index.html
-2. manifest.json
-3. script.js
-4. style.css
-5. sw.js
-6. NPF_Q400_MODIFICATIONS.txt si modifié
+  
+            </div>
+            <button id="reset-all-btn" title="Réinitialiser le tableau">🗑️</button>
+        </div>
+    </div>
+          
+<div id="rlt-mass-modal" class="rlt-mass-modal" style="display: none;" aria-hidden="true">
+        <div class="rlt-mass-modal-content">
+            <button id="rlt-mass-close-btn" class="rlt-mass-close-btn" type="button" title="Fermer">&times;</button>
+            <h3>Masse retardant</h3>
+            <div class="rlt-mass-formula-row">
+                <label>Volume
+                    <input id="rlt-volume-input" type="text" inputmode="decimal" autocomplete="off" placeholder="L">
+                </label>
+                <span>×</span>
+                <label>Densité
+                    <input id="rlt-density-input" type="text" inputmode="decimal" autocomplete="off" placeholder="kg/L">
+                </label>
+                <span>=</span>
+                <label>Masse
+                    <input id="rlt-mass-input" type="text" inputmode="decimal" autocomplete="off" placeholder="kg">
+                </label>
+            </div>
+            <div class="rlt-mass-actions">
+                <button id="rlt-mass-cancel-btn" type="button">Annuler</button>
+                <button id="rlt-mass-clear-btn" type="button">Effacer</button>
+                <button id="rlt-mass-validate-btn" type="button">Valider</button>
+            </div>
+        </div>
+    </div>
 
-Rappel de diagnostic actuel
----------------------------
-- IGN importé en premier : fonctionne parfaitement.
-- OpenStreet importé en second : devient lent/bloqué.
-- Avant, OpenStreet en premier fonctionnait et IGN en second devenait lent.
-- Conclusion : ce n'est pas un problème spécifique IGN ou OpenStreet ; c'est un problème de deuxième gros import avec une carte déjà active et une IndexedDB déjà sollicitée.
+<div id="offline-map-modal" style="display: none;">
+        <div class="main-container">
+            <button id="close-offline-map-btn">&times;</button>
+            <h2>Gestion des Cartes Hors-ligne</h2>
+            
+            <div class="modal-content">
+                <div class="import-section">
+                    <p>Importez un pack de tuiles au format .zip (formats reconnus : z/x/y.png, z_x_y.png ou z-x-y.png) pour l'utiliser hors-ligne.</p>
+                    <label for="zip-importer-input" class="import-button">Importer un pack de tuiles (.zip)</label>
+                    <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
+                </div>
 
-v12.17 — Troisième import + suppression par blocs
-- Constat utilisateur : IGN en premier fonctionne, OpenStreet en second fonctionne avec v12.16, mais OACI installée en troisième rame. La suppression d'IGN n'avance pas non plus.
-- Diagnostic : après deux gros imports, IndexedDB est volumineuse. Même si la carte Leaflet est suspendue, le service worker peut garder une connexion IndexedDB ouverte et son cache mémoire. Les suppressions en une grosse transaction donnent aussi l'impression de bloquer car l'interface ne se rafraîchit pas.
-- Modification script.js : suspendOfflineMapRenderingDuringImport() envoie maintenant OFFLINE_IMPORT_START au service worker.
-- Modification sw.js : réception de OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START, vidage du cache mémoire, désactivation temporaire des packs actifs côté SW, fermeture de la connexion IndexedDB du SW.
-- Modification script.js : la suppression de pack se fait par blocs de 750 tuiles avec transactions courtes et progression affichée.
-- Modification script.js : fallback scan complet si l'index packName ne trouve rien, pour supprimer d'anciens packs mal indexés.
-- Modification script.js : les cartes non OpenStreet, dont IGN et OACI, utilisent le mode lecture arraybuffer et des lots plus larges.
-- Pourquoi : éviter les conflits lecture/écriture/suppression IndexedDB et rendre visible l'avancement de la suppression.
-- Effet attendu : OACI en troisième doit être plus fluide ; suppression IGN doit afficher une progression et finir.
+                <div id="import-progress-section" style="display: none;">
+                    <p id="import-status-message">Importation en cours...</p>
+                    <div class="progress-bar-container">
+                        <div id="import-progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
 
-v12.18 — Libération IndexedDB attendue + OACI repassée en blob
-- Constat utilisateur : suppression IGN affiche le message mais ne démarre pas ; OACI bloque à “Préparation terminée...” en troisième carte.
-- Diagnostic : v12.17 envoyait un postMessage au service worker, mais sans attendre que le service worker ferme réellement sa connexion IndexedDB. L'opération lourde pouvait donc démarrer trop tôt.
-- Modification script.js : ajout de releaseOfflineDatabaseForHeavyOperation(), qui suspend la carte, prévient le service worker, ferme la connexion IndexedDB de la page, attend 900 ms, puis rouvre une connexion propre.
-- Modification import : OpenStreet reste en profil conservateur ; IGN garde arraybuffer ; OACI revient en blob avec lots plus petits, car l'arraybuffer généralisé pouvait bloquer OACI au début de lecture.
-- Modification import : affichage d'un message “Début lecture des tuiles...” puis progression toutes les 10 tuiles pour voir si le blocage est en lecture ZIP ou en écriture IndexedDB.
-- Modification suppression : remplacement de la suppression curseur par une suppression getAllKeys + lots de 500 clés ; fallback scan complet si besoin.
-- Modification sw.js : OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START utilise event.waitUntil(closeOfflineDBForHeavyWrite()) pour fiabiliser la fermeture IndexedDB côté service worker.
-- Pourquoi : traiter les deux blocages observés, suppression silencieuse et import OACI bloqué immédiatement après préparation.
+                <div class="installed-maps-section">
+                    <h3>Packs installés</h3>
+                    <div class="offline-toggle-row">
+                        <span>Type de carte :</span>
+                        <div class="map-source-buttons">
+                            <button type="button" id="map-source-online-btn" class="map-source-btn map-source-btn-online active">Online</button>
+                            <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">Offline</button>
+                        </div>
+                    </div>
+                    <button type="button" id="purge-inactive-packs-btn" class="danger-inline-btn">Vider le cache des packs désélectionnés</button>
+                    <button type="button" id="refresh-offline-tiles-btn" class="neutral-inline-btn">Rafraîchir l'affichage des cartes offline</button>
+                    <ul id="installed-maps-list">
+                        <!-- Les packs installés seront listés ici par le JavaScript -->
+                        <li class="no-maps-placeholder">Aucun pack de cartes installé.</li>
+                    </ul>
+                </div>
+                <div class="airport-pdf-section">
+                    <h3>PDF aérodromes offline</h3>
+                    <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne depuis le bouton PDF des pélicandromes.</p>
+                    <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDF aérodromes</label>
+                    <input type="file" id="airport-pdf-importer-input" accept="application/pdf,.pdf" multiple style="display: none;">
+                    <ul id="installed-airport-pdfs-list">
+                        <li class="no-pdfs-placeholder">Aucun PDF aérodrome stocké.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+ </body>
+</html>
 
-v12.19 — Reset complet offline + mode sécurisé OACI
-- Constat utilisateur : suppression IGN bloquée sur “Suppression 1/7 : IGN-01...” ; import OACI bloque/crashe à “Lecture tuiles 51/3347”.
-- Diagnostic suppression : la base IndexedDB est probablement verrouillée ou trop fragmentée pour une suppression pack par pack fiable après plusieurs gros imports.
-- Modification UI : ajout d'un bouton “Tout réinitialiser” dans la gestion des cartes offline. Il supprime toute la base OfflineTilesDB et tous les packs offline, puis recharge l'application.
-- Pourquoi : fournir une méthode de réparation fiable quand les suppressions pack par pack ne démarrent pas.
-- Diagnostic OACI : OACI plantait très tôt en troisième import, probablement par pression mémoire/IndexedDB après IGN + OpenStreet.
-- Modification import OACI : mode sécurisé avec lots de 10 tuiles, réouverture IndexedDB toutes les 200 tuiles, lecture blob, progression toutes les 10 tuiles.
-- Modification import OACI : si une tuile échoue deux fois à la lecture, elle est ignorée au lieu de faire planter tout l'import.
-- Risque : OACI peut être un peu plus lente, mais doit cesser de planter à 51/3347.
-- Recommandation : si la base actuelle est déjà bloquée, utiliser d'abord “Tout réinitialiser”, puis réinstaller les cartes.
-
-v12.20 — Nouvelle base IndexedDB offline
-- Constat utilisateur : reset complet bloqué vers la moitié avec “Suppression bloquée”.
-- Diagnostic : indexedDB.deleteDatabase('OfflineTilesDB') reste bloqué si Safari/iPadOS ou l'ancien service worker garde une connexion ouverte. Tant que cette connexion existe, la suppression complète ne peut pas aboutir.
-- Décision : ne plus dépendre de la suppression de l'ancienne base. La v12.20 abandonne l'ancienne base OfflineTilesDB et utilise une nouvelle base OfflineTilesDB_v12_20 côté script.js et sw.js.
-- Modification script.js : ajout de OFFLINE_DB_NAME = 'OfflineTilesDB_v12_20' et ouverture IndexedDB via cette constante.
-- Modification sw.js : DB_NAME = 'OfflineTilesDB_v12_20'.
-- Modification reset : le bouton “Tout réinitialiser” devient un reset logique. Il vide les listes locales, désactive les packs actifs, nettoie les caches de tuiles, crée/ouvre la nouvelle base et recharge. L'ancienne base est seulement supprimée en tentative non bloquante.
-- Pourquoi : retrouver une application utilisable même si l'ancienne base est verrouillée.
-- Limite : les anciennes tuiles peuvent rester dans les données Safari du site et consommer de l'espace. Si le quota iPad devient insuffisant, il faudra supprimer les données du site NPF-Q400 dans Réglages Safari.
-- Test conseillé : installer v12.20, faire MAJ, fermer/réouvrir, cliquer “Tout réinitialiser”, puis réimporter OpenStreet, IGN et OACI.
-
-v12.21 — Version de récupération service worker
-- Constat utilisateur : après installation v12.20, la carte ne charge pas ; les icônes sont visibles mais les boutons ne fonctionnent pas.
-- Diagnostic : très probablement mélange de fichiers ou ancien service worker encore actif après les essais de suppression IndexedDB. Le HTML/CSS s'affiche mais le JavaScript applicatif ne s'initialise pas correctement.
-- Modification index.html : ajout d'une séquence de récupération exécutée une seule fois en v12.21. Elle désenregistre les anciens service workers, supprime les caches app-shell NPF-Q400, puis recharge une URL fraîche.
-- Modification script.js/sw.js : nouvelle base IndexedDB OfflineTilesDB_v12_21 pour éviter toute base verrouillée précédente.
-- Pourquoi : repartir sur un couple index/script/sw cohérent et éviter les anciens caches après blocage.
-- Test conseillé : remplacer les fichiers, ouvrir avec connexion, laisser l'application recharger automatiquement une fois, puis cliquer MAJ et fermer/réouvrir.
-
-v12.22 — Stabilisation offline, reprise iPad, chat
-- Constat utilisateur : suppression OpenStreet trop lente/inutilisable ; message “importation en cours” puis suppression extrêmement lente ; OACI redevient lent après nettoyage ; reprise iPad après veille un peu lente ; besoin d'un bouton chat Reconnecter et d'une fermeture plus visible.
-- Modification script.js : remise à zéro de isZipImportRunning au chargement pour éviter qu'un import interrompu bloque les actions suivantes.
-- Modification script.js : OpenStreet passe en suppression logique. L'application retire le groupe OpenStreet de la liste et le désactive sans parcourir physiquement 1 Go de tuiles IndexedDB.
-- Pourquoi : la suppression physique d'OpenStreet est trop lourde et instable sur iPad/Safari ; “Vider le cache” reste la méthode de nettoyage lourd.
-- Modification import OACI : lots augmentés de 10 à 35 et réouverture IndexedDB toutes les 350 tuiles pour accélérer sans revenir au mode trop agressif qui plantait.
-- Modification reprise veille : plusieurs invalidateSize/redraw espacés après focus/pageshow/visibilitychange.
-- Modification chat : ajout d'un bouton “↻ Reconnecter” pour forcer la reconnexion après changement de pseudo ou de canal.
-- Modification chat : bouton de fermeture rendu rouge et plus visible.
-- Non inclus volontairement : Base OACI saisissable, multi-vols Bloc/Fuel, et déroutement “vide retardant”. Ces fonctions seront traitées ensuite par versions séparées pour éviter les régressions.
-
-v12.23 — Chat auto-reconnect + fermeture plus propre
-- Constat utilisateur : le bouton fermeture chat de v12.22 n'est pas esthétique ; le bouton Reconnecter fonctionne mais il serait préférable de reconnecter automatiquement quand le canal ou le pseudo change.
-- Modification script.js : le bouton de fermeture chat affiche désormais “✕ Fermer” au lieu d'un symbole moins + ajout CSS.
-- Modification script.js : ajout d'une reconnexion automatique après modification du canal ou du pseudo, avec temporisation 1,2 s pour éviter une reconnexion à chaque lettre.
-- Modification script.js : si le chat n'est pas connecté, la modification canal/pseudo est simplement mémorisée ; si le chat est connecté ou en connexion, l'app déconnecte puis reconnecte automatiquement.
-- Modification style.css : fermeture en bouton pilule blanc/rouge plus propre, suppression du pseudo-texte CSS précédent.
-- Non modifié : import OpenStreet. Le mode OpenStreet reste volontairement conservateur car c'est le pack de 1 Go le plus risqué pour Safari/iPadOS. À réévaluer après un test complet de durée.
-
-v12.24 — Chat Valider + OpenStreet découpé plus rapide
-- Constat utilisateur : l'auto-reconnexion chat n'est pas souhaitée ; il faut un bouton “Valider” qui se dégrise quand canal/pseudo change. OpenStreet était rapide quelques versions avant ; les ZIP actuels ne sont pas volumineux mais l'import est redevenu très long.
-- Modification chat : suppression de la reconnexion automatique à chaque changement stabilisé.
-- Modification chat : ajout d'un bouton “Valider”, grisé par défaut, qui se dégrise uniquement quand le canal ou le pseudo diffère de la configuration validée.
-- Modification chat : au clic Valider, la configuration est mémorisée et le chat se déconnecte/reconnecte si nécessaire.
-- Modification OpenStreet : pour les ZIP OpenStreet non volumineux (<300 Mo), on évite la libération lourde IndexedDB avec attente de 900 ms avant import.
-- Modification OpenStreet : lots d'écriture non-gros OpenStreet portés à 260 tuiles pour revenir vers un profil plus rapide.
-- Pourquoi : les ZIP OpenStreet découpés ne doivent pas subir le profil très conservateur prévu pour un gros ZIP unique d'environ 1 Go.
-
-v12.25 — OpenStreet import progressif
-- Constat utilisateur : OpenStreet fichier 1 bloque par paliers à 251/7176 puis 511/7176 puis 771/7176.
-- Diagnostic : ces valeurs correspondent au profil v12.24 avec gros lots d'écriture. L'import n'est pas forcément arrêté, mais l'iPad/Safari reste longtemps occupé entre deux rafraîchissements UI.
-- Modification script.js : pour les ZIP OpenStreet non volumineux, lots d'écriture réduits de 260 à 70 tuiles.
-- Modification script.js : réouverture/stabilisation IndexedDB toutes les 420 tuiles pour les ZIP OpenStreet découpés.
-- Modification script.js : message spécifique “OpenStreet : écriture progressive...” pour distinguer lecture ZIP et écriture IndexedDB.
-- Pourquoi : rendre l'import OpenStreet plus régulier et éviter les longues pauses apparentes.
-- Limite : le temps total peut ne pas être beaucoup plus court, mais l'interface doit moins donner l'impression d'être bloquée.
-
-v12.26 — Cellule Base OACI
-- Modification demandée : dans la barre du haut des deux premiers onglets, remplacement de “CS BASE” par une cellule “Base”.
-- Modification index.html : ajout d'une saisie OACI “Base” dans l'onglet prévision/suivi et dans l'onglet Bloc/Fuel.
-- Modification script.js : validation stricte du code OACI. Un code inconnu est refusé avec alerte et la base précédente est restaurée.
-- Modification script.js : la base saisie devient la base utilisée pour les calculs BINGO, déroutement et Bloc/Fuel via selectedBaseOACI.
-- Modification script.js : la base est mémorisée dans localStorage via selected_base_oaci et restaurée au lancement.
-- Modification script.js : les deux cellules Base restent synchronisées.
-- Modification style.css : style spécifique pour saisie Base et état invalide.
-- Non modifié : import cartes OpenStreet mis de côté ; multi-vols Bloc/Fuel et déroutement “vide retardant” seront traités ensuite.
-
-v12.27 — Alignement bandeau PREVI / BLOC-FUEL
-- Constat utilisateur : dans l'onglet PREVI. NBR ROTATIONS, le bandeau supérieur ne touche pas la zone des titres d'onglets et ne touche pas les bords, contrairement à l'onglet BLOC/FUEL.
-- Modification style.css : suppression de la marge spécifique de .previ-shared-header-section.
-- Modification style.css : le bandeau PREVI reprend le même principe visuel que le bandeau BLOC/FUEL : pleine largeur, fond identique, bord inférieur identique, padding identique.
-- Modification responsive : alignement aussi conservé sur iPad/smartphone avec les paddings mobiles existants.
-- Non modifié : multi-vols Bloc/Fuel, déroutement “vide retardant”, et import OpenStreet.
-
-v12.28 — Bloc/Fuel multi-vols première version
-- Ajout dans l'onglet BLOC/FUEL d'une barre “Vol n°” avec sélection, Nouveau, Clôturer/Réouvrir et Supprimer.
-- Un vol correspond à un bloc départ et à ses lignes bloc arrivée/fuel.
-- Les vols sont conservés localement dans calculator_flights_v12_28.
-- À l'ouverture, l'application restaure le dernier vol actif.
-- Si tous les vols sont clôturés, la clôture du dernier vol ouvre automatiquement un nouveau vol vierge.
-- Les vols clôturés restent sélectionnables et modifiables.
-- La limite HDV affichée dans le tableau du vol actif prend en compte le cumul des temps de vol des vols précédents.
-- Le bouton corbeille global supprime désormais tous les vols et repart à Vol n°1.
-- Limite volontaire : première version prudente. Le suivi global multi-vols sera à valider en usage avant ajout du déroutement “vide retardant”.
-
-v12.29 — Déroutement vide retardant
-- Ajout dans l'onglet DEROUT./GAAR d'une case “Vide retardant”.
-- Si la case est décochée : fonctionnement inchangé, calcul depuis la position GPS vers le feu.
-- Si la case est cochée : la première rotation utilise le trajet position GPS actuelle → pélicandrome sélectionné → feu.
-- Le pélicandrome utilisé est celui déjà sélectionné dans l'application, pas le plus proche automatiquement.
-- Le calcul de temps inclut un forfait de 20 min au pélicandrome, cohérent avec le forfait de rotation existant.
-- Le calcul carburant “Fuel mini 1 largage / Base ou Pélic” utilise la consommation du trajet GPS → Pélic → Feu + forfait largage + BINGO.
-- Les rotations suivantes restent calculées avec la logique normale feu ↔ pélicandrome.
-- La case est mémorisée localement.
-
-v12.30 — Correctifs Bloc/Fuel après multi-vols
-- Constat utilisateur : dans BLOC/FUEL, après validation d'un fuel saisi, la fenêtre Fuel reste ouverte alors que la valeur est prise en compte.
-- Correction script.js : fermeture renforcée de la fenêtre Fuel après validation, avec blur des champs, aria-hidden et display:none prioritaire.
-- Constat utilisateur : les colonnes Durée rotation, Fuel rotation, Tps de vol et Tps de vol restant restent vides malgré la saisie du bloc arrivée.
-- Correction script.js : recalcul forcé des lignes BLOC/FUEL après validation Fuel et après toute modification d'une ligne.
-- Correction script.js : recalculateBlocFuel rendu plus robuste avec sélecteurs protégés et valeurs “--” explicites.
-- Objectif : conserver la logique multi-vols v12.28/v12.29 mais rétablir le comportement immédiat du tableau Bloc/Fuel.
-
-v12.31 — Ordre Bloc/Fuel + Limite HDV multi-vols
-- Constat utilisateur : dans l'onglet Vol n°2, la limite HDV affichée à 08:00 n'est pas actualisée avec le temps de vol du Vol n°1.
-- Modification script.js : la limite HDV du Vol n°1 sert de limite journée de référence.
-- Modification script.js : pour les vols suivants, le champ LIMITE HDV affiche la limite restante avant le vol actif, c'est-à-dire limite journée moins les temps de vol des vols précédents.
-- Modification script.js : le tableau du vol actif calcule ensuite le temps de vol restant à partir de cette limite restante, sans double déduction.
-- Constat utilisateur : il faut inverser la ligne “Vol n°...” et la ligne “Bloc départ / Fuel départ / Base / TMD / Limite HDV”.
-- Modification index.html/style.css : dans BLOC/FUEL, la ligne Bloc départ/Fuel départ/Base/TMD/Limite HDV est désormais au-dessus de la barre Vol n°.
-
-v12.32 — Correctif runtime multi-vols
-- Constat utilisateur : après v12.31, le menu Vol n° n'est plus renseigné, les boutons Nouveau/Clôturer/Supprimer sont inactifs et les colonnes Bloc/Fuel ne se remplissent plus.
-- Diagnostic : la fonction getCumulativeHdvBeforeActiveFlight avait été supprimée involontairement lors de la correction Limite HDV v12.31, ce qui provoquait une erreur JavaScript à l'initialisation du module Bloc/Fuel.
-- Correction script.js : restauration de getCumulativeHdvBeforeActiveFlight.
-- Correction script.js : sécurisation de getEffectiveLimitHdvForActiveFlight pour éviter qu'une erreur de cumul bloque toute l'interface.
-- Correction script.js : sécurité supplémentaire dans refreshFlightSelector pour recréer un Vol n°1 si le stockage local est vide ou incohérent.
-- Aucun changement de mise en page autre que le numéro de version.
-
-v12.33 — Statut GPS DEROUTEMENT/GAAR
-- Renommage du bouton “Rafraîchir GPS” en “Actualiser position GPS”.
-- Ajout d'un statut visible dans DEROUT./GAAR : “GPS non actualisé” ou “GPS actualisé à HH:MM — âge”.
-- Le bouton force toujours une position fraîche avec maximumAge: 0.
-- Après actualisation manuelle, les calculs DEROUT./GAAR sont recalculés immédiatement.
-- La position GPS mémorise désormais aussi son timestamp dans lastPosition pour afficher l'âge de la position utilisée.
-- Objectif : rendre visible si le calcul utilise une position récente ou ancienne.
-
-v12.34 — Feux de l'historique sur carte + centrage vecteurs
-- Ajout d'un calque fireHistoryLayer pour afficher sur la carte les feux présents dans l'historique de recherche.
-- Chaque feu historique est représenté par une flamme rouge.
-- Clic sur une flamme historique : le feu est sélectionné comme feu courant et les calculs/routes sont recalculés.
-- Le feu courant n'est pas doublonné : s'il est sélectionné, il reste affiché comme feu courant, pas comme historique superposé.
-- Suppression d'un feu historique ou effacement complet : mise à jour immédiate des flammes sur la carte.
-- Correction des ancres Leaflet des flammes : l'ancrage est au centre de l'icône, pour que les vecteurs passent par le milieu.
-- Correction des ancres Leaflet des icônes pélicandromes personnalisées : ancrage au centre.
-- Correction de l'ancre de l'icône GPS altitude : le vecteur GPS/temps part visuellement du centre du point violet, pas du côté/bas de l'icône.
-
-v12.35 — Taille feux historiques + sélection par popup
-- Constat utilisateur : les icônes feu sont trop grandes.
-- Modification script.js/style.css : les flammes feu passent à 24 px, avec ancrage central conservé.
-- Constat utilisateur : les icônes pélicandromes ont grossi en v12.34.
-- Modification script.js/style.css : retour à la taille normale des icônes pélicandromes.
-- Constat utilisateur : un clic sur un feu historique ne doit pas sélectionner immédiatement le feu.
-- Modification script.js : un clic sur une flamme historique ouvre désormais une étiquette avec le nom du feu et un bouton “Sélectionner”.
-- Le feu est sélectionné uniquement après appui sur “Sélectionner”.
-
-v12.36 — Correctif fort tailles icônes carte
-- Constat utilisateur : en v12.35, la taille des icônes n'a pas changé visuellement ; les feux restent trop gros et les pélicandromes restent trop gros.
-- Cause probable : anciennes classes .custom-marker-icon et règles Leaflet/globales 32 px encore prioritaires selon l'ordre CSS/cache.
-- Modification script.js : les flammes historiques et le feu actif utilisent désormais des classes dédiées, sans .custom-marker-icon, pour éviter l'héritage 32 px.
-- Modification script.js/style.css : flammes feu forcées à 18 px avec ancrage central 9/9.
-- Modification script.js/style.css : pélicandromes forcés à 20 px avec ancrage central 10/10.
-- Le comportement popup “nom du feu + bouton Sélectionner” est conservé.
-
-v12.37 — Taille mini icônes carte
-- Constat utilisateur : les icônes restent trop grosses malgré v12.36.
-- Modification script.js : flammes feu historiques et feu actif réduits de 18 px à 14 px, ancrage central 7/7.
-- Modification script.js : pélicandromes réduits de 20 px à 14 px, ancrage central 7/7.
-- Modification style.css : surcharge CSS forte Leaflet pour imposer 14 px sur feux, pélicandromes, points eau/retardant et pélicandromes désactivés.
-- Le popup des feux historiques “nom + Sélectionner” est conservé.
-
-v12.38 — Consolidation offline + calque départements
-- Objectif : ne pas reproduire le problème récurrent d'application qui ne se lance plus hors connexion après modification.
-- Modification sw.js : installation du service worker refusée si un fichier cœur est absent du cache (index.html, script.js, style.css, manifest, Leaflet, SunCalc, JSZip, communes).
-- Modification sw.js : l'ancien cache applicatif n'est donc plus remplacé par un nouveau cache incomplet.
-- Modification sw.js : ajout du GeoJSON départements dans le pré-cache lors de l'installation/mise à jour en ligne.
-- Modification sw.js : ajout d'un gestionnaire cache-first pour l'URL externe des départements.
-- Modification script.js : le calque départements tente d'abord Cache Storage, puis réseau, puis erreur explicite.
-- Limite importante : si un appareil n'a jamais ouvert l'application en ligne après cette mise à jour, le fichier départements ne peut pas apparaître hors ligne par magie.
-- Après ouverture en ligne de la v12.38, le calque départements doit pouvoir se lancer hors ligne sans avoir été activé manuellement auparavant, sous réserve que le pré-cache ait bien réussi.
-
-v12.39 — Correction démarrage hors ligne après modification
-- Diagnostic : l'application contenait encore un bloc de récupération automatique v12.38 exécuté une fois par version.
-- Ce bloc désenregistrait le service worker, supprimait les caches app-shell et rechargeait une URL fraîche.
-- Conséquence : après une modification/version, un lancement hors ligne pouvait échouer car l'application supprimait elle-même son cache local.
-- Modification index.html : suppression/désactivation de cette purge automatique au démarrage.
-- La récupération manuelle reste disponible via le bouton MAJ / forceRecoveryReload.
-- sw.js conserve la logique v12.38 : il refuse de remplacer l'ancien cache si les fichiers cœur ne sont pas précachés correctement.
-- Objectif : conserver un cache fonctionnel tant qu'une nouvelle version n'est pas installée proprement.
-
-v12.40 — Colonne Masse Rlt Bloc/Fuel
-- Ajout dans l'onglet BLOC/FUEL d'une colonne “Masse Rlt” après la colonne OACI.
-- Chaque cellule Masse Rlt fonctionne comme la saisie Fuel : appui sur la cellule pour ouvrir une fenêtre dédiée.
-- Ajout d'une fenêtre “Masse retardant” avec trois champs : Volume × Densité = Masse.
-- Si Volume et Densité sont saisis, la Masse est calculée automatiquement.
-- Si Masse et Densité sont saisies, le Volume est calculé automatiquement.
-- Validation : la masse calculée/saisie est affichée en kg dans la colonne Masse Rlt.
-- Les données Volume, Densité et Masse sont sauvegardées avec chaque ligne Bloc/Fuel et dans chaque vol multi-vols.
-
-v12.41 — Correction Masse Rlt : largeur et calcul
-- Constat utilisateur : la colonne OACI est trop large et la colonne Masse Rlt trop étroite.
-- Modification style.css : réduction forcée de la colonne OACI à 52 px.
-- Modification style.css : élargissement de la colonne Masse Rlt à 128 px.
-- Constat utilisateur : la fenêtre Masse retardant déborde horizontalement.
-- Modification style.css : fenêtre élargie et grille corrigée avec champs à largeur contrôlée, sans débordement.
-- Constat utilisateur : le calcul affichait 864 kg pour Volume 8000 et Densité 1,08.
-- Modification script.js : calcul rendu déterministe ; Volume + Densité recalculent toujours la Masse.
-- Exemple attendu : 8000 × 1,08 = 8640 kg.
-- Si Masse + Densité sont saisies sans Volume, le Volume est recalculé.
-
-v12.42 — Masse Rlt : densité préremplie, ordre inverse, surlignage calcul
-- Densité : le champ affiche toujours le préfixe “1.” par défaut, adapté aux densités retardant attendues entre 1.06 et 1.10.
-- Saisie densité : l'utilisateur peut saisir directement la partie décimale ; le champ reste au format 1.xx.
-- Boutons : ordre modifié en Annuler / Effacer / Valider.
-- Bouton Effacer : couleur changée pour mieux le distinguer.
-- Mode normal : Volume + Densité calcule la Masse ; le champ Masse calculé s'affiche sur fond vert pastel.
-- Mode prévision : Masse + Densité calcule le Volume ; le champ Volume calculé s'affiche sur fond vert pastel.
-- Validation : la colonne du tableau continue d'afficher la Masse en kg.
-
-v12.43 — Bloc/Fuel boutons + Volume entier Masse Rlt
-- Modification style.css : police du sélecteur Vol n° légèrement augmentée sans augmenter la hauteur de cellule.
-- Modification style.css : police des boutons Nouveau / Clôturer / Supprimer légèrement augmentée sans augmenter la hauteur des boutons.
-- Modification style.css : bouton Nouveau en fond bleu avec texte blanc.
-- Modification style.css : bouton Clôturer en fond vert avec texte blanc.
-- Modification style.css : bouton Supprimer en fond rouge avec texte blanc.
-- Demande précédente intégrée : Volume Masse Rlt sans décimale, y compris quand il est calculé depuis Masse / Densité.
-- Modification script.js : saisie Volume limitée à des entiers.
-
-v12.44 — Verrouillage des vols clôturés
-- Constat utilisateur : un vol clôturé restait modifiable sans cliquer sur “Réouvrir”.
-- Modification script.js : ajout d'un état visuel et fonctionnel de verrouillage pour le vol actif lorsqu'il est clôturé.
-- Les cellules Bloc/Fuel et les champs du bandeau sont lisibles mais non modifiables tant que le vol est clôturé.
-- Les boutons de gestion restent actifs : sélection du vol, Nouveau, Réouvrir, Supprimer.
-- Ajout d'un indicateur “Vol clôturé — verrouillé”.
-- Le bouton Clôturer devient toujours “Réouvrir” sur un vol clôturé ; la modification redevient possible uniquement après clic sur Réouvrir.
-
-v12.45 — Étiquettes permanentes des feux sur carte
-- Constat utilisateur : les feux affichés sur la carte doivent garder en permanence la petite étiquette avec le nom et le département.
-- Modification script.js : les feux de l'historique ont désormais une étiquette permanente nom + département.
-- Modification script.js : le feu actif conserve aussi une étiquette permanente.
-- Comportement au clic inchangé : un clic sur une flamme historique ouvre la popup avec le nom et le bouton “Sélectionner”.
-- Modification style.css : ajout d'un style spécifique pour les étiquettes permanentes des feux.
-
-v12.46 — Étiquettes feu réduites, zone tactile, icône GPS avion
-- Modification style.css : taille des étiquettes permanentes feu réduite d'environ 1,5 fois.
-- Modification script.js/style.css : zone tactile des icônes feu agrandie à 34 px sans agrandir visuellement la flamme.
-- Comportement au clic inchangé : clic sur feu historique => popup avec bouton “Sélectionner”.
-- Ajout d'une icône GPS en forme d'avion.
-- Orientation : l'icône GPS avion s'oriente selon le cap GPS fourni par le navigateur ; à défaut, l'estimation de route déjà calculée par l'application est utilisée.
-- Ancrage GPS conservé au centre pour que les vecteurs partent du centre de l'icône.
-
-v12.47 — Taille étiquettes feu
-- Constat utilisateur : les étiquettes permanentes des feux ont été trop réduites en v12.46.
-- Modification style.css : augmentation légère des étiquettes feu permanentes.
-- Taille cible : intermédiaire entre v12.45 et v12.46.
-- Aucun autre comportement modifié : zone tactile des feux, popup “Sélectionner” et icône GPS avion conservées.
-
-v12.48 — Retour profil rapide ZIP fractionné cartes offline
-- Constat utilisateur : le téléchargement/import des cartes est redevenu très lent alors que le mode ZIP fractionné fonctionnait correctement.
-- Modification script.js : ajout d'un profil “ZIP fractionné rapide” pour les packs OpenStreet non volumineux.
-- Les ZIP fractionnés OpenStreet repassent en lots IndexedDB de 260 tuiles au lieu de 70.
-- Suppression de la réouverture périodique IndexedDB pour les ZIP fractionnés OpenStreet.
-- Réduction des rafraîchissements d'affichage pendant l'import pour éviter de ralentir Safari/iPad.
-- Les gros ZIP OpenStreet restent sur le profil conservateur de sécurité.
-- Les profils OACI et IGN sont conservés.
-
-v12.49 — ZIP fractionné TURBO + popup feu Supprimer
-- Constat utilisateur : les ZIP font environ 180 Mo ; le profil restait trop lent.
-- Modification script.js : création d'un mode “ZIP fractionné TURBO” pour les ZIP OpenStreet non volumineux.
-- Lecture des tuiles par paquets parallèles de 48 au lieu d'une lecture strictement séquentielle.
-- Lecture des tuiles en Uint8Array pour éviter le coût de création de Blob tuile par tuile.
-- Écriture IndexedDB par gros lots de 1000 tuiles pour les ZIP fractionnés.
-- Rafraîchissement d'écran limité pendant l'import pour ne pas ralentir Safari/iPad.
-- Les gros ZIP OpenStreet restent en mode conservateur.
-- Les profils OACI/IGN restent séparés.
-- Feux : étiquette permanente rapprochée de l'icône.
-- Feux historiques : popup enrichie avec bouton “Sélectionner” et bouton “Supprimer”.
-- Supprimer enlève le feu de l'historique et retire immédiatement l'icône de la carte.
-
-
-
-v12.50 — Import ZIP fluide + étiquette feu intégrée
-- Constat utilisateur : les ZIP fractionnés font environ 180 Mo et le blocage arrive tous les 1008 tuiles.
-- Diagnostic : v12.49 écrivait les ZIP OpenStreet non volumineux par grosses transactions IndexedDB d'environ 1000 tuiles. Avec une lecture par 48, le premier palier tombait à 1008 tuiles.
-- Modification script.js : remplacement du profil “TURBO” par un profil “ZIP fractionné fluide”.
-- Modification script.js : lecture parallèle conservée mais réduite à 24 tuiles à la fois.
-- Modification script.js : écriture IndexedDB réduite à des transactions de 120 tuiles pour éviter les longues pauses Safari/iPadOS.
-- Modification script.js : rafraîchissement UI forcé après les écritures des ZIP fractionnés pour éviter l'impression de blocage.
-- Modification script.js : lecture des ZIP fractionnés en Blob au lieu de Uint8Array afin de conserver un type directement exploitable pour les réponses tuiles.
-- Modification script.js/style.css : l'étiquette du nom du feu est maintenant intégrée à l'icône Leaflet, collée à droite de la flamme, au lieu d'un tooltip séparé au-dessus.
-- Modification script.js : l'icône du feu actif ouvre une popup avec bouton “Supprimer”.
-- Comportement suppression : supprime le feu de l'historique, retire l'icône active de la carte et efface la sélection courante.
+    
