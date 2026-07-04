@@ -4800,3 +4800,19 @@ body {
     }
 }
 
+/* v12.42 — Masse Rlt : densité 1., bouton Effacer, champ calculé vert pastel */
+#rlt-mass-clear-btn {
+    background: #f59e0b !important;
+    color: #111827 !important;
+}
+
+.rlt-mass-formula-row input.rlt-calculated-field {
+    background: #dcfce7 !important;
+    border-color: #22c55e !important;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18) !important;
+}
+
+#rlt-density-input {
+    color: #0f172a !important;
+}
+
