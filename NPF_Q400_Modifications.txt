@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.42
+Version actuelle TEST : v12.43
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -339,4 +339,13 @@ v12.42 — Masse Rlt : densité préremplie, ordre inverse, surlignage calcul
 - Mode normal : Volume + Densité calcule la Masse ; le champ Masse calculé s'affiche sur fond vert pastel.
 - Mode prévision : Masse + Densité calcule le Volume ; le champ Volume calculé s'affiche sur fond vert pastel.
 - Validation : la colonne du tableau continue d'afficher la Masse en kg.
+
+v12.43 — Bloc/Fuel boutons + Volume entier Masse Rlt
+- Modification style.css : police du sélecteur Vol n° légèrement augmentée sans augmenter la hauteur de cellule.
+- Modification style.css : police des boutons Nouveau / Clôturer / Supprimer légèrement augmentée sans augmenter la hauteur des boutons.
+- Modification style.css : bouton Nouveau en fond bleu avec texte blanc.
+- Modification style.css : bouton Clôturer en fond vert avec texte blanc.
+- Modification style.css : bouton Supprimer en fond rouge avec texte blanc.
+- Demande précédente intégrée : Volume Masse Rlt sans décimale, y compris quand il est calculé depuis Masse / Densité.
+- Modification script.js : saisie Volume limitée à des entiers.
 
