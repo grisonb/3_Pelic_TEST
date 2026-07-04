@@ -4816,3 +4816,46 @@ body {
     color: #0f172a !important;
 }
 
+/* v12.43 — Vol n° et boutons Bloc/Fuel : police + couleurs */
+#bloc-fuel #flight-select {
+    font-size: 17px !important;
+    font-weight: 950 !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+#bloc-fuel .flight-manager-bar button {
+    font-size: 17px !important;
+    font-weight: 950 !important;
+    height: 36px !important;
+    line-height: 1 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+#bloc-fuel #new-flight-btn {
+    background: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #ffffff !important;
+}
+
+#bloc-fuel #close-flight-btn {
+    background: var(--success-color) !important;
+    border-color: var(--success-color) !important;
+    color: #ffffff !important;
+}
+
+#bloc-fuel #delete-flight-btn {
+    background: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
+#bloc-fuel #new-flight-btn:active,
+#bloc-fuel #close-flight-btn:active,
+#bloc-fuel #delete-flight-btn:active {
+    transform: translateY(1px);
+}
+
