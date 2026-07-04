@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.51
+Version actuelle TEST : v12.52
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -424,3 +423,15 @@ v12.51 — Étiquette feu au-dessus + coordonnées + import ZIP accéléré
 - Modification script.js : profil ZIP fractionné accéléré pour les packs OpenStreet non volumineux : 48 lectures parallèles et transactions IndexedDB de 240 tuiles.
 - Objectif import : aller plus vite que v12.50, sans revenir aux transactions d'environ 1000 tuiles qui provoquaient le blocage observé à 1008.
 - Les gros ZIP OpenStreet restent en profil conservateur ; les profils OACI/IGN restent séparés.
+
+
+v12.52 — Calque lignes haute tension RTE
+- Constat utilisateur : besoin d'un calque avec les lignes haute tension, utilisable hors ligne dans l'application.
+- Source préparée : fichier local `lignes_ht_rte_simplifiees.geojson`, issu du shapefile RTE/data.gouv, reprojeté en WGS84 et simplifié avec Mapshaper.
+- Données intégrées : 13 287 tronçons `LineString`, fichier final d'environ 8,7 Mo.
+- Modification index.html : ajout d'un bouton “Lignes HT” dans les contrôles supplémentaires.
+- Modification script.js : ajout du calque haute tension chargé à la demande uniquement quand le bouton est activé.
+- Performance : calque désactivé par défaut, rendu Canvas Leaflet, tracés non interactifs pour limiter la charge iPad.
+- Style : 400 kV et 225 kV en trait plus épais ; 90 kV et 63 kV en pointillé plus fin.
+- Modification sw.js : ajout du GeoJSON lignes HT dans le cache applicatif pour usage hors ligne après mise à jour.
+- Moteur d'import ZIP non modifié en v12.52, car l'utilisateur a confirmé que le téléchargement/import fonctionne parfaitement après suppression puis réinstallation de l'application.
