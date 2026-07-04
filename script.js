@@ -3010,9 +3010,38 @@ function updateDepartmentsLayerAppearance() {
 
 async function loadDepartmentsLayerData() {
     const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
-    const response = await fetch(DEPARTMENTS_GEOJSON_URL, { cache: 'force-cache' });
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v12-38';
+    let response = null;
+
+    /*
+     * v12.38 — consolidation offline :
+     * - on tente d'abord le cache applicatif/Cache Storage ;
+     * - si absent, on télécharge et on stocke explicitement ;
+     * - si hors ligne et jamais préchargé, le calque reste impossible.
+     */
+    try {
+        if ('caches' in window) {
+            const cached = await caches.match(DEPARTMENTS_GEOJSON_URL, { ignoreSearch: true });
+            if (cached && cached.ok) {
+                response = cached;
+            }
+        }
+    } catch (_) {}
+
+    if (!response) {
+        response = await fetch(DEPARTMENTS_GEOJSON_URL, { cache: 'force-cache' });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        try {
+            if ('caches' in window) {
+                const cache = await caches.open(DEPARTMENTS_CACHE_NAME);
+                await cache.put(DEPARTMENTS_GEOJSON_URL, response.clone());
+            }
+        } catch (cacheError) {
+            console.warn('Cache départements impossible:', cacheError);
+        }
     }
 
     const departmentsGeojson = await response.json();
@@ -3046,7 +3075,7 @@ async function toggleDepartmentsLayer(shouldShow) {
             await loadDepartmentsLayerData();
         } catch (error) {
             console.error('Erreur de chargement du calque départements:', error);
-            alert("Impossible de générer le calque des départements.");
+            alert("Impossible de générer le calque des départements. Si l'appareil est hors ligne, il faut que le calque ait été préchargé au moins une fois après la mise à jour.");
             areDepartmentsVisible = false;
             localStorage.setItem(SHOW_DEPARTMENTS_LAYER_KEY, 'false');
             if (departmentsLayerButton) departmentsLayerButton.classList.remove('active');
