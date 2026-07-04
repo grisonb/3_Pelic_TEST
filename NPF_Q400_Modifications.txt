@@ -5,8 +5,8 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.37
-Date de génération : 2026-07-03
+Version actuelle TEST : v12.38
+Date de génération : 2026-07-04
 
 Règle de méthode
 ----------------
@@ -291,4 +291,14 @@ v12.37 — Taille mini icônes carte
 - Modification script.js : pélicandromes réduits de 20 px à 14 px, ancrage central 7/7.
 - Modification style.css : surcharge CSS forte Leaflet pour imposer 14 px sur feux, pélicandromes, points eau/retardant et pélicandromes désactivés.
 - Le popup des feux historiques “nom + Sélectionner” est conservé.
+
+v12.38 — Consolidation offline + calque départements
+- Objectif : ne pas reproduire le problème récurrent d'application qui ne se lance plus hors connexion après modification.
+- Modification sw.js : installation du service worker refusée si un fichier cœur est absent du cache (index.html, script.js, style.css, manifest, Leaflet, SunCalc, JSZip, communes).
+- Modification sw.js : l'ancien cache applicatif n'est donc plus remplacé par un nouveau cache incomplet.
+- Modification sw.js : ajout du GeoJSON départements dans le pré-cache lors de l'installation/mise à jour en ligne.
+- Modification sw.js : ajout d'un gestionnaire cache-first pour l'URL externe des départements.
+- Modification script.js : le calque départements tente d'abord Cache Storage, puis réseau, puis erreur explicite.
+- Limite importante : si un appareil n'a jamais ouvert l'application en ligne après cette mise à jour, le fichier départements ne peut pas apparaître hors ligne par magie.
+- Après ouverture en ligne de la v12.38, le calque départements doit pouvoir se lancer hors ligne sans avoir été activé manuellement auparavant, sous réserve que le pré-cache ait bien réussi.
 
