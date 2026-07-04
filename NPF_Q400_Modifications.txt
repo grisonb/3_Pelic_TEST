@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.41
+Version actuelle TEST : v12.42
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -331,4 +330,13 @@ v12.41 — Correction Masse Rlt : largeur et calcul
 - Modification script.js : calcul rendu déterministe ; Volume + Densité recalculent toujours la Masse.
 - Exemple attendu : 8000 × 1,08 = 8640 kg.
 - Si Masse + Densité sont saisies sans Volume, le Volume est recalculé.
+
+v12.42 — Masse Rlt : densité préremplie, ordre inverse, surlignage calcul
+- Densité : le champ affiche toujours le préfixe “1.” par défaut, adapté aux densités retardant attendues entre 1.06 et 1.10.
+- Saisie densité : l'utilisateur peut saisir directement la partie décimale ; le champ reste au format 1.xx.
+- Boutons : ordre modifié en Annuler / Effacer / Valider.
+- Bouton Effacer : couleur changée pour mieux le distinguer.
+- Mode normal : Volume + Densité calcule la Masse ; le champ Masse calculé s'affiche sur fond vert pastel.
+- Mode prévision : Masse + Densité calcule le Volume ; le champ Volume calculé s'affiche sur fond vert pastel.
+- Validation : la colonne du tableau continue d'afficher la Masse en kg.
 
