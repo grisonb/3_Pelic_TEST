@@ -162,6 +162,8 @@ let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
 let showLftwRoute = true;
 let departmentsLayerGroup = null;
 let departmentsLabelsLayer = null;
+let highVoltageLinesLayer = null;
+let highVoltageLinesRenderer = null;
 let areDepartmentsVisible = false;
 let hasLoadedDepartments = false;
 let communesLayerGroup = null;
@@ -198,6 +200,11 @@ const AIRPORT_PDF_DB_VERSION = 1;
 let airportPdfDb = null;
 const WATER_POINTS_LAYER_KEY = 'showWaterPointsLayer';
 let showWaterPointsLayer = localStorage.getItem(WATER_POINTS_LAYER_KEY) === 'true';
+const HIGH_VOLTAGE_LINES_LAYER_KEY = 'showHighVoltageLinesLayer';
+const HIGH_VOLTAGE_LINES_GEOJSON_URL = 'lignes_ht_rte_simplifiees.geojson';
+let showHighVoltageLinesLayer = localStorage.getItem(HIGH_VOLTAGE_LINES_LAYER_KEY) === 'true';
+let hasLoadedHighVoltageLines = false;
+let isHighVoltageLinesLoading = false;
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
 const FIRE_HISTORY_MAX_ITEMS = 20;
 const FORCE_DISPLAY_MODE = new URLSearchParams(window.location.search).get('force_display') === '1';
@@ -1378,6 +1385,14 @@ function initMap() {
     map.on('zoomend', enforceOfflineZoomLimit);
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     applyMapNoBackgroundStyle();
+
+    if (map.createPane && !map.getPane('highVoltageLinesPane')) {
+        map.createPane('highVoltageLinesPane');
+        const htPane = map.getPane('highVoltageLinesPane');
+        if (htPane) htPane.style.zIndex = '385';
+    }
+    highVoltageLinesRenderer = L.canvas ? L.canvas({ padding: 0.35 }) : null;
+
     setupBaseTileLayer();
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
@@ -1388,6 +1403,7 @@ function initMap() {
     gaarLayer = L.layerGroup().addTo(map);
     departmentsLayerGroup = L.layerGroup();
     departmentsLabelsLayer = L.layerGroup();
+    highVoltageLinesLayer = L.layerGroup();
     communesLayerGroup = L.layerGroup();
     communesLabelsLayer = L.layerGroup();
     drawPermanentAirportMarkers();
@@ -1396,6 +1412,10 @@ function initMap() {
 
     if (areDepartmentsVisible) {
         setTimeout(() => { toggleDepartmentsLayer(true); }, 150);
+    }
+
+    if (showHighVoltageLinesLayer) {
+        setTimeout(() => { toggleHighVoltageLinesLayer(true); }, 350);
     }
 
     areCommunesVisible = localStorage.getItem(SHOW_COMMUNES_LAYER_KEY) === 'true';
@@ -1645,6 +1665,7 @@ function setupEventListeners() {
     const departmentsLayerButton = document.getElementById('departments-layer-button');
     const communesLayerButton = document.getElementById('communes-layer-button');
     const waterPointsButton = document.getElementById('water-points-button');
+    const highVoltageLinesButton = document.getElementById('high-voltage-lines-button');
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
     const closeOfflineMapButton = document.getElementById('close-offline-map-btn');
@@ -1713,6 +1734,13 @@ function setupEventListeners() {
         waterPointsButton.classList.toggle('active', showWaterPointsLayer);
         waterPointsButton.addEventListener('click', () => {
             toggleWaterPointsLayer();
+        });
+    }
+
+    if (highVoltageLinesButton) {
+        refreshHighVoltageLinesButtonState();
+        highVoltageLinesButton.addEventListener('click', () => {
+            toggleHighVoltageLinesLayer();
         });
     }
 
@@ -2383,6 +2411,143 @@ function toggleWaterPointsLayer(forceState = null) {
     refreshWaterPointsButtonState();
 
     drawWaterPointMarkersForCommune(currentCommune);
+}
+
+
+function getHighVoltageLineStyle(feature) {
+    const props = feature?.properties || {};
+    const tension = String(props.tension || '').toLowerCase();
+
+    let weight = 1.5;
+    let opacity = 0.72;
+    let dashArray = '5 4';
+
+    if (tension.includes('400')) {
+        weight = 3.0;
+        opacity = 0.86;
+        dashArray = null;
+    } else if (tension.includes('225')) {
+        weight = 2.4;
+        opacity = 0.82;
+        dashArray = null;
+    } else if (tension.includes('90')) {
+        weight = 1.9;
+        opacity = 0.78;
+        dashArray = '7 4';
+    } else if (tension.includes('63')) {
+        weight = 1.6;
+        opacity = 0.70;
+        dashArray = '4 4';
+    }
+
+    return {
+        color: '#d8232a',
+        weight,
+        opacity,
+        dashArray,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false,
+        pane: 'highVoltageLinesPane'
+    };
+}
+
+function refreshHighVoltageLinesButtonState() {
+    const button = document.getElementById('high-voltage-lines-button');
+    if (!button) return;
+
+    button.classList.toggle('active', showHighVoltageLinesLayer);
+    button.classList.toggle('loading', isHighVoltageLinesLoading);
+    button.disabled = isHighVoltageLinesLoading;
+    button.title = isHighVoltageLinesLoading
+        ? 'Chargement des lignes haute tension RTE…'
+        : 'Afficher/Masquer les lignes haute tension RTE';
+}
+
+async function fetchHighVoltageLinesGeojson() {
+    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.52')}`;
+    let response = null;
+
+    try {
+        if ('caches' in window) {
+            const cached = await caches.match(HIGH_VOLTAGE_LINES_GEOJSON_URL, { ignoreSearch: true });
+            if (cached && cached.ok) response = cached;
+        }
+    } catch (_) {}
+
+    if (!response) {
+        response = await fetch(url, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        try {
+            if ('caches' in window) {
+                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.52'}`);
+                await cache.put(HIGH_VOLTAGE_LINES_GEOJSON_URL, response.clone());
+            }
+        } catch (cacheError) {
+            console.warn('Cache lignes HT impossible:', cacheError);
+        }
+    }
+
+    return await response.json();
+}
+
+async function loadHighVoltageLinesLayerData() {
+    if (!map || !highVoltageLinesLayer) return;
+    if (hasLoadedHighVoltageLines) return;
+
+    isHighVoltageLinesLoading = true;
+    refreshHighVoltageLinesButtonState();
+
+    try {
+        const geojson = await fetchHighVoltageLinesGeojson();
+        const featuresCount = Array.isArray(geojson?.features) ? geojson.features.length : 0;
+
+        const geoJsonLayer = L.geoJSON(geojson, {
+            style: getHighVoltageLineStyle,
+            pane: 'highVoltageLinesPane',
+            renderer: highVoltageLinesRenderer || undefined,
+            interactive: false,
+            filter: feature => !!feature?.geometry
+        });
+
+        geoJsonLayer.addTo(highVoltageLinesLayer);
+        hasLoadedHighVoltageLines = true;
+        console.log(`Lignes HT chargées: ${featuresCount} tronçons`);
+    } finally {
+        isHighVoltageLinesLoading = false;
+        refreshHighVoltageLinesButtonState();
+    }
+}
+
+async function toggleHighVoltageLinesLayer(forceState = null) {
+    const shouldShow = forceState === null ? !showHighVoltageLinesLayer : Boolean(forceState);
+
+    if (shouldShow && !hasLoadedHighVoltageLines) {
+        try {
+            await loadHighVoltageLinesLayerData();
+        } catch (error) {
+            console.error('Erreur de chargement du calque lignes HT:', error);
+            alert("Impossible de charger le calque Lignes HT. Vérifiez que le fichier lignes_ht_rte_simplifiees.geojson est bien présent à la racine du dépôt et que l'application a été mise à jour.");
+            showHighVoltageLinesLayer = false;
+            localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, 'false');
+            refreshHighVoltageLinesButtonState();
+            return;
+        }
+    }
+
+    showHighVoltageLinesLayer = shouldShow;
+
+    if (showHighVoltageLinesLayer) {
+        if (highVoltageLinesLayer && !map.hasLayer(highVoltageLinesLayer)) {
+            highVoltageLinesLayer.addTo(map);
+        }
+    } else if (highVoltageLinesLayer && map.hasLayer(highVoltageLinesLayer)) {
+        map.removeLayer(highVoltageLinesLayer);
+    }
+
+    localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, String(showHighVoltageLinesLayer));
+    refreshHighVoltageLinesButtonState();
 }
 
 
