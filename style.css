@@ -5037,3 +5037,70 @@ body {
     width: 100%;
 }
 
+
+/* v12.50 — feu : nom collé à l'icône, sans tooltip Leaflet séparé */
+.leaflet-marker-icon.active-fire-map-marker.fire-with-label,
+.leaflet-marker-icon.fire-history-map-marker.fire-with-label {
+    width: 34px !important;
+    height: 34px !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.leaflet-marker-icon.active-fire-map-marker.fire-with-label .fire-marker-glyph,
+.leaflet-marker-icon.fire-history-map-marker.fire-with-label .fire-marker-glyph {
+    position: absolute !important;
+    left: 17px !important;
+    top: 17px !important;
+    transform: translate(-50%, -50%) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 14px !important;
+    height: 14px !important;
+    line-height: 14px !important;
+    border-radius: 50% !important;
+    background: #d90429 !important;
+    border: 1px solid #ffffff !important;
+    box-shadow: 0 0 0 1px rgba(217, 4, 41, 0.35), 0 1px 3px rgba(0,0,0,0.38) !important;
+    color: #fff !important;
+    font-size: 9px !important;
+    box-sizing: border-box !important;
+    pointer-events: none !important;
+}
+
+.leaflet-marker-icon.active-fire-map-marker.fire-with-label .fire-marker-label,
+.leaflet-marker-icon.fire-history-map-marker.fire-with-label .fire-marker-label {
+    position: absolute !important;
+    left: 24px !important;
+    top: 17px !important;
+    transform: translateY(-50%) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 14px !important;
+    max-width: 145px !important;
+    line-height: 1.05 !important;
+    padding: 2px 5px !important;
+    border-radius: 0 6px 6px 0 !important;
+    background: rgba(255,255,255,0.97) !important;
+    border: 1px solid #c1121f !important;
+    border-left: none !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.24) !important;
+    color: #8a0012 !important;
+    font-size: 9px !important;
+    font-weight: 950 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    box-sizing: border-box !important;
+    pointer-events: none !important;
+}
+
+.leaflet-marker-icon.active-fire-map-marker.fire-with-label .fire-marker-label {
+    border-color: #c1121f !important;
+    color: #7f0015 !important;
+}
