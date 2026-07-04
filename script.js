@@ -532,17 +532,33 @@ function buildFireDisplayName(item) {
 
 function buildFireMapIcon(label, markerClassName = 'fire-history-map-marker') {
     /*
-     * v12.50 — l'étiquette du feu est intégrée dans l'icône Leaflet.
-     * Cela évite l'étiquette séparée qui flotte au-dessus de la flamme et donne
-     * un ensemble icône + nom plus compact et plus stable au zoom/pan.
+     * v12.51 — retour à l'étiquette Leaflet au-dessus du feu.
+     * La flamme reste dans une zone tactile 34 px ; le nom du feu est affiché
+     * par tooltip permanent, avec la petite flèche Leaflet, mais rapproché de
+     * l'icône par tooltipAnchor + offset.
      */
     return L.divIcon({
-        className: `${markerClassName} fire-touch-hitbox fire-with-label`,
-        html: `<span class="fire-marker-glyph">🔥</span><span class="fire-marker-label">${escapeHtml(label || 'Feu')}</span>`,
+        className: `${markerClassName} fire-touch-hitbox`,
+        html: `<span class="fire-marker-glyph">🔥</span>`,
         iconSize: [34, 34],
         iconAnchor: [17, 17],
-        popupAnchor: [0, -18]
+        popupAnchor: [0, -16],
+        tooltipAnchor: [0, -10]
     });
+}
+
+function bindFireMapTooltip(marker, label, isActive = false) {
+    if (!marker) return marker;
+
+    marker.bindTooltip(escapeHtml(label || 'Feu'), {
+        permanent: true,
+        direction: 'top',
+        offset: [0, -2],
+        opacity: 1,
+        className: `fire-history-map-tooltip-permanent${isActive ? ' fire-active-map-tooltip' : ''}`
+    });
+
+    return marker;
 }
 
 function buildFireHistoryIcon(label = 'Feu') {
@@ -600,11 +616,12 @@ function drawFireHistoryMarkers() {
             title: name,
             keyboard: false
         });
+        bindFireMapTooltip(marker, name, false);
 
         marker.bindPopup(() => {
             const container = document.createElement('div');
             container.className = 'fire-history-map-popup';
-            container.innerHTML = `<b>${escapeHtml(name)}</b>`;
+            container.innerHTML = `<b>${escapeHtml(name)}</b><br>${convertToDMM(lat, 'lat')}<br>${convertToDMM(lon, 'lon')}`;
 
             const actions = document.createElement('div');
             actions.className = 'fire-history-map-popup-actions';
@@ -2412,7 +2429,9 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     const allPoints = [[lat, lon]];
     const fireLabel = buildFireDisplayName(commune);
     const fireIcon = buildActiveFireIcon(fireLabel);
-    L.marker([lat, lon], { icon: fireIcon, title: fireLabel, keyboard: false })
+    const activeFireMarker = L.marker([lat, lon], { icon: fireIcon, title: fireLabel, keyboard: false });
+    bindFireMapTooltip(activeFireMarker, fireLabel, true);
+    activeFireMarker
         .bindPopup(() => {
             const container = document.createElement('div');
             container.className = 'fire-history-map-popup active-fire-map-popup';
@@ -4947,25 +4966,25 @@ async function handleZipImport(file) {
         const useSplitZipFastProfile = isOpenStreetPack && !isLargeZip;
 
         /*
-         * v12.48 — retour profil rapide ZIP fractionné.
-         * Le mode ZIP fractionné fonctionnait bien car chaque fichier est déjà
-         * assez petit pour éviter le profil ultra-conservateur.
-         * On ré-augmente donc les lots IndexedDB et on supprime la réouverture
-         * périodique pour les ZIP OpenStreet fractionnés.
+         * v12.51 — profil ZIP fractionné rapide sans blocage 1008.
+         * v12.50 était trop prudent : beaucoup de petites transactions de 120
+         * tuiles ralentissaient l'installation. On repasse sur un débit plus
+         * élevé avec 240 tuiles par transaction et 48 lectures parallèles, mais
+         * sans revenir aux transactions de ~1000 tuiles qui bloquaient Safari.
          */
         const batchSize = useConservativeLargeImport
             ? 35
-            : (useSplitZipFastProfile ? 120 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
+            : (useSplitZipFastProfile ? 240 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
-        const splitZipReadConcurrency = useSplitZipFastProfile ? 24 : 1;
-        const splitZipUiYieldEveryTiles = useSplitZipFastProfile ? 480 : 0;
+        const splitZipReadConcurrency = useSplitZipFastProfile ? 48 : 1;
+        const splitZipUiYieldEveryTiles = useSplitZipFastProfile ? 960 : 0;
         const usePackScopedKey = !isOpenStreetPack;
         /*
          * v12.19 : OACI passe en mode sécurisé.
          * Symptôme : blocage/crash vers Lecture tuiles 51/3347 quand OACI est la 3e carte.
          * Mesure : petits lots de 10, réouverture périodique IndexedDB, lecture blob.
          */
-        const tileReadMode = useSplitZipFastProfile ? 'blob' : (isIgnPack ? 'arraybuffer' : 'blob');
+        const tileReadMode = useSplitZipFastProfile ? 'arraybuffer' : (isIgnPack ? 'arraybuffer' : 'blob');
         let skippedTiles = 0;
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
@@ -5005,7 +5024,7 @@ async function handleZipImport(file) {
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
             await updateImportProgress(
                 useSplitZipFastProfile
-                    ? `ZIP fractionné fluide : ${processedFiles} / ${totalFiles} tuiles`
+                    ? `ZIP fractionné rapide : ${processedFiles} / ${totalFiles} tuiles`
                     : `Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`,
                 percent,
                 useConservativeLargeImport || useSplitZipFastProfile
@@ -5024,11 +5043,10 @@ async function handleZipImport(file) {
 
         if (useSplitZipFastProfile) {
             /*
-             * v12.50 — ZIP fractionné FLUIDE :
-             * Le blocage utilisateur arrivait tous les 1008 fichiers car le profil
-             * v12.49 attendait environ 1000 tuiles avant une seule grosse transaction
-             * IndexedDB. On garde la lecture parallèle, mais on écrit en transactions
-             * courtes et régulières pour éviter les longues pauses Safari/iPadOS.
+             * v12.51 — ZIP fractionné RAPIDE :
+             * On garde la lecture parallèle, mais avec des transactions moyennes
+             * de 240 tuiles : assez grandes pour accélérer l'import, assez courtes pour
+             * éviter le palier bloquant observé à 1008 tuiles.
              */
             for (let i = 0; i < tileFiles.length; i += splitZipReadConcurrency) {
                 const slice = tileFiles.slice(i, i + splitZipReadConcurrency);
@@ -5058,7 +5076,7 @@ async function handleZipImport(file) {
                 if (batch.length >= batchSize) {
                     await flushBatch();
                     if (splitZipUiYieldEveryTiles && processedFiles > 0 && processedFiles % splitZipUiYieldEveryTiles === 0) {
-                        await updateImportProgress(`Import fluide : ${processedFiles} / ${totalFiles} tuiles`, Math.min(99, Math.round((processedFiles / totalFiles) * 100)), true);
+                        await updateImportProgress(`Import rapide : ${processedFiles} / ${totalFiles} tuiles`, Math.min(99, Math.round((processedFiles / totalFiles) * 100)), true);
                         await idle(8);
                     }
                 }
@@ -5069,7 +5087,7 @@ async function handleZipImport(file) {
                     const readCount = Math.min(i + splitZipReadConcurrency, totalFiles);
                     const percent = Math.min(99, Math.round((Math.max(processedFiles, readCount) / totalFiles) * 100));
                     await updateImportProgress(
-                        `ZIP fractionné fluide : lu ${readCount} / ${totalFiles}, écrit ${processedFiles}`,
+                        `ZIP fractionné rapide : lu ${readCount} / ${totalFiles}, écrit ${processedFiles}`,
                         percent,
                         true
                     );
