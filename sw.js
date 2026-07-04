@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-52-lignes-ht';
+const SW_VERSION = 'sw-v12-53-bouton-lignes-ht';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
