@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-43-flight-buttons-volume-int';
+const SW_VERSION = 'sw-v12-44-closed-flight-lock';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
