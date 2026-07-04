@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-37-icon-size-mini';
+const SW_VERSION = 'sw-v12-38-offline-consolidation';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -8,6 +8,7 @@ const OFFLINE_ONLINE_FALLBACK_KEY = 'offlineOnlineFallback';
 const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
 
 const APP_SHELL_CACHE = `npf-q400-app-shell-${SW_VERSION}`;
+const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
 const APP_SHELL_URLS = [
     './',
     './index.html',
@@ -20,6 +21,7 @@ const APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
+    DEPARTMENTS_GEOJSON_URL,
     './icons/icon-192x192.png',
     './icons/icon-512x512.png'
 ,
@@ -28,6 +30,20 @@ const APP_SHELL_URLS = [
     './icons/bloc-fuel-shortcut-icon.png'    , './icons/calculator-fms-icon.png'
     , './icons/search-commune-icon.png'
     , './icons/center-gps-icon.png'
+];
+
+const CORE_APP_SHELL_URLS = [
+    './',
+    './index.html',
+    './style.css',
+    './script.js',
+    './manifest.json',
+    './leaflet.css',
+    './leaflet.min.js',
+    './suncalc.js',
+    './jszip.min.js',
+    './communes.json',
+    './communes_aliases.json'
 ];
 
 
@@ -53,17 +69,38 @@ const memoryTileCache = new Map();
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
         const cache = await caches.open(APP_SHELL_CACHE);
+        const failedCoreUrls = [];
 
         await Promise.all(APP_SHELL_URLS.map(async (url) => {
             try {
-                const response = await fetch(new Request(url, { cache: 'reload' }));
-                if (response && response.ok) {
-                    await cache.put(url, response);
+                const request = new Request(url, { cache: 'reload', mode: url === DEPARTMENTS_GEOJSON_URL ? 'cors' : 'same-origin' });
+                const response = await fetch(request);
+
+                /*
+                 * v12.38 :
+                 * - les fichiers cœur doivent obligatoirement être cachés ;
+                 * - les ressources optionnelles peuvent échouer sans casser l'installation ;
+                 * - cela évite d'activer un nouveau SW incomplet qui casserait le lancement hors ligne.
+                 */
+                if (response && (response.ok || response.type === 'opaque')) {
+                    await cache.put(url, response.clone());
+                    return;
+                }
+
+                if (CORE_APP_SHELL_URLS.includes(url)) {
+                    failedCoreUrls.push(url);
                 }
             } catch (error) {
                 console.warn('[SW] Cache app shell ignoré pour', url, error);
+                if (CORE_APP_SHELL_URLS.includes(url)) {
+                    failedCoreUrls.push(url);
+                }
             }
         }));
+
+        if (failedCoreUrls.length) {
+            throw new Error(`[SW] Installation refusée, fichiers cœur absents: ${failedCoreUrls.join(', ')}`);
+        }
 
         await self.skipWaiting();
     })());
@@ -152,6 +189,11 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    if (request.url === DEPARTMENTS_GEOJSON_URL) {
+        event.respondWith(handleCachedExternalRequest(request));
+        return;
+    }
+
     if (isAppShellRequest(request)) {
         event.respondWith(handleAppShellRequest(request));
         return;
@@ -223,6 +265,31 @@ async function handleAppShellRequest(request) {
         return fresh;
     } catch (_) {
         return cached || new Response('', { status: 504, statusText: 'Offline asset unavailable' });
+    }
+}
+
+async function handleCachedExternalRequest(request) {
+    const cached = await caches.match(request, { ignoreSearch: true });
+
+    if (cached) {
+        fetch(request).then(async (fresh) => {
+            if (fresh && (fresh.ok || fresh.type === 'opaque')) {
+                const cache = await caches.open(APP_SHELL_CACHE);
+                await cache.put(request, fresh.clone());
+            }
+        }).catch(() => {});
+        return cached;
+    }
+
+    try {
+        const fresh = await fetch(request);
+        if (fresh && (fresh.ok || fresh.type === 'opaque')) {
+            const cache = await caches.open(APP_SHELL_CACHE);
+            await cache.put(request, fresh.clone());
+        }
+        return fresh;
+    } catch (_) {
+        return new Response('', { status: 504, statusText: 'Offline external asset unavailable' });
     }
 }
 
