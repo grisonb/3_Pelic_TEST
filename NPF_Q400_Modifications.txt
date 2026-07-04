@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.44
+Version actuelle TEST : v12.45
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -356,4 +356,11 @@ v12.44 — Verrouillage des vols clôturés
 - Les boutons de gestion restent actifs : sélection du vol, Nouveau, Réouvrir, Supprimer.
 - Ajout d'un indicateur “Vol clôturé — verrouillé”.
 - Le bouton Clôturer devient toujours “Réouvrir” sur un vol clôturé ; la modification redevient possible uniquement après clic sur Réouvrir.
+
+v12.45 — Étiquettes permanentes des feux sur carte
+- Constat utilisateur : les feux affichés sur la carte doivent garder en permanence la petite étiquette avec le nom et le département.
+- Modification script.js : les feux de l'historique ont désormais une étiquette permanente nom + département.
+- Modification script.js : le feu actif conserve aussi une étiquette permanente.
+- Comportement au clic inchangé : un clic sur une flamme historique ouvre la popup avec le nom et le bouton “Sélectionner”.
+- Modification style.css : ajout d'un style spécifique pour les étiquettes permanentes des feux.
 
