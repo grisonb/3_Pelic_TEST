@@ -4731,3 +4731,72 @@ body {
     }
 }
 
+/* v12.41 — correction largeur colonne OACI / Masse Rlt */
+#bloc-fuel .table-section th:nth-child(3),
+#bloc-fuel .table-section td:nth-child(3) {
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+}
+
+#bloc-fuel .table-section th:nth-child(4),
+#bloc-fuel .table-section td:nth-child(4) {
+    width: 128px !important;
+    min-width: 128px !important;
+    max-width: 128px !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+}
+
+#bloc-fuel .rlt-mass-input-wrapper {
+    width: 118px !important;
+    min-width: 118px !important;
+}
+
+#bloc-fuel .rlt-mass-input-wrapper .display-input {
+    font-size: 17px !important;
+    padding-left: 28px !important;
+    padding-right: 4px !important;
+    text-align: center !important;
+}
+
+/* v12.41 — fenêtre Masse retardant compacte, sans débordement horizontal */
+.rlt-mass-modal-content {
+    width: min(760px, calc(100vw - 28px)) !important;
+    overflow: hidden !important;
+}
+
+.rlt-mass-formula-row {
+    grid-template-columns: minmax(130px, 1fr) 22px minmax(120px, 0.85fr) 22px minmax(140px, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.rlt-mass-formula-row label {
+    min-width: 0 !important;
+}
+
+.rlt-mass-formula-row input {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    font-size: 20px !important;
+}
+
+.rlt-mass-formula-row span {
+    text-align: center !important;
+}
+
+@media (max-width: 760px) {
+    .rlt-mass-modal-content {
+        width: min(560px, calc(100vw - 18px)) !important;
+    }
+
+    .rlt-mass-formula-row {
+        grid-template-columns: 1fr !important;
+    }
+}
+
