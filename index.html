@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.37-icon-size-mini">
-    <link rel="manifest" href="manifest.json?appv=v12.37-icon-size-mini">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.37-icon-size-mini">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.37-icon-size-mini">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.37-icon-size-mini">
+    <link rel="stylesheet" href="style.css?appv=v12.38-offline-consolidation">
+    <link rel="manifest" href="manifest.json?appv=v12.38-offline-consolidation">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.38-offline-consolidation">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.38-offline-consolidation">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.38-offline-consolidation">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.37';
+        const APP_VERSION = 'v12.38';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -64,10 +64,10 @@
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
         /*
-         * v12.37 — récupération après service worker / IndexedDB bloqué.
+         * v12.38 — récupération après service worker / IndexedDB bloqué.
          * Si l'app affiche les icônes mais que les boutons ne répondent plus,
          * on peut avoir un ancien service worker actif ou un mélange de fichiers.
-         * Cette séquence s'exécute une seule fois pour la version v12.37 :
+         * Cette séquence s'exécute une seule fois pour la version v12.38 :
          * - désenregistre les anciens service workers ;
          * - supprime les caches app-shell ;
          * - recharge une URL fraîche ;
@@ -284,7 +284,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.37-icon-size-mini"></script>
+    <script src="script.js?appv=v12.38-offline-consolidation"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
