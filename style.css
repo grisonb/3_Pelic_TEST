@@ -5003,3 +5003,10 @@ body {
     box-shadow: 0 1px 5px rgba(0,0,0,.25);
 }
 
+/* v12.47 — étiquettes feu légèrement ré-augmentées */
+.leaflet-tooltip.fire-history-map-tooltip-permanent {
+    font-size: 9px !important;
+    padding: 4px 7px !important;
+    line-height: 1.08 !important;
+}
+
