@@ -5010,3 +5010,30 @@ body {
     line-height: 1.08 !important;
 }
 
+/* v12.49 — étiquette feu collée à l'icône + bouton Supprimer */
+.leaflet-tooltip.fire-history-map-tooltip-permanent {
+    margin-top: 0 !important;
+}
+
+.fire-history-map-popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 8px;
+}
+
+.fire-history-map-delete-btn {
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    background: #dc3545;
+    color: #ffffff;
+    font-weight: 950;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+.fire-history-map-select-btn {
+    width: 100%;
+}
+
