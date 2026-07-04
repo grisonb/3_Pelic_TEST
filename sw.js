@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-50-zip-fluid-fire-label-delete';
+const SW_VERSION = 'sw-v12-51-fire-tooltip-fastzip';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
