@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.50
+Version actuelle TEST : v12.51
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -414,3 +413,13 @@ v12.50 — Import ZIP fluide + étiquette feu intégrée
 - Modification script.js/style.css : l'étiquette du nom du feu est maintenant intégrée à l'icône Leaflet, collée à droite de la flamme, au lieu d'un tooltip séparé au-dessus.
 - Modification script.js : l'icône du feu actif ouvre une popup avec bouton “Supprimer”.
 - Comportement suppression : supprime le feu de l'historique, retire l'icône active de la carte et efface la sélection courante.
+
+
+v12.51 — Étiquette feu au-dessus + coordonnées + import ZIP accéléré
+- Constat utilisateur : l'étiquette collée à droite de l'icône feu ne convient pas ; souhait de revenir à l'étiquette au-dessus avec la petite flèche, comme avant, mais plus proche de l'icône.
+- Modification script.js : l'icône feu redevient une flamme seule ; le nom du feu est affiché via un tooltip Leaflet permanent au-dessus de l'icône.
+- Modification script.js/style.css : tooltip rapproché de la flamme avec tooltipAnchor et offset, tout en conservant la petite flèche Leaflet.
+- Modification script.js : clic sur un feu historique non sélectionné affiche désormais aussi les coordonnées géographiques du feu dans la popup.
+- Modification script.js : profil ZIP fractionné accéléré pour les packs OpenStreet non volumineux : 48 lectures parallèles et transactions IndexedDB de 240 tuiles.
+- Objectif import : aller plus vite que v12.50, sans revenir aux transactions d'environ 1000 tuiles qui provoquaient le blocage observé à 1008.
+- Les gros ZIP OpenStreet restent en profil conservateur ; les profils OACI/IGN restent séparés.
