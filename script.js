@@ -474,6 +474,28 @@ function getFireHistory() {
     }
 }
 
+function getFireHistoryItemKey(item) {
+    const normalized = normalizeHistoryCommune(item);
+    if (!normalized) return '';
+    return [
+        simplifyString(normalized.nom_standard || ''),
+        normalized.dep_code || '',
+        Number(normalized.latitude_mairie).toFixed(5),
+        Number(normalized.longitude_mairie).toFixed(5)
+    ].join('|');
+}
+
+function deleteFireHistoryItemByCommune(item) {
+    const targetKey = getFireHistoryItemKey(item);
+    if (!targetKey) return;
+
+    const nextHistory = getFireHistory().filter(entry => getFireHistoryItemKey(entry) !== targetKey);
+    localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+    displayFireHistory();
+    drawFireHistoryMarkers();
+}
+
+
 function saveFireHistory(commune) {
     const normalized = normalizeHistoryCommune(commune);
     if (!normalized) return;
@@ -563,7 +585,7 @@ function drawFireHistoryMarkers() {
         marker.bindTooltip(name, {
             permanent: true,
             direction: 'top',
-            offset: [0, -14],
+            offset: [0, -6],
             opacity: 0.95,
             className: 'fire-history-map-tooltip fire-history-map-tooltip-permanent'
         });
@@ -572,15 +594,31 @@ function drawFireHistoryMarkers() {
             const container = document.createElement('div');
             container.className = 'fire-history-map-popup';
             container.innerHTML = `<b>${escapeHtml(name)}</b>`;
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = 'Sélectionner';
-            button.className = 'fire-history-map-select-btn';
-            button.addEventListener('click', () => {
+
+            const actions = document.createElement('div');
+            actions.className = 'fire-history-map-popup-actions';
+
+            const selectButton = document.createElement('button');
+            selectButton.type = 'button';
+            selectButton.textContent = 'Sélectionner';
+            selectButton.className = 'fire-history-map-select-btn';
+            selectButton.addEventListener('click', () => {
                 selectFireFromHistoryMap(item);
                 try { map.closePopup(); } catch (_) {}
             });
-            container.appendChild(button);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.textContent = 'Supprimer';
+            deleteButton.className = 'fire-history-map-delete-btn';
+            deleteButton.addEventListener('click', () => {
+                deleteFireHistoryItemByCommune(item);
+                try { map.closePopup(); } catch (_) {}
+            });
+
+            actions.appendChild(selectButton);
+            actions.appendChild(deleteButton);
+            container.appendChild(actions);
             return container;
         });
         marker.addTo(fireHistoryLayer);
@@ -664,6 +702,8 @@ window.deleteFireHistoryItem = function(index) {
     displayFireHistory();
     drawFireHistoryMarkers();
 };
+
+window.deleteFireHistoryItemByCommune = deleteFireHistoryItemByCommune;
 
 window.clearFireHistory = function() {
     if (!confirm('Effacer tous les derniers feux mémorisés ?')) return;
@@ -2370,7 +2410,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
         .bindTooltip(`${name}${commune.dep_code ? ` (${commune.dep_code})` : ''}`, {
             permanent: true,
             direction: 'top',
-            offset: [0, -14],
+            offset: [0, -6],
             opacity: 0.95,
             className: 'fire-history-map-tooltip fire-history-map-tooltip-permanent fire-active-map-tooltip'
         })
@@ -4894,15 +4934,16 @@ async function handleZipImport(file) {
          */
         const batchSize = useConservativeLargeImport
             ? 35
-            : (useSplitZipFastProfile ? 260 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
+            : (useSplitZipFastProfile ? 1000 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
         const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
+        const splitZipReadConcurrency = useSplitZipFastProfile ? 48 : 1;
         const usePackScopedKey = !isOpenStreetPack;
         /*
          * v12.19 : OACI passe en mode sécurisé.
          * Symptôme : blocage/crash vers Lecture tuiles 51/3347 quand OACI est la 3e carte.
          * Mesure : petits lots de 10, réouverture périodique IndexedDB, lecture blob.
          */
-        const tileReadMode = isIgnPack ? 'arraybuffer' : 'blob';
+        const tileReadMode = useSplitZipFastProfile ? 'uint8array' : (isIgnPack ? 'arraybuffer' : 'blob');
         let skippedTiles = 0;
 
         const alreadyInstalledPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
@@ -4959,59 +5000,104 @@ async function handleZipImport(file) {
         await updateImportProgress(`Début lecture des tuiles ${packName}...`, 2, true);
         await idle(120);
 
-        for (let i = 0; i < tileFiles.length; i += 1) {
-            const tileFile = tileFiles[i];
+        if (useSplitZipFastProfile) {
+            /*
+             * v12.49 — ZIP fractionné TURBO :
+             * 180 Mo n'est pas un gros ZIP pour l'iPad ; le ralentissement venait
+             * surtout de la lecture strictement séquentielle tuile par tuile.
+             * On lit donc plusieurs tuiles en parallèle, en Uint8Array, puis on écrit
+             * dans IndexedDB par gros lots.
+             */
+            for (let i = 0; i < tileFiles.length; i += splitZipReadConcurrency) {
+                const slice = tileFiles.slice(i, i + splitZipReadConcurrency);
 
-            if (!useConservativeLargeImport && !useSplitZipFastProfile && (i === 0 || i % 10 === 0)) {
-                const readPercent = Math.min(95, Math.max(2, Math.round((i / totalFiles) * 100)));
-                await updateImportProgress(`Lecture tuiles... ${i + 1} / ${totalFiles}`, readPercent, true);
-            }
-
-            if (useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
-                const readPercent = Math.min(96, Math.max(1, Math.round((i / totalFiles) * 100)));
-                await updateImportProgress(`Lecture ZIP... ${i + 1} / ${totalFiles} tuiles`, readPercent, true);
-            }
-
-            let blob;
-            try {
-                blob = await tileFile.async(tileReadMode);
-            } catch (tileReadError) {
-                await idle(isOaciPack ? 300 : 160);
-                try {
-                    blob = await tileFile.async(tileReadMode);
-                } catch (secondTileReadError) {
-                    if (isOaciPack) {
+                const readItems = await Promise.all(slice.map(async (tileFile, offset) => {
+                    const absoluteIndex = i + offset;
+                    try {
+                        const tile = await tileFile.async(tileReadMode);
+                        const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
+                        return {
+                            url: usePackScopedKey ? buildStoredTileKey(tileUrl, packName) : tileUrl,
+                            tileUrl,
+                            tile,
+                            packName
+                        };
+                    } catch (tileReadError) {
+                        console.warn('[Offline] Tuile ZIP fractionné ignorée:', absoluteIndex + 1, tileReadError);
                         skippedTiles += 1;
-                        await updateImportProgress(`OACI : tuile ignorée ${i + 1} / ${totalFiles} (${skippedTiles} erreur(s))`, null, true);
-                        continue;
+                        return null;
                     }
-                    throw secondTileReadError;
+                }));
+
+                for (const item of readItems) {
+                    if (item) batch.push(item);
+                }
+
+                if (batch.length >= batchSize) {
+                    await flushBatch();
+                }
+
+                const now = Date.now();
+                if (now - lastUiUpdate > 900) {
+                    lastUiUpdate = now;
+                    const readCount = Math.min(i + splitZipReadConcurrency, totalFiles);
+                    const percent = Math.min(99, Math.round((Math.max(processedFiles, readCount) / totalFiles) * 100));
+                    await updateImportProgress(
+                        `ZIP fractionné TURBO : lu ${readCount} / ${totalFiles}, écrit ${processedFiles}`,
+                        percent,
+                        false
+                    );
                 }
             }
-            const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
+        } else {
+            for (let i = 0; i < tileFiles.length; i += 1) {
+                const tileFile = tileFiles[i];
 
-            batch.push({
-                url: usePackScopedKey ? buildStoredTileKey(tileUrl, packName) : tileUrl,
-                tileUrl,
-                tile: blob,
-                packName
-            });
+                if (!useConservativeLargeImport && !useSplitZipFastProfile && (i === 0 || i % 10 === 0)) {
+                    const readPercent = Math.min(95, Math.max(2, Math.round((i / totalFiles) * 100)));
+                    await updateImportProgress(`Lecture tuiles... ${i + 1} / ${totalFiles}`, readPercent, true);
+                }
 
-            if (batch.length >= batchSize) {
-                await flushBatch();
-            }
+                if (useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
+                    const readPercent = Math.min(96, Math.max(1, Math.round((i / totalFiles) * 100)));
+                    await updateImportProgress(`Lecture ZIP... ${i + 1} / ${totalFiles} tuiles`, readPercent, true);
+                }
 
-            const now = Date.now();
-            if (now - lastUiUpdate > (useConservativeLargeImport ? 350 : (useSplitZipFastProfile ? 1200 : 700))) {
-                lastUiUpdate = now;
-                const percent = Math.min(99, Math.round((Math.max(processedFiles, i + 1) / totalFiles) * 100));
-                await updateImportProgress(
-                    useSplitZipFastProfile
-                        ? `ZIP fractionné rapide... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`
-                        : `Importation... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`,
-                    percent,
-                    !useSplitZipFastProfile
-                );
+                let blob;
+                try {
+                    blob = await tileFile.async(tileReadMode);
+                } catch (tileReadError) {
+                    await idle(isOaciPack ? 300 : 160);
+                    try {
+                        blob = await tileFile.async(tileReadMode);
+                    } catch (secondTileReadError) {
+                        if (isOaciPack) {
+                            skippedTiles += 1;
+                            await updateImportProgress(`OACI : tuile ignorée ${i + 1} / ${totalFiles} (${skippedTiles} erreur(s))`, null, true);
+                            continue;
+                        }
+                        throw secondTileReadError;
+                    }
+                }
+                const tileUrl = buildOfflineTileUrlForPack(tileFile.name, packName, isLargeZip);
+
+                batch.push({
+                    url: usePackScopedKey ? buildStoredTileKey(tileUrl, packName) : tileUrl,
+                    tileUrl,
+                    tile: blob,
+                    packName
+                });
+
+                if (batch.length >= batchSize) {
+                    await flushBatch();
+                }
+
+                const now = Date.now();
+                if (now - lastUiUpdate > (useConservativeLargeImport ? 350 : 700)) {
+                    lastUiUpdate = now;
+                    const percent = Math.min(99, Math.round((Math.max(processedFiles, i + 1) / totalFiles) * 100));
+                    await updateImportProgress(`Importation... lecture ${i + 1} / ${totalFiles}, écrit ${processedFiles}`, percent, true);
+                }
             }
         }
 
