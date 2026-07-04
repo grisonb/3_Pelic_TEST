@@ -1,12 +1,11 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.45
+Version actuelle TEST : v12.46
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -364,4 +363,13 @@ v12.45 — Étiquettes permanentes des feux sur carte
 - Modification script.js : le feu actif conserve aussi une étiquette permanente.
 - Comportement au clic inchangé : un clic sur une flamme historique ouvre la popup avec le nom et le bouton “Sélectionner”.
 - Modification style.css : ajout d'un style spécifique pour les étiquettes permanentes des feux.
+
+v12.46 — Étiquettes feu réduites, zone tactile, icône GPS avion
+- Modification style.css : taille des étiquettes permanentes feu réduite d'environ 1,5 fois.
+- Modification script.js/style.css : zone tactile des icônes feu agrandie à 34 px sans agrandir visuellement la flamme.
+- Comportement au clic inchangé : clic sur feu historique => popup avec bouton “Sélectionner”.
+- Ajout d'une icône GPS en forme d'avion.
+- Orientation : l'icône GPS avion s'oriente selon le cap GPS fourni par le navigateur ; à défaut, l'estimation de route déjà calculée par l'application est utilisée.
+- Ancrage GPS conservé au centre pour que les vecteurs partent du centre de l'icône.
+
 
