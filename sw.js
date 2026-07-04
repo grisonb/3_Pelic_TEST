@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-48-zip-fractionne-rapide';
+const SW_VERSION = 'sw-v12-49-zip-turbo-fire-popup';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
