@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.46
+Version actuelle TEST : v12.47
 Date de génération : 2026-07-04
 
 Règle de méthode
@@ -372,4 +372,9 @@ v12.46 — Étiquettes feu réduites, zone tactile, icône GPS avion
 - Orientation : l'icône GPS avion s'oriente selon le cap GPS fourni par le navigateur ; à défaut, l'estimation de route déjà calculée par l'application est utilisée.
 - Ancrage GPS conservé au centre pour que les vecteurs partent du centre de l'icône.
 
+v12.47 — Taille étiquettes feu
+- Constat utilisateur : les étiquettes permanentes des feux ont été trop réduites en v12.46.
+- Modification style.css : augmentation légère des étiquettes feu permanentes.
+- Taille cible : intermédiaire entre v12.45 et v12.46.
+- Aucun autre comportement modifié : zone tactile des feux, popup “Sélectionner” et icône GPS avion conservées.
 
