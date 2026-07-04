@@ -225,6 +225,9 @@ let offlineOnlineFallbackMode = DEFAULT_OFFLINE_ONLINE_FALLBACK;
 let activeOfflinePacks = [];
 let isMapSourceSwitching = false;
 let isZipImportRunning = false;
+const STARTUP_GPS_CENTER_ZOOM = 10;
+let startupGpsAutoCenteredWithRealPosition = false;
+let startupGpsStoredCenterAppliedAt = 0;
 
 // v12.22 — sécurité : un import interrompu ne doit pas bloquer les suppressions suivantes.
 try {
@@ -1025,6 +1028,12 @@ async function initializeApp() {
         currentCommune = JSON.parse(savedCommuneJSON);
         displayCommuneDetails(currentCommune, true);
     }
+
+    setTimeout(() => {
+        if (!startupGpsAutoCenteredWithRealPosition) {
+            applyStoredGpsStartupCenter({ force: true });
+        }
+    }, 750);
 
     /*
      * v12.13 — restauration plans d'eau au démarrage.
@@ -2465,7 +2474,7 @@ function refreshHighVoltageLinesButtonState() {
 }
 
 async function fetchHighVoltageLinesGeojson() {
-    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.53')}`;
+    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.54')}`;
     let response = null;
 
     try {
@@ -2481,7 +2490,7 @@ async function fetchHighVoltageLinesGeojson() {
 
         try {
             if ('caches' in window) {
-                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.53'}`);
+                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.54'}`);
                 await cache.put(HIGH_VOLTAGE_LINES_GEOJSON_URL, response.clone());
             }
         } catch (cacheError) {
@@ -3853,6 +3862,53 @@ function saveStoredGpsPosition(lat, lng, timestamp = Date.now()) {
     } catch (_) {}
 }
 
+function getStartupGpsCenterZoom() {
+    if (!map) return STARTUP_GPS_CENTER_ZOOM;
+
+    const minZoom = typeof map.getMinZoom === 'function' ? map.getMinZoom() : GLOBAL_MIN_ZOOM;
+    const maxZoom = typeof map.getMaxZoom === 'function' ? map.getMaxZoom() : GLOBAL_MAX_ZOOM;
+
+    return Math.max(
+        minZoom,
+        Math.min(maxZoom, STARTUP_GPS_CENTER_ZOOM)
+    );
+}
+
+function applyStartupGpsAutoCenter(lat, lng, { source = 'real', force = false } = {}) {
+    /*
+     * v12.54 — ouverture centrée GPS.
+     * Objectif : ouvrir la carte sur la position GPS avec un zoom large,
+     * sans suivre ensuite l'utilisateur en permanence.
+     * - position stockée : recentrage provisoire rapide ;
+     * - position GPS réelle : recentrage prioritaire une seule fois au lancement.
+     */
+    if (!map) return false;
+
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return false;
+
+    const isRealPosition = source !== 'stored';
+
+    if (isRealPosition) {
+        if (startupGpsAutoCenteredWithRealPosition && !force) return false;
+        startupGpsAutoCenteredWithRealPosition = true;
+    } else {
+        if (startupGpsAutoCenteredWithRealPosition) return false;
+        if (startupGpsStoredCenterAppliedAt && !force) return false;
+        startupGpsStoredCenterAppliedAt = Date.now();
+    }
+
+    map.setView([numericLat, numericLng], getStartupGpsCenterZoom(), { animate: false });
+    return true;
+}
+
+function applyStoredGpsStartupCenter({ force = false } = {}) {
+    const stored = getStoredGpsPosition();
+    if (!stored) return false;
+    return applyStartupGpsAutoCenter(stored.lat, stored.lng, { source: 'stored', force });
+}
+
 function primeGpsFromStoredPosition() {
     if (userMarker || !map) return false;
     const stored = getStoredGpsPosition();
@@ -3867,7 +3923,8 @@ function primeGpsFromStoredPosition() {
             speed: null,
             accuracy: null
         },
-        timestamp: stored.timestamp || Date.now()
+        timestamp: stored.timestamp || Date.now(),
+        npfIsStoredPosition: true
     };
 
     updateUserPosition(fakePosition);
@@ -4490,6 +4547,9 @@ function updateUserPosition(pos) {
     updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
     lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs };
     saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
+    applyStartupGpsAutoCenter(latitude, longitude, {
+        source: pos && pos.npfIsStoredPosition ? 'stored' : 'real'
+    });
 
     if (!userMarker) {
         const userIcon = buildOwnGpsIcon(ownAltitudeLabel);
