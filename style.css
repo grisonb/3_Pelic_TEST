@@ -5317,3 +5317,86 @@ body {
     }
 }
 
+/* ==========================================================================
+   RAPPEL MISE A JOUR PERIODIQUE
+   ========================================================================== */
+.update-reminder-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.36);
+}
+
+.update-reminder-modal-content {
+    width: min(420px, calc(100vw - 36px));
+    box-sizing: border-box;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    padding: 18px;
+    text-align: center;
+    color: var(--text-color);
+}
+
+.update-reminder-modal-content h3 {
+    margin: 0 0 10px;
+    font-size: 22px;
+    color: var(--primary-color);
+}
+
+.update-reminder-modal-content p {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.35;
+    font-weight: 600;
+}
+
+.update-reminder-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 24px;
+    margin: 0 3px;
+    border-radius: 8px;
+    border: 1px solid #b9c8d8;
+    background: #ffffff;
+    color: var(--primary-color);
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+    vertical-align: -5px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+
+.update-reminder-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.update-reminder-actions button {
+    flex: 1;
+    min-height: 42px;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.update-reminder-primary {
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+.update-reminder-secondary {
+    background: #eef2f6;
+    color: var(--text-color);
+}
+
