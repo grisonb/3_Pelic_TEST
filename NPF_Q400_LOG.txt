@@ -581,3 +581,11 @@ v12.66 — Simulation GPS et ajustements interface
 - Modification statut bas de recherche : le texte est limité à “Mode ONLINE” ou “Mode OFFLINE”. Les messages de chargement du calque Communes ne remplacent plus cette indication.
 - Modification recherche feu : si un feu est déjà dans la barre de recherche et que l'utilisateur clique sur X, le focus est forcé immédiatement pour rouvrir/conserver le clavier iPad.
 - Non modifié : appui long simulation avion/feu, appui long normal feu direct, suppression Route BASE LFTW, import ZIP, IndexedDB, cartes offline, calque Communes limité à l'écran, calque Lignes HT, retardant, PDF aérodromes et rappel MAJ.
+
+
+v12.67 — Route base active sans bouton
+- Base : v12.66 TEST sim_gps_ui.
+- Correction : le bouton “Route BASE LFTW” reste supprimé de l’interface, mais la fonction de route base est de nouveau forcée active.
+- Modification script.js : l’ancien état local `showLftwRoute=false` est ignoré, car il n’y a plus de bouton pour réactiver manuellement la route.
+- Résultat attendu : la route vers la base sélectionnée reste affichée/calculée automatiquement lorsqu’un feu est sélectionné, même après mise à jour depuis une version où l’utilisateur avait désactivé le bouton.
+- Non modifié : simulation par appui long, GPS, bordure rouge simulation, interface Cartes, Communes, Lignes HT, retardant, PDF, import ZIP, IndexedDB et rappel MAJ.
