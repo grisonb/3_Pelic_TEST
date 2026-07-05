@@ -235,6 +235,7 @@ let isSimulationMode = false;
 let simulationMapClickHandler = null;
 let simulationSuppressNextClickUntil = 0;
 let simulationActionPopup = null;
+let simulationWasLiveGpsActiveBeforeSimulation = false;
 
 // v12.22 — sécurité : un import interrompu ne doit pas bloquer les suppressions suivantes.
 try {
@@ -1964,31 +1965,53 @@ function setupEventListeners() {
         searchInput.readOnly = false;
     });
 
+    const focusSearchInputForKeyboard = () => {
+        searchInput.disabled = false;
+        searchInput.readOnly = false;
+        try {
+            searchInput.focus({ preventScroll: true });
+        } catch (_) {
+            searchInput.focus();
+        }
+    };
+
+    const prepareSearchClearAndKeyboard = (event = null) => {
+        if (event) event.stopPropagation();
+        focusSearchInputForKeyboard();
+    };
+
     const clearSearchInputAndKeepKeyboard = (event = null) => {
         /*
-         * v12.00 — iPad : correction du bouton X de la barre de recherche.
-         * En v11.99, preventDefault sur touchstart/pointerdown pouvait empêcher
-         * le bouton de fonctionner sur Safari iPad. On laisse le toucher se faire,
-         * puis on efface explicitement au click/touchend et on remet le focus.
+         * v12.66 — iPad : lorsque le champ contient déjà un feu et que l'on clique
+         * sur X, on force le focus dans le geste utilisateur pour rouvrir le clavier.
          */
         if (event) {
             event.stopPropagation();
         }
 
+        focusSearchInputForKeyboard();
         searchInput.value = '';
         clearSearchBtn.style.display = 'none';
         document.getElementById('results-list').style.display = 'none';
         displayFireHistory();
 
-        setTimeout(() => {
+        const refocus = () => {
             try {
                 searchInput.focus({ preventScroll: true });
                 searchInput.setSelectionRange(0, 0);
             } catch (_) {
                 searchInput.focus();
             }
-        }, 0);
+        };
+
+        refocus();
+        setTimeout(refocus, 40);
+        setTimeout(refocus, 140);
     };
+
+    ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
+        clearSearchBtn.addEventListener(eventName, prepareSearchClearAndKeyboard, { passive: false });
+    });
 
     clearSearchBtn.addEventListener('touchend', (event) => {
         event.preventDefault();
@@ -3630,10 +3653,7 @@ function updateCommunesLayerAppearance() {
             map.removeLayer(communesLayerGroup);
         }
 
-        const status = document.getElementById('offline-status');
-        if (status && areCommunesVisible) {
-            status.textContent = 'Calque Communes actif : zoome davantage pour afficher les contours et noms.';
-        }
+        updateOfflineStatus();
         return;
     }
 
@@ -3674,10 +3694,7 @@ function renderVisibleCommuneLayers() {
         visibleCount += 1;
     }
 
-    const status = document.getElementById('offline-status');
-    if (status && areCommunesVisible) {
-        status.textContent = `Calque Communes actif : ${visibleCount} communes affichées à l'écran.`;
-    }
+    updateOfflineStatus();
 }
 
 
@@ -3902,10 +3919,7 @@ async function loadCommunesLayerData() {
     const communesSource = getCommunesGeojsonUrl();
     const COMMUNES_GEOJSON_URL = communesSource.url;
 
-    const status = document.getElementById('offline-status');
-    if (status) {
-        status.textContent = `Chargement du calque Communes ${communesSource.precision}... patienter.`;
-    }
+    updateOfflineStatus();
 
     if (!communesLayerLoadController) {
         communesLayerLoadController = new AbortController();
@@ -3953,9 +3967,7 @@ async function loadCommunesLayerData() {
     hasLoadedCommunes = true;
     updateCommunesLayerAppearance();
 
-    if (status) {
-        status.textContent = `Calque Communes ${communesSource.precision} chargé : ${communesLabelData.length} communes.`;
-    }
+    updateOfflineStatus();
 }
 
 async function toggleCommunesLayer(shouldShow) {
@@ -4906,6 +4918,9 @@ function openSimulationActionPopup(latlng) {
 
 function refreshSimulationModeButtonState() {
     const button = document.getElementById('simulation-mode-button');
+    if (document.body) {
+        document.body.classList.toggle('simulation-mode-active', isSimulationMode);
+    }
     if (!button) return;
     button.classList.toggle('active', isSimulationMode);
     button.textContent = isSimulationMode ? 'Quitter le mode simulation avion' : 'Mode simulation avion';
@@ -4933,6 +4948,7 @@ function applySimulatedUserPosition(lat, lng) {
 function enableSimulationMode() {
     if (!map || isSimulationMode) return;
 
+    simulationWasLiveGpsActiveBeforeSimulation = (localStorage.getItem('liveGpsActive') === 'true') || !!watchId;
     isSimulationMode = true;
     if (watchId && navigator.geolocation) {
         navigator.geolocation.clearWatch(watchId);
@@ -4964,8 +4980,11 @@ function disableSimulationMode({ restoreGps = true } = {}) {
     refreshSimulationModeButtonState();
 
     if (restoreGps) {
-        requestOneShotGps({ silent: true, highAccuracy: true, timeout: 12000, maximumAge: 600000 });
+        localStorage.setItem('liveGpsActive', 'true');
+        restartLiveGpsWatch({ silent: true });
+        setTimeout(() => requestOneShotGps({ silent: true, highAccuracy: true, timeout: 12000, maximumAge: 600000 }), 250);
     }
+    simulationWasLiveGpsActiveBeforeSimulation = false;
 }
 
 function toggleSimulationMode() {
@@ -5246,15 +5265,7 @@ async function setMapSourceMode(mode) {
 function updateOfflineStatus() {
     const status = document.getElementById('offline-status');
     if (!status) return;
-    if (mapSourceMode !== 'offline') {
-        status.textContent = 'Mode ONLINE actif : seules les tuiles en ligne sont affichées.';
-        return;
-    }
-
-    const selectedLabel = activeOfflinePacks.length
-        ? `Packs actifs : ${activeOfflinePacks.join(', ')}.`
-        : 'Aucun pack actif.';
-    status.textContent = `Mode OFFLINE strict actif. ${selectedLabel}`;
+    status.textContent = mapSourceMode === 'offline' ? 'Mode OFFLINE' : 'Mode ONLINE';
 }
 
 async function initializeOfflineTilePreference() {
@@ -8622,7 +8633,7 @@ function initializeCalculator() {
         const rect = nav.getBoundingClientRect();
         const x = event.clientX;
         const y = event.clientY;
-        const verticalMargin = 10;
+        const verticalMargin = 36;
         if (x < rect.left || x > rect.right || y < rect.top - verticalMargin || y > rect.bottom + verticalMargin) return;
 
         const buttons = Array.from(nav.querySelectorAll('.onglet-bouton'));
