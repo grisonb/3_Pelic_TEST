@@ -454,3 +454,13 @@ v12.54 — Ouverture centrée sur la position GPS
 - Cas dégradé : si le GPS est refusé ou indisponible et qu'aucune dernière position n'est stockée, l'ancien centrage France reste utilisé.
 - Modification index.html / manifest.json / sw.js : passage de version v12.53 à v12.54 pour forcer la prise en compte des nouveaux fichiers.
 - Aucun changement sur l'import ZIP offline ni sur le calque Lignes HT.
+v12.55 — Mise à jour PWA sécurisée avant nouvelle pérenne
+- Constat utilisateur : passage v2026.46 vers v2026.47 pérenne impossible sans désinstaller/réinstaller ; carte qui ne charge pas et boutons inactifs.
+- Diagnostic probable : transition trop importante avec ancien service worker et ancien app-shell cache-first. L'application pouvait mélanger ancien index, ancien script, nouveau cache ou nouvelle version, surtout en PWA iPad.
+- Modification sw.js : index.html, script.js, style.css et manifest.json passent en stratégie réseau d'abord avec cache en secours hors ligne.
+- Modification sw.js : après activation d'un nouveau service worker, navigation forcée des fenêtres ouvertes vers la même URL avec paramètre `swrefresh`, pour sortir de l'ancien app-shell sans désinstallation.
+- Modification index.html : ajout d'un rechargement unique lors du changement de contrôleur service worker.
+- Modification index.html : si un service worker neuf est déjà en attente, envoi explicite de `SKIP_WAITING` et demande `registration.update()`.
+- Sécurité : aucune suppression IndexedDB ; les cartes offline et les tuiles importées ne sont pas touchées.
+- Fonctionnalités conservées : import ZIP inchangé, centrage GPS v12.54 conservé, calque Lignes HT conservé.
+- Cette version reste une version TEST avant préparation d'une nouvelle version pérenne.
