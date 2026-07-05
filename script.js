@@ -2286,7 +2286,7 @@ function showUpdateReminderModal(timestamp = Date.now()) {
     modal.innerHTML = `
         <div class="update-reminder-modal-content" role="dialog" aria-modal="true" aria-labelledby="update-reminder-title">
             <h3 id="update-reminder-title">Mise à jour</h3>
-            <p>Pensez à cliquer sur <span class="update-reminder-maj-button" aria-label="bouton MAJ"><span class="update-reminder-maj-symbol">🔄</span><span>MAJ</span></span> de temps en temps pour être certain d’avoir la dernière version à jour.</p>
+            <p>Pensez à cliquer sur <span class="update-reminder-maj-button" aria-label="bouton MAJ"><span class="update-reminder-maj-symbol">🔄</span><span>MAJ</span></span> de temps en temps pour être certain d’avoir la dernière version à jour.<br><strong>Relancer l’application après mise à jour.</strong></p>
             <div class="update-reminder-actions">
                 <button id="update-reminder-now-button" class="update-reminder-primary" type="button">Vérifier maintenant</button>
                 <button id="update-reminder-later-button" class="update-reminder-secondary" type="button">Plus tard</button>
@@ -8486,6 +8486,11 @@ function initializeCalculator() {
     }
 
 
+    function formatDurationForFlightSummary(totalMinutes) {
+        const value = formatTime(totalMinutes) || '00:00';
+        return value.replace(':', 'h');
+    }
+
     function updateFlightDurationSummary() {
         const summary = document.getElementById('flight-duration-summary');
         if (!summary) return;
@@ -8507,11 +8512,11 @@ function initializeCalculator() {
         const flightDuration = getFlightDurationFromState(state);
         const activeIndex = getActiveFlightIndex();
         const flightNumber = activeIndex >= 0 ? activeIndex + 1 : 1;
-        const flightText = `Tps de vol n°${flightNumber} : ${formatTime(flightDuration) || '00:00'}`;
+        const flightText = `Tps de vol n°${flightNumber} : ${formatDurationForFlightSummary(flightDuration)}`;
 
         if (activeIndex > 0) {
             const totalDuration = getCumulativeHdvBeforeActiveFlight() + flightDuration;
-            summary.textContent = `${flightText} · Total : ${formatTime(totalDuration) || '00:00'}`;
+            summary.innerHTML = `<span>${flightText}</span><span class="flight-duration-separator">/</span><span class="flight-duration-total">Total : ${formatDurationForFlightSummary(totalDuration)}</span>`;
         } else {
             summary.textContent = flightText;
         }
@@ -9506,8 +9511,24 @@ function initializeCalculator() {
             });
         }
 
-        if (cancelBtn) cancelBtn.addEventListener('click', closeRltMassModal);
-        if (closeBtn) closeBtn.addEventListener('click', closeRltMassModal);
+        const bindRltModalCloseButton = (button) => {
+            if (!button || button.dataset.rltCloseBound === '1') return;
+            button.dataset.rltCloseBound = '1';
+            const handler = (event) => {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                closeRltMassModal();
+            };
+            ['pointerdown', 'touchstart', 'mousedown'].forEach(type => {
+                button.addEventListener(type, handler, { capture: true });
+            });
+            button.addEventListener('click', handler, { capture: true });
+        };
+
+        bindRltModalCloseButton(cancelBtn);
+        bindRltModalCloseButton(closeBtn);
         modal.addEventListener('click', (event) => {
             if (event.target === modal) closeRltMassModal();
         });
