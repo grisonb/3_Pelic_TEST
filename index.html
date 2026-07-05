@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.62-communes-ecran">
-    <link rel="manifest" href="manifest.json?appv=v12.62-communes-ecran">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.62-communes-ecran">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.62-communes-ecran">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.62-communes-ecran">
+    <link rel="stylesheet" href="style.css?appv=v12.65-sim-appui-long">
+    <link rel="manifest" href="manifest.json?appv=v12.65-sim-appui-long">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.65-sim-appui-long">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.65-sim-appui-long">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.65-sim-appui-long">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.62';
+        const APP_VERSION = 'v12.65';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -64,7 +64,7 @@
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
         /*
-         * v12.62 — communes affichées uniquement dans l’emprise écran.
+         * v12.65 — simulation uniquement par appui long.
          * Quand un nouveau service worker prend le contrôle, on recharge une
          * seule fois la page pour éviter un mélange ancien index / nouveau cache
          * ou nouveau index / ancien script. Les tuiles offline IndexedDB ne sont
@@ -278,7 +278,6 @@
             <ul id="results-list" style="display: none;"></ul>
                
 <div class="extra-controls extra-controls-grid">
-                <button id="lftw-route-button" class="toggle-button active" title="Afficher/Masquer la route vers la base">Route BASE<br>LFTW</button>
                 <button id="gaar-mode-button" class="toggle-button" title="Afficher/Masquer les circuits GAAR">Circuits<br>GAAR</button>
                 <button id="departments-layer-button" class="toggle-button" title="Afficher/Masquer les contours de départements">Départements</button>
                 <button id="communes-layer-button" class="toggle-button" title="Afficher/Masquer les contours de communes">Communes</button>
@@ -300,7 +299,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.62-communes-ecran"></script>
+    <script src="script.js?appv=v12.65-sim-appui-long"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -509,11 +508,11 @@
 <div id="offline-map-modal" style="display: none;">
         <div class="main-container">
             <button id="close-offline-map-btn">&times;</button>
-            <h2>Gestion des Cartes Hors-ligne</h2>
+            <h2>Gestion des Cartes</h2>
             
             <div class="modal-content">
                 <div class="import-section">
-                    <p>Importez un pack de tuiles au format .zip (formats reconnus : z/x/y.png, z_x_y.png ou z-x-y.png) pour l'utiliser hors-ligne.</p>
+                    <button id="simulation-mode-button" type="button" class="simulation-mode-button">Mode simulation avion</button>
                     <label for="zip-importer-input" class="import-button">Importer un pack de tuiles (.zip)</label>
                     <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
                 </div>
@@ -534,8 +533,11 @@
                             <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">Offline</button>
                         </div>
                     </div>
-                    <button type="button" id="purge-inactive-packs-btn" class="danger-inline-btn">Vider le cache des packs désélectionnés</button>
-                    <button type="button" id="refresh-offline-tiles-btn" class="neutral-inline-btn">Rafraîchir l'affichage des cartes offline</button>
+                    <details class="offline-maintenance-section">
+                        <summary>Maintenance / dépannage</summary>
+                        <button type="button" id="refresh-offline-tiles-btn" class="neutral-inline-btn">Rafraîchir l'affichage des cartes</button>
+                        <button type="button" id="purge-inactive-packs-btn" class="danger-inline-btn">Vider le cache des packs désélectionnés</button>
+                    </details>
                     <ul id="installed-maps-list">
                         <!-- Les packs installés seront listés ici par le JavaScript -->
                         <li class="no-maps-placeholder">Aucun pack de cartes installé.</li>
