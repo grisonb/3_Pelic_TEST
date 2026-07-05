@@ -5474,7 +5474,7 @@ body {
     background: #eef6ff;
     border: 1px solid #b9d8f0;
     color: var(--primary-color);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 950;
     white-space: nowrap;
 }
@@ -5484,3 +5484,27 @@ body {
     border-color: #b9d8f0 !important;
     color: var(--primary-color) !important;
 }
+
+/* v12.60 — Masse RLT : comportement clavier iPad + résumé temps de vol */
+.rlt-mass-modal {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    align-items: center !important;
+}
+
+.rlt-mass-modal:focus-within {
+    align-items: flex-start !important;
+    padding-top: max(12px, calc(env(safe-area-inset-top, 0px) + 12px)) !important;
+    padding-bottom: max(42vh, calc(env(safe-area-inset-bottom, 0px) + 180px)) !important;
+}
+
+.rlt-mass-modal:focus-within .rlt-mass-modal-content {
+    margin-top: 4px !important;
+    margin-bottom: 32vh !important;
+}
+
+.flight-duration-summary {
+    font-size: 16px !important;
+    padding: 0 12px !important;
+}
+
