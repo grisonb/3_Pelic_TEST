@@ -409,7 +409,7 @@ function getCommuneFromDatabaseByNameAndDepartment(commune) {
 
 function buildManualFireCommuneFromPoint(lat, lon, fallbackName = 'Feu manuel') {
     /*
-     * v12.57 — nommage feu par polygone communal uniquement.
+     * v12.59 — nommage feu par polygone communal uniquement.
      * On ne persiste plus une commune calculée par simple proximité, car cela
      * peut nommer à tort un feu situé dans Marseille avec une commune limitrophe.
      */
@@ -504,7 +504,7 @@ function normalizeHistoryCommune(commune) {
     if (!name) return null;
 
     /*
-     * v12.57 — historique feux : priorité au polygone communal.
+     * v12.58 — historique feux : priorité au polygone communal.
      * La commune la plus proche n'est plus utilisée pour enrichir un feu,
      * afin d'éviter les erreurs aux limites de Marseille / communes voisines.
      */
@@ -2590,7 +2590,7 @@ function refreshHighVoltageLinesButtonState() {
 }
 
 async function fetchHighVoltageLinesGeojson() {
-    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.57')}`;
+    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.59')}`;
     let response = null;
 
     try {
@@ -2606,7 +2606,7 @@ async function fetchHighVoltageLinesGeojson() {
 
         try {
             if ('caches' in window) {
-                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.57'}`);
+                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.59'}`);
                 await cache.put(HIGH_VOLTAGE_LINES_GEOJSON_URL, response.clone());
             }
         } catch (cacheError) {
@@ -3148,10 +3148,24 @@ async function deleteAirportPdf(oaci) {
     }
 }
 
+async function airportServerPdfExists(url) {
+    try {
+        const response = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+        return !!(response && response.ok);
+    } catch (_) {
+        return false;
+    }
+}
+
 async function openAirportPdf(oaci) {
     const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!safeOaci) return;
 
+    /*
+     * v12.58 — sécurité PDF pélicandrome/aérodrome :
+     * si aucun PDF offline ni serveur n'est trouvé, on n'envoie plus l'iPad
+     * vers une page PDF inexistante. La fenêtre pré-ouverte est fermée proprement.
+     */
     const openedWindow = window.open('', '_blank');
     const serverPdfUrl = `./pdf/${safeOaci}.pdf`;
 
@@ -3168,14 +3182,24 @@ async function openAirportPdf(oaci) {
             return;
         }
     } catch (error) {
-        console.warn('Ouverture PDF offline impossible, fallback serveur:', error);
+        console.warn('Ouverture PDF offline impossible:', error);
     }
 
-    if (openedWindow) {
-        openedWindow.location.href = serverPdfUrl;
-    } else {
-        window.location.href = serverPdfUrl;
+    const hasServerPdf = await airportServerPdfExists(serverPdfUrl);
+    if (hasServerPdf) {
+        if (openedWindow) {
+            openedWindow.location.href = serverPdfUrl;
+        } else {
+            window.location.href = serverPdfUrl;
+        }
+        return;
     }
+
+    try {
+        if (openedWindow && !openedWindow.closed) openedWindow.close();
+    } catch (_) {}
+
+    alert(`Aucun PDF associé à ${safeOaci}.`);
 }
 
 window.openAirportPdf = openAirportPdf;
@@ -4027,7 +4051,7 @@ function applyStoredGpsStartupCenter({ force = false } = {}) {
 
 function centerMapOnGpsOverviewAfterClear() {
     /*
-     * v12.57 — fermeture du bandeau feu conservée.
+     * v12.58 — fermeture du bandeau feu conservée.
      * Le bouton X ne doit plus renvoyer sur une vue France dézoomée.
      * On reprend la logique d'ouverture : position GPS connue, zoom large 10,
      * puis correction par GPS réel si disponible.
@@ -4251,7 +4275,7 @@ function updateNearestCommuneDisplay(lat, lon) {
     }
 
     /*
-     * v12.57 — affichage GPS par polygone obligatoire.
+     * v12.58 — affichage GPS par polygone obligatoire.
      * On n'affiche plus temporairement la commune la plus proche pendant le
      * chargement, car cela provoquait un flash Plan-de-Cuques avant Marseille.
      */
@@ -8382,6 +8406,23 @@ function initializeCalculator() {
         };
     }
 
+
+    function calculatorRowDataHasContent(rowData) {
+        if (!rowData) return false;
+        return !!(
+            rowData.time
+            || rowData.fuel
+            || rowData.oaci
+            || rowData.rltMass
+            || rowData.rltVolume
+            || rowData.rltDensity
+        );
+    }
+
+    function compactCalculatorTableData(tableData = []) {
+        return (Array.isArray(tableData) ? tableData : []).filter(calculatorRowDataHasContent);
+    }
+
     function normalizeFlightNumbers() {
         dailyFlights.forEach((flight, index) => {
             flight.number = index + 1;
@@ -8409,7 +8450,7 @@ function initializeCalculator() {
                 tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity });
             }
         });
-        state.calculator_table_data = tableData;
+        state.calculator_table_data = compactCalculatorTableData(tableData);
         return state;
     }
 
@@ -8442,6 +8483,39 @@ function initializeCalculator() {
         return dailyFlights
             .slice(0, activeIndex)
             .reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+    }
+
+
+    function updateFlightDurationSummary() {
+        const summary = document.getElementById('flight-duration-summary');
+        if (!summary) return;
+
+        const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+        if (!activeFlight) {
+            summary.textContent = '';
+            summary.style.display = 'none';
+            return;
+        }
+
+        let state = activeFlight.state || {};
+        try {
+            if (!isApplyingFlightState && document.querySelector('#bloc-fuel tbody')) {
+                state = readCalculatorStateFromDom();
+            }
+        } catch (_) {}
+
+        const flightDuration = getFlightDurationFromState(state);
+        const activeIndex = getActiveFlightIndex();
+        const flightText = `Tps vol : ${formatTime(flightDuration) || '00:00'}`;
+
+        if (activeIndex > 0) {
+            const totalDuration = getCumulativeHdvBeforeActiveFlight() + flightDuration;
+            summary.textContent = `${flightText} · Total : ${formatTime(totalDuration) || '00:00'}`;
+        } else {
+            summary.textContent = flightText;
+        }
+
+        summary.style.display = 'inline-flex';
     }
 
     function getGlobalLimitHdvMinutes() {
@@ -8581,6 +8655,7 @@ function initializeCalculator() {
         }
 
         updateActiveFlightLockState();
+        updateFlightDurationSummary();
     }
 
     function updateActiveFlightLockState() {
@@ -8594,9 +8669,11 @@ function initializeCalculator() {
         }
 
         if (lockStatus) {
-            lockStatus.textContent = isClosed ? 'Vol clôturé — verrouillé' : '';
-            lockStatus.style.display = isClosed ? 'inline-flex' : 'none';
+            lockStatus.textContent = '';
+            lockStatus.style.display = 'none';
         }
+
+        updateFlightDurationSummary();
 
         /*
          * v12.44 — verrouillage réel des vols clôturés :
@@ -8639,12 +8716,16 @@ function initializeCalculator() {
             initializeNumericInput(document.getElementById('suivi-conso-rotation-wrapper'), state['suivi-conso-rotation-wrapper']);
             initializeTimeInput(document.getElementById('suivi-duree-rotation-wrapper'), state['suivi-duree-rotation-wrapper']);
 
-            const tableData = state.calculator_table_data || [];
+            const tableData = compactCalculatorTableData(state.calculator_table_data || []);
+            const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
+            const isClosedFlight = !!activeFlight?.closed;
             tableData.forEach(rowData => addNewRow(tableBody, rowData, false));
 
-            const rowsToAdd = Math.max(6, tableBody.rows.length + 1) - tableBody.rows.length;
-            for (let i = 0; i < rowsToAdd; i++) {
-                addNewRow(tableBody, null, i === rowsToAdd - 1);
+            if (!isClosedFlight) {
+                const rowsToAdd = Math.max(6, tableBody.rows.length + 1) - tableBody.rows.length;
+                for (let i = 0; i < rowsToAdd; i++) {
+                    addNewRow(tableBody, null, i === rowsToAdd - 1);
+                }
             }
         } finally {
             isApplyingFlightState = false;
@@ -8656,6 +8737,7 @@ function initializeCalculator() {
         refreshSharedHeaderMirrorValues();
         updateActiveFlightLockState();
         masterRecalculate();
+        updateFlightDurationSummary();
     }
 
     function loadActiveFlightState() {
@@ -9170,13 +9252,16 @@ function initializeCalculator() {
     }
 
     function markRltCalculatedField(fieldName) {
-        const { volumeInput, densityInput, massInput } = getRltMassModalElements();
-        [volumeInput, densityInput, massInput].filter(Boolean).forEach(input => {
+        const elements = getRltMassModalElements();
+        [
+            elements.massToVolumeVolumeInput,
+            elements.massInput
+        ].filter(Boolean).forEach(input => {
             input.classList.remove('rlt-calculated-field');
         });
 
-        if (fieldName === 'volume') volumeInput?.classList.add('rlt-calculated-field');
-        if (fieldName === 'mass') massInput?.classList.add('rlt-calculated-field');
+        if (fieldName === 'volumeFromMass') elements.massToVolumeVolumeInput?.classList.add('rlt-calculated-field');
+        if (fieldName === 'massFromVolume') elements.massInput?.classList.add('rlt-calculated-field');
     }
 
     function formatDecimalValue(value, decimals = 2) {
@@ -9192,6 +9277,9 @@ function initializeCalculator() {
     function getRltMassModalElements() {
         return {
             modal: document.getElementById('rlt-mass-modal'),
+            massToVolumeMassInput: document.getElementById('rlt-mass-to-volume-mass-input'),
+            massToVolumeDensityInput: document.getElementById('rlt-mass-to-volume-density-input'),
+            massToVolumeVolumeInput: document.getElementById('rlt-mass-to-volume-volume-input'),
             volumeInput: document.getElementById('rlt-volume-input'),
             densityInput: document.getElementById('rlt-density-input'),
             massInput: document.getElementById('rlt-mass-input'),
@@ -9203,9 +9291,17 @@ function initializeCalculator() {
     }
 
     function closeRltMassModal() {
-        const { modal, volumeInput, densityInput, massInput } = getRltMassModalElements();
+        const elements = getRltMassModalElements();
+        const { modal } = elements;
         try {
-            [volumeInput, densityInput, massInput].forEach(input => input && input.blur && input.blur());
+            [
+                elements.massToVolumeMassInput,
+                elements.massToVolumeDensityInput,
+                elements.massToVolumeVolumeInput,
+                elements.volumeInput,
+                elements.densityInput,
+                elements.massInput
+            ].forEach(input => input && input.blur && input.blur());
         } catch (_) {}
         if (modal) {
             modal.style.setProperty('display', 'none', 'important');
@@ -9217,74 +9313,95 @@ function initializeCalculator() {
         markRltCalculatedField(null);
     }
 
+    function ensureRltDensityDefaults() {
+        const { massToVolumeDensityInput, densityInput } = getRltMassModalElements();
+        [massToVolumeDensityInput, densityInput].filter(Boolean).forEach(input => {
+            if (!input.value || input.value === '1') input.value = '1.';
+        });
+    }
+
     function syncRltMassModalFromInputs() {
-        const { volumeInput, densityInput, massInput } = getRltMassModalElements();
-        if (!volumeInput || !densityInput || !massInput) return;
+        const {
+            massToVolumeMassInput,
+            massToVolumeDensityInput,
+            massToVolumeVolumeInput,
+            volumeInput,
+            densityInput,
+            massInput
+        } = getRltMassModalElements();
 
-        if (!densityInput.value || densityInput.value === '1') {
-            densityInput.value = '1.';
-        }
+        ensureRltDensityDefaults();
+        markRltCalculatedField(null);
 
-        const volume = parseDecimalInput(volumeInput.value);
-        const density = parseRltDensityInput(densityInput.value);
-        const mass = parseDecimalInput(massInput.value);
+        const topMass = parseDecimalInput(massToVolumeMassInput?.value);
+        const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
+        const bottomVolume = parseDecimalInput(volumeInput?.value);
+        const bottomDensity = parseRltDensityInput(densityInput?.value);
+        const topComputedVolume = (topMass !== null && topDensity !== null) ? (topMass / topDensity) : null;
 
-        if (density === null) {
-            markRltCalculatedField(null);
-            return;
+        if (massToVolumeVolumeInput) {
+            if (topComputedVolume !== null) {
+                massToVolumeVolumeInput.value = formatDecimalValue(topComputedVolume, 0);
+                markRltCalculatedField('volumeFromMass');
+            } else {
+                massToVolumeVolumeInput.value = '';
+            }
         }
 
         /*
-         * v12.42 :
-         * - mode normal : Volume + Densité => Masse calculée sur fond vert pastel.
-         * - mode prévision : Masse + Densité => Volume calculé sur fond vert pastel.
+         * v12.59 — colonne Masse RLT : la valeur validée doit toujours être
+         * le résultat de la ligne Volume × Densité = Masse. Si l'utilisateur
+         * part de la ligne Masse ÷ Densité = Volume, le volume calculé sert
+         * simplement d'entrée implicite pour la ligne Volume × Densité.
          */
-        if (activeRltMassLastEdited === 'mass') {
-            activeRltMassCalculationMode = 'massToVolume';
-        } else if (activeRltMassLastEdited === 'volume') {
-            activeRltMassCalculationMode = 'volumeToMass';
+        if (massInput) {
+            const effectiveVolumeForMass = bottomVolume !== null ? bottomVolume : topComputedVolume;
+            const effectiveDensityForMass = bottomDensity !== null ? bottomDensity : topDensity;
+            if (effectiveVolumeForMass !== null && effectiveDensityForMass !== null) {
+                massInput.value = formatDecimalValue(effectiveVolumeForMass * effectiveDensityForMass, 0);
+                markRltCalculatedField('massFromVolume');
+            } else {
+                massInput.value = '';
+            }
         }
-
-        if (activeRltMassCalculationMode === 'massToVolume' && mass !== null) {
-            volumeInput.value = formatDecimalValue(mass / density, 0);
-            markRltCalculatedField('volume');
-            return;
-        }
-
-        if (volume !== null) {
-            massInput.value = formatDecimalValue(volume * density, 0);
-            activeRltMassCalculationMode = 'volumeToMass';
-            markRltCalculatedField('mass');
-            return;
-        }
-
-        if (mass !== null) {
-            volumeInput.value = formatDecimalValue(mass / density, 0);
-            activeRltMassCalculationMode = 'massToVolume';
-            markRltCalculatedField('volume');
-            return;
-        }
-
-        markRltCalculatedField(null);
     }
 
     function setupRltMassModalOnce() {
-        const { modal, volumeInput, densityInput, massInput, validateBtn, clearBtn, cancelBtn, closeBtn } = getRltMassModalElements();
+        const elements = getRltMassModalElements();
+        const {
+            modal,
+            massToVolumeMassInput,
+            massToVolumeDensityInput,
+            massToVolumeVolumeInput,
+            volumeInput,
+            densityInput,
+            massInput,
+            validateBtn,
+            clearBtn,
+            cancelBtn,
+            closeBtn
+        } = elements;
         if (!modal || modal.dataset.bound === '1') return;
         modal.dataset.bound = '1';
 
-        const bindInput = (input, field) => {
+        [massToVolumeVolumeInput, massInput].filter(Boolean).forEach(input => {
+            input.readOnly = true;
+            input.setAttribute('readonly', 'readonly');
+            input.setAttribute('aria-readonly', 'true');
+            input.addEventListener('focus', () => input.blur());
+        });
+
+        const bindInput = (input, field, mode) => {
             if (!input) return;
             input.addEventListener('input', () => {
                 if (field === 'density') {
                     input.value = normalizeRltDensityInput(input.value);
                     try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {}
-                } else if (field === 'volume') {
+                } else if (field === 'volume' || field === 'mass') {
                     input.value = String(input.value || '').replace(/[^0-9]/g, '');
-                } else {
-                    input.value = String(input.value || '').replace(',', '.').replace(/[^0-9.]/g, '');
                 }
                 activeRltMassLastEdited = field;
+                activeRltMassCalculationMode = mode;
                 syncRltMassModalFromInputs();
             });
             input.addEventListener('keydown', (event) => {
@@ -9299,9 +9416,10 @@ function initializeCalculator() {
             });
         };
 
-        bindInput(volumeInput, 'volume');
-        bindInput(densityInput, 'density');
-        bindInput(massInput, 'mass');
+        bindInput(massToVolumeMassInput, 'mass', 'massToVolume');
+        bindInput(massToVolumeDensityInput, 'density', 'massToVolume');
+        bindInput(volumeInput, 'volume', 'volumeToMass');
+        bindInput(densityInput, 'density', 'volumeToMass');
 
         if (validateBtn) {
             validateBtn.addEventListener('click', (event) => {
@@ -9314,21 +9432,34 @@ function initializeCalculator() {
 
                 syncRltMassModalFromInputs();
 
-                let volume = parseDecimalInput(volumeInput?.value);
-                const density = parseRltDensityInput(densityInput?.value);
-                let mass = parseDecimalInput(massInput?.value);
+                const topMass = parseDecimalInput(massToVolumeMassInput?.value);
+                const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
+                const topVolume = parseDecimalInput(massToVolumeVolumeInput?.value);
+                const bottomVolume = parseDecimalInput(volumeInput?.value);
+                const bottomDensity = parseRltDensityInput(densityInput?.value);
+                const bottomMass = parseDecimalInput(massInput?.value);
 
-                if (density !== null) {
-                    if (activeRltMassCalculationMode === 'massToVolume' && mass !== null) {
-                        volume = mass / density;
-                        if (volumeInput) volumeInput.value = formatDecimalValue(volume, 1);
-                    } else if (volume !== null) {
-                        mass = volume * density;
-                        if (massInput) massInput.value = formatDecimalValue(mass, 0);
-                    } else if (mass !== null) {
-                        volume = mass / density;
-                        if (volumeInput) volumeInput.value = formatDecimalValue(volume, 1);
-                    }
+                let volume = null;
+                let density = null;
+                let mass = null;
+
+                const topComputedVolume = (topMass !== null && topDensity !== null)
+                    ? (topVolume !== null ? topVolume : (topMass / topDensity))
+                    : null;
+                const volumeForMassResult = bottomVolume !== null ? bottomVolume : topComputedVolume;
+                const densityForMassResult = bottomDensity !== null ? bottomDensity : topDensity;
+
+                if (volumeForMassResult !== null && densityForMassResult !== null) {
+                    volume = volumeForMassResult;
+                    density = densityForMassResult;
+                    /*
+                     * v12.59 — important : la colonne Masse RLT affiche et
+                     * mémorise le résultat de Volume × Densité, jamais la
+                     * masse saisie directement dans la première ligne.
+                     */
+                    mass = bottomMass !== null && bottomVolume !== null && bottomDensity !== null
+                        ? bottomMass
+                        : (volumeForMassResult * densityForMassResult);
                 }
 
                 activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 0) : '';
@@ -9346,6 +9477,9 @@ function initializeCalculator() {
 
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
+                if (massToVolumeMassInput) massToVolumeMassInput.value = '';
+                if (massToVolumeDensityInput) massToVolumeDensityInput.value = '1.';
+                if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = '';
                 if (volumeInput) volumeInput.value = '';
                 if (densityInput) densityInput.value = '1.';
                 if (massInput) massInput.value = '';
@@ -9363,19 +9497,36 @@ function initializeCalculator() {
     }
 
     function openRltMassModal(wrapper) {
-        const { modal, volumeInput, densityInput, massInput } = getRltMassModalElements();
+        const elements = getRltMassModalElements();
+        const {
+            modal,
+            massToVolumeMassInput,
+            massToVolumeDensityInput,
+            massToVolumeVolumeInput,
+            volumeInput,
+            densityInput,
+            massInput
+        } = elements;
         if (!modal || !wrapper) return;
 
         setupRltMassModalOnce();
         activeRltMassWrapper = wrapper;
         activeRltMassLastEdited = null;
-
-        if (volumeInput) volumeInput.value = wrapper.dataset.volume || '';
-        if (densityInput) densityInput.value = wrapper.dataset.density || '1.';
-        if (massInput) massInput.value = wrapper.dataset.mass || String(wrapper.querySelector('.display-input')?.value || '').replace(/[^0-9]/g, '');
-
         activeRltMassCalculationMode = null;
+
+        const storedVolume = wrapper.dataset.volume || '';
+        const storedDensity = wrapper.dataset.density || '1.';
+        const storedMass = wrapper.dataset.mass || String(wrapper.querySelector('.display-input')?.value || '').replace(/[^0-9]/g, '');
+
+        if (massToVolumeMassInput) massToVolumeMassInput.value = storedMass || '';
+        if (massToVolumeDensityInput) massToVolumeDensityInput.value = storedDensity || '1.';
+        if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = storedVolume || '';
+        if (volumeInput) volumeInput.value = storedVolume || '';
+        if (densityInput) densityInput.value = storedDensity || '1.';
+        if (massInput) massInput.value = storedMass || '';
+
         markRltCalculatedField(null);
+        syncRltMassModalFromInputs();
 
         modal.style.removeProperty('display');
         modal.style.display = 'flex';
@@ -9383,8 +9534,8 @@ function initializeCalculator() {
 
         setTimeout(() => {
             try {
-                if (volumeInput && !volumeInput.value) volumeInput.focus({ preventScroll: false });
-                else if (massInput) massInput.focus({ preventScroll: false });
+                if (massToVolumeMassInput && !massToVolumeMassInput.value) massToVolumeMassInput.focus({ preventScroll: false });
+                else if (volumeInput) volumeInput.focus({ preventScroll: false });
             } catch (_) {}
         }, 50);
     }
@@ -9581,9 +9732,10 @@ function initializeCalculator() {
             const activeFlight = dailyFlights.find(flight => flight.id === activeFlightId);
             if (!activeFlight) return;
             activeFlight.closed = !activeFlight.closed;
+            if (activeFlight.state) {
+                activeFlight.state.calculator_table_data = compactCalculatorTableData(activeFlight.state.calculator_table_data || []);
+            }
             persistFlights();
-            refreshFlightSelector();
-            updateActiveFlightLockState();
 
             if (activeFlight.closed) {
                 const allClosed = dailyFlights.every(flight => flight.closed);
@@ -9596,8 +9748,11 @@ function initializeCalculator() {
                     activeFlightId = nextFlight.id;
                     persistFlights();
                     loadActiveFlightState();
+                    return;
                 }
             }
+
+            loadActiveFlightState();
         });
     }
 
@@ -9636,6 +9791,7 @@ function initializeCalculator() {
         updatePreviTab();
         updateSuiviTab();
         updateDeroutementTab();
+        if (typeof updateFlightDurationSummary === 'function') updateFlightDurationSummary();
     };
 
     masterRecalculate();
