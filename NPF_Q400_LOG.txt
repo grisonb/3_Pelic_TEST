@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.60
+Version actuelle TEST : v12.65
 Date de génération : 2026-07-05
 
 Règle de méthode
@@ -535,3 +535,38 @@ v12.62 — Calque Communes limité à l'écran
 - Modification script.js : le recalcul des communes visibles se fait en fin de déplacement ou de zoom (`moveend` / `zoomend`), et non en continu pendant le geste.
 - Objectif : conserver le rendu et les noms existants tout en réduisant fortement le nombre d'objets Leaflet actifs pendant la navigation.
 - Non modifié : seuils de zoom des communes, noms des communes, feux par polygones, retardant, PDF aérodromes, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS et rappel MAJ.
+
+v12.63 — Gestion des cartes, simulation avion et onglets
+- Base : v12.62 TEST communes_ecran.
+- Modification interface Cartes : titre renommé “Gestion des Cartes”, sans mention “hors ligne”.
+- Modification interface Cartes : suppression du texte explicatif “Importez un pack de tuiles...” au-dessus du bouton d'import ZIP.
+- Modification interface Cartes : ajout du bouton “Mode simulation avion” au-dessus du bouton “Importer un pack de tuiles (.zip)”.
+- Modification interface Cartes : les boutons techniques “Rafraîchir l'affichage des cartes” et “Vider le cache des packs désélectionnés” sont déplacés dans une section repliable “Maintenance / dépannage”.
+- Ajout mode simulation avion : après activation, toucher la carte place l'avion à la position choisie.
+- Le mode simulation interrompt le suivi GPS affiché afin que le GPS réel ne remplace pas la position simulée.
+- La position simulée est visuellement identifiée par un badge “SIM” et n'est pas enregistrée comme dernière position GPS réelle.
+- Le chat continue à demander et publier la vraie position GPS lorsqu'il est activé ; la position simulée ne sert qu'aux calculs/affichages locaux basés sur l'icône avion.
+- Retour GPS : quitter le mode simulation relance une demande GPS ponctuelle pour rétablir la position réelle.
+- Correction onglets calculateur : toute la barre d'onglets devient une zone tactile effective, avec interception de sécurité par coordonnées écran.
+- Correction CSS onglets : hauteur tactile renforcée et texte recentré pour éviter que seuls le bas ou le dessous du titre soient cliquables.
+- Non modifié : calque Communes limité à l'écran, retardant, PDF aérodromes, feux par polygones, import ZIP, IndexedDB, calque Lignes HT, centrage GPS et rappel MAJ.
+
+
+v12.64 — Simulation avion/feu par appui long
+- Base : v12.63 TEST cartes_sim_onglets.
+- Modification interface recherche/carte : suppression du bouton “Route BASE LFTW” à côté du bouton “Circuits GAAR”. La logique interne de route base reste disponible pour les calculs existants.
+- Modification mode simulation : un appui long sur la carte ouvre une petite fenêtre avec deux actions : “Positionner avion” et “Positionner feu”.
+- En mode simulation, le toucher simple conserve le positionnement rapide de l’avion.
+- Le feu créé depuis le mode simulation utilise la même logique de nommage par polygone communal que les feux manuels/GPS.
+- Protection ajoutée : après un appui long simulation, le clic résiduel éventuel est ignoré pour éviter de positionner l’avion en plus de l’action choisie.
+- Non modifié : import ZIP, IndexedDB, cartes offline, calque Communes limité à l'écran, calque Lignes HT, retardant, PDF aérodromes, rappel MAJ et centrage GPS.
+
+v12.65 — Simulation uniquement par appui long
+- Base : v12.64 TEST sim_feu.
+- Demande utilisateur : supprimer le toucher simple en mode simulation.
+- Modification mode simulation : le toucher simple ne positionne plus l'avion ; la carte reste donc manipulable normalement.
+- En mode simulation, seul l'appui long ouvre la fenêtre avec deux choix : “Positionner avion” et “Positionner feu”.
+- Hors mode simulation, l'appui long conserve le comportement opérationnel existant : création directe d'un feu à l'endroit touché, avec nommage par polygone communal.
+- Texte d'information du mode simulation ajusté pour indiquer l'appui long uniquement.
+- Non modifié : suppression du bouton Route BASE LFTW, import ZIP, IndexedDB, cartes offline, calque Communes limité à l'écran, calque Lignes HT, retardant, PDF aérodromes, rappel MAJ et centrage GPS.
+
