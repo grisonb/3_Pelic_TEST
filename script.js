@@ -231,6 +231,10 @@ const UPDATE_REMINDER_STORAGE_KEY = 'npfUpdateReminderLastShownAt';
 const UPDATE_REMINDER_INTERVAL_MS = 5 * 24 * 60 * 60 * 1000;
 let startupGpsAutoCenteredWithRealPosition = false;
 let startupGpsStoredCenterAppliedAt = 0;
+let isSimulationMode = false;
+let simulationMapClickHandler = null;
+let simulationSuppressNextClickUntil = 0;
+let simulationActionPopup = null;
 
 // v12.22 — sécurité : un import interrompu ne doit pas bloquer les suppressions suivantes.
 try {
@@ -1505,8 +1509,16 @@ function initMap() {
 
     map.on('contextmenu', async (e) => {
         if (isDrawingMode) return;
-        selectedPelicanOACI = null;
+        if (!e || !e.latlng) return;
         L.DomEvent.preventDefault(e.originalEvent);
+
+        if (isSimulationMode) {
+            simulationSuppressNextClickUntil = Date.now() + 900;
+            openSimulationActionPopup(e.latlng);
+            return;
+        }
+
+        selectedPelicanOACI = null;
         const manualCommune = await buildManualFireCommuneFromPointAsync(e.latlng.lat, e.latlng.lng, 'Feu manuel');
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
@@ -1754,6 +1766,7 @@ function setupEventListeners() {
     const mapSourceOfflineBtn = document.getElementById('map-source-offline-btn');
     const purgeInactivePacksBtn = document.getElementById('purge-inactive-packs-btn');
     const refreshOfflineTilesBtn = document.getElementById('refresh-offline-tiles-btn');
+    const simulationModeButton = document.getElementById('simulation-mode-button');
     
     if (mainActionButtons) {
         const versionDisplay = document.getElementById('app-version-display');
@@ -2014,7 +2027,9 @@ function setupEventListeners() {
     }
 
     liveGpsButton.addEventListener('click', toggleLiveGps);
-    lftwRouteButton.addEventListener('click', toggleLftwRoute);
+    if (lftwRouteButton) {
+        lftwRouteButton.addEventListener('click', toggleLftwRoute);
+    }
     gaarModeButton.addEventListener('click', toggleGaarVisibility);
     editCircuitsButton.addEventListener('click', toggleGaarDrawingMode);
     deleteCircuitsButton.addEventListener('click', () => { if (confirm("Voulez-vous vraiment supprimer tous les circuits GAAR ?")) { clearAllGaarCircuits(); } });
@@ -2065,7 +2080,7 @@ function setupEventListeners() {
     closeCalculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'none'; });
     calculatorModal.addEventListener('click', (e) => { if (e.target === calculatorModal) { calculatorModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && calculatorModal.style.display === 'flex') { calculatorModal.style.display = 'none'; } });
-    offlineMapsButton.addEventListener('click', () => { offlineMapModal.style.display = 'flex'; displayInstalledMaps(); displayInstalledAirportPdfs(); });
+    offlineMapsButton.addEventListener('click', () => { offlineMapModal.style.display = 'flex'; displayInstalledMaps(); displayInstalledAirportPdfs(); refreshSimulationModeButtonState(); });
     closeOfflineMapButton.addEventListener('click', () => { offlineMapModal.style.display = 'none'; });
     offlineMapModal.addEventListener('click', (e) => { if (e.target === offlineMapModal) { offlineMapModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && offlineMapModal.style.display === 'flex') { offlineMapModal.style.display = 'none'; } });
@@ -2138,6 +2153,14 @@ function setupEventListeners() {
                 refreshOfflineTilesBtn.disabled = false;
                 refreshOfflineTilesBtn.textContent = "Rafraîchir l'affichage des cartes offline";
             }
+        });
+    }
+
+
+    if (simulationModeButton) {
+        refreshSimulationModeButtonState();
+        simulationModeButton.addEventListener('click', () => {
+            toggleSimulationMode();
         });
     }
 
@@ -4588,17 +4611,19 @@ function ensureOwnGpsAltitudeMarkerStyle() {
     document.head.appendChild(style);
 }
 
-function buildOwnGpsIcon(altitudeLabel = '') {
+function buildOwnGpsIcon(altitudeLabel = '', options = {}) {
     ensureOwnGpsAltitudeMarkerStyle();
+    const isSimulation = options && options.simulation === true;
     const hasAltitudeLabel = !!String(altitudeLabel || '').trim();
     const safeAltitude = escapeHtml(altitudeLabel || '');
     const altitudeHtml = hasAltitudeLabel
         ? `<div class="own-gps-plane-altitude">${safeAltitude}</div>`
         : '';
+    const simulationHtml = isSimulation ? '<div class="own-gps-sim-badge">SIM</div>' : '';
 
     return L.divIcon({
-        className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}`,
-        html: `${altitudeHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈</span></div>`,
+        className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}${isSimulation ? ' own-gps-simulation-icon' : ''}`,
+        html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈</span></div>`,
         iconSize: [74, 58],
         iconAnchor: [37, 38]
     });
@@ -4737,31 +4762,46 @@ function updateOwnGpsVector(latitude, longitude, headingDeg, speedMps) {
 }
 
 function updateUserPosition(pos) {
+    if (!pos || !pos.coords) return;
+
+    const isSimulationPosition = pos.npfIsSimulation === true;
+    if (isSimulationMode && !isSimulationPosition) {
+        return;
+    }
+
     const { latitude, longitude } = pos.coords;
-    const ownAltitudeLabel = shouldShowOwnGpsAltitude() ? formatGpsAltitudeFtFromCoords(pos.coords) : '';
+    if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return;
+
+    const ownAltitudeLabel = (!isSimulationPosition && shouldShowOwnGpsAltitude()) ? formatGpsAltitudeFtFromCoords(pos.coords) : '';
     const gpsTimestampMs = Number(pos.timestamp) || Date.now();
-    const estimatedMotion = estimateMotionFromLastPosition(latitude, longitude, gpsTimestampMs);
+    const estimatedMotion = isSimulationPosition ? { heading: null, speed: null } : estimateMotionFromLastPosition(latitude, longitude, gpsTimestampMs);
     const rawHeading = Number(pos.coords.heading);
     const rawSpeed = Number(pos.coords.speed);
     const motionHeading = Number.isFinite(rawHeading) ? rawHeading : estimatedMotion.heading;
     const motionSpeed = Number.isFinite(rawSpeed) ? rawSpeed : estimatedMotion.speed;
-    updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
-    lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs };
-    saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
-    applyStartupGpsAutoCenter(latitude, longitude, {
-        source: pos && pos.npfIsStoredPosition ? 'stored' : 'real'
-    });
 
-    const ownGpsPopupHtml = ownAltitudeLabel
-        ? `Votre position<br>${escapeHtml(ownAltitudeLabel)}`
-        : 'Votre position';
+    if (isSimulationPosition) {
+        clearOwnGpsVector();
+        lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs, simulation: true };
+    } else {
+        updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
+        lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs };
+        saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
+        applyStartupGpsAutoCenter(latitude, longitude, {
+            source: pos && pos.npfIsStoredPosition ? 'stored' : 'real'
+        });
+    }
+
+    const ownGpsPopupHtml = isSimulationPosition
+        ? 'Position simulée'
+        : (ownAltitudeLabel ? `Votre position<br>${escapeHtml(ownAltitudeLabel)}` : 'Votre position');
 
     if (!userMarker) {
-        const userIcon = buildOwnGpsIcon(ownAltitudeLabel);
+        const userIcon = buildOwnGpsIcon(ownAltitudeLabel, { simulation: isSimulationPosition });
         userMarker = L.marker([latitude, longitude], { icon: userIcon }).bindPopup(ownGpsPopupHtml).addTo(map);
     } else {
         userMarker.setLatLng([latitude, longitude]);
-        userMarker.setIcon(buildOwnGpsIcon(ownAltitudeLabel));
+        userMarker.setIcon(buildOwnGpsIcon(ownAltitudeLabel, { simulation: isSimulationPosition }));
         userMarker.bindPopup(ownGpsPopupHtml);
     }
 
@@ -4782,6 +4822,160 @@ function updateUserPosition(pos) {
     drawUserToTargetRoute();
 }
 
+
+
+function closeSimulationActionPopup() {
+    try {
+        if (map && simulationActionPopup) {
+            map.closePopup(simulationActionPopup);
+        }
+    } catch (_) {}
+    simulationActionPopup = null;
+}
+
+async function createSimulatedFireAtPoint(lat, lng) {
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return;
+
+    selectedPelicanOACI = null;
+    const simulatedFire = await buildManualFireCommuneFromPointAsync(numericLat, numericLng, 'Feu SIM');
+    currentCommune = simulatedFire;
+    localStorage.setItem('currentCommune', JSON.stringify(simulatedFire));
+    displayCommuneDetails(simulatedFire, false);
+}
+
+function openSimulationActionPopup(latlng) {
+    if (!map || !latlng) return;
+
+    closeSimulationActionPopup();
+
+    const container = document.createElement('div');
+    container.className = 'simulation-action-popup-content';
+
+    const title = document.createElement('div');
+    title.className = 'simulation-action-popup-title';
+    title.textContent = 'Mode simulation';
+
+    const actions = document.createElement('div');
+    actions.className = 'simulation-action-popup-actions';
+
+    const aircraftButton = document.createElement('button');
+    aircraftButton.type = 'button';
+    aircraftButton.className = 'simulation-action-popup-btn simulation-aircraft-btn';
+    aircraftButton.textContent = 'Positionner avion';
+    aircraftButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applySimulatedUserPosition(latlng.lat, latlng.lng);
+        closeSimulationActionPopup();
+    });
+
+    const fireButton = document.createElement('button');
+    fireButton.type = 'button';
+    fireButton.className = 'simulation-action-popup-btn simulation-fire-btn';
+    fireButton.textContent = 'Positionner feu';
+    fireButton.addEventListener('click', async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await createSimulatedFireAtPoint(latlng.lat, latlng.lng);
+        closeSimulationActionPopup();
+    });
+
+    actions.appendChild(aircraftButton);
+    actions.appendChild(fireButton);
+    container.appendChild(title);
+    container.appendChild(actions);
+
+    try {
+        L.DomEvent.disableClickPropagation(container);
+        L.DomEvent.disableScrollPropagation(container);
+    } catch (_) {}
+
+    simulationActionPopup = L.popup({
+        className: 'simulation-action-popup',
+        closeButton: true,
+        autoClose: true,
+        closeOnClick: true,
+        maxWidth: 280
+    })
+        .setLatLng(latlng)
+        .setContent(container)
+        .openOn(map);
+}
+
+function refreshSimulationModeButtonState() {
+    const button = document.getElementById('simulation-mode-button');
+    if (!button) return;
+    button.classList.toggle('active', isSimulationMode);
+    button.textContent = isSimulationMode ? 'Quitter le mode simulation avion' : 'Mode simulation avion';
+}
+
+function applySimulatedUserPosition(lat, lng) {
+    const numericLat = Number(lat);
+    const numericLng = Number(lng);
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return;
+
+    updateUserPosition({
+        coords: {
+            latitude: numericLat,
+            longitude: numericLng,
+            altitude: null,
+            heading: null,
+            speed: null,
+            accuracy: null
+        },
+        timestamp: Date.now(),
+        npfIsSimulation: true
+    });
+}
+
+function enableSimulationMode() {
+    if (!map || isSimulationMode) return;
+
+    isSimulationMode = true;
+    if (watchId && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        const liveGpsButton = document.getElementById('live-gps-button');
+        if (liveGpsButton) liveGpsButton.classList.remove('active');
+        localStorage.setItem('liveGpsActive', 'false');
+    }
+
+    simulationMapClickHandler = null;
+    refreshSimulationModeButtonState();
+
+    const offlineMapModal = document.getElementById('offline-map-modal');
+    if (offlineMapModal) offlineMapModal.style.display = 'none';
+
+    alert('Mode simulation actif : appui long sur la carte pour choisir avion ou feu.');
+}
+
+function disableSimulationMode({ restoreGps = true } = {}) {
+    if (!isSimulationMode && !simulationMapClickHandler) return;
+
+    if (map && simulationMapClickHandler) {
+        map.off('click', simulationMapClickHandler);
+    }
+    simulationMapClickHandler = null;
+    simulationSuppressNextClickUntil = 0;
+    closeSimulationActionPopup();
+    isSimulationMode = false;
+    refreshSimulationModeButtonState();
+
+    if (restoreGps) {
+        requestOneShotGps({ silent: true, highAccuracy: true, timeout: 12000, maximumAge: 600000 });
+    }
+}
+
+function toggleSimulationMode() {
+    if (isSimulationMode) {
+        disableSimulationMode({ restoreGps: true });
+    } else {
+        enableSimulationMode();
+    }
+}
+
 function findClosestCommuneName(lat, lon) {
     const closestCommune = findClosestCommune(lat, lon, 27);
     return closestCommune ? closestCommune.nom_standard : null;
@@ -4796,6 +4990,7 @@ function toggleLftwRoute() {
 
 function updateLftwButtonState() {
     const lftwRouteButton = document.getElementById('lftw-route-button');
+    if (!lftwRouteButton) return;
     lftwRouteButton.classList.toggle('active', showLftwRoute);
 }
 
@@ -8419,6 +8614,35 @@ function initializeCalculator() {
             activateTab(onglet);
         });
     });
+
+    document.addEventListener('pointerup', (event) => {
+        if (!calculatorModal || calculatorModal.style.display !== 'flex') return;
+        const nav = calculatorModal.querySelector('.onglets-navigation');
+        if (!nav) return;
+        const rect = nav.getBoundingClientRect();
+        const x = event.clientX;
+        const y = event.clientY;
+        const verticalMargin = 10;
+        if (x < rect.left || x > rect.right || y < rect.top - verticalMargin || y > rect.bottom + verticalMargin) return;
+
+        const buttons = Array.from(nav.querySelectorAll('.onglet-bouton'));
+        if (!buttons.length) return;
+
+        let target = buttons.find((button) => {
+            const b = button.getBoundingClientRect();
+            return x >= b.left && x <= b.right;
+        });
+
+        if (!target) {
+            const ratio = Math.max(0, Math.min(0.999, (x - rect.left) / Math.max(1, rect.width)));
+            target = buttons[Math.floor(ratio * buttons.length)];
+        }
+
+        if (target) {
+            event.preventDefault();
+            activateTab(target);
+        }
+    }, { passive: false });
 
 
     function createEmptyFlight(number = 1) {
