@@ -8506,7 +8506,8 @@ function initializeCalculator() {
 
         const flightDuration = getFlightDurationFromState(state);
         const activeIndex = getActiveFlightIndex();
-        const flightText = `Tps vol : ${formatTime(flightDuration) || '00:00'}`;
+        const flightNumber = activeIndex >= 0 ? activeIndex + 1 : 1;
+        const flightText = `Tps de vol n°${flightNumber} : ${formatTime(flightDuration) || '00:00'}`;
 
         if (activeIndex > 0) {
             const totalDuration = getCumulativeHdvBeforeActiveFlight() + flightDuration;
@@ -9393,6 +9394,22 @@ function initializeCalculator() {
 
         const bindInput = (input, field, mode) => {
             if (!input) return;
+            input.addEventListener('focus', () => {
+                /*
+                 * v12.60 — iPad : quand le clavier apparaît, la fenêtre
+                 * Masse RLT doit remonter comme lorsqu'une cellule déjà
+                 * renseignée est ouverte. On force un recentrage visuel
+                 * de la boîte au focus de chaque champ éditable.
+                 */
+                setTimeout(() => {
+                    try {
+                        const content = input.closest('.rlt-mass-modal-content');
+                        if (content && typeof content.scrollIntoView === 'function') {
+                            content.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+                        }
+                    } catch (_) {}
+                }, 160);
+            });
             input.addEventListener('input', () => {
                 if (field === 'density') {
                     input.value = normalizeRltDensityInput(input.value);
@@ -9534,10 +9551,26 @@ function initializeCalculator() {
 
         setTimeout(() => {
             try {
-                if (massToVolumeMassInput && !massToVolumeMassInput.value) massToVolumeMassInput.focus({ preventScroll: false });
-                else if (volumeInput) volumeInput.focus({ preventScroll: false });
+                /*
+                 * v12.60 — on privilégie la ligne opérationnelle
+                 * Volume × Densité = Masse. Sur iPad, focaliser ce champ
+                 * fait remonter la fenêtre avec le clavier, y compris quand
+                 * la cellule Masse RLT était vide.
+                 */
+                const preferredInput = volumeInput || massToVolumeMassInput;
+                if (preferredInput) {
+                    preferredInput.focus({ preventScroll: false });
+                    const content = preferredInput.closest('.rlt-mass-modal-content');
+                    setTimeout(() => {
+                        try {
+                            if (content && typeof content.scrollIntoView === 'function') {
+                                content.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+                            }
+                        } catch (_) {}
+                    }, 180);
+                }
             } catch (_) {}
-        }, 50);
+        }, 80);
     }
 
     function initializeRltMassInput(wrapper, data = {}) {
