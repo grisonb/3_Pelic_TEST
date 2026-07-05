@@ -464,3 +464,13 @@ v12.55 — Mise à jour PWA sécurisée avant nouvelle pérenne
 - Sécurité : aucune suppression IndexedDB ; les cartes offline et les tuiles importées ne sont pas touchées.
 - Fonctionnalités conservées : import ZIP inchangé, centrage GPS v12.54 conservé, calque Lignes HT conservé.
 - Cette version reste une version TEST avant préparation d'une nouvelle version pérenne.
+
+v12.56 — Rappel MAJ 5 jours + fermeture feu centrée GPS
+- Base : v12.55 TEST maj_pwa.
+- Modification : ajout d’un rappel non bloquant à l’ouverture tous les 5 jours.
+- Message : “Pensez à cliquer sur [icône MAJ] de temps en temps pour être certain d’avoir la dernière version à jour.”
+- Action : bouton “Vérifier maintenant” lance la logique MAJ existante ; “Plus tard” mémorise le rappel pour 5 jours.
+- Modification : le bouton X du bandeau feu ne renvoie plus sur la vue France dézoomée.
+- Nouvelle logique : après fermeture du feu, la carte reprend la logique d’ouverture GPS avec zoom 10, en utilisant la position GPS courante, la dernière position connue ou la position stockée.
+- Non modifié : import ZIP, cartes offline, IndexedDB, calque Lignes HT.
+
