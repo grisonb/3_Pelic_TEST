@@ -984,8 +984,10 @@ async function initializeApp() {
         localStorage.removeItem('water_airports');
         localStorage.removeItem('selected_base_oaci');
     }
-    const savedLftwState = localStorage.getItem('showLftwRoute');
-    showLftwRoute = savedLftwState === null ? true : (savedLftwState === 'true');
+    // v12.67 — le bouton Route BASE a été retiré de l'interface, mais la route base reste active.
+    // On ignore donc l'ancien état local éventuel (ex. utilisateur avait désactivé la route avant suppression du bouton).
+    showLftwRoute = true;
+    localStorage.setItem('showLftwRoute', 'true');
     localStorage.setItem(SHOW_DEPARTMENTS_LAYER_KEY, 'false');
     const savedGaarJSON = localStorage.getItem('gaarCircuits');
     if (savedGaarJSON) {
