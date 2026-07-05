@@ -5527,3 +5527,165 @@ body {
 #bloc-fuel.flight-locked .flight-duration-summary .flight-duration-total {
     color: var(--secondary-color) !important;
 }
+
+/* ==========================================================================
+   v12.63 — Gestion cartes, simulation avion et zone tactile onglets
+   ========================================================================== */
+.simulation-mode-button {
+    display: block;
+    width: min(100%, 420px);
+    margin: 0 auto 12px auto;
+    padding: 15px;
+    border: 2px solid #0b63a3;
+    border-radius: 10px;
+    background: #eef8ff;
+    color: #004a80;
+    font-size: 18px;
+    font-weight: 900;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.simulation-mode-button.active {
+    background: #7c2d12;
+    border-color: #7c2d12;
+    color: #ffffff;
+}
+
+.offline-maintenance-section {
+    margin: 4px 0 10px 0;
+    padding: 8px 10px;
+    border: 1px solid #d6dee8;
+    border-radius: 10px;
+    background: #f7fafc;
+}
+
+.offline-maintenance-section summary {
+    cursor: pointer;
+    color: #40556c;
+    font-weight: 800;
+    text-align: center;
+    list-style-position: inside;
+    padding: 4px 0;
+}
+
+.offline-maintenance-section .neutral-inline-btn,
+.offline-maintenance-section .danger-inline-btn {
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+.own-gps-simulation-icon .own-gps-plane-body {
+    background: #7c2d12 !important;
+    border-color: #ffffff !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, .85), 0 2px 7px rgba(0,0,0,.45) !important;
+}
+
+.own-gps-sim-badge {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: #7c2d12;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1.1;
+    box-shadow: 0 1px 4px rgba(0,0,0,.28);
+    white-space: nowrap;
+}
+
+.onglets-navigation {
+    min-height: 66px !important;
+    align-items: stretch !important;
+    z-index: 80 !important;
+    flex: 0 0 auto !important;
+}
+
+.onglet-bouton {
+    min-height: 66px !important;
+    height: auto !important;
+    align-self: stretch !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: auto !important;
+}
+
+.onglet-bouton::before {
+    content: '';
+    position: absolute;
+    inset: -8px 0 -8px 0;
+    z-index: -1;
+}
+
+@media (max-width: 760px) {
+    .onglets-navigation {
+        min-height: 48px !important;
+        height: 48px !important;
+    }
+
+    .onglet-bouton {
+        min-height: 48px !important;
+        height: 48px !important;
+    }
+
+    .onglets-conteneur {
+        height: calc(100% - 48px) !important;
+    }
+}
+
+/* ========================================================================== 
+   v12.64 — Popup simulation avion / feu par appui long
+   ========================================================================== */
+.simulation-action-popup .leaflet-popup-content-wrapper {
+    border-radius: 14px;
+    border: 2px solid #0b63a3;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
+}
+
+.simulation-action-popup .leaflet-popup-content {
+    margin: 12px 14px;
+    min-width: 230px;
+}
+
+.simulation-action-popup-title {
+    color: #004a80;
+    font-weight: 950;
+    text-align: center;
+    font-size: 17px;
+    margin-bottom: 10px;
+}
+
+.simulation-action-popup-actions {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    justify-content: center;
+}
+
+.simulation-action-popup-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.simulation-aircraft-btn {
+    background: #0b63a3;
+}
+
+.simulation-fire-btn {
+    background: #e3001b;
+}
