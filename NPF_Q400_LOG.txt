@@ -589,3 +589,12 @@ v12.67 — Route base active sans bouton
 - Modification script.js : l’ancien état local `showLftwRoute=false` est ignoré, car il n’y a plus de bouton pour réactiver manuellement la route.
 - Résultat attendu : la route vers la base sélectionnée reste affichée/calculée automatiquement lorsqu’un feu est sélectionné, même après mise à jour depuis une version où l’utilisateur avait désactivé le bouton.
 - Non modifié : simulation par appui long, GPS, bordure rouge simulation, interface Cartes, Communes, Lignes HT, retardant, PDF, import ZIP, IndexedDB et rappel MAJ.
+
+
+v12.68 — Onglets plus hauts et popup simulation persistante
+- Base : v12.67 TEST route_base_active.
+- Correction onglets calculateur : la zone tactile des titres d'onglets est encore remontée. La détection par coordonnées accepte désormais une marge supérieure plus importante et intercepte aussi pointerdown, pointerup, touchend et click.
+- Protection onglets : les boutons et champs hors barre d'onglets ne sont pas détournés par cette interception, afin d'éviter une activation parasite lors d'un clic sur le X ou sur un champ.
+- Correction mode simulation : la fenêtre ouverte par appui long ne se ferme plus au relâchement du doigt. Le popup Leaflet n'est plus fermé par le clic résiduel de la carte.
+- Modification popup simulation : les événements tactiles/clics dans la fenêtre sont isolés de la carte ; fermeture uniquement par le X Leaflet ou par les boutons Positionner avion / Positionner feu.
+- Non modifié : route base active sans bouton, GPS, bordure rouge simulation, interface Cartes, Communes, Lignes HT, retardant, PDF, import ZIP, IndexedDB et rappel MAJ.
