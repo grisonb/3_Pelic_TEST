@@ -1,6 +1,5 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
@@ -475,3 +474,12 @@ v12.56 — Rappel MAJ 5 jours + fermeture feu centrée GPS
 - Nouvelle logique : après fermeture du feu, la carte reprend la logique d’ouverture GPS avec zoom 10, en utilisant la position GPS courante, la dernière position connue ou la position stockée.
 - Non modifié : import ZIP, cartes offline, IndexedDB, calque Lignes HT.
 
+v12.57 — Interface iPad, GPS chat et communes par polygones
+- Base : v12.56 TEST info_maj_5j_zoom_x.
+- Modification rappel MAJ : dans la fenêtre de rappel, l'icône générique est remplacée par un petit bouton “🔄 MAJ” reprenant le visuel du bouton réel de l'application.
+- Modification GPS avion : l'altitude n'est plus affichée sur l'icône avion par défaut. Elle est affichée uniquement si le chat est connecté et si le partage de position GPS du chat est activé.
+- Modification communes/feux : le nom d'un feu manuel ou GPS est déterminé par le polygone communal uniquement. La commune la plus proche n'est plus utilisée pour nommer ou enrichir un feu.
+- Modification affichage commune GPS : pendant le chargement des polygones, l'application affiche “chargement...” et non plus une commune provisoire par proximité. Cela supprime le flash Plan-de-Cuques avant Marseille.
+- Modification historique feux : lorsque les polygones sont disponibles, les feux manuels/GPS mémorisés peuvent être réajustés avec la commune réellement contenant les coordonnées.
+- Modification interface carte : les colonnes d'icônes carte gauche et droite sont légèrement descendues pour éviter le collage avec la date, l'heure et la batterie iPad.
+- Non modifié : import ZIP, IndexedDB, cartes offline, calque Lignes HT, rappel 5 jours, logique MAJ existante et correction du X du bandeau feu.
