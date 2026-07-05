@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-67-route-base-active';
+const SW_VERSION = 'sw-v12-68-sim-popup-onglets';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
