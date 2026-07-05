@@ -5356,22 +5356,30 @@ body {
     font-weight: 600;
 }
 
-.update-reminder-icon {
+.update-reminder-maj-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 24px;
-    margin: 0 3px;
+    gap: 3px;
+    min-width: 54px;
+    height: 28px;
+    margin: 0 4px;
+    padding: 0 7px;
     border-radius: 8px;
-    border: 1px solid #b9c8d8;
-    background: #ffffff;
+    border: 1px solid var(--primary-color);
+    background: rgba(255, 255, 255, 0.95);
     color: var(--primary-color);
-    font-size: 20px;
+    font-size: 12px;
     font-weight: 900;
     line-height: 1;
-    vertical-align: -5px;
+    vertical-align: -6px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+    box-sizing: border-box;
+}
+
+.update-reminder-maj-symbol {
+    font-size: 14px;
+    line-height: 1;
 }
 
 .update-reminder-actions {
@@ -5400,3 +5408,30 @@ body {
     color: var(--text-color);
 }
 
+
+
+/* ==========================================================================
+   v12.57 — marge haute des icônes carte iPad/PWA
+   ========================================================================== */
+:root {
+    --map-action-top-offset: 24px;
+}
+
+#main-action-buttons,
+#left-map-action-buttons {
+    top: calc(var(--safe-area-top) + var(--map-action-top-offset)) !important;
+}
+
+@media (max-width: 760px) {
+    #main-action-buttons,
+    #left-map-action-buttons {
+        top: calc(env(safe-area-inset-top, 0px) + 28px) !important;
+    }
+}
+
+@media (max-width: 430px) {
+    #main-action-buttons,
+    #left-map-action-buttons {
+        top: 36px !important;
+    }
+}
