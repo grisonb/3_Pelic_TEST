@@ -5689,3 +5689,72 @@ body {
 .simulation-fire-btn {
     background: #e3001b;
 }
+
+
+/* ========================================================================== 
+   v12.66 — Simulation GPS, bordure rouge, boutons centrés, onglets renforcés
+   ========================================================================== */
+body.simulation-mode-active #map::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border: 7px solid #e3001b;
+    border-radius: 0;
+    z-index: 1400;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.75);
+}
+
+#ui-overlay .extra-controls,
+#ui-overlay .extra-controls-grid {
+    grid-template-columns: repeat(5, minmax(0, 160px)) !important;
+    justify-content: center !important;
+    justify-items: stretch !important;
+}
+
+@media (max-width: 760px) {
+    #ui-overlay .extra-controls,
+    #ui-overlay .extra-controls-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+
+.onglets-navigation {
+    min-height: 74px !important;
+    height: 74px !important;
+    padding-top: 0 !important;
+    align-items: stretch !important;
+    overflow: visible !important;
+}
+
+.onglet-bouton {
+    min-height: 74px !important;
+    height: 74px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    align-items: center !important;
+    touch-action: manipulation !important;
+    z-index: 90 !important;
+}
+
+.onglet-bouton::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -30px;
+    bottom: -12px;
+    z-index: 0;
+}
+
+.onglet-bouton > * {
+    position: relative;
+    z-index: 1;
+}
+
+#offline-status {
+    font-weight: 900 !important;
+    color: #005a9c !important;
+    text-align: center !important;
+}
