@@ -1,6 +1,5 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
@@ -515,3 +514,13 @@ v12.60 — Clavier Masse RLT et libellé temps de vol
 - Modification fenêtre VOLUME/MASSE RETARDANT : à l'ouverture d'une cellule Masse RLT vide, le focus est placé sur la ligne opérationnelle “Volume × Densité = Masse”.
 - Modification iPad/clavier : la fenêtre Masse RLT remonte désormais aussi lorsque la cellule était vide, afin d'éviter que le clavier masque les boutons et la seconde ligne.
 - Non modifié : calcul Masse RLT par Volume × Densité, PDF aérodromes, clôture vols, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS et nommage des feux par polygones.
+
+
+v12.61 — Retardant, rappel MAJ et résumé temps de vol
+- Base : v12.60 TEST clavier_rlt_tps_vol.
+- Modification fenêtre VOLUME/MASSE RETARDANT : le bouton “Annuler” utilise désormais la même fermeture immédiate que le bouton X, même quand le clavier iPad est ouvert.
+- Modification Bloc/Fuel : le résumé affiche “Tps de vol n°X : HHhMM / Total : HHhMM” à partir du vol n°2.
+- Modification Bloc/Fuel : le séparateur entre le temps du vol et le total est “/”.
+- Modification Bloc/Fuel : “Total : HHhMM” est affiché en rouge, tout en conservant le fond bleu du bandeau.
+- Modification rappel MAJ 5 jours : ajout du texte “Relancer l’application après mise à jour.”
+- Non modifié : calcul Masse RLT par Volume × Densité, PDF aérodromes, nommage des feux par polygones, import ZIP, IndexedDB, cartes offline, calque Lignes HT et centrage GPS.
