@@ -226,6 +226,8 @@ let activeOfflinePacks = [];
 let isMapSourceSwitching = false;
 let isZipImportRunning = false;
 const STARTUP_GPS_CENTER_ZOOM = 10;
+const UPDATE_REMINDER_STORAGE_KEY = 'npfUpdateReminderLastShownAt';
+const UPDATE_REMINDER_INTERVAL_MS = 5 * 24 * 60 * 60 * 1000;
 let startupGpsAutoCenteredWithRealPosition = false;
 let startupGpsStoredCenterAppliedAt = 0;
 
@@ -1013,6 +1015,7 @@ async function initializeApp() {
     } catch (uiError) {
         console.error('Erreur setupEventListeners:', uiError);
     }
+    setTimeout(showUpdateReminderIfDue, 1500);
     setTimeout(() => {
         updateBaseTileNativeZoomFromAvailability({ forceScan: true }).catch(() => {});
     }, 0);
@@ -1624,8 +1627,7 @@ function clearCurrentSelection() {
     masterRecalculate();
     updateCommuneDisplay(null);
     document.getElementById('bingo-map-display').style.display = 'none';
-    navigator.geolocation.getCurrentPosition(updateUserPosition);
-    map.setView([46.6, 2.2], 5.5);
+    centerMapOnGpsOverviewAfterClear();
 }
 
 
@@ -2210,6 +2212,64 @@ async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = 
     }
 }
 
+function showUpdateReminderIfDue() {
+    try {
+        const lastShown = Number(localStorage.getItem(UPDATE_REMINDER_STORAGE_KEY) || '0');
+        const now = Date.now();
+        if (lastShown && (now - lastShown) < UPDATE_REMINDER_INTERVAL_MS) return;
+        showUpdateReminderModal(now);
+    } catch (_) {}
+}
+
+function showUpdateReminderModal(timestamp = Date.now()) {
+    if (document.getElementById('update-reminder-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'update-reminder-modal';
+    modal.className = 'update-reminder-modal';
+    modal.innerHTML = `
+        <div class="update-reminder-modal-content" role="dialog" aria-modal="true" aria-labelledby="update-reminder-title">
+            <h3 id="update-reminder-title">Mise à jour</h3>
+            <p>Pensez à cliquer sur <span class="update-reminder-icon" aria-label="icône de mise à jour">↻</span> de temps en temps pour être certain d’avoir la dernière version à jour.</p>
+            <div class="update-reminder-actions">
+                <button id="update-reminder-now-button" class="update-reminder-primary" type="button">Vérifier maintenant</button>
+                <button id="update-reminder-later-button" class="update-reminder-secondary" type="button">Plus tard</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const rememberAndClose = () => {
+        try {
+            localStorage.setItem(UPDATE_REMINDER_STORAGE_KEY, String(timestamp));
+        } catch (_) {}
+        modal.remove();
+    };
+
+    const laterButton = document.getElementById('update-reminder-later-button');
+    if (laterButton) {
+        laterButton.addEventListener('click', rememberAndClose);
+    }
+
+    const nowButton = document.getElementById('update-reminder-now-button');
+    if (nowButton) {
+        nowButton.addEventListener('click', () => {
+            rememberAndClose();
+            if (typeof window.forceRecoveryReload === 'function') {
+                window.forceRecoveryReload();
+                return;
+            }
+            const forceUpdateButton = document.getElementById('force-update-button');
+            if (forceUpdateButton) forceUpdateButton.click();
+        });
+    }
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) rememberAndClose();
+    });
+}
+
 function updateCommuneDisplay(commune) {
     const communeDisplay = document.getElementById('commune-info-display');
     if (!commune) {
@@ -2474,7 +2534,7 @@ function refreshHighVoltageLinesButtonState() {
 }
 
 async function fetchHighVoltageLinesGeojson() {
-    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.55')}`;
+    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.56')}`;
     let response = null;
 
     try {
@@ -2490,7 +2550,7 @@ async function fetchHighVoltageLinesGeojson() {
 
         try {
             if ('caches' in window) {
-                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.55'}`);
+                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.56'}`);
                 await cache.put(HIGH_VOLTAGE_LINES_GEOJSON_URL, response.clone());
             }
         } catch (cacheError) {
@@ -3907,6 +3967,56 @@ function applyStoredGpsStartupCenter({ force = false } = {}) {
     const stored = getStoredGpsPosition();
     if (!stored) return false;
     return applyStartupGpsAutoCenter(stored.lat, stored.lng, { source: 'stored', force });
+}
+
+function centerMapOnGpsOverviewAfterClear() {
+    /*
+     * v12.56 — fermeture du bandeau feu.
+     * Le bouton X ne doit plus renvoyer sur une vue France dézoomée.
+     * On reprend la logique d'ouverture : position GPS connue, zoom large 10,
+     * puis correction par GPS réel si disponible.
+     */
+    if (!map) return;
+
+    const zoom = getStartupGpsCenterZoom();
+
+    const centerOn = (lat, lng) => {
+        const numericLat = Number(lat);
+        const numericLng = Number(lng);
+        if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return false;
+        map.setView([numericLat, numericLng], zoom, { animate: false });
+        return true;
+    };
+
+    let centered = false;
+
+    try {
+        if (userMarker && typeof userMarker.getLatLng === 'function') {
+            const latlng = userMarker.getLatLng();
+            centered = centerOn(latlng.lat, latlng.lng);
+        }
+    } catch (_) {}
+
+    if (!centered && lastPosition) {
+        centered = centerOn(lastPosition.lat, lastPosition.lng);
+    }
+
+    if (!centered) {
+        const stored = getStoredGpsPosition();
+        if (stored) centered = centerOn(stored.lat, stored.lng);
+    }
+
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            updateUserPosition(pos);
+            const { latitude, longitude } = pos.coords || {};
+            centerOn(latitude, longitude);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 600000 }
+    );
 }
 
 function primeGpsFromStoredPosition() {
