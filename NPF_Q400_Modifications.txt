@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.58
+Version actuelle TEST : v12.60
 Date de génération : 2026-07-05
 
 Règle de méthode
@@ -505,3 +505,12 @@ v12.59 — Masse RLT issue du calcul Volume × Densité
 - Si l'utilisateur utilise la ligne “Masse ÷ Densité = Volume”, le volume calculé sert d'entrée implicite pour recalculer ensuite la masse via Volume × Densité.
 - La masse saisie directement dans la première ligne ne sert donc plus d'affichage direct dans la colonne “Masse RLT”.
 - Non modifié : PDF aérodromes, clôture vols, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS, logique MAJ et nommage des feux par polygones.
+
+
+v12.60 — Clavier Masse RLT et libellé temps de vol
+- Base : v12.59 TEST masse_rlt_resultat_volume.
+- Modification Bloc/Fuel : la synthèse à droite du bouton Supprimer affiche maintenant “Tps de vol n°X : HH:MM”.
+- Modification Bloc/Fuel : la taille de police de cette synthèse est légèrement augmentée pour améliorer la lisibilité sur iPad.
+- Modification fenêtre VOLUME/MASSE RETARDANT : à l'ouverture d'une cellule Masse RLT vide, le focus est placé sur la ligne opérationnelle “Volume × Densité = Masse”.
+- Modification iPad/clavier : la fenêtre Masse RLT remonte désormais aussi lorsque la cellule était vide, afin d'éviter que le clavier masque les boutons et la seconde ligne.
+- Non modifié : calcul Masse RLT par Volume × Densité, PDF aérodromes, clôture vols, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS et nommage des feux par polygones.
