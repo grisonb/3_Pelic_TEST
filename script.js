@@ -4904,13 +4904,19 @@ function openSimulationActionPopup(latlng) {
     try {
         L.DomEvent.disableClickPropagation(container);
         L.DomEvent.disableScrollPropagation(container);
+        ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'click'].forEach((eventName) => {
+            container.addEventListener(eventName, (event) => {
+                event.stopPropagation();
+            }, { passive: true });
+        });
     } catch (_) {}
 
     simulationActionPopup = L.popup({
         className: 'simulation-action-popup',
         closeButton: true,
         autoClose: true,
-        closeOnClick: true,
+        closeOnClick: false,
+        autoPan: true,
         maxWidth: 280
     })
         .setLatLng(latlng)
@@ -8628,18 +8634,31 @@ function initializeCalculator() {
         });
     });
 
-    document.addEventListener('pointerup', (event) => {
-        if (!calculatorModal || calculatorModal.style.display !== 'flex') return;
+    function handleCalculatorTabHitByCoordinates(event) {
+        if (!calculatorModal || calculatorModal.style.display !== 'flex') return false;
         const nav = calculatorModal.querySelector('.onglets-navigation');
-        if (!nav) return;
+        if (!nav) return false;
+
+        const targetElement = event.target instanceof Element ? event.target : null;
+        const blockedInteractive = targetElement?.closest('button, input, select, textarea, a, [role="button"]');
+        if (blockedInteractive && !blockedInteractive.classList.contains('onglet-bouton') && !blockedInteractive.closest('.onglets-navigation')) {
+            return false;
+        }
+
+        const point = event.changedTouches && event.changedTouches[0]
+            ? event.changedTouches[0]
+            : (event.touches && event.touches[0] ? event.touches[0] : event);
+        const x = Number(point.clientX);
+        const y = Number(point.clientY);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+
         const rect = nav.getBoundingClientRect();
-        const x = event.clientX;
-        const y = event.clientY;
-        const verticalMargin = 36;
-        if (x < rect.left || x > rect.right || y < rect.top - verticalMargin || y > rect.bottom + verticalMargin) return;
+        const verticalMarginTop = 105;
+        const verticalMarginBottom = 42;
+        if (x < rect.left || x > rect.right || y < rect.top - verticalMarginTop || y > rect.bottom + verticalMarginBottom) return false;
 
         const buttons = Array.from(nav.querySelectorAll('.onglet-bouton'));
-        if (!buttons.length) return;
+        if (!buttons.length) return false;
 
         let target = buttons.find((button) => {
             const b = button.getBoundingClientRect();
@@ -8651,11 +8670,15 @@ function initializeCalculator() {
             target = buttons[Math.floor(ratio * buttons.length)];
         }
 
-        if (target) {
-            event.preventDefault();
-            activateTab(target);
-        }
-    }, { passive: false });
+        if (!target) return false;
+        event.preventDefault();
+        activateTab(target);
+        return true;
+    }
+
+    ['pointerdown', 'pointerup', 'touchend', 'click'].forEach((eventName) => {
+        document.addEventListener(eventName, handleCalculatorTabHitByCoordinates, { passive: false, capture: true });
+    });
 
 
     function createEmptyFlight(number = 1) {
