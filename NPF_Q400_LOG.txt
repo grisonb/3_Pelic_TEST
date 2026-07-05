@@ -1,7 +1,5 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
@@ -526,3 +524,14 @@ v12.61 — Retardant, rappel MAJ et résumé temps de vol
 - Modification Bloc/Fuel : “Total : HHhMM” est affiché en rouge, tout en conservant le fond bleu du bandeau.
 - Modification rappel MAJ 5 jours : ajout du texte “Relancer l’application après mise à jour.”
 - Non modifié : calcul Masse RLT par Volume × Densité, PDF aérodromes, nommage des feux par polygones, import ZIP, IndexedDB, cartes offline, calque Lignes HT et centrage GPS.
+
+
+v12.62 — Calque Communes limité à l'écran
+- Base : v12.61 TEST retardant_maj_tps_vol.
+- Constat utilisateur : lorsque le calque Communes est activé, les déplacements et zooms deviennent très lents sur iPad.
+- Décision utilisateur : ne pas modifier les seuils de zoom ni l'affichage des noms de communes.
+- Modification script.js : les polygones des communes ne sont plus tous ajoutés simultanément à la carte.
+- Nouvelle logique : seules les communes dont les limites intersectent l'emprise visible de l'écran sont ajoutées au calque Leaflet.
+- Modification script.js : le recalcul des communes visibles se fait en fin de déplacement ou de zoom (`moveend` / `zoomend`), et non en continu pendant le geste.
+- Objectif : conserver le rendu et les noms existants tout en réduisant fortement le nombre d'objets Leaflet actifs pendant la navigation.
+- Non modifié : seuils de zoom des communes, noms des communes, feux par polygones, retardant, PDF aérodromes, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS et rappel MAJ.
