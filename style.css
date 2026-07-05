@@ -5508,3 +5508,22 @@ body {
     padding: 0 12px !important;
 }
 
+
+/* v12.61 — résumé temps de vol : séparateur / et total rouge */
+.flight-duration-summary {
+    gap: 7px !important;
+}
+
+.flight-duration-summary .flight-duration-separator {
+    color: var(--primary-color) !important;
+    font-weight: 950 !important;
+}
+
+.flight-duration-summary .flight-duration-total {
+    color: var(--secondary-color) !important;
+    font-weight: 950 !important;
+}
+
+#bloc-fuel.flight-locked .flight-duration-summary .flight-duration-total {
+    color: var(--secondary-color) !important;
+}
