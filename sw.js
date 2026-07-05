@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-65-sim-appui-long';
+const SW_VERSION = 'sw-v12-66-sim-gps-ui';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
