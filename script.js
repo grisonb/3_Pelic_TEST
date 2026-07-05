@@ -407,26 +407,87 @@ function getCommuneFromDatabaseByNameAndDepartment(commune) {
     return sameName[0];
 }
 
-function buildManualFireCommuneFromPoint(lat, lon) {
+function buildManualFireCommuneFromPoint(lat, lon, fallbackName = 'Feu manuel') {
     /*
-     * v11.61 — feu manuel :
-     * on privilégie la base communes par centre/nom de commune plutôt que
-     * le polygone sous le pointeur. Cela évite les incohérences aux limites
-     * départementales, par exemple Marseillargues (34) proche du 30.
+     * v12.57 — nommage feu par polygone communal uniquement.
+     * On ne persiste plus une commune calculée par simple proximité, car cela
+     * peut nommer à tort un feu situé dans Marseille avec une commune limitrophe.
      */
-    const nearestFromDatabase = findClosestCommune(lat, lon, 27);
     const containedFromMap = findCommuneContainingPoint(lat, lon);
-    const referenceCommune = nearestFromDatabase || containedFromMap || null;
-    const databaseCommune = getCommuneFromDatabaseByNameAndDepartment(referenceCommune) || referenceCommune;
+    const databaseCommune = getCommuneFromDatabaseByNameAndDepartment(containedFromMap) || containedFromMap;
+
+    if (databaseCommune) {
+        return {
+            nom_standard: databaseCommune.nom_standard || databaseCommune.name || 'Feu manuel',
+            dep_code: databaseCommune.dep_code || null,
+            dep_nom: databaseCommune.dep_nom || null,
+            latitude_mairie: lat,
+            longitude_mairie: lon,
+            isManual: true,
+            communeSource: 'polygon'
+        };
+    }
 
     return {
-        nom_standard: databaseCommune?.nom_standard || 'Feu manuel',
-        dep_code: databaseCommune?.dep_code || null,
-        dep_nom: databaseCommune?.dep_nom || null,
+        nom_standard: fallbackName,
+        dep_code: null,
+        dep_nom: null,
         latitude_mairie: lat,
         longitude_mairie: lon,
-        isManual: true
+        isManual: true,
+        communeSource: 'coordinates'
     };
+}
+
+async function buildManualFireCommuneFromPointAsync(lat, lon, fallbackName = 'Feu manuel') {
+    if (!hasLoadedCommunes) {
+        try {
+            await ensureCommunesLayerDataLoaded();
+        } catch (error) {
+            console.warn('Identification commune par polygone indisponible:', error);
+        }
+    }
+
+    return buildManualFireCommuneFromPoint(lat, lon, fallbackName);
+}
+
+function repairManualFireCommuneLabelsFromPolygons() {
+    if (!hasLoadedCommunes) return;
+
+    let shouldRefreshCurrent = false;
+
+    try {
+        if (currentCommune && currentCommune.isManual) {
+            const repairedCurrent = normalizeHistoryCommune(currentCommune);
+            if (repairedCurrent) {
+                const before = JSON.stringify(currentCommune);
+                const after = JSON.stringify(repairedCurrent);
+                if (before !== after) {
+                    currentCommune = repairedCurrent;
+                    localStorage.setItem('currentCommune', JSON.stringify(repairedCurrent));
+                    shouldRefreshCurrent = true;
+                }
+            }
+        }
+    } catch (_) {}
+
+    try {
+        const rawHistory = JSON.parse(localStorage.getItem(FIRE_HISTORY_STORAGE_KEY) || '[]');
+        if (Array.isArray(rawHistory)) {
+            const repairedHistory = rawHistory
+                .map(normalizeHistoryCommune)
+                .filter(Boolean)
+                .slice(0, FIRE_HISTORY_MAX_ITEMS);
+            localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(repairedHistory));
+        }
+    } catch (_) {}
+
+    displayFireHistory();
+    drawFireHistoryMarkers();
+
+    if (shouldRefreshCurrent && currentCommune) {
+        displayCommuneDetails(currentCommune, false);
+    }
 }
 
 
@@ -436,20 +497,19 @@ function normalizeHistoryCommune(commune) {
     const lon = Number(commune.longitude_mairie);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-    let name = String(commune.nom_standard || commune.name || 'Feu').trim();
+    const polygonCommune = findCommuneContainingPoint(lat, lon);
+    const polygonDatabaseCommune = polygonCommune ? (getCommuneFromDatabaseByNameAndDepartment(polygonCommune) || polygonCommune) : null;
+
+    let name = String(polygonDatabaseCommune?.nom_standard || polygonDatabaseCommune?.name || commune.nom_standard || commune.name || 'Feu').trim();
     if (!name) return null;
 
     /*
-     * Historique feux : correction robuste.
-     * Certains feux déjà mémorisés n'avaient pas dep_code/dep_nom.
-     * On ré-enrichit donc l'entrée avec la commune la plus proche si possible.
+     * v12.57 — historique feux : priorité au polygone communal.
+     * La commune la plus proche n'est plus utilisée pour enrichir un feu,
+     * afin d'éviter les erreurs aux limites de Marseille / communes voisines.
      */
-    const closestCommune = (!commune.dep_code && typeof findClosestCommune === 'function')
-        ? findClosestCommune(lat, lon, 27)
-        : null;
-
-    let depCode = commune.dep_code || closestCommune?.dep_code || null;
-    let depNom = commune.dep_nom || closestCommune?.dep_nom || null;
+    let depCode = polygonDatabaseCommune?.dep_code || commune.dep_code || null;
+    let depNom = polygonDatabaseCommune?.dep_nom || commune.dep_nom || null;
 
     /*
      * Si le nom contient déjà un suffixe "(12)", on récupère ce code
@@ -1020,6 +1080,11 @@ async function initializeApp() {
         updateBaseTileNativeZoomFromAvailability({ forceScan: true }).catch(() => {});
     }, 0);
     setupGpsResumeHandlers();
+    setTimeout(() => {
+        ensureCommunesLayerDataLoaded()
+            .then(() => repairManualFireCommuneLabelsFromPolygons())
+            .catch((error) => console.warn('Préchargement polygones communes impossible:', error));
+    }, 500);
     primeGpsFromStoredPosition();
     if (localStorage.getItem('liveGpsActive') === 'true') {
         restartLiveGpsWatch({ silent: true });
@@ -1437,11 +1502,11 @@ function initMap() {
 
     map.on('click', handleGaarMapClick);
 
-    map.on('contextmenu', (e) => {
+    map.on('contextmenu', async (e) => {
         if (isDrawingMode) return;
         selectedPelicanOACI = null;
         L.DomEvent.preventDefault(e.originalEvent);
-        const manualCommune = buildManualFireCommuneFromPoint(e.latlng.lat, e.latlng.lng);
+        const manualCommune = await buildManualFireCommuneFromPointAsync(e.latlng.lat, e.latlng.lng, 'Feu manuel');
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
         displayCommuneDetails(manualCommune, false);
@@ -1930,18 +1995,9 @@ function setupEventListeners() {
         if (!navigator.geolocation) { alert("La géolocalisation n'est pas supportée par votre navigateur."); return; }
         selectedPelicanOACI = null;
         navigator.geolocation.getCurrentPosition(
-            (pos) => {
+            async (pos) => {
                 const { latitude, longitude } = pos.coords;
-                const closestCommune = findClosestCommune(latitude, longitude, 27);
-                const pointName = closestCommune?.nom_standard || 'Feu GPS';
-                const gpsCommune = {
-                    nom_standard: pointName,
-                    dep_code: closestCommune?.dep_code || null,
-                    dep_nom: closestCommune?.dep_nom || null,
-                    latitude_mairie: latitude,
-                    longitude_mairie: longitude,
-                    isManual: true
-                };
+                const gpsCommune = await buildManualFireCommuneFromPointAsync(latitude, longitude, 'Feu GPS');
                 currentCommune = gpsCommune;
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
                 displayCommuneDetails(gpsCommune, false);
@@ -2230,7 +2286,7 @@ function showUpdateReminderModal(timestamp = Date.now()) {
     modal.innerHTML = `
         <div class="update-reminder-modal-content" role="dialog" aria-modal="true" aria-labelledby="update-reminder-title">
             <h3 id="update-reminder-title">Mise à jour</h3>
-            <p>Pensez à cliquer sur <span class="update-reminder-icon" aria-label="icône de mise à jour">↻</span> de temps en temps pour être certain d’avoir la dernière version à jour.</p>
+            <p>Pensez à cliquer sur <span class="update-reminder-maj-button" aria-label="bouton MAJ"><span class="update-reminder-maj-symbol">🔄</span><span>MAJ</span></span> de temps en temps pour être certain d’avoir la dernière version à jour.</p>
             <div class="update-reminder-actions">
                 <button id="update-reminder-now-button" class="update-reminder-primary" type="button">Vérifier maintenant</button>
                 <button id="update-reminder-later-button" class="update-reminder-secondary" type="button">Plus tard</button>
@@ -2534,7 +2590,7 @@ function refreshHighVoltageLinesButtonState() {
 }
 
 async function fetchHighVoltageLinesGeojson() {
-    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.56')}`;
+    const url = `${HIGH_VOLTAGE_LINES_GEOJSON_URL}?appv=${encodeURIComponent(window.APP_VERSION || 'v12.57')}`;
     let response = null;
 
     try {
@@ -2550,7 +2606,7 @@ async function fetchHighVoltageLinesGeojson() {
 
         try {
             if ('caches' in window) {
-                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.56'}`);
+                const cache = await caches.open(`npf-q400-lignes-ht-${window.APP_VERSION || 'v12.57'}`);
                 await cache.put(HIGH_VOLTAGE_LINES_GEOJSON_URL, response.clone());
             }
         } catch (cacheError) {
@@ -3971,7 +4027,7 @@ function applyStoredGpsStartupCenter({ force = false } = {}) {
 
 function centerMapOnGpsOverviewAfterClear() {
     /*
-     * v12.56 — fermeture du bandeau feu.
+     * v12.57 — fermeture du bandeau feu conservée.
      * Le bouton X ne doit plus renvoyer sur une vue France dézoomée.
      * On reprend la logique d'ouverture : position GPS connue, zoom large 10,
      * puis correction par GPS réel si disponible.
@@ -4172,36 +4228,19 @@ function updateNearestCommuneDisplay(lat, lon) {
 
     const enrichCommuneForDisplay = (commune) => {
         if (!commune) return null;
-
-        /*
-         * v11.63 — affichage bas droite stable :
-         * au démarrage, le GPS peut d'abord utiliser la base communes,
-         * puis le calque polygone peut repasser dessus avec une donnée incomplète.
-         * On utilise donc la base communes comme référence pour le département.
-         */
-        const nearestFromDatabase = findClosestCommune(lat, lon, 27);
-        const databaseMatch = getCommuneFromDatabaseByNameAndDepartment(commune);
-
-        const candidate = databaseMatch || commune;
-        const candidateHasFullDepartment = !!(candidate.dep_code && candidate.dep_nom);
-
-        if (!candidateHasFullDepartment && nearestFromDatabase) {
-            return {
-                ...candidate,
-                dep_code: candidate.dep_code || nearestFromDatabase.dep_code || null,
-                dep_nom: candidate.dep_nom || nearestFromDatabase.dep_nom || null,
-                nom_standard: candidate.nom_standard || nearestFromDatabase.nom_standard
-            };
-        }
-
-        return candidate;
+        return getCommuneFromDatabaseByNameAndDepartment(commune) || commune;
     };
 
     const buildLabel = (commune, prefix = 'Commune') => {
         const displayCommune = enrichCommuneForDisplay(commune);
         if (!displayCommune) return '';
         const depLabel = formatCommuneDepartment(displayCommune);
-        return `📍 ${prefix}: <b>${displayCommune.nom_standard}${depLabel ? ` (${depLabel})` : ''}</b>`;
+        return `📍 ${prefix}: <b>${displayCommune.nom_standard || displayCommune.name || 'non déterminée'}${depLabel ? ` (${depLabel})` : ''}</b>`;
+    };
+
+    const showUndetermined = () => {
+        nearestDisplay.style.display = 'block';
+        nearestDisplay.innerHTML = '📍 Commune: <b>non déterminée</b>';
     };
 
     const containedCommune = findCommuneContainingPoint(lat, lon);
@@ -4212,44 +4251,31 @@ function updateNearestCommuneDisplay(lat, lon) {
     }
 
     /*
-     * Si le fichier communes-50m n'est pas encore chargé, on l'utilise même
-     * si le calque Communes n'est pas affiché. En attendant la fin du chargement,
-     * on garde l'ancien calcul par centre-ville comme solution temporaire.
+     * v12.57 — affichage GPS par polygone obligatoire.
+     * On n'affiche plus temporairement la commune la plus proche pendant le
+     * chargement, car cela provoquait un flash Plan-de-Cuques avant Marseille.
      */
     if (!hasLoadedCommunes) {
         nearestDisplay.style.display = 'block';
-
-        const nearestCommuneDuringLoad = findClosestCommune(lat, lon);
-        if (nearestCommuneDuringLoad) {
-            nearestDisplay.innerHTML = buildLabel(nearestCommuneDuringLoad, 'Commune');
-        } else {
-            nearestDisplay.innerHTML = '📍 Commune: <b>chargement...</b>';
-        }
+        nearestDisplay.innerHTML = '📍 Commune: <b>chargement...</b>';
 
         ensureCommunesLayerDataLoaded()
             .then(() => {
                 const preciseCommune = findCommuneContainingPoint(lat, lon);
-                const communeToDisplay = preciseCommune || findClosestCommune(lat, lon);
-                if (!communeToDisplay) return;
                 const display = document.getElementById('nearest-commune-display');
                 if (!display) return;
                 display.style.display = 'block';
-                display.innerHTML = buildLabel(communeToDisplay, 'Commune');
+                display.innerHTML = preciseCommune ? buildLabel(preciseCommune, 'Commune') : '📍 Commune: <b>non déterminée</b>';
+                repairManualFireCommuneLabelsFromPolygons();
             })
             .catch((error) => {
                 console.warn('Chargement du calque communes pour identification impossible:', error);
+                showUndetermined();
             });
-    }
-
-    const nearestCommune = findClosestCommune(lat, lon);
-    if (!nearestCommune) {
-        nearestDisplay.style.display = 'none';
-        nearestDisplay.innerHTML = '';
         return;
     }
 
-    nearestDisplay.style.display = 'block';
-    nearestDisplay.innerHTML = buildLabel(nearestCommune, 'Plus proche');
+    showUndetermined();
 }
 
 function findClosestCommune(lat, lon, maxDistanceNm = null) {
@@ -4272,6 +4298,14 @@ function findClosestCommune(lat, lon, maxDistanceNm = null) {
     return closestCommune;
 }
 
+
+function shouldShowOwnGpsAltitude() {
+    try {
+        return chatConnected === true && localStorage.getItem('teamChatLocationSharing') === 'true';
+    } catch (_) {
+        return false;
+    }
+}
 
 function formatGpsAltitudeFtFromCoords(coords) {
     if (!coords) return '--- ft';
@@ -4500,14 +4534,17 @@ function ensureOwnGpsAltitudeMarkerStyle() {
     document.head.appendChild(style);
 }
 
-function buildOwnGpsIcon(altitudeLabel = '--- ft') {
+function buildOwnGpsIcon(altitudeLabel = '') {
     ensureOwnGpsAltitudeMarkerStyle();
-    const safeAltitude = escapeHtml(altitudeLabel || '--- ft');
+    const hasAltitudeLabel = !!String(altitudeLabel || '').trim();
+    const safeAltitude = escapeHtml(altitudeLabel || '');
+    const altitudeHtml = hasAltitudeLabel
+        ? `<div class="own-gps-plane-altitude">${safeAltitude}</div>`
+        : '';
 
     return L.divIcon({
-        className: 'own-gps-altitude-marker own-gps-plane-icon',
-        html: `<div class="own-gps-plane-altitude">${safeAltitude}</div>
-               <div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈</span></div>`,
+        className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}`,
+        html: `${altitudeHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈</span></div>`,
         iconSize: [74, 58],
         iconAnchor: [37, 38]
     });
@@ -4647,7 +4684,7 @@ function updateOwnGpsVector(latitude, longitude, headingDeg, speedMps) {
 
 function updateUserPosition(pos) {
     const { latitude, longitude } = pos.coords;
-    const ownAltitudeLabel = formatGpsAltitudeFtFromCoords(pos.coords);
+    const ownAltitudeLabel = shouldShowOwnGpsAltitude() ? formatGpsAltitudeFtFromCoords(pos.coords) : '';
     const gpsTimestampMs = Number(pos.timestamp) || Date.now();
     const estimatedMotion = estimateMotionFromLastPosition(latitude, longitude, gpsTimestampMs);
     const rawHeading = Number(pos.coords.heading);
@@ -4661,13 +4698,17 @@ function updateUserPosition(pos) {
         source: pos && pos.npfIsStoredPosition ? 'stored' : 'real'
     });
 
+    const ownGpsPopupHtml = ownAltitudeLabel
+        ? `Votre position<br>${escapeHtml(ownAltitudeLabel)}`
+        : 'Votre position';
+
     if (!userMarker) {
         const userIcon = buildOwnGpsIcon(ownAltitudeLabel);
-        userMarker = L.marker([latitude, longitude], { icon: userIcon }).bindPopup(`Votre position<br>${escapeHtml(ownAltitudeLabel)}`).addTo(map);
+        userMarker = L.marker([latitude, longitude], { icon: userIcon }).bindPopup(ownGpsPopupHtml).addTo(map);
     } else {
         userMarker.setLatLng([latitude, longitude]);
         userMarker.setIcon(buildOwnGpsIcon(ownAltitudeLabel));
-        userMarker.bindPopup(`Votre position<br>${escapeHtml(ownAltitudeLabel)}`);
+        userMarker.bindPopup(ownGpsPopupHtml);
     }
 
     applyOwnGpsPlaneHeading(motionHeading);
