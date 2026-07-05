@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-54-centrage-gps';
+const SW_VERSION = 'sw-v12-55-maj-pwa';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -119,6 +119,28 @@ self.addEventListener('activate', event => {
 
         await refreshOfflineSettingsFromDB({ force: true });
         await self.clients.claim();
+
+        /*
+         * v12.55 — transition PWA plus propre.
+         * Après activation d'un nouveau service worker, on force une navigation
+         * des fenêtres ouvertes vers la même URL avec un paramètre de rafraîchissement.
+         * Objectif : éviter une page servie par l'ancien app-shell avec des scripts
+         * ou styles d'une autre version. Les bases IndexedDB des tuiles offline ne
+         * sont pas supprimées.
+         */
+        try {
+            const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+            await Promise.all(windowClients.map(async (client) => {
+                try {
+                    if (!client || typeof client.navigate !== 'function') return;
+                    const url = new URL(client.url);
+                    if (url.origin !== self.location.origin) return;
+                    if (url.searchParams.get('swrefresh') === SW_VERSION) return;
+                    url.searchParams.set('swrefresh', SW_VERSION);
+                    await client.navigate(url.toString());
+                } catch (_) {}
+            }));
+        } catch (_) {}
     })());
 });
 
@@ -231,40 +253,57 @@ function isAppShellRequest(request) {
     }
 }
 
+function isCriticalAppShellRequest(request) {
+    try {
+        if (request.mode === 'navigate') return true;
+        const parsed = new URL(request.url);
+        const filename = parsed.pathname.split('/').pop() || '';
+        return ['index.html', 'script.js', 'style.css', 'manifest.json'].includes(filename);
+    } catch (_) {
+        return false;
+    }
+}
+
 async function handleAppShellRequest(request) {
     const cached = await caches.match(request, { ignoreSearch: true });
+    const cache = await caches.open(APP_SHELL_CACHE);
 
     /*
-     * v11.43 — démarrage/reprise plus rapide.
-     * Navigation : cache d'abord, mise à jour réseau en arrière-plan.
+     * v12.55 — fichiers critiques en réseau d'abord.
+     * Ancien comportement : index/script/style servis d'abord depuis l'ancien
+     * cache, ce qui pouvait bloquer une transition pérenne et laisser la carte
+     * blanche avec boutons inactifs. Nouveau comportement : si le réseau est
+     * disponible, index.html, script.js, style.css et manifest.json viennent du
+     * serveur ; le cache reste le secours hors ligne.
      */
-    if (request.mode === 'navigate') {
-        if (cached) {
-            fetch(request).then(async (fresh) => {
-                if (fresh && fresh.ok) {
-                    const cache = await caches.open(APP_SHELL_CACHE);
-                    await cache.put('./index.html', fresh.clone());
-                }
-            }).catch(() => {});
-            return cached;
-        }
-
+    if (isCriticalAppShellRequest(request)) {
         try {
-            const fresh = await fetch(request);
-            const cache = await caches.open(APP_SHELL_CACHE);
-            await cache.put('./index.html', fresh.clone());
-            return fresh;
-        } catch (_) {
-            return await caches.match('./index.html', { ignoreSearch: true });
-        }
+            const freshRequest = new Request(request, { cache: 'reload' });
+            const fresh = await fetch(freshRequest);
+            if (fresh && fresh.ok) {
+                const cacheKey = request.mode === 'navigate' ? './index.html' : request;
+                await cache.put(cacheKey, fresh.clone());
+                return fresh;
+            }
+        } catch (_) {}
+
+        return cached || await caches.match('./index.html', { ignoreSearch: true }) || new Response('', { status: 504, statusText: 'Offline critical asset unavailable' });
     }
 
-    if (cached) return cached;
+    if (cached) {
+        fetch(request).then(async (fresh) => {
+            if (fresh && fresh.ok) {
+                await cache.put(request, fresh.clone());
+            }
+        }).catch(() => {});
+        return cached;
+    }
 
     try {
         const fresh = await fetch(request);
-        const cache = await caches.open(APP_SHELL_CACHE);
-        await cache.put(request, fresh.clone());
+        if (fresh && fresh.ok) {
+            await cache.put(request, fresh.clone());
+        }
         return fresh;
     } catch (_) {
         return cached || new Response('', { status: 504, statusText: 'Offline asset unavailable' });
