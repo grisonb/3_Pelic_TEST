@@ -5,8 +5,8 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.52
-Date de génération : 2026-07-04
+Version actuelle TEST : v12.58
+Date de génération : 2026-07-05
 
 Règle de méthode
 ----------------
@@ -483,3 +483,25 @@ v12.57 — Interface iPad, GPS chat et communes par polygones
 - Modification historique feux : lorsque les polygones sont disponibles, les feux manuels/GPS mémorisés peuvent être réajustés avec la commune réellement contenant les coordonnées.
 - Modification interface carte : les colonnes d'icônes carte gauche et droite sont légèrement descendues pour éviter le collage avec la date, l'heure et la batterie iPad.
 - Non modifié : import ZIP, IndexedDB, cartes offline, calque Lignes HT, rappel 5 jours, logique MAJ existante et correction du X du bandeau feu.
+
+
+v12.58 — Retardant, PDF aérodromes et clôture vols
+- Base : v12.57 TEST interface_gps_communes.
+- Modification PDF : le bouton PDF des pélicandromes/aérodromes ne dirige plus vers une page inexistante si aucun PDF offline ni serveur n'est disponible. L'application affiche désormais “Aucun PDF associé à OACI”.
+- Modification fenêtre retardant : titre renommé “VOLUME/MASSE RETARDANT”.
+- Modification fenêtre retardant : ajout d'une première ligne “Masse ÷ Densité = Volume”.
+- Modification fenêtre retardant : la ligne “Volume × Densité = Masse” est conservée, mais les cellules résultats sont désormais en lecture seule.
+- Modification Bloc/Fuel : la masse de la colonne “Masse Rlt” est affichée en gras.
+- Modification vols clôturés : les lignes vides du tableau Bloc/Fuel ne sont plus affichées lorsqu'un vol est clôturé.
+- Modification vols : ajout d'une synthèse à droite du bouton Supprimer : temps du vol actif, puis temps total à partir du vol n°2.
+- Modification vols clôturés : suppression de l'affichage du message “Vol clôturé — verrouillé”. Le verrouillage fonctionnel du vol clôturé reste conservé.
+- Non modifié : import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS, logique MAJ et nommage des feux par polygones.
+
+
+v12.59 — Masse RLT issue du calcul Volume × Densité
+- Base : v12.58 TEST retardant_pdf_vols.
+- Précision utilisateur : dans la colonne “Masse RLT”, la masse affichée doit correspondre au résultat de la ligne “Volume × Densité = Masse”.
+- Modification script.js : la valeur validée pour la colonne “Masse RLT” est désormais toujours calculée à partir de Volume × Densité.
+- Si l'utilisateur utilise la ligne “Masse ÷ Densité = Volume”, le volume calculé sert d'entrée implicite pour recalculer ensuite la masse via Volume × Densité.
+- La masse saisie directement dans la première ligne ne sert donc plus d'affichage direct dans la colonne “Masse RLT”.
+- Non modifié : PDF aérodromes, clôture vols, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS, logique MAJ et nommage des feux par polygones.
