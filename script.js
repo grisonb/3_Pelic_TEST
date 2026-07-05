@@ -171,6 +171,7 @@ let communesLabelsLayer = null;
 let areCommunesVisible = false;
 let hasLoadedCommunes = false;
 let communesLabelData = [];
+let communesViewportLayerData = [];
 let communesPolygonData = [];
 let communesLayerLoadController = null;
 let communesLayerLoadPromise = null;
@@ -1802,7 +1803,8 @@ function setupEventListeners() {
 
         if (map && map._communesZoomStyleBound !== true) {
             map._communesZoomStyleBound = true;
-            map.on('zoom move zoomend moveend', updateCommunesLayerAppearance);
+            // v12.62 — performance iPad : recalcul du calque Communes uniquement en fin de déplacement/zoom.
+            map.on('zoomend moveend', updateCommunesLayerAppearance);
         }
     }
 
@@ -3620,16 +3622,39 @@ function updateCommunesLayerAppearance() {
         communesLabelsLayer.addTo(map);
     }
 
-    if (communesLayerGroup) {
-        const style = getCommunesBoundaryStyle();
-        communesLayerGroup.eachLayer((layer) => {
-            if (layer && typeof layer.setStyle === 'function') {
-                layer.setStyle(style);
-            }
-        });
+    renderVisibleCommuneLayers();
+    renderVisibleCommuneLabels();
+}
+
+
+function renderVisibleCommuneLayers() {
+    if (!map || !communesLayerGroup || !areCommunesVisible || !hasLoadedCommunes) return;
+
+    communesLayerGroup.clearLayers();
+
+    const zoom = map.getZoom();
+    if (zoom < COMMUNES_DISPLAY_MIN_ZOOM) return;
+
+    const viewportBounds = map.getBounds().pad(0.08);
+    const style = getCommunesBoundaryStyle();
+    let visibleCount = 0;
+
+    for (const item of communesViewportLayerData) {
+        if (!item || !item.layer || !item.bounds) continue;
+        if (!viewportBounds.intersects(item.bounds)) continue;
+
+        if (typeof item.layer.setStyle === 'function') {
+            item.layer.setStyle(style);
+        }
+
+        communesLayerGroup.addLayer(item.layer);
+        visibleCount += 1;
     }
 
-    renderVisibleCommuneLabels();
+    const status = document.getElementById('offline-status');
+    if (status && areCommunesVisible) {
+        status.textContent = `Calque Communes actif : ${visibleCount} communes affichées à l'écran.`;
+    }
 }
 
 
@@ -3876,6 +3901,7 @@ async function loadCommunesLayerData() {
 
     communesPolygonData = buildCommunePolygonIndex(communesGeojson);
     communesLabelData = [];
+    communesViewportLayerData = [];
     communesLayerGroup.clearLayers();
     communesLabelsLayer.clearLayers();
 
@@ -3884,13 +3910,17 @@ async function loadCommunesLayerData() {
     });
 
     geoJsonLayer.eachLayer((layer) => {
-        communesLayerGroup.addLayer(layer);
-
         const properties = layer.feature?.properties || {};
         const communeName = getCommuneNameFromProperties(properties);
         if (!communeName || !layer.getBounds) return;
 
-        const center = layer.getBounds().getCenter();
+        const layerBounds = layer.getBounds();
+        communesViewportLayerData.push({
+            layer,
+            bounds: layerBounds
+        });
+
+        const center = layerBounds.getCenter();
         communesLabelData.push({
             name: communeName,
             latLng: center
