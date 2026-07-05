@@ -5758,3 +5758,39 @@ body.simulation-mode-active #map::after {
     color: #005a9c !important;
     text-align: center !important;
 }
+
+
+/* ========================================================================== 
+   v12.68 — Onglets calculateur + popup simulation persistante
+   ========================================================================== */
+.onglets-navigation {
+    min-height: 82px !important;
+    height: 82px !important;
+    padding-top: 0 !important;
+    margin-top: -8px !important;
+    position: relative !important;
+    z-index: 180 !important;
+}
+
+.onglet-bouton {
+    min-height: 82px !important;
+    height: 82px !important;
+    padding-top: 2px !important;
+    padding-bottom: 0 !important;
+    position: relative !important;
+    z-index: 181 !important;
+}
+
+.onglet-bouton::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -56px;
+    bottom: -18px;
+    z-index: -1;
+}
+
+.simulation-action-popup {
+    pointer-events: auto !important;
+}
