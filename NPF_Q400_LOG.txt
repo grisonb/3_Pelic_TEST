@@ -1,6 +1,5 @@
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
-
 But du fichier
 -------------
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
@@ -599,3 +598,13 @@ v12.68 — Onglets plus hauts et popup simulation persistante
 - Correction mode simulation : la fenêtre ouverte par appui long ne se ferme plus au relâchement du doigt. Le popup Leaflet n'est plus fermé par le clic résiduel de la carte.
 - Modification popup simulation : les événements tactiles/clics dans la fenêtre sont isolés de la carte ; fermeture uniquement par le X Leaflet ou par les boutons Positionner avion / Positionner feu.
 - Non modifié : route base active sans bouton, GPS, bordure rouge simulation, interface Cartes, Communes, Lignes HT, retardant, PDF, import ZIP, IndexedDB et rappel MAJ.
+
+v12.69 — Reprise iPad après arrière-plan prolongé
+- Base : v12.68 TEST sim_popup_onglets.
+- Correction ciblée : réduire les écrans blancs de quelques secondes après une mise en arrière-plan prolongée sur iPad/PWA.
+- Modification script.js : ajout d’une séquence de reprise renforcée sur visibilitychange/pageshow/focus.
+- Modification script.js : l’application force immédiatement app-ready, rend le conteneur carte visible, puis répète invalidateSize/redraw à plusieurs délais courts.
+- Modification script.js : redessin doux des couches visibles après reprise : tuiles, communes visibles, départements, GAAR, lignes HT et UI.
+- Modification script.js : si aucune tuile utilisable n’est présente après reprise longue, reconstruction douce de la couche de tuiles sans purge IndexedDB ni suppression de pack offline.
+- Modification style.css : ajout d’un petit écran non bloquant “Reprise carte…” pendant les reprises longues, pour éviter l’impression de page blanche.
+- Non modifié : calculs Prévi rotation/TMD/CS/HDV, import ZIP, IndexedDB, cartes offline, simulation, route base, Lignes HT, Communes, retardant, PDF et rappel MAJ.
