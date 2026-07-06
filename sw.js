@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-69-reprise-ipad';
+const SW_VERSION = 'sw-v12-70-previ-plus1-aides';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
