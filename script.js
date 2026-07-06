@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('pageshow', refreshMapAfterWake);
 })();
 
-// v12.69 — reprise iPad/PWA renforcée après arrière-plan prolongé.
+// v12.70 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées.
 (function setupNpfIpadResumeHardening() {
     const LONG_BACKGROUND_MS = 2 * 60 * 1000;
     const RESUME_DELAYS_MS = [0, 80, 180, 350, 700, 1200, 2200, 3600];
@@ -6659,59 +6659,210 @@ const formatTime = (totalMinutes) => { if (totalMinutes === null || isNaN(totalM
 const parseNumeric = (numericString) => { if (!numericString) return null; const value = parseInt(numericString.replace(/[^0-9]/g, ''), 10); return isNaN(value) ? null : value; };
 
 function updateAndSortRotations(container, current, params) {
+    const FIRST_DROP_FORFAIT_MIN = 10;
     const lines = Array.from(container.querySelectorAll('.result-line'));
     const resultsData = [];
     let minTimeLimit = Infinity;
     let minFuelLimit = Infinity;
 
-    // --- Première passe : Calculer toutes les valeurs et trouver la limite temporelle ---
+    const containerId = container?.id || '';
+    const isSuiviRotation = containerId === 'suivi-rotation-results-container';
+    const isPreviRotation = containerId === 'previ-rotation-results-container';
+    const isDeroutRotation = containerId === 'derout-rotation-results-container';
+    const fuelImmediateDropAllowed = !isSuiviRotation;
+
+    const returnBaseTime = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu || 0));
+    const effectivePelicDistance = Math.max(CALCULATOR_DATA.distPelicFeu || 0, 10);
+    const rotationSpeedLabel = effectivePelicDistance <= 50 ? '3,5 Nm/min (210 kt)' : '4,0 Nm/min (240 kt)';
+    const rotationSpeedValue = effectivePelicDistance <= 50 ? 3.5 : 4;
+    const rotationConsoRate = effectivePelicDistance <= 70 ? 10 : 8;
+    const baseConsoRate = (CALCULATOR_DATA.distBaseFeu || 0) <= 70 ? 5 : 4;
+    const pelicConsoRate = (CALCULATOR_DATA.distPelicFeu || 0) <= 70 ? 5 : 4;
+
+    const numberOrNA = value => Number.isFinite(value) ? value : 'N/A';
+    const kgOrNA = value => Number.isFinite(value) ? `${value} kg` : 'N/A';
+    const minOrNA = value => Number.isFinite(value) ? `${Math.round(value)} min` : 'N/A';
+    const timeOrNA = value => (value !== null && Number.isFinite(value)) ? formatTime(value) : 'N/A';
+
+    const rotationFormulaDetails = () => [
+        `Durée rotation feu ↔ pélic = 20 min + ((Distance retenue × 2) / Vitesse)`,
+        `Distance retenue = max(Distance Feu → Pélic, 10 Nm) = ${effectivePelicDistance} Nm`,
+        `Vitesse = ${rotationSpeedLabel}`,
+        `Durée rotation = 20 + ((${effectivePelicDistance} × 2) / ${rotationSpeedValue}) = ${minOrNA(params.rotationTime)}`,
+        ``,
+        `Conso rotation feu ↔ pélic = Distance retenue × conso aller-retour + forfait largage`,
+        `Conso aller-retour = 10 kg/Nm si distance ≤ 70 Nm, sinon 8 kg/Nm`,
+        `Forfait largage = 250 kg`,
+        `Conso rotation = (${effectivePelicDistance} × ${rotationConsoRate}) + 250 = ${kgOrNA(params.consoRotation)}`
+    ].join('\n');
+
+    const bingoBaseDetails = () => [
+        `BINGO Base = 700 kg + conso Feu → Base`,
+        `Distance Feu → Base = ${numberOrNA(CALCULATOR_DATA.distBaseFeu)} Nm`,
+        `Conso = ${baseConsoRate} kg/Nm (${(CALCULATOR_DATA.distBaseFeu || 0) <= 70 ? 'distance ≤ 70 Nm' : 'distance > 70 Nm'})`,
+        `BINGO Base = 700 + (${numberOrNA(CALCULATOR_DATA.distBaseFeu)} × ${baseConsoRate}) = ${kgOrNA(params.bingoBase)}`
+    ].join('\n');
+
+    const bingoPelicDetails = () => [
+        `BINGO Pélic = 700 kg + conso Feu → Pélic`,
+        `Distance Feu → Pélic = ${numberOrNA(CALCULATOR_DATA.distPelicFeu)} Nm`,
+        `Conso = ${pelicConsoRate} kg/Nm (${(CALCULATOR_DATA.distPelicFeu || 0) <= 70 ? 'distance ≤ 70 Nm' : 'distance > 70 Nm'})`,
+        `BINGO Pélic = 700 + (${numberOrNA(CALCULATOR_DATA.distPelicFeu)} × ${pelicConsoRate}) = ${kgOrNA(params.bingoPelic)}`
+    ].join('\n');
+
+    const currentContextDetails = () => [
+        `Heure sur feu = ${timeOrNA(current.time)}`,
+        `Fuel sur feu = ${kgOrNA(current.fuel)}`,
+        `Transit vers feu = ${minOrNA(params.transitTime)}`,
+        `Forfait validation premier largage = ${FIRST_DROP_FORFAIT_MIN} min`,
+        `Retour feu → base = ${minOrNA(returnBaseTime)}`
+    ].join('\n');
+
+    // --- Première passe : calculer toutes les valeurs et trouver les limites ---
     lines.forEach(line => {
         const type = line.dataset.rotationType;
         let value = null;
         let formulaString = "Données insuffisantes pour le calcul.";
 
-        const canCalculateFuel = current.fuel !== null && params.consoRotation !== null && params.consoRotation > 0;
-        const canCalculateTime = current.time !== null && params.rotationTime !== null && params.rotationTime > 0;
+        const canCalculateFuel = current.fuel !== null && Number.isFinite(current.fuel) && params.consoRotation !== null && Number.isFinite(params.consoRotation) && params.consoRotation > 0;
+        const canCalculateTime = current.time !== null && Number.isFinite(current.time) && params.rotationTime !== null && Number.isFinite(params.rotationTime) && params.rotationTime > 0;
 
-        const initialFuelForCheck = current.fuel + (params.transitTime && params.consoTransitFromGps ? (params.consoTransitFromGps || 0) : 0);
-        const fuelForFirstDropBase = (params.transitTime && params.consoTransitFromGps ? (params.consoTransitFromGps || 0) : 0) + 250 + params.bingoBase;
-        const fuelForFirstDropPelic = (params.transitTime && params.consoTransitFromGps ? (params.consoTransitFromGps || 0) : 0) + 250 + params.bingoPelic;
-
-        const hasFuelForFirstDropBase = initialFuelForCheck >= fuelForFirstDropBase;
-        const hasFuelForFirstDropPelic = initialFuelForCheck >= fuelForFirstDropPelic;
+        const hasFuelForFirstDropBase = fuelImmediateDropAllowed && canCalculateFuel && current.fuel >= (250 + params.bingoBase);
+        const hasFuelForFirstDropPelic = fuelImmediateDropAllowed && canCalculateFuel && current.fuel >= (250 + params.bingoPelic);
 
         if (type === 'base') {
             const plusOne = hasFuelForFirstDropBase ? 1 : 0;
-            formulaString = `Fuel sur Feu = ${current.fuel || 'N/A'} kg\n\nFormule : ((Fuel sur Feu - BINGO Base) / Conso. Rotation) [+1 si possible]\n\nCalcul : ((${current.fuel || 'N/A'} - ${params.bingoBase}) / ${params.consoRotation || 'N/A'}) + ${plusOne}`;
+            formulaString = [
+                `FUEL RETOUR BASE`,
+                ``,
+                currentContextDetails(),
+                ``,
+                bingoBaseDetails(),
+                ``,
+                rotationFormulaDetails(),
+                ``,
+                `Validation du +1 :`,
+                isSuiviRotation
+                    ? `Dans Suivi rotation, le +1 fuel est neutralisé : l'avion est considéré au pélicandrome/vide, donc il ne peut pas larguer immédiatement.`
+                    : `+1 possible si Fuel sur feu ≥ 250 kg + BINGO Base.`,
+                isSuiviRotation
+                    ? `+1 = 0`
+                    : `Test : ${kgOrNA(current.fuel)} ≥ 250 + ${kgOrNA(params.bingoBase)} = ${kgOrNA(250 + params.bingoBase)} → ${hasFuelForFirstDropBase ? 'OUI' : 'NON'}`,
+                ``,
+                `Formule finale :`,
+                `Nbr rotations = ((Fuel sur feu - BINGO Base) / Conso rotation) + ${plusOne}`,
+                `Calcul = ((${kgOrNA(current.fuel)} - ${kgOrNA(params.bingoBase)}) / ${kgOrNA(params.consoRotation)}) + ${plusOne}`
+            ].join('\n');
             if (canCalculateFuel) value = ((current.fuel - params.bingoBase) / params.consoRotation) + plusOne;
         }
         if (type === 'pelic') {
             const plusOne = hasFuelForFirstDropPelic ? 1 : 0;
-            formulaString = `Fuel sur Feu = ${current.fuel || 'N/A'} kg\n\nFormule : ((Fuel sur Feu - BINGO Pélic.) / Conso. Rotation) [+1 si possible]\n\nCalcul : ((${current.fuel || 'N/A'} - ${params.bingoPelic}) / ${params.consoRotation || 'N/A'}) + ${plusOne}`;
+            formulaString = [
+                `FUEL RETOUR PÉLIC`,
+                ``,
+                currentContextDetails(),
+                ``,
+                bingoPelicDetails(),
+                ``,
+                rotationFormulaDetails(),
+                ``,
+                `Validation du +1 :`,
+                isSuiviRotation
+                    ? `Dans Suivi rotation, le +1 fuel est neutralisé : l'avion est considéré au pélicandrome/vide, donc il ne peut pas larguer immédiatement.`
+                    : `+1 possible si Fuel sur feu ≥ 250 kg + BINGO Pélic.`,
+                isSuiviRotation
+                    ? `+1 = 0`
+                    : `Test : ${kgOrNA(current.fuel)} ≥ 250 + ${kgOrNA(params.bingoPelic)} = ${kgOrNA(250 + params.bingoPelic)} → ${hasFuelForFirstDropPelic ? 'OUI' : 'NON'}`,
+                ``,
+                `Formule finale :`,
+                `Nbr rotations = ((Fuel sur feu - BINGO Pélic) / Conso rotation) + ${plusOne}`,
+                `Calcul = ((${kgOrNA(current.fuel)} - ${kgOrNA(params.bingoPelic)}) / ${kgOrNA(params.consoRotation)}) + ${plusOne}`
+            ].join('\n');
             if (canCalculateFuel) value = ((current.fuel - params.bingoPelic) / params.consoRotation) + plusOne;
         }
         if (type === 'cs') {
-            const canDropOnArrivalBeforeCs = canCalculateTime && params.csFeuTime !== null && current.time < params.csFeuTime;
-            const plusOne = canDropOnArrivalBeforeCs ? 1 : 0;
-            formulaString = `Heure sur Feu = ${formatTime(current.time) || 'N/A'}
-
-Formule : ((Heure CS - Heure sur Feu) / Durée Rotation) [+1 si arrivée sur feu avant CS]
-
-Calcul : ((${formatTime(params.csFeuTime) || 'N/A'} - ${formatTime(current.time) || 'N/A'}) / ${params.rotationTime || 'N/A'} min) + ${plusOne}`;
-            if (canCalculateTime && params.csFeuTime !== null) value = ((params.csFeuTime - current.time) / params.rotationTime) + plusOne;
+            const firstDropTime = canCalculateTime ? current.time + FIRST_DROP_FORFAIT_MIN : null;
+            const canFirstDropBeforeCs = canCalculateTime && params.csFeuTime !== null && Number.isFinite(params.csFeuTime) && firstDropTime <= params.csFeuTime;
+            const remainingAfterFirstDrop = canFirstDropBeforeCs ? (params.csFeuTime - firstDropTime) : null;
+            formulaString = [
+                `COUCHER SOLEIL`,
+                ``,
+                currentContextDetails(),
+                `Coucher soleil sur feu = ${timeOrNA(params.csFeuTime)}`,
+                ``,
+                rotationFormulaDetails(),
+                ``,
+                `Validation du +1 :`,
+                `+1 possible uniquement si Heure sur feu + ${FIRST_DROP_FORFAIT_MIN} min ≤ CS.`,
+                `Test : ${timeOrNA(current.time)} + ${FIRST_DROP_FORFAIT_MIN} min = ${timeOrNA(firstDropTime)} ≤ ${timeOrNA(params.csFeuTime)} → ${canFirstDropBeforeCs ? 'OUI' : 'NON'}`,
+                ``,
+                `Si le +1 est impossible : résultat = 0.`,
+                `Si le +1 est possible :`,
+                `Nbr rotations CS = 1 + ((CS - Heure premier largage) / Durée rotation)`,
+                `Heure premier largage = Heure sur feu + ${FIRST_DROP_FORFAIT_MIN} min`,
+                `Calcul = 1 + ((${timeOrNA(params.csFeuTime)} - ${timeOrNA(firstDropTime)}) / ${minOrNA(params.rotationTime)})`
+            ].join('\n');
+            if (canCalculateTime && params.csFeuTime !== null && Number.isFinite(params.csFeuTime)) {
+                value = canFirstDropBeforeCs ? 1 + (remainingAfterFirstDrop / params.rotationTime) : 0;
+            }
         }
         if (type === 'tmd') {
-            formulaString = `Heure sur Feu = ${formatTime(current.time) || 'N/A'}\n\nFormule : (Heure TMD - Heure sur Feu) / Durée Rotation\n\nCalcul : (${formatTime(params.tmdTime) || 'N/A'} - ${formatTime(current.time) || 'N/A'}) / ${params.rotationTime || 'N/A'} min`;
-            if (canCalculateTime && params.tmdTime !== null) value = (params.tmdTime - current.time) / params.rotationTime;
+            const firstDropTime = canCalculateTime ? current.time + FIRST_DROP_FORFAIT_MIN : null;
+            const backBaseAfterFirstDropTime = canCalculateTime ? firstDropTime + returnBaseTime : null;
+            const canFirstDropAndReturnBeforeTmd = canCalculateTime && params.tmdTime !== null && Number.isFinite(params.tmdTime) && backBaseAfterFirstDropTime <= params.tmdTime;
+            const remainingForRotations = canFirstDropAndReturnBeforeTmd ? (params.tmdTime - firstDropTime - returnBaseTime) : null;
+            formulaString = [
+                `TMD`,
+                ``,
+                currentContextDetails(),
+                `Fin TMD = ${timeOrNA(params.tmdTime)}`,
+                ``,
+                rotationFormulaDetails(),
+                ``,
+                `Validation du +1 :`,
+                `+1 possible uniquement si l'avion peut arriver sur feu, larguer avec le forfait ${FIRST_DROP_FORFAIT_MIN} min, puis revenir base avant la fin TMD.`,
+                `Test : Heure sur feu + ${FIRST_DROP_FORFAIT_MIN} min + retour base ≤ TMD`,
+                `Test : ${timeOrNA(current.time)} + ${FIRST_DROP_FORFAIT_MIN} min + ${minOrNA(returnBaseTime)} = ${timeOrNA(backBaseAfterFirstDropTime)} ≤ ${timeOrNA(params.tmdTime)} → ${canFirstDropAndReturnBeforeTmd ? 'OUI' : 'NON'}`,
+                ``,
+                `Si le +1 est impossible : résultat = 0.`,
+                `Si le +1 est possible :`,
+                `Nbr rotations TMD = 1 + ((TMD - Heure premier largage - Retour base final) / Durée rotation)`,
+                `Heure premier largage = Heure sur feu + ${FIRST_DROP_FORFAIT_MIN} min`,
+                `Calcul = 1 + ((${timeOrNA(params.tmdTime)} - ${timeOrNA(firstDropTime)} - ${minOrNA(returnBaseTime)}) / ${minOrNA(params.rotationTime)})`
+            ].join('\n');
+            if (canCalculateTime && params.tmdTime !== null && Number.isFinite(params.tmdTime)) {
+                value = canFirstDropAndReturnBeforeTmd ? 1 + (remainingForRotations / params.rotationTime) : 0;
+            }
         }
         if (type === 'hdv') {
-            const hdvOnSite = (params.limiteHDV !== null) ? params.limiteHDV - (params.transitTime || 0) : null;
-            formulaString = `HDV sur Feu = ${formatTime(hdvOnSite) || 'N/A'}\n\nFormule : (HDV sur Feu) / Durée Rotation\n\nHDV sur Feu = ${formatTime(params.limiteHDV) || 'N/A'} - ${formatTime(params.transitTime || 0)} (transit)\n\nCalcul : ${formatTime(hdvOnSite) || 'N/A'} / ${params.rotationTime || 'N/A'} min`;
-            if (canCalculateTime && hdvOnSite !== null) value = hdvOnSite / params.rotationTime;
+            const canFirstDropAndReturnWithinHdv = canCalculateTime && params.limiteHDV !== null && Number.isFinite(params.limiteHDV)
+                && params.transitTime !== null && Number.isFinite(params.transitTime)
+                && (params.transitTime + FIRST_DROP_FORFAIT_MIN + returnBaseTime) <= params.limiteHDV;
+            const remainingForRotations = canFirstDropAndReturnWithinHdv ? (params.limiteHDV - params.transitTime - FIRST_DROP_FORFAIT_MIN - returnBaseTime) : null;
+            formulaString = [
+                `HDV RESTANTES`,
+                ``,
+                currentContextDetails(),
+                `HDV restantes disponibles = ${timeOrNA(params.limiteHDV)}`,
+                ``,
+                rotationFormulaDetails(),
+                ``,
+                `Validation du +1 :`,
+                `Même logique que TMD, mais en durée restante : +1 possible uniquement si Transit vers feu + ${FIRST_DROP_FORFAIT_MIN} min + retour base ≤ HDV restantes.`,
+                `Test : ${minOrNA(params.transitTime)} + ${FIRST_DROP_FORFAIT_MIN} min + ${minOrNA(returnBaseTime)} = ${minOrNA((params.transitTime || 0) + FIRST_DROP_FORFAIT_MIN + returnBaseTime)} ≤ ${timeOrNA(params.limiteHDV)} → ${canFirstDropAndReturnWithinHdv ? 'OUI' : 'NON'}`,
+                ``,
+                `Si le +1 est impossible : résultat = 0.`,
+                `Si le +1 est possible :`,
+                `Nbr rotations HDV = 1 + ((HDV restantes - Transit vers feu - ${FIRST_DROP_FORFAIT_MIN} min - Retour base final) / Durée rotation)`,
+                `Calcul = 1 + ((${timeOrNA(params.limiteHDV)} - ${minOrNA(params.transitTime)} - ${FIRST_DROP_FORFAIT_MIN} min - ${minOrNA(returnBaseTime)}) / ${minOrNA(params.rotationTime)})`
+            ].join('\n');
+            if (canCalculateTime && params.limiteHDV !== null && Number.isFinite(params.limiteHDV)) {
+                value = canFirstDropAndReturnWithinHdv ? 1 + (remainingForRotations / params.rotationTime) : 0;
+            }
         }
 
         resultsData.push({ type, value, element: line, formulaString });
-        
+
         if ((type === 'cs' || type === 'tmd' || type === 'hdv') && value !== null) {
             minTimeLimit = Math.min(minTimeLimit, value);
         }
@@ -6724,7 +6875,7 @@ Calcul : ((${formatTime(params.csFeuTime) || 'N/A'} - ${formatTime(current.time)
     // toute valeur suivante (plus élevée) est impossible et passe en rouge.
     const shouldForceTimeConstraint = minTimeLimit !== Infinity;
 
-    // --- Deuxième passe : Appliquer les styles et mettre à jour le DOM ---
+    // --- Deuxième passe : appliquer les styles et mettre à jour le DOM ---
     resultsData.forEach(result => {
         const { type, value, element, formulaString } = result;
         const valueCell = element.querySelector('.value');
@@ -6734,16 +6885,14 @@ Calcul : ((${formatTime(params.csFeuTime) || 'N/A'} - ${formatTime(current.time)
         if (value === null) {
             valueCell.textContent = '--';
         } else {
-            valueCell.textContent = value.toFixed(1); 
+            valueCell.textContent = Math.max(0, value).toFixed(1);
         }
 
         valueCell.classList.remove('rotation-value-default', 'rotation-value-green', 'rotation-value-yellow', 'rotation-value-red');
-        
+
         if (isTimeLimited) {
-            // Si la valeur est supérieure à la limite de temps, on force le rouge
             valueCell.classList.add('rotation-value-red');
         } else {
-            // Sinon, on applique la logique de couleur standard
             if (value === null) {
                  valueCell.classList.add('rotation-value-default');
                  valueCell.textContent = '--';
@@ -6761,8 +6910,8 @@ Calcul : ((${formatTime(params.csFeuTime) || 'N/A'} - ${formatTime(current.time)
 
     // --- Trier et ré-insérer les éléments dans le DOM ---
     resultsData.sort((a, b) => {
-        const valA = a.value !== null ? a.value : Infinity;
-        const valB = b.value !== null ? b.value : Infinity;
+        const valA = a.value !== null ? Math.max(0, a.value) : Infinity;
+        const valB = b.value !== null ? Math.max(0, b.value) : Infinity;
         return valA - valB;
     });
 
@@ -6876,24 +7025,24 @@ function updatePreviTab() {
     const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null;
 
     document.getElementById('duree-transit').textContent = formatTime(transitTime) || '--:--';
-    setHelp('duree-transit-help', `Formule : Distance Base → Feu × (60 / Vitesse)\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} Nm × (60 / ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240})`);
+    setHelp('duree-transit-help', `DURÉE TRANSIT BASE → FEU\n\nFormule : Distance Base → Feu × (60 / Vitesse)\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nDistance Base → Feu : ${CALCULATOR_DATA.distBaseFeu} Nm\nVitesse retenue : ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240} kt\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} × (60 / ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240}) = ${formatTime(transitTime)} (${transitTime} min)`);
 
     document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
-    setHelp('heure-sur-feu-help', `Formule : BLOC Départ + Durée transit\n\nCalcul : ${formatTime(blocDepart) || 'N/A'} + ${formatTime(transitTime)}`);
+    setHelp('heure-sur-feu-help', `HEURE SUR FEU\n\nFormule : BLOC Départ + Durée transit Base → Feu\n\nBLOC Départ : ${formatTime(blocDepart) || 'N/A'}\nDurée transit : ${formatTime(transitTime)} (${transitTime} min)\n\nCalcul : ${formatTime(blocDepart) || 'N/A'} + ${formatTime(transitTime)} = ${formatTime(heureSurFeu) || 'N/A'}\n\nCette heure sert ensuite à vérifier le +1 Coucher Soleil et TMD avec le forfait de 10 min avant largage.`);
 
     document.getElementById('conso-aller-feu').textContent = `${consoAller} kg`;
-    setHelp('conso-aller-feu-help', `Formule : Distance Base → Feu × Conso. au Nm\n\nRègle consommation :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} Nm × ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} kg/Nm`);
+    setHelp('conso-aller-feu-help', `CONSO TRANSIT BASE → FEU\n\nFormule : Distance Base → Feu × Conso au Nm\n\nRègle consommation :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nDistance Base → Feu : ${CALCULATOR_DATA.distBaseFeu} Nm\nConso retenue : ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} kg/Nm\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} × ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} = ${consoAller} kg`);
 
     document.getElementById('duree-rotation').textContent = rotationTime === 20 ? '--:--' : formatTime(rotationTime);
-    setHelp('duree-rotation-help', `Formule : 20 min + ((Distance retenue × 2) / Vitesse)\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nRègle vitesse :\n- Distance retenue ≤ 50 Nm : 3,5 Nm/min, soit 210 kt\n- Distance retenue > 50 Nm : 4,0 Nm/min, soit 240 kt\n\nCalcul : 20 + ((${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm × 2) / ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 50 ? 3.5 : 4})`);
+    setHelp('duree-rotation-help', `DURÉE ROTATION FEU ↔ PÉLIC\n\nFormule : 20 min + ((Distance retenue × 2) / Vitesse)\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nDistance Feu → Pélic mesurée : ${CALCULATOR_DATA.distPelicFeu} Nm\nDistance retenue : ${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm\n\nRègle vitesse :\n- Distance retenue ≤ 50 Nm : 3,5 Nm/min, soit 210 kt\n- Distance retenue > 50 Nm : 4,0 Nm/min, soit 240 kt\n\nCalcul : 20 + ((${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} × 2) / ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 50 ? 3.5 : 4}) = ${formatTime(rotationTime)} (${rotationTime} min)\n\nCette durée sert pour les rotations supplémentaires après validation éventuelle du +1.`);
 
     document.getElementById('conso-par-rotation').textContent = consoRotation === 250 ? '-- kg' : `${consoRotation} kg`;
-    setHelp('conso-par-rotation-help', `Formule : (Distance retenue × Conso. au Nm) + Forfait largage\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nRègle consommation :\n- Distance retenue ≤ 70 Nm : 10 kg/Nm\n- Distance retenue > 70 Nm : 8 kg/Nm\n- Forfait largage : 250 kg\n\nCalcul : (${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm × ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 70 ? 10 : 8}) + 250`);
+    setHelp('conso-par-rotation-help', `CONSO ROTATION FEU ↔ PÉLIC\n\nFormule : (Distance retenue × conso aller-retour) + forfait largage\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nDistance Feu → Pélic mesurée : ${CALCULATOR_DATA.distPelicFeu} Nm\nDistance retenue : ${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm\n\nRègle consommation aller-retour :\n- Distance retenue ≤ 70 Nm : 10 kg/Nm\n- Distance retenue > 70 Nm : 8 kg/Nm\n\nForfait largage : 250 kg\n\nCalcul : (${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} × ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 70 ? 10 : 8}) + 250 = ${consoRotation} kg`);
 
     const fuelSurFeuInput = document.getElementById('fuel-sur-feu-wrapper').querySelector('.display-input');
     const fuelEstime = fuelDepart ? fuelDepart - consoAller : null;
     if (!isFuelSurFeuManual) { fuelSurFeuInput.value = fuelEstime ? `${fuelEstime} kg` : ''; }
-    setHelp('fuel-sur-feu-help', `Formule (AUTO) : FUEL Départ - Conso. transit\n\nCalcul : ${fuelDepart || 'N/A'} - ${consoAller}`);
+    setHelp('fuel-sur-feu-help', `FUEL SUR FEU\n\nMode AUTO :\nFormule : FUEL Départ - Conso transit Base → Feu\n\nFUEL Départ : ${fuelDepart || 'N/A'} kg\nConso transit : ${consoAller} kg\n\nCalcul : ${fuelDepart || 'N/A'} - ${consoAller} = ${fuelEstime !== null ? fuelEstime + ' kg' : 'N/A'}\n\nEn mode manuel, cette valeur peut être corrigée directement. Elle sert aux calculs Fuel retour Base/Pélic.`);
 
     const fuelSurFeu = parseNumeric(fuelSurFeuInput.value);
 
@@ -6964,7 +7113,7 @@ function updateSuiviTab() {
         document.getElementById('suivi-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) {
-            suiviHeureHelpIcon.onclick = () => alert(`Formule : Heure bloc arrivée + Durée transit base->Feu\n\nCalcul : ${formatTime(currentTime) || 'N/A'} + ${formatTime(transitTimeVersFeu) || 'N/A'}`);
+            suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION\n\nFormule : Heure dernière arrivée pélic/base + Durée transit vers feu\n\nHeure dernière arrivée : ${formatTime(currentTime) || 'N/A'}\nDistance Base → Feu utilisée : ${CALCULATOR_DATA.distBaseFeu} Nm\nRègle vitesse : ≤70 Nm = 210 kt, >70 Nm = 240 kt\nDurée transit : ${formatTime(transitTimeVersFeu) || 'N/A'} (${transitTimeVersFeu} min)\n\nCalcul : ${formatTime(currentTime) || 'N/A'} + ${formatTime(transitTimeVersFeu) || 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}\n\nCette heure sert aux limites CS/TMD. Le +1 fuel est neutralisé dans cet onglet car l'avion est considéré au pélicandrome/vide.`);
         }
         updateAndSortRotations(document.getElementById('suivi-rotation-results-container'), { fuel: currentFuel, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: transitTimeVersFeu });
     }
@@ -7057,12 +7206,12 @@ function updateDeroutementTab() {
         : `Distance GPS → Feu : ${distGpsFeu ?? 'N/A'} Nm`;
 
     setHelp('derout-fuel-mini-base-help', consoTransitFromGps !== null
-        ? `Formule : Conso ${deroutFirstLegLabel} + Forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase}`
+        ? `FUEL MINI 1 LARGAGE / BASE\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Base :\n700 kg + conso Feu → Base = ${bingoBase} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase} = ${fuelMiniBase} kg`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
     setHelp('derout-fuel-mini-pelic-help', consoTransitFromGps !== null
-        ? `Formule : Conso ${deroutFirstLegLabel} + Forfait largage + BINGO Pélic.\n\n${deroutFirstLegDetail}\n\nForfait largage : 250 kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic}`
+        ? `FUEL MINI 1 LARGAGE / PÉLIC\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Pélic\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Pélic :\n700 kg + conso Feu → Pélic = ${bingoPelic} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic} = ${fuelMiniPelic} kg`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
@@ -7071,7 +7220,7 @@ function updateDeroutementTab() {
     document.getElementById('derout-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
     document.getElementById('derout-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
     setHelp('derout-heure-sur-feu-help', transitTimeFromGps !== null
-        ? `Formule : Heure actuelle + Durée ${deroutFirstLegLabel}\n\n${deroutFirstLegDetail}\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'}`
+        ? `HEURE SUR FEU — DÉROUTEMENT\n\nFormule : Heure actuelle + Durée ${deroutFirstLegLabel}\n\n${deroutFirstLegDetail}\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nHeure actuelle : ${formatTime(heureActuelle) || 'N/A'}\nDurée ${deroutFirstLegLabel} : ${formatTime(transitTimeFromGps) || 'N/A'} (${transitTimeFromGps} min)\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
