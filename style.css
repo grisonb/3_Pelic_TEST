@@ -5794,3 +5794,37 @@ body.simulation-mode-active #map::after {
 .simulation-action-popup {
     pointer-events: auto !important;
 }
+
+
+/* v12.69 — reprise iPad/PWA : écran de reprise non bloquant après arrière-plan prolongé */
+#npf-resume-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: rgba(219, 234, 254, 0.28);
+    color: #0b2f6b;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body.npf-resuming #npf-resume-overlay {
+    display: flex;
+}
+
+#npf-resume-overlay .npf-resume-card {
+    padding: 12px 18px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.92);
+    border: 1px solid rgba(255,255,255,.95);
+    box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: .01em;
+}
+
+#map {
+    background-color: #eef2f5;
+}
