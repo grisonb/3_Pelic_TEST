@@ -608,3 +608,16 @@ v12.69 — Reprise iPad après arrière-plan prolongé
 - Modification script.js : si aucune tuile utilisable n’est présente après reprise longue, reconstruction douce de la couche de tuiles sans purge IndexedDB ni suppression de pack offline.
 - Modification style.css : ajout d’un petit écran non bloquant “Reprise carte…” pendant les reprises longues, pour éviter l’impression de page blanche.
 - Non modifié : calculs Prévi rotation/TMD/CS/HDV, import ZIP, IndexedDB, cartes offline, simulation, route base, Lignes HT, Communes, retardant, PDF et rappel MAJ.
+
+v12.70 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées
+- Base : v12.69 TEST reprise_ipad.
+- Correction calcul Coucher Soleil : le +1 n'est plus automatique à l'arrivée sur feu. Il est validé uniquement si l'heure sur feu + forfait 10 min est avant ou égale au coucher du soleil.
+- Correction calcul TMD : le +1 est validé uniquement si l'heure sur feu + forfait 10 min + retour base reste avant ou égal à l'heure de fin TMD.
+- Correction calcul HDV restantes : même logique que TMD en durée relative. Le +1 est validé uniquement si transit vers feu + forfait 10 min + retour base reste dans la limite HDV restante.
+- Les rotations supplémentaires après validation du +1 conservent la formule existante feu ↔ pélic : durée rotation = 20 min + temps aller-retour feu/pélic.
+- Correction Suivi rotation : suppression du +1 fuel retour base/pélic dans cet onglet, car l'avion est considéré au pélicandrome/vide et ne peut pas larguer immédiatement.
+- Les calculs Fuel retour base/pélic en Prévi et Déroute conservent un +1 seulement si le fuel sur feu permet un largage immédiat de 250 kg et la conservation du BINGO retour concerné.
+- Refonte des aides “?” dans l'onglet Prévi rotation : chaque aide détaille désormais les sous-formules utiles sans obliger à ouvrir une autre aide.
+- Refonte des aides des résultats rotations : Fuel retour base, Fuel retour pélic, Coucher Soleil, TMD et HDV détaillent maintenant les distances, BINGO, conso rotation, forfaits, conditions du +1 et calcul final.
+- Amélioration des aides Suivi rotation et Déroute : détail plus explicite de l'heure sur feu et des fuel mini 1 largage.
+- Non modifié : reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Lignes HT, Communes, retardant, PDF et rappel MAJ.
