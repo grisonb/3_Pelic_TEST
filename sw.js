@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-68-sim-popup-onglets';
+const SW_VERSION = 'sw-v12-69-reprise-ipad';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
