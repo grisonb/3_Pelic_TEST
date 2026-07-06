@@ -5796,7 +5796,7 @@ body.simulation-mode-active #map::after {
 }
 
 
-/* v12.69 — reprise iPad/PWA : écran de reprise non bloquant après arrière-plan prolongé */
+/* v12.70 — reprise iPad/PWA : écran de reprise non bloquant après arrière-plan prolongé */
 #npf-resume-overlay {
     position: fixed;
     inset: 0;
