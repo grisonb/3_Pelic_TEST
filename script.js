@@ -148,6 +148,193 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('pageshow', refreshMapAfterWake);
 })();
 
+// v12.69 — reprise iPad/PWA renforcée après arrière-plan prolongé.
+(function setupNpfIpadResumeHardening() {
+    const LONG_BACKGROUND_MS = 2 * 60 * 1000;
+    const RESUME_DELAYS_MS = [0, 80, 180, 350, 700, 1200, 2200, 3600];
+    let hiddenAt = 0;
+    let resumeToken = 0;
+
+    const markReady = () => {
+        try {
+            if (document.body) document.body.classList.add('app-ready');
+            if (document.documentElement) document.documentElement.classList.add('app-ready');
+        } catch (_) {}
+    };
+
+    const ensureResumeOverlay = () => {
+        let overlay = document.getElementById('npf-resume-overlay');
+        if (overlay) return overlay;
+
+        overlay = document.createElement('div');
+        overlay.id = 'npf-resume-overlay';
+        overlay.setAttribute('aria-live', 'polite');
+        overlay.innerHTML = '<div class="npf-resume-card">Reprise carte…</div>';
+        document.body.appendChild(overlay);
+        return overlay;
+    };
+
+    const showResumeOverlay = () => {
+        try {
+            if (!document.body) return;
+            document.body.classList.add('npf-resuming');
+            ensureResumeOverlay();
+        } catch (_) {}
+    };
+
+    const hideResumeOverlay = (token, delay = 1800) => {
+        setTimeout(() => {
+            if (token !== resumeToken) return;
+            try {
+                if (document.body) document.body.classList.remove('npf-resuming');
+            } catch (_) {}
+        }, delay);
+    };
+
+    const forceMapContainerVisible = () => {
+        try {
+            const mapEl = document.getElementById('map');
+            if (mapEl) {
+                mapEl.style.visibility = 'visible';
+                mapEl.style.opacity = '1';
+                mapEl.style.backgroundColor = '#eef2f5';
+            }
+
+            document.querySelectorAll('.leaflet-container, .leaflet-pane, .leaflet-map-pane, .leaflet-tile-pane').forEach((el) => {
+                el.style.visibility = 'visible';
+                el.style.opacity = '1';
+            });
+        } catch (_) {}
+    };
+
+    const redrawVisibleApplicationLayers = () => {
+        try {
+            if (typeof updateDepartmentsLayerAppearance === 'function' && areDepartmentsVisible) {
+                updateDepartmentsLayerAppearance();
+            }
+        } catch (_) {}
+
+        try {
+            if (typeof updateCommunesLayerAppearance === 'function' && areCommunesVisible) {
+                updateCommunesLayerAppearance();
+            }
+        } catch (_) {}
+
+        try {
+            if (typeof redrawGaarCircuits === 'function' && isGaarMode) {
+                redrawGaarCircuits();
+            }
+        } catch (_) {}
+
+        try {
+            if (typeof updateHighVoltageLinesLayerVisibility === 'function') {
+                updateHighVoltageLinesLayerVisibility();
+            }
+        } catch (_) {}
+
+        try {
+            if (typeof refreshUI === 'function') {
+                refreshUI();
+            }
+        } catch (_) {}
+    };
+
+    const refreshLeafletOnce = (options = {}) => {
+        markReady();
+        forceMapContainerVisible();
+
+        try {
+            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                map.invalidateSize(options.pan === true);
+            }
+        } catch (_) {}
+
+        try {
+            if (typeof notifyServiceWorkerActivePacks === 'function') {
+                notifyServiceWorkerActivePacks(activeOfflinePacks);
+            }
+        } catch (_) {}
+
+        try {
+            if (typeof baseTileLayer !== 'undefined' && baseTileLayer && typeof baseTileLayer.redraw === 'function') {
+                baseTileLayer.redraw();
+            }
+        } catch (_) {}
+
+        redrawVisibleApplicationLayers();
+    };
+
+    const countUsableTiles = () => {
+        try {
+            const tiles = Array.from(document.querySelectorAll('.leaflet-tile'));
+            if (!tiles.length) return 0;
+            return tiles.filter((tile) => {
+                const img = tile;
+                const rect = img.getBoundingClientRect ? img.getBoundingClientRect() : null;
+                const hasSize = rect && rect.width > 10 && rect.height > 10;
+                return hasSize && img.complete !== false && img.style.display !== 'none' && img.style.visibility !== 'hidden';
+            }).length;
+        } catch (_) {
+            return 0;
+        }
+    };
+
+    const softRebuildTileLayerIfNeeded = () => {
+        try {
+            if (typeof isZipImportRunning !== 'undefined' && isZipImportRunning) return;
+            if (countUsableTiles() > 0) return;
+            if (typeof setupBaseTileLayer === 'function' && typeof map !== 'undefined' && map) {
+                setupBaseTileLayer();
+                if (typeof map.invalidateSize === 'function') map.invalidateSize(true);
+            }
+        } catch (_) {}
+    };
+
+    const runResumeSequence = (reason = 'resume') => {
+        const token = ++resumeToken;
+        const wasLongBackground = hiddenAt && (Date.now() - hiddenAt) >= LONG_BACKGROUND_MS;
+        const shouldShowOverlay = wasLongBackground || reason === 'pageshow-persisted';
+
+        markReady();
+        forceMapContainerVisible();
+        if (shouldShowOverlay) showResumeOverlay();
+
+        RESUME_DELAYS_MS.forEach((delay, index) => {
+            setTimeout(() => {
+                if (token !== resumeToken) return;
+                refreshLeafletOnce({ pan: index >= 2 });
+            }, delay);
+        });
+
+        if (shouldShowOverlay) {
+            setTimeout(() => {
+                if (token !== resumeToken) return;
+                softRebuildTileLayerIfNeeded();
+            }, 2400);
+            hideResumeOverlay(token, 3200);
+        } else {
+            hideResumeOverlay(token, 900);
+        }
+    };
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            hiddenAt = Date.now();
+            return;
+        }
+        runResumeSequence('visible');
+    }, { passive: true });
+
+    window.addEventListener('pageshow', (event) => {
+        runResumeSequence(event && event.persisted ? 'pageshow-persisted' : 'pageshow');
+    });
+
+    window.addEventListener('focus', () => {
+        runResumeSequence('focus');
+    });
+})();
+
+
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
