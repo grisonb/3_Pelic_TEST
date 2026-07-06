@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.68-sim-popup-onglets">
-    <link rel="manifest" href="manifest.json?appv=v12.68-sim-popup-onglets">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.68-sim-popup-onglets">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.68-sim-popup-onglets">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.68-sim-popup-onglets">
+    <link rel="stylesheet" href="style.css?appv=v12.69-reprise-ipad">
+    <link rel="manifest" href="manifest.json?appv=v12.69-reprise-ipad">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.69-reprise-ipad">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.69-reprise-ipad">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.69-reprise-ipad">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.68';
+        const APP_VERSION = 'v12.69';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -64,7 +64,7 @@
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
         /*
-         * v12.68 — stabilité popup simulation et onglets.
+         * v12.69 — stabilité popup simulation et onglets.
          * Quand un nouveau service worker prend le contrôle, on recharge une
          * seule fois la page pour éviter un mélange ancien index / nouveau cache
          * ou nouveau index / ancien script. Les tuiles offline IndexedDB ne sont
@@ -196,7 +196,7 @@
     <div id="app-boot-screen" aria-live="polite">
         <div class="boot-card">
             <div>Chargement NPF-Q400…</div>
-            <div class="boot-version">reprise application</div>
+            <div class="boot-version">reprise iPad</div>
         </div>
     </div>
     <div id="map"></div>
@@ -299,7 +299,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.68-sim-popup-onglets"></script>
+    <script src="script.js?appv=v12.69-reprise-ipad"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
