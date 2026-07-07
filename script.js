@@ -9958,10 +9958,26 @@ function initializeCalculator() {
     }
 
     function parseRltDensityInput(value) {
-        const normalized = String(value || '').trim().replace(',', '.');
-        if (normalized === '1.' || normalized === '1') return null;
-        const density = parseDecimalInput(normalized);
-        if (density === null || density <= 0) return null;
+        const rawString = String(value || '').trim().replace(',', '.');
+        const normalized = rawString.replace(/[^0-9.]/g, '');
+        if (normalized === '1.' || normalized === '1' || normalized === '') return null;
+
+        let density = Number(normalized);
+
+        /*
+         * v12.75 — sécurité densité retardant.
+         * La densité attendue est autour de 1,06 à 1,10. Sur iPad, selon
+         * le clavier et les anciennes valeurs, une saisie visuelle "1.1" peut
+         * parfois être relue comme 0.11. Dans ce cas opérationnel impossible,
+         * on reconstruit la densité à partir des chiffres saisis.
+         */
+        const digits = normalized.replace(/\D/g, '');
+        if (Number.isFinite(density) && density > 0 && density < 0.5 && digits.startsWith('1') && digits.length >= 2) {
+            const decimals = digits.slice(1, 4);
+            density = Number(`1.${decimals}`);
+        }
+
+        if (!Number.isFinite(density) || density <= 0) return null;
         return density;
     }
 
@@ -10036,6 +10052,13 @@ function initializeCalculator() {
         });
     }
 
+    function isFirstBlocFuelRltRow(wrapper) {
+        const row = wrapper?.closest?.('#bloc-fuel tbody tr');
+        if (!row || !row.parentElement) return false;
+        const rows = Array.from(row.parentElement.querySelectorAll('tr'));
+        return rows.indexOf(row) === 0;
+    }
+
     function syncRltMassModalFromInputs() {
         const {
             massToVolumeMassInput,
@@ -10081,9 +10104,12 @@ function initializeCalculator() {
         }
 
         if (firstFullBtn) {
-            const topComplete = topMass !== null && topDensity !== null;
-            const bottomHasAnyValue = bottomVolume !== null || bottomDensity !== null;
-            const canUseFirstFull = topComplete && !bottomHasAnyValue;
+            /*
+             * v12.75 — le bouton 1er Plein dépend de la ligne du tableau
+             * BLOC/FUEL ouverte, pas de la première ligne de calcul de la
+             * fenêtre. Il n'est disponible que sur la première ligne du tableau.
+             */
+            const canUseFirstFull = isFirstBlocFuelRltRow(activeRltMassWrapper);
             firstFullBtn.hidden = !canUseFirstFull;
             firstFullBtn.style.display = canUseFirstFull ? 'inline-flex' : 'none';
             if (!canUseFirstFull) activeRltFirstFull = false;
@@ -10241,7 +10267,7 @@ function initializeCalculator() {
              * La priorité de calcul reste celle de v12.71 : ligne 2 prioritaire,
              * ligne 1 utilisée seulement si la ligne 2 est incomplète.
              */
-            const isFirstFull = !!activeRltFirstFull && topComplete && !bottomComplete;
+            const isFirstFull = !!activeRltFirstFull && isFirstBlocFuelRltRow(activeRltMassWrapper) && topComplete && !bottomComplete;
 
             if (bottomComplete) {
                 volume = bottomVolume;
