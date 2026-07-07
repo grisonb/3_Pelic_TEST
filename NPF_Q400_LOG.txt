@@ -662,3 +662,13 @@ v12.74 — Retardant : 1er Plein et suppression X
 - Le mode “1er Plein” ne s'applique qu'à la première ligne du calcul retardant ; si la ligne Volume × Densité = Masse est renseignée, elle garde la priorité normale.
 - Sauvegarde/restauration : le statut “1er Plein” est conservé dans les données du tableau.
 - Non modifié : calculs Prévi/TMD/CS/HDV, aides, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
+
+v12.75 — Retardant : 1er Plein lié à la première ligne du tableau
+- Base : v12.74 TEST retardant_1er_plein.
+- Correction logique : le bouton “1er Plein” ne dépend plus de la première ligne de calcul Masse ÷ Densité = Volume.
+- Nouvelle règle : le bouton “1er Plein” apparaît uniquement quand la cellule Masse RLT ouverte appartient à la première ligne du tableau BLOC/FUEL.
+- Validation : le mode “1er Plein” ne peut être appliqué que sur cette première ligne du tableau ; les autres lignes conservent le comportement Masse RLT normal.
+- Correction calcul densité : sécurisation de la lecture de densité pour éviter qu’une valeur visuelle de type 1,1 / 1.1 soit interprétée comme 0,11 et donne une masse dix fois trop faible.
+- Les deux lignes de calcul restent indépendantes : ligne 1 Masse ÷ Densité = Volume, ligne 2 Volume × Densité = Masse.
+- Priorité conservée : si la ligne 2 est renseignée, le résultat Volume × Densité reste prioritaire pour la colonne Masse RLT.
+- Non modifié : Prévi/TMD/CS/HDV, aides, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
