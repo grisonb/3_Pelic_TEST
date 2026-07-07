@@ -5848,3 +5848,45 @@ body.npf-resuming #npf-resume-overlay {
 .post-update-restart-actions {
     grid-template-columns: 1fr !important;
 }
+
+/* v12.74 — Retardant : 1er Plein et fenêtre sans X */
+#rlt-mass-close-btn {
+    display: none !important;
+}
+.rlt-first-full-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    margin: -4px auto 10px;
+    min-height: 34px;
+    padding: 6px 18px;
+    border: 2px solid #0b63a5;
+    border-radius: 999px;
+    background: #eef7ff;
+    color: #005a9c;
+    font-size: 15px;
+    font-weight: 950;
+    cursor: pointer;
+}
+.rlt-first-full-btn.active {
+    background: #005a9c;
+    color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(0, 90, 156, .18);
+}
+#bloc-fuel tr.bloc-fuel-first-full-row .fuel-split-input-wrapper {
+    display: none !important;
+}
+#bloc-fuel tr.bloc-fuel-first-full-row .airport-oaci-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .duree-rotation-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .fuel-rotation-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-restant-cell {
+    color: transparent !important;
+}
+#bloc-fuel tr.bloc-fuel-first-full-row .airport-oaci-cell::before,
+#bloc-fuel tr.bloc-fuel-first-full-row .duree-rotation-cell::before,
+#bloc-fuel tr.bloc-fuel-first-full-row .fuel-rotation-cell::before,
+#bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-cell::before,
+#bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-restant-cell::before {
+    content: '' !important;
+}
