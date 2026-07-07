@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-72-retardant-boutons';
+const SW_VERSION = 'sw-v12-73-maj-postupdate-retardant';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
