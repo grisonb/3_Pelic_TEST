@@ -6989,6 +6989,20 @@ function recalculateBlocFuel() {
         const fuelCell = row.querySelector('.fuel-rotation-cell');
         const tpsVolCell = row.querySelector('.tps-vol-cell');
         const tpsRestantCell = row.querySelector('.tps-vol-restant-cell');
+        const rltWrapper = row.querySelector('.rlt-mass-input-wrapper');
+        const isFirstFullRlt = rltWrapper?.dataset.rltFirstFull === '1' || rltWrapper?.dataset.rltMode === 'firstFull';
+        row.classList.toggle('bloc-fuel-first-full-row', !!isFirstFullRlt);
+        if (isFirstFullRlt) {
+            if (dureeCell) dureeCell.textContent = '';
+            if (fuelCell) fuelCell.textContent = '';
+            if (tpsVolCell) tpsVolCell.textContent = '';
+            if (tpsRestantCell) tpsRestantCell.textContent = '';
+            const fuelInput = row.querySelector('.fuel-split-input-wrapper .display-input');
+            if (fuelInput) fuelInput.value = '';
+            row.dataset.airportOaci = '';
+            try { updateRowAirportOaci(row); } catch (_) {}
+            return;
+        }
 
         let dureeRotation = null;
         if (blocArrivee !== null && previousBlocArrivee !== null) {
@@ -8757,6 +8771,7 @@ function initializeCalculator() {
     let activeRltMassWrapper = null;
     let activeRltMassLastEdited = null;
     let activeRltMassCalculationMode = null;
+    let activeRltFirstFull = false;
 
     function getSharedHeaderMainId(wrapper) {
         if (!wrapper) return '';
@@ -9092,6 +9107,7 @@ function initializeCalculator() {
             || rowData.rltBottomDensity
             || rowData.rltBottomMass
             || rowData.rltMode
+            || rowData.rltFirstFull
         );
     }
 
@@ -9128,9 +9144,10 @@ function initializeCalculator() {
             const rltBottomDensity = rltWrapper?.dataset.bottomDensity || '';
             const rltBottomMass = rltWrapper?.dataset.bottomMass || '';
             const rltMode = rltWrapper?.dataset.rltMode || '';
+            const rltFirstFull = rltWrapper?.dataset.rltFirstFull || '';
             const oaci = row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || '';
-            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltMode) {
-                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltMode });
+            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltMode || rltFirstFull) {
+                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltMode, rltFirstFull });
             }
         });
         state.calculator_table_data = compactCalculatorTableData(tableData);
@@ -9983,7 +10000,8 @@ function initializeCalculator() {
             validateBtn: document.getElementById('rlt-mass-validate-btn'),
             clearBtn: document.getElementById('rlt-mass-clear-btn'),
             cancelBtn: document.getElementById('rlt-mass-cancel-btn'),
-            closeBtn: document.getElementById('rlt-mass-close-btn')
+            closeBtn: document.getElementById('rlt-mass-close-btn'),
+            firstFullBtn: document.getElementById('rlt-first-full-btn')
         };
     }
 
@@ -10007,6 +10025,7 @@ function initializeCalculator() {
         activeRltMassWrapper = null;
         activeRltMassLastEdited = null;
         activeRltMassCalculationMode = null;
+        activeRltFirstFull = false;
         markRltCalculatedField(null);
     }
 
@@ -10024,7 +10043,8 @@ function initializeCalculator() {
             massToVolumeVolumeInput,
             volumeInput,
             densityInput,
-            massInput
+            massInput,
+            firstFullBtn
         } = getRltMassModalElements();
 
         ensureRltDensityDefaults();
@@ -10059,6 +10079,17 @@ function initializeCalculator() {
                 massInput.value = '';
             }
         }
+
+        if (firstFullBtn) {
+            const topComplete = topMass !== null && topDensity !== null;
+            const bottomHasAnyValue = bottomVolume !== null || bottomDensity !== null;
+            const canUseFirstFull = topComplete && !bottomHasAnyValue;
+            firstFullBtn.hidden = !canUseFirstFull;
+            firstFullBtn.style.display = canUseFirstFull ? 'inline-flex' : 'none';
+            if (!canUseFirstFull) activeRltFirstFull = false;
+            firstFullBtn.classList.toggle('active', !!activeRltFirstFull && canUseFirstFull);
+            firstFullBtn.setAttribute('aria-pressed', (!!activeRltFirstFull && canUseFirstFull) ? 'true' : 'false');
+        }
     }
 
     function setupRltMassModalOnce() {
@@ -10074,7 +10105,8 @@ function initializeCalculator() {
             validateBtn,
             clearBtn,
             cancelBtn,
-            closeBtn
+            closeBtn,
+            firstFullBtn
         } = elements;
         if (!modal || modal.dataset.bound === '1') return;
         modal.dataset.bound = '1';
@@ -10140,6 +10172,20 @@ function initializeCalculator() {
         bindInput(volumeInput, 'volume', 'volumeToMass');
         bindInput(densityInput, 'density', 'volumeToMass');
 
+        if (firstFullBtn && firstFullBtn.dataset.rltFirstFullBound !== '1') {
+            firstFullBtn.dataset.rltFirstFullBound = '1';
+            const toggleFirstFull = (event) => {
+                stopRltButtonEvent(event);
+                runRltButtonActionOnce(() => {
+                    activeRltFirstFull = !activeRltFirstFull;
+                    syncRltMassModalFromInputs();
+                }, 'rlt-firstfull');
+            };
+            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
+                firstFullBtn.addEventListener(type, toggleFirstFull, { capture: true, passive: false });
+            });
+        }
+
         const stopRltButtonEvent = (event) => {
             if (!event) return;
             event.preventDefault();
@@ -10195,6 +10241,8 @@ function initializeCalculator() {
              * La priorité de calcul reste celle de v12.71 : ligne 2 prioritaire,
              * ligne 1 utilisée seulement si la ligne 2 est incomplète.
              */
+            const isFirstFull = !!activeRltFirstFull && topComplete && !bottomComplete;
+
             if (bottomComplete) {
                 volume = bottomVolume;
                 density = bottomDensity;
@@ -10204,7 +10252,7 @@ function initializeCalculator() {
                 volume = topComputedVolume;
                 density = topDensity;
                 mass = topMass;
-                selectedMode = 'massToVolume';
+                selectedMode = isFirstFull ? 'firstFull' : 'massToVolume';
             }
 
             activeRltMassWrapper.dataset.topMass = topMass !== null ? String(Math.round(topMass)) : '';
@@ -10214,6 +10262,18 @@ function initializeCalculator() {
             activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
             activeRltMassWrapper.dataset.bottomMass = bottomMass !== null ? String(Math.round(bottomMass)) : '';
             activeRltMassWrapper.dataset.rltMode = selectedMode;
+            activeRltMassWrapper.dataset.rltFirstFull = selectedMode === 'firstFull' ? '1' : '';
+
+            const activeRltRow = activeRltMassWrapper.closest('tr');
+            if (activeRltRow) {
+                activeRltRow.classList.toggle('bloc-fuel-first-full-row', selectedMode === 'firstFull');
+                if (selectedMode === 'firstFull') {
+                    const fuelInput = activeRltRow.querySelector('.fuel-split-input-wrapper .display-input');
+                    if (fuelInput) fuelInput.value = '';
+                    activeRltRow.dataset.airportOaci = '';
+                    try { updateRowAirportOaci(activeRltRow); } catch (_) {}
+                }
+            }
 
             activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 0) : '';
             activeRltMassWrapper.dataset.density = density !== null ? formatDecimalValue(density, 3) : '';
@@ -10236,6 +10296,7 @@ function initializeCalculator() {
             if (massInput) massInput.value = '';
             activeRltMassLastEdited = null;
             activeRltMassCalculationMode = null;
+            activeRltFirstFull = false;
             markRltCalculatedField(null);
             ensureRltDensityDefaults();
 
@@ -10306,6 +10367,14 @@ function initializeCalculator() {
                         runRltButtonActionOnce(clearRltModalFields, 'rlt-clear-global');
                         return;
                     }
+                    if (buttonContainsPoint(firstFullBtn, point)) {
+                        stopRltButtonEvent(event);
+                        runRltButtonActionOnce(() => {
+                            activeRltFirstFull = !activeRltFirstFull;
+                            syncRltMassModalFromInputs();
+                        }, 'rlt-firstfull-global');
+                        return;
+                    }
                     if (buttonContainsPoint(cancelBtn, point) || buttonContainsPoint(closeBtn, point)) {
                         stopRltButtonEvent(event);
                         runRltButtonActionOnce(closeRltMassModal, 'rlt-close-global');
@@ -10363,6 +10432,7 @@ function initializeCalculator() {
         activeRltMassWrapper = wrapper;
         activeRltMassLastEdited = null;
         activeRltMassCalculationMode = null;
+        activeRltFirstFull = wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull';
 
         const storedVolume = wrapper.dataset.volume || '';
         const storedDensity = wrapper.dataset.density || '1.';
@@ -10374,6 +10444,7 @@ function initializeCalculator() {
         const storedBottomDensity = wrapper.dataset.bottomDensity || '';
         const storedBottomMass = wrapper.dataset.bottomMass || '';
         const storedMode = wrapper.dataset.rltMode || '';
+        const storedFirstFull = wrapper.dataset.rltFirstFull || '';
 
         /*
          * v12.71 — restauration indépendante des deux lignes.
@@ -10435,6 +10506,9 @@ function initializeCalculator() {
         wrapper.dataset.bottomDensity = data?.rltBottomDensity || '';
         wrapper.dataset.bottomMass = data?.rltBottomMass || '';
         wrapper.dataset.rltMode = data?.rltMode || '';
+        wrapper.dataset.rltFirstFull = data?.rltFirstFull || '';
+        const rowForFirstFull = wrapper.closest('tr');
+        if (rowForFirstFull) rowForFirstFull.classList.toggle('bloc-fuel-first-full-row', wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull');
         if (displayInput) displayInput.value = data?.rltMass || '';
 
         setupRltMassModalOnce();
@@ -10465,6 +10539,9 @@ function initializeCalculator() {
                 wrapper.dataset.bottomDensity = '';
                 wrapper.dataset.bottomMass = '';
                 wrapper.dataset.rltMode = '';
+                wrapper.dataset.rltFirstFull = '';
+                const rowForClear = wrapper.closest('tr');
+                if (rowForClear) rowForClear.classList.remove('bloc-fuel-first-full-row');
                 if (displayInput) displayInput.value = '';
                 masterRecalculate();
                 saveCalculatorState();
