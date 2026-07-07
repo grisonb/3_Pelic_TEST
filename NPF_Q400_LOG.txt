@@ -5,7 +5,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.65
+Version actuelle TEST : v12.74
 Date de génération : 2026-07-05
 
 Règle de méthode
@@ -651,4 +651,14 @@ v12.73 — Message post-MAJ et boutons retardant renforcés
 - Correction Valider : un appui sur Valider doit exécuter la validation même clavier ouvert.
 - Correction Effacer : un appui sur Effacer doit vider les cellules sans fermer la fenêtre ; le clavier est conservé autant que possible.
 - Les deux lignes de calcul retardant restent indépendantes : Masse ÷ Densité = Volume et Volume × Densité = Masse.
+- Non modifié : calculs Prévi/TMD/CS/HDV, aides, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
+
+
+v12.74 — Retardant : 1er Plein et suppression X
+- Base : v12.73 TEST maj_postupdate_retardant.
+- Modification fenêtre VOLUME/MASSE RETARDANT : suppression du bouton X en haut à droite, Annuler reste l'action de fermeture.
+- Ajout d'un bouton “1er Plein” sous le titre lorsque la première ligne Masse ÷ Densité = Volume est renseignée seule.
+- Si “1er Plein” est activé puis validé, la ligne BLOC/FUEL affiche uniquement la Masse RLT ; les colonnes suivantes restent vides et la cellule Fuel Pélic. est masquée pour cette ligne.
+- Le mode “1er Plein” ne s'applique qu'à la première ligne du calcul retardant ; si la ligne Volume × Densité = Masse est renseignée, elle garde la priorité normale.
+- Sauvegarde/restauration : le statut “1er Plein” est conservé dans les données du tableau.
 - Non modifié : calculs Prévi/TMD/CS/HDV, aides, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
