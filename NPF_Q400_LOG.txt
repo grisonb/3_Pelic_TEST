@@ -643,3 +643,12 @@ v12.72 — Retardant : boutons iPad fiables
 - Ajout d'une protection anti-double événement pointer/touch/click pour éviter les validations ou effacements multiples.
 - Les deux lignes de calcul restent indépendantes : Masse ÷ Densité = Volume et Volume × Densité = Masse.
 - Aucune modification des calculs Prévi/TMD/CS/HDV, cartes, simulation, import ZIP ou IndexedDB.
+
+v12.73 — Message post-MAJ et boutons retardant renforcés
+- Base : v12.72 TEST retardant_boutons.
+- Ajout : après une mise à jour lancée par MAJ ou activation d'un nouveau service worker, l'application mémorise l'événement et affiche au redémarrage une fenêtre : “Une mise à jour vient d’être effectuée. Fermez et relancez l’application.”
+- Correction fenêtre VOLUME/MASSE RETARDANT : gestion des boutons Valider/Effacer renforcée par détection globale des coordonnées tactiles des boutons, afin d'éviter le comportement iPad où le premier appui ne fait que fermer le clavier.
+- Correction Valider : un appui sur Valider doit exécuter la validation même clavier ouvert.
+- Correction Effacer : un appui sur Effacer doit vider les cellules sans fermer la fenêtre ; le clavier est conservé autant que possible.
+- Les deux lignes de calcul retardant restent indépendantes : Masse ÷ Densité = Volume et Volume × Densité = Masse.
+- Non modifié : calculs Prévi/TMD/CS/HDV, aides, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
