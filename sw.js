@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-73-maj-postupdate-retardant';
+const SW_VERSION = 'sw-v12-74-retardant-1er-plein';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
