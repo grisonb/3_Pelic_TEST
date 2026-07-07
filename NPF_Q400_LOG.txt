@@ -635,3 +635,11 @@ v12.71 — Retardant : calculs indépendants et clavier iPad
 - Correction fermeture parasite : après Effacer, un nouveau clic sur une cellule Masse ou Volume ne ferme plus la fenêtre.
 - Sauvegarde BLOC/FUEL : les détails ligne 1 / ligne 2 du calcul retardant sont conservés en plus de la masse affichée.
 - Non modifié : calculs Prévi/TMD/CS/HDV, aides “?”, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Lignes HT, Communes, PDF et rappel MAJ.
+
+v12.72 — Retardant : boutons iPad fiables
+- Base : v12.71_retardant_independant.
+- Correction fenêtre VOLUME/MASSE RETARDANT : le bouton Valider exécute l'action dès l'appui, même clavier iPad ouvert ; il ne faut plus deux appuis.
+- Correction bouton Effacer : un seul appui vide les cellules de la fenêtre sans fermer le clavier ni la fenêtre.
+- Ajout d'une protection anti-double événement pointer/touch/click pour éviter les validations ou effacements multiples.
+- Les deux lignes de calcul restent indépendantes : Masse ÷ Densité = Volume et Volume × Densité = Masse.
+- Aucune modification des calculs Prévi/TMD/CS/HDV, cartes, simulation, import ZIP ou IndexedDB.
