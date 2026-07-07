@@ -10036,6 +10036,14 @@ function initializeCalculator() {
         if (!modal || modal.dataset.bound === '1') return;
         modal.dataset.bound = '1';
 
+        const modalContent = modal.querySelector('.rlt-mass-modal-content');
+        if (modalContent && modalContent.dataset.rltStopBound !== '1') {
+            modalContent.dataset.rltStopBound = '1';
+            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
+                modalContent.addEventListener(type, (event) => event.stopPropagation(), { capture: true });
+            });
+        }
+
         [massToVolumeVolumeInput, massInput].filter(Boolean).forEach(input => {
             input.readOnly = true;
             input.setAttribute('readonly', 'readonly');
@@ -10089,81 +10097,90 @@ function initializeCalculator() {
         bindInput(volumeInput, 'volume', 'volumeToMass');
         bindInput(densityInput, 'density', 'volumeToMass');
 
-        if (validateBtn) {
-            validateBtn.addEventListener('click', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                if (!activeRltMassWrapper) {
-                    closeRltMassModal();
-                    return;
-                }
-
-                syncRltMassModalFromInputs();
-
-                const topMass = parseDecimalInput(massToVolumeMassInput?.value);
-                const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
-                const topVolume = parseDecimalInput(massToVolumeVolumeInput?.value);
-                const bottomVolume = parseDecimalInput(volumeInput?.value);
-                const bottomDensity = parseRltDensityInput(densityInput?.value);
-                const bottomMass = parseDecimalInput(massInput?.value);
-
-                const topComplete = topMass !== null && topDensity !== null;
-                const bottomComplete = bottomVolume !== null && bottomDensity !== null;
-
-                const topComputedVolume = topComplete
-                    ? (topVolume !== null ? topVolume : (topMass / topDensity))
-                    : null;
-
-                let volume = null;
-                let density = null;
-                let mass = null;
-                let selectedMode = '';
-
-                /*
-                 * v12.71 — priorité opérationnelle :
-                 * - si la ligne 2 est complète, la colonne Masse RLT prend le
-                 *   résultat Volume × Densité = Masse ;
-                 * - sinon, si seule la ligne 1 est complète, la colonne Masse RLT
-                 *   prend la masse saisie sur la ligne 1.
-                 */
-                if (bottomComplete) {
-                    volume = bottomVolume;
-                    density = bottomDensity;
-                    mass = bottomMass !== null ? bottomMass : (bottomVolume * bottomDensity);
-                    selectedMode = 'volumeToMass';
-                } else if (topComplete) {
-                    volume = topComputedVolume;
-                    density = topDensity;
-                    mass = topMass;
-                    selectedMode = 'massToVolume';
-                }
-
-                activeRltMassWrapper.dataset.topMass = topMass !== null ? String(Math.round(topMass)) : '';
-                activeRltMassWrapper.dataset.topDensity = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
-                activeRltMassWrapper.dataset.topVolume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
-                activeRltMassWrapper.dataset.bottomVolume = bottomVolume !== null ? formatDecimalValue(bottomVolume, 0) : '';
-                activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
-                activeRltMassWrapper.dataset.bottomMass = bottomMass !== null ? String(Math.round(bottomMass)) : '';
-                activeRltMassWrapper.dataset.rltMode = selectedMode;
-
-                activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 0) : '';
-                activeRltMassWrapper.dataset.density = density !== null ? formatDecimalValue(density, 3) : '';
-                activeRltMassWrapper.dataset.mass = mass !== null ? String(Math.round(mass)) : '';
-
-                const displayInput = activeRltMassWrapper.querySelector('.display-input');
-                if (displayInput) displayInput.value = mass !== null ? formatKgValue(mass) : '';
-
-                masterRecalculate();
-                saveCalculatorState();
-                closeRltMassModal();
-            }, { capture: true });
-        }
-
-        const clearRltModalFields = (event) => {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
+        const stopRltButtonEvent = (event) => {
+            if (!event) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') {
+                event.stopImmediatePropagation();
             }
+        };
+
+        const runRltButtonActionOnce = (action) => {
+            const now = Date.now();
+            const lastRun = Number(modal?.dataset.rltLastButtonActionAt || '0');
+            if (now - lastRun < 220) return;
+            if (modal) modal.dataset.rltLastButtonActionAt = String(now);
+            action();
+        };
+
+        const validateRltModalFields = () => {
+            if (!activeRltMassWrapper) {
+                closeRltMassModal();
+                return;
+            }
+
+            syncRltMassModalFromInputs();
+
+            const topMass = parseDecimalInput(massToVolumeMassInput?.value);
+            const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
+            const topVolume = parseDecimalInput(massToVolumeVolumeInput?.value);
+            const bottomVolume = parseDecimalInput(volumeInput?.value);
+            const bottomDensity = parseRltDensityInput(densityInput?.value);
+            const bottomMass = parseDecimalInput(massInput?.value);
+
+            const topComplete = topMass !== null && topDensity !== null;
+            const bottomComplete = bottomVolume !== null && bottomDensity !== null;
+
+            const topComputedVolume = topComplete
+                ? (topVolume !== null ? topVolume : (topMass / topDensity))
+                : null;
+
+            let volume = null;
+            let density = null;
+            let mass = null;
+            let selectedMode = '';
+
+            /*
+             * v12.72 — validation fiable iPad :
+             * l'action est lancée dès pointerdown/touchstart afin qu'un premier
+             * appui sur Valider ne serve pas seulement à fermer le clavier.
+             * La priorité de calcul reste celle de v12.71 : ligne 2 prioritaire,
+             * ligne 1 utilisée seulement si la ligne 2 est incomplète.
+             */
+            if (bottomComplete) {
+                volume = bottomVolume;
+                density = bottomDensity;
+                mass = bottomMass !== null ? bottomMass : (bottomVolume * bottomDensity);
+                selectedMode = 'volumeToMass';
+            } else if (topComplete) {
+                volume = topComputedVolume;
+                density = topDensity;
+                mass = topMass;
+                selectedMode = 'massToVolume';
+            }
+
+            activeRltMassWrapper.dataset.topMass = topMass !== null ? String(Math.round(topMass)) : '';
+            activeRltMassWrapper.dataset.topDensity = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
+            activeRltMassWrapper.dataset.topVolume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
+            activeRltMassWrapper.dataset.bottomVolume = bottomVolume !== null ? formatDecimalValue(bottomVolume, 0) : '';
+            activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
+            activeRltMassWrapper.dataset.bottomMass = bottomMass !== null ? String(Math.round(bottomMass)) : '';
+            activeRltMassWrapper.dataset.rltMode = selectedMode;
+
+            activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 0) : '';
+            activeRltMassWrapper.dataset.density = density !== null ? formatDecimalValue(density, 3) : '';
+            activeRltMassWrapper.dataset.mass = mass !== null ? String(Math.round(mass)) : '';
+
+            const displayInput = activeRltMassWrapper.querySelector('.display-input');
+            if (displayInput) displayInput.value = mass !== null ? formatKgValue(mass) : '';
+
+            masterRecalculate();
+            saveCalculatorState();
+            closeRltMassModal();
+        };
+
+        const clearRltModalFields = () => {
             if (massToVolumeMassInput) massToVolumeMassInput.value = '';
             if (massToVolumeDensityInput) massToVolumeDensityInput.value = '1.';
             if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = '';
@@ -10173,25 +10190,40 @@ function initializeCalculator() {
             activeRltMassLastEdited = null;
             activeRltMassCalculationMode = null;
             markRltCalculatedField(null);
+            ensureRltDensityDefaults();
+
+            /*
+             * v12.72 — Effacer ne ferme ni le clavier ni la fenêtre.
+             * On refocalise un champ éditable après le nettoyage pour empêcher
+             * Safari/iPad de transformer le premier appui en simple fermeture clavier.
+             */
             try {
-                const refocusInput = document.activeElement && modal?.contains(document.activeElement)
+                const current = document.activeElement && modal?.contains(document.activeElement)
                     && document.activeElement.tagName === 'INPUT'
                     && !document.activeElement.readOnly
                     ? document.activeElement
-                    : (volumeInput || massToVolumeMassInput);
-                setTimeout(() => refocusInput?.focus?.({ preventScroll: false }), 30);
+                    : null;
+                const refocusInput = current || volumeInput || massToVolumeMassInput;
+                requestAnimationFrame(() => refocusInput?.focus?.({ preventScroll: false }));
+                setTimeout(() => refocusInput?.focus?.({ preventScroll: false }), 80);
+                setTimeout(() => refocusInput?.focus?.({ preventScroll: false }), 220);
             } catch (_) {}
         };
 
-        if (clearBtn) {
-            ['pointerdown', 'touchstart', 'mousedown'].forEach(type => {
-                clearBtn.addEventListener(type, (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }, { capture: true });
+        const bindRltActionButton = (button, action) => {
+            if (!button || button.dataset.rltActionBound === '1') return;
+            button.dataset.rltActionBound = '1';
+            const handler = (event) => {
+                stopRltButtonEvent(event);
+                runRltButtonActionOnce(action);
+            };
+            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
+                button.addEventListener(type, handler, { capture: true });
             });
-            clearBtn.addEventListener('click', clearRltModalFields, { capture: true });
-        }
+        };
+
+        bindRltActionButton(validateBtn, validateRltModalFields);
+        bindRltActionButton(clearBtn, clearRltModalFields);
 
         const bindRltModalCloseButton = (button) => {
             if (!button || button.dataset.rltCloseBound === '1') return;
