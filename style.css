@@ -5828,3 +5828,23 @@ body.npf-resuming #npf-resume-overlay {
 #map {
     background-color: #eef2f5;
 }
+
+
+/* v12.73 — iPad : boutons retardant et fenêtre post-MAJ */
+.rlt-mass-actions button,
+.rlt-mass-close-btn {
+    touch-action: manipulation !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    position: relative !important;
+    z-index: 5 !important;
+}
+
+.post-update-restart-modal-content p {
+    font-size: 18px !important;
+    line-height: 1.35 !important;
+}
+
+.post-update-restart-actions {
+    grid-template-columns: 1fr !important;
+}
