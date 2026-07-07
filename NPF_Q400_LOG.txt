@@ -621,3 +621,17 @@ v12.70 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées
 - Refonte des aides des résultats rotations : Fuel retour base, Fuel retour pélic, Coucher Soleil, TMD et HDV détaillent maintenant les distances, BINGO, conso rotation, forfaits, conditions du +1 et calcul final.
 - Amélioration des aides Suivi rotation et Déroute : détail plus explicite de l'heure sur feu et des fuel mini 1 largage.
 - Non modifié : reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Lignes HT, Communes, retardant, PDF et rappel MAJ.
+
+
+v12.71 — Retardant : calculs indépendants et clavier iPad
+- Base : v12.70 TEST previ_plus1_aides.
+- Correction fenêtre VOLUME/MASSE RETARDANT : les deux lignes sont désormais indépendantes.
+- Ligne 1 : Masse ÷ Densité = Volume. Cette ligne calcule uniquement son volume et ne renseigne plus automatiquement la ligne 2.
+- Ligne 2 : Volume × Densité = Masse. Cette ligne calcule uniquement sa masse et ne modifie pas la ligne 1.
+- Validation Masse RLT : si seule la ligne 1 est renseignée, la colonne Masse RLT affiche la masse saisie dans la première cellule Masse.
+- Validation Masse RLT : si la ligne 2 est renseignée, son résultat Volume × Densité = Masse est prioritaire dans la colonne Masse RLT.
+- Réouverture d'une cellule Masse RLT : les valeurs des deux lignes sont restaurées séparément afin d'éviter que la deuxième ligne se recalcule depuis la première.
+- Bouton Effacer : un seul clic vide toutes les cellules de la fenêtre sans fermer le clavier iPad et sans fermer la fenêtre.
+- Correction fermeture parasite : après Effacer, un nouveau clic sur une cellule Masse ou Volume ne ferme plus la fenêtre.
+- Sauvegarde BLOC/FUEL : les détails ligne 1 / ligne 2 du calcul retardant sont conservés en plus de la masse affichée.
+- Non modifié : calculs Prévi/TMD/CS/HDV, aides “?”, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Lignes HT, Communes, PDF et rappel MAJ.
