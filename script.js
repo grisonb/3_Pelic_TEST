@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('pageshow', refreshMapAfterWake);
 })();
 
-// v12.70 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées.
+// v12.71 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées.
 (function setupNpfIpadResumeHardening() {
     const LONG_BACKGROUND_MS = 2 * 60 * 1000;
     const RESUME_DELAYS_MS = [0, 80, 180, 350, 700, 1200, 2200, 3600];
@@ -9042,6 +9042,13 @@ function initializeCalculator() {
             || rowData.rltMass
             || rowData.rltVolume
             || rowData.rltDensity
+            || rowData.rltTopMass
+            || rowData.rltTopDensity
+            || rowData.rltTopVolume
+            || rowData.rltBottomVolume
+            || rowData.rltBottomDensity
+            || rowData.rltBottomMass
+            || rowData.rltMode
         );
     }
 
@@ -9071,9 +9078,16 @@ function initializeCalculator() {
             const rltMass = rltWrapper?.querySelector('.display-input')?.value || '';
             const rltVolume = rltWrapper?.dataset.volume || '';
             const rltDensity = rltWrapper?.dataset.density || '';
+            const rltTopMass = rltWrapper?.dataset.topMass || '';
+            const rltTopDensity = rltWrapper?.dataset.topDensity || '';
+            const rltTopVolume = rltWrapper?.dataset.topVolume || '';
+            const rltBottomVolume = rltWrapper?.dataset.bottomVolume || '';
+            const rltBottomDensity = rltWrapper?.dataset.bottomDensity || '';
+            const rltBottomMass = rltWrapper?.dataset.bottomMass || '';
+            const rltMode = rltWrapper?.dataset.rltMode || '';
             const oaci = row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || '';
-            if (time || fuel || oaci || rltMass || rltVolume || rltDensity) {
-                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity });
+            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltMode) {
+                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltMode });
             }
         });
         state.calculator_table_data = compactCalculatorTableData(tableData);
@@ -9669,6 +9683,14 @@ function initializeCalculator() {
         if (!modal || modal.dataset.bound === '1') return;
         modal.dataset.bound = '1';
 
+        const modalContent = modal.querySelector('.rlt-mass-modal-content');
+        if (modalContent && modalContent.dataset.rltStopBound !== '1') {
+            modalContent.dataset.rltStopBound = '1';
+            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
+                modalContent.addEventListener(type, (event) => event.stopPropagation(), { capture: true });
+            });
+        }
+
         if (window.visualViewport && modal.dataset.keyboardOffsetBound !== '1') {
             modal.dataset.keyboardOffsetBound = '1';
             window.visualViewport.addEventListener('resize', applyFuelSplitKeyboardOffset);
@@ -9981,16 +10003,14 @@ function initializeCalculator() {
         }
 
         /*
-         * v12.59 — colonne Masse RLT : la valeur validée doit toujours être
-         * le résultat de la ligne Volume × Densité = Masse. Si l'utilisateur
-         * part de la ligne Masse ÷ Densité = Volume, le volume calculé sert
-         * simplement d'entrée implicite pour la ligne Volume × Densité.
+         * v12.71 — les deux lignes sont indépendantes.
+         * Ligne 1 : Masse ÷ Densité = Volume. Elle calcule uniquement son volume.
+         * Ligne 2 : Volume × Densité = Masse. Elle calcule uniquement sa masse.
+         * La ligne 1 ne remplit plus la ligne 2 et inversement.
          */
         if (massInput) {
-            const effectiveVolumeForMass = bottomVolume !== null ? bottomVolume : topComputedVolume;
-            const effectiveDensityForMass = bottomDensity !== null ? bottomDensity : topDensity;
-            if (effectiveVolumeForMass !== null && effectiveDensityForMass !== null) {
-                massInput.value = formatDecimalValue(effectiveVolumeForMass * effectiveDensityForMass, 0);
+            if (bottomVolume !== null && bottomDensity !== null) {
+                massInput.value = formatDecimalValue(bottomVolume * bottomDensity, 0);
                 markRltCalculatedField('massFromVolume');
             } else {
                 massInput.value = '';
@@ -10087,28 +10107,44 @@ function initializeCalculator() {
                 const bottomDensity = parseRltDensityInput(densityInput?.value);
                 const bottomMass = parseDecimalInput(massInput?.value);
 
+                const topComplete = topMass !== null && topDensity !== null;
+                const bottomComplete = bottomVolume !== null && bottomDensity !== null;
+
+                const topComputedVolume = topComplete
+                    ? (topVolume !== null ? topVolume : (topMass / topDensity))
+                    : null;
+
                 let volume = null;
                 let density = null;
                 let mass = null;
+                let selectedMode = '';
 
-                const topComputedVolume = (topMass !== null && topDensity !== null)
-                    ? (topVolume !== null ? topVolume : (topMass / topDensity))
-                    : null;
-                const volumeForMassResult = bottomVolume !== null ? bottomVolume : topComputedVolume;
-                const densityForMassResult = bottomDensity !== null ? bottomDensity : topDensity;
-
-                if (volumeForMassResult !== null && densityForMassResult !== null) {
-                    volume = volumeForMassResult;
-                    density = densityForMassResult;
-                    /*
-                     * v12.59 — important : la colonne Masse RLT affiche et
-                     * mémorise le résultat de Volume × Densité, jamais la
-                     * masse saisie directement dans la première ligne.
-                     */
-                    mass = bottomMass !== null && bottomVolume !== null && bottomDensity !== null
-                        ? bottomMass
-                        : (volumeForMassResult * densityForMassResult);
+                /*
+                 * v12.71 — priorité opérationnelle :
+                 * - si la ligne 2 est complète, la colonne Masse RLT prend le
+                 *   résultat Volume × Densité = Masse ;
+                 * - sinon, si seule la ligne 1 est complète, la colonne Masse RLT
+                 *   prend la masse saisie sur la ligne 1.
+                 */
+                if (bottomComplete) {
+                    volume = bottomVolume;
+                    density = bottomDensity;
+                    mass = bottomMass !== null ? bottomMass : (bottomVolume * bottomDensity);
+                    selectedMode = 'volumeToMass';
+                } else if (topComplete) {
+                    volume = topComputedVolume;
+                    density = topDensity;
+                    mass = topMass;
+                    selectedMode = 'massToVolume';
                 }
+
+                activeRltMassWrapper.dataset.topMass = topMass !== null ? String(Math.round(topMass)) : '';
+                activeRltMassWrapper.dataset.topDensity = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
+                activeRltMassWrapper.dataset.topVolume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
+                activeRltMassWrapper.dataset.bottomVolume = bottomVolume !== null ? formatDecimalValue(bottomVolume, 0) : '';
+                activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
+                activeRltMassWrapper.dataset.bottomMass = bottomMass !== null ? String(Math.round(bottomMass)) : '';
+                activeRltMassWrapper.dataset.rltMode = selectedMode;
 
                 activeRltMassWrapper.dataset.volume = volume !== null ? formatDecimalValue(volume, 0) : '';
                 activeRltMassWrapper.dataset.density = density !== null ? formatDecimalValue(density, 3) : '';
@@ -10123,18 +10159,38 @@ function initializeCalculator() {
             }, { capture: true });
         }
 
+        const clearRltModalFields = (event) => {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            if (massToVolumeMassInput) massToVolumeMassInput.value = '';
+            if (massToVolumeDensityInput) massToVolumeDensityInput.value = '1.';
+            if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = '';
+            if (volumeInput) volumeInput.value = '';
+            if (densityInput) densityInput.value = '1.';
+            if (massInput) massInput.value = '';
+            activeRltMassLastEdited = null;
+            activeRltMassCalculationMode = null;
+            markRltCalculatedField(null);
+            try {
+                const refocusInput = document.activeElement && modal?.contains(document.activeElement)
+                    && document.activeElement.tagName === 'INPUT'
+                    && !document.activeElement.readOnly
+                    ? document.activeElement
+                    : (volumeInput || massToVolumeMassInput);
+                setTimeout(() => refocusInput?.focus?.({ preventScroll: false }), 30);
+            } catch (_) {}
+        };
+
         if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-                if (massToVolumeMassInput) massToVolumeMassInput.value = '';
-                if (massToVolumeDensityInput) massToVolumeDensityInput.value = '1.';
-                if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = '';
-                if (volumeInput) volumeInput.value = '';
-                if (densityInput) densityInput.value = '1.';
-                if (massInput) massInput.value = '';
-                activeRltMassLastEdited = null;
-                activeRltMassCalculationMode = null;
-                markRltCalculatedField(null);
+            ['pointerdown', 'touchstart', 'mousedown'].forEach(type => {
+                clearBtn.addEventListener(type, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }, { capture: true });
             });
+            clearBtn.addEventListener('click', clearRltModalFields, { capture: true });
         }
 
         const bindRltModalCloseButton = (button) => {
@@ -10181,13 +10237,27 @@ function initializeCalculator() {
         const storedVolume = wrapper.dataset.volume || '';
         const storedDensity = wrapper.dataset.density || '1.';
         const storedMass = wrapper.dataset.mass || String(wrapper.querySelector('.display-input')?.value || '').replace(/[^0-9]/g, '');
+        const storedTopMass = wrapper.dataset.topMass || '';
+        const storedTopDensity = wrapper.dataset.topDensity || '';
+        const storedTopVolume = wrapper.dataset.topVolume || '';
+        const storedBottomVolume = wrapper.dataset.bottomVolume || '';
+        const storedBottomDensity = wrapper.dataset.bottomDensity || '';
+        const storedBottomMass = wrapper.dataset.bottomMass || '';
+        const storedMode = wrapper.dataset.rltMode || '';
 
-        if (massToVolumeMassInput) massToVolumeMassInput.value = storedMass || '';
-        if (massToVolumeDensityInput) massToVolumeDensityInput.value = storedDensity || '1.';
-        if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = storedVolume || '';
-        if (volumeInput) volumeInput.value = storedVolume || '';
-        if (densityInput) densityInput.value = storedDensity || '1.';
-        if (massInput) massInput.value = storedMass || '';
+        /*
+         * v12.71 — restauration indépendante des deux lignes.
+         * Compatibilité ancienne donnée : s'il n'existe pas encore de détail
+         * ligne 1/ligne 2, on restaure l'ancienne valeur comme ligne 2.
+         */
+        const hasDetailedRltData = !!(storedTopMass || storedTopDensity || storedTopVolume || storedBottomVolume || storedBottomDensity || storedBottomMass || storedMode);
+
+        if (massToVolumeMassInput) massToVolumeMassInput.value = hasDetailedRltData ? storedTopMass : '';
+        if (massToVolumeDensityInput) massToVolumeDensityInput.value = hasDetailedRltData ? (storedTopDensity || '1.') : '1.';
+        if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = hasDetailedRltData ? storedTopVolume : '';
+        if (volumeInput) volumeInput.value = hasDetailedRltData ? storedBottomVolume : storedVolume;
+        if (densityInput) densityInput.value = hasDetailedRltData ? (storedBottomDensity || '1.') : (storedDensity || '1.');
+        if (massInput) massInput.value = hasDetailedRltData ? storedBottomMass : storedMass;
 
         markRltCalculatedField(null);
         syncRltMassModalFromInputs();
@@ -10228,6 +10298,13 @@ function initializeCalculator() {
         wrapper.dataset.volume = data?.rltVolume || '';
         wrapper.dataset.density = data?.rltDensity || '';
         wrapper.dataset.mass = data?.rltMass ? String(data.rltMass).replace(/[^0-9]/g, '') : '';
+        wrapper.dataset.topMass = data?.rltTopMass || '';
+        wrapper.dataset.topDensity = data?.rltTopDensity || '';
+        wrapper.dataset.topVolume = data?.rltTopVolume || '';
+        wrapper.dataset.bottomVolume = data?.rltBottomVolume || '';
+        wrapper.dataset.bottomDensity = data?.rltBottomDensity || '';
+        wrapper.dataset.bottomMass = data?.rltBottomMass || '';
+        wrapper.dataset.rltMode = data?.rltMode || '';
         if (displayInput) displayInput.value = data?.rltMass || '';
 
         setupRltMassModalOnce();
@@ -10251,6 +10328,13 @@ function initializeCalculator() {
                 wrapper.dataset.volume = '';
                 wrapper.dataset.density = '';
                 wrapper.dataset.mass = '';
+                wrapper.dataset.topMass = '';
+                wrapper.dataset.topDensity = '';
+                wrapper.dataset.topVolume = '';
+                wrapper.dataset.bottomVolume = '';
+                wrapper.dataset.bottomDensity = '';
+                wrapper.dataset.bottomMass = '';
+                wrapper.dataset.rltMode = '';
                 if (displayInput) displayInput.value = '';
                 masterRecalculate();
                 saveCalculatorState();
