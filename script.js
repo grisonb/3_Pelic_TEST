@@ -1270,7 +1270,8 @@ async function initializeApp() {
     } catch (uiError) {
         console.error('Erreur setupEventListeners:', uiError);
     }
-    setTimeout(showUpdateReminderIfDue, 1500);
+    setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
+    setTimeout(showUpdateReminderIfDue, 1700);
     setTimeout(() => {
         updateBaseTileNativeZoomFromAvailability({ forceScan: true }).catch(() => {});
     }, 0);
@@ -2505,8 +2506,50 @@ async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = 
     }
 }
 
+
+function showPostUpdateRestartNoticeIfNeeded() {
+    try {
+        const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
+        const currentVersion = (typeof window.APP_VERSION !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '';
+        if (!noticeVersion) return;
+        if (currentVersion && noticeVersion !== currentVersion) return;
+        showPostUpdateRestartNoticeModal();
+    } catch (_) {}
+}
+
+function showPostUpdateRestartNoticeModal() {
+    if (document.getElementById('post-update-restart-modal')) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'post-update-restart-modal';
+    modal.className = 'update-reminder-modal post-update-restart-modal';
+    modal.innerHTML = `
+        <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
+            <h3 id="post-update-restart-title">Mise à jour</h3>
+            <p><strong>Une mise à jour vient d’être effectuée.</strong><br>Fermez et relancez l’application.</p>
+            <div class="update-reminder-actions post-update-restart-actions">
+                <button id="post-update-restart-ok-button" class="update-reminder-primary" type="button">OK</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const close = () => {
+        try { localStorage.removeItem('npfPostUpdateRestartNoticeVersion'); } catch (_) {}
+        modal.remove();
+    };
+
+    const okButton = document.getElementById('post-update-restart-ok-button');
+    if (okButton) okButton.addEventListener('click', close);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) close();
+    });
+}
+
 function showUpdateReminderIfDue() {
     try {
+        if (document.getElementById('post-update-restart-modal')) return;
         const lastShown = Number(localStorage.getItem(UPDATE_REMINDER_STORAGE_KEY) || '0');
         const now = Date.now();
         if (lastShown && (now - lastShown) < UPDATE_REMINDER_INTERVAL_MS) return;
@@ -10106,11 +10149,15 @@ function initializeCalculator() {
             }
         };
 
-        const runRltButtonActionOnce = (action) => {
+        const runRltButtonActionOnce = (action, actionKey = 'rlt') => {
             const now = Date.now();
             const lastRun = Number(modal?.dataset.rltLastButtonActionAt || '0');
-            if (now - lastRun < 220) return;
-            if (modal) modal.dataset.rltLastButtonActionAt = String(now);
+            const lastKey = modal?.dataset.rltLastButtonActionKey || '';
+            if (lastKey === actionKey && now - lastRun < 260) return;
+            if (modal) {
+                modal.dataset.rltLastButtonActionAt = String(now);
+                modal.dataset.rltLastButtonActionKey = actionKey;
+            }
             action();
         };
 
@@ -10215,12 +10262,63 @@ function initializeCalculator() {
             button.dataset.rltActionBound = '1';
             const handler = (event) => {
                 stopRltButtonEvent(event);
-                runRltButtonActionOnce(action);
+                runRltButtonActionOnce(action, button.id || 'rlt-action');
             };
             ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
-                button.addEventListener(type, handler, { capture: true });
+                button.addEventListener(type, handler, { capture: true, passive: false });
             });
         };
+
+
+        const getRltActionPoint = (event) => {
+            const source = event?.touches?.[0] || event?.changedTouches?.[0] || event;
+            if (!source || typeof source.clientX !== 'number' || typeof source.clientY !== 'number') return null;
+            return { x: source.clientX, y: source.clientY };
+        };
+
+        const buttonContainsPoint = (button, point) => {
+            if (!button || !point) return false;
+            const rect = button.getBoundingClientRect();
+            const margin = 12;
+            return point.x >= rect.left - margin
+                && point.x <= rect.right + margin
+                && point.y >= rect.top - margin
+                && point.y <= rect.bottom + margin;
+        };
+
+        const bindRltGlobalButtonCapture = () => {
+            if (!modal || modal.dataset.rltGlobalButtonCaptureBound === '1') return;
+            modal.dataset.rltGlobalButtonCaptureBound = '1';
+
+            const captureHandler = (event) => {
+                try {
+                    if (modal.getAttribute('aria-hidden') === 'true' || modal.style.display === 'none') return;
+                    const point = getRltActionPoint(event);
+                    if (!point) return;
+
+                    if (buttonContainsPoint(validateBtn, point)) {
+                        stopRltButtonEvent(event);
+                        runRltButtonActionOnce(validateRltModalFields, 'rlt-validate-global');
+                        return;
+                    }
+                    if (buttonContainsPoint(clearBtn, point)) {
+                        stopRltButtonEvent(event);
+                        runRltButtonActionOnce(clearRltModalFields, 'rlt-clear-global');
+                        return;
+                    }
+                    if (buttonContainsPoint(cancelBtn, point) || buttonContainsPoint(closeBtn, point)) {
+                        stopRltButtonEvent(event);
+                        runRltButtonActionOnce(closeRltMassModal, 'rlt-close-global');
+                    }
+                } catch (_) {}
+            };
+
+            ['touchstart', 'pointerdown', 'mousedown'].forEach(type => {
+                document.addEventListener(type, captureHandler, { capture: true, passive: false });
+            });
+        };
+
+        bindRltGlobalButtonCapture();
 
         bindRltActionButton(validateBtn, validateRltModalFields);
         bindRltActionButton(clearBtn, clearRltModalFields);
