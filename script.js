@@ -6768,10 +6768,11 @@ function updateAndSortRotations(container, current, params) {
     const currentContextDetails = () => [
         `Heure sur feu = ${timeOrNA(current.time)}`,
         `Fuel sur feu = ${kgOrNA(current.fuel)}`,
+        params.transitSourceLabel ? `Terrain départ premier transit = ${params.transitSourceLabel}` : null,
         `Transit vers feu = ${minOrNA(params.transitTime)}`,
         `Forfait validation premier largage = ${FIRST_DROP_FORFAIT_MIN} min`,
         `Retour feu → base = ${minOrNA(returnBaseTime)}`
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     // --- Première passe : calculer toutes les valeurs et trouver les limites ---
     lines.forEach(line => {
@@ -7005,14 +7006,20 @@ function recalculateBlocFuel() {
         const isFirstFullRlt = rltWrapper?.dataset.rltFirstFull === '1' || rltWrapper?.dataset.rltMode === 'firstFull';
         row.classList.toggle('bloc-fuel-first-full-row', !!isFirstFullRlt);
         if (isFirstFullRlt) {
+            /*
+             * v12.84 — Plein au départ : la ligne reste une ligne de départ
+             * exploitable. On ne verrouille/masque plus Fuel ni OACI : ces
+             * deux valeurs servent notamment au premier transit Suivi rotations.
+             * Seules les colonnes de rotations calculées restent vides pour
+             * cette ligne.
+             */
             if (dureeCell) dureeCell.textContent = '';
             if (fuelCell) fuelCell.textContent = '';
             if (tpsVolCell) tpsVolCell.textContent = '';
             if (tpsRestantCell) tpsRestantCell.textContent = '';
-            const fuelInput = row.querySelector('.fuel-split-input-wrapper .display-input');
-            if (fuelInput) fuelInput.value = '';
-            row.dataset.airportOaci = '';
             try { updateRowAirportOaci(row); } catch (_) {}
+            if (blocArrivee !== null) previousBlocArrivee = blocArrivee;
+            if (fuelPelic !== null) previousFuelPelic = fuelPelic;
             return;
         }
 
@@ -7154,11 +7161,84 @@ function updateSuiviTab() {
         suiviDureeInput.value = previDuree.includes('--') ? '' : previDuree;
     }
 
-    const allRows = document.querySelectorAll('#bloc-fuel tbody tr');
-    let lastFilledRow = null;
-    allRows.forEach(row => { if (parseTime(row.querySelector('.time-input-wrapper .display-input').value) !== null || parseNumeric(row.querySelector('.numeric-input-wrapper .display-input').value) !== null) { lastFilledRow = row; } });
+    const allRows = Array.from(document.querySelectorAll('#bloc-fuel tbody tr'));
+    const firstRow = allRows[0] || null;
+    const firstRowRltWrapper = firstRow?.querySelector('.rlt-mass-input-wrapper') || null;
+    const isFirstRowFullDeparture = !!firstRowRltWrapper && (
+        firstRowRltWrapper.dataset.rltFirstFull === '1'
+        || firstRowRltWrapper.dataset.rltMode === 'firstFull'
+    );
 
-    if (!lastFilledRow) {
+    const getRowTime = row => parseTime(row?.querySelector('.time-input-wrapper .display-input')?.value || '');
+    const getRowFuel = row => parseNumeric(row?.querySelector('.numeric-input-wrapper .display-input')?.value || '');
+    const getRowOaci = row => {
+        const datasetOaci = String(row?.dataset?.airportOaci || '').trim().toUpperCase();
+        if (datasetOaci) return datasetOaci;
+        const cellText = String(row?.querySelector('.airport-oaci-cell')?.textContent || '').replace('--', '').trim().toUpperCase();
+        return cellText || '';
+    };
+    const getDistanceFromOaciToFire = oaci => {
+        if (!currentCommune || !oaci) return null;
+        const airport = getAirportByOaci(oaci);
+        if (!airport) return null;
+        const { latitude_mairie: feuLat, longitude_mairie: feuLon } = currentCommune;
+        return Math.round(calculateDistanceInNm(airport.lat, airport.lon, feuLat, feuLon));
+    };
+
+    let lastFilledRow = null;
+    allRows.forEach(row => {
+        if (getRowTime(row) !== null || getRowFuel(row) !== null) {
+            lastFilledRow = row;
+        }
+    });
+
+    const blocDepartTime = parseTime(document.getElementById('bloc-depart')?.querySelector('.display-input')?.value || '');
+    const fuelDepart = parseNumeric(document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '');
+    const limiteHdvDepart = (typeof getEffectiveLimitHdvForActiveFlight === 'function')
+        ? getEffectiveLimitHdvForActiveFlight()
+        : parseTime(document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '');
+
+    let currentFuel = null;
+    let currentTime = null;
+    let currentHdv = null;
+    let transitDistanceVersFeu = null;
+    let transitSourceLabel = '';
+    let transitSourceDetail = '';
+
+    if (lastFilledRow) {
+        currentFuel = getRowFuel(lastFilledRow);
+        currentTime = getRowTime(lastFilledRow);
+
+        if (lastFilledRow === firstRow && isFirstRowFullDeparture) {
+            const firstRowOaci = getRowOaci(firstRow);
+            transitDistanceVersFeu = getDistanceFromOaciToFire(firstRowOaci);
+            currentHdv = limiteHdvDepart;
+            transitSourceLabel = firstRowOaci ? `1re ligne Plein au départ (${firstRowOaci})` : '1re ligne Plein au départ — OACI non renseigné';
+            transitSourceDetail = `Terrain départ retenu : 1re ligne BLOC/FUEL en mode Plein au départ`;
+        } else {
+            currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell')?.textContent || '');
+            const hasSelectedPelicForSuivi = !!selectedPelicanOACI && Number.isFinite(CALCULATOR_DATA.distPelicFeu);
+            transitDistanceVersFeu = hasSelectedPelicForSuivi ? CALCULATOR_DATA.distPelicFeu : null;
+            transitSourceLabel = selectedPelicanOACI ? `Pélic sélectionné (${selectedPelicanOACI})` : 'Pélic sélectionné non renseigné';
+            transitSourceDetail = `Terrain départ retenu : pélicandrome sélectionné après le premier transit`;
+        }
+    } else {
+        currentFuel = fuelDepart;
+        currentTime = blocDepartTime;
+        currentHdv = limiteHdvDepart;
+        transitDistanceVersFeu = Number.isFinite(CALCULATOR_DATA.distBaseFeu) ? CALCULATOR_DATA.distBaseFeu : null;
+        transitSourceLabel = selectedBaseOACI ? `BLOC DÉPART / base (${selectedBaseOACI})` : 'BLOC DÉPART / base non renseignée';
+        transitSourceDetail = `Terrain départ retenu : ligne BLOC DÉPART / FUEL DÉPART / BASE`;
+    }
+
+    const consoRotation = parseNumeric(suiviConsoInput.value);
+    const rotationTime = parseTime(suiviDureeInput.value);
+    const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
+    const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
+    const transitTimeVersFeu = Number.isFinite(transitDistanceVersFeu) ? Math.round(calculateTransitTime(transitDistanceVersFeu)) : null;
+    const heureSurFeu = (currentTime !== null && transitTimeVersFeu !== null) ? currentTime + transitTimeVersFeu : null;
+
+    if (currentFuel === null && currentTime === null) {
         document.getElementById('suivi-fuel-actuel').textContent = '-- kg';
         document.getElementById('suivi-heure-sur-feu').textContent = '--:--';
         document.getElementById('suivi-cs-sur-feu').textContent = '--:--';
@@ -7166,38 +7246,34 @@ function updateSuiviTab() {
         if (suiviHeureHelpIcon) { suiviHeureHelpIcon.onclick = () => alert('Données insuffisantes pour le calcul.'); }
         document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => { el.textContent = '--'; el.className = 'value rotation-value-default'; });
     } else {
-        const currentFuel = parseNumeric(lastFilledRow.querySelector('.numeric-input-wrapper .display-input').value);
-        const currentTime = parseTime(lastFilledRow.querySelector('.time-input-wrapper .display-input').value);
-        const currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell').textContent);
-        document.getElementById('suivi-fuel-actuel').textContent = currentFuel ? `${currentFuel} kg` : '--';
-
-        const consoRotation = parseNumeric(suiviConsoInput.value);
-        const rotationTime = parseTime(suiviDureeInput.value);
-
-        const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
-        const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
-        const hasSelectedPelicForSuivi = !!selectedPelicanOACI && Number.isFinite(CALCULATOR_DATA.distPelicFeu);
-        const transitTimeVersFeu = hasSelectedPelicForSuivi ? Math.round(calculateTransitTime(CALCULATOR_DATA.distPelicFeu)) : null;
-        const heureSurFeu = (currentTime !== null && transitTimeVersFeu !== null) ? currentTime + transitTimeVersFeu : null;
+        document.getElementById('suivi-fuel-actuel').textContent = currentFuel !== null ? `${currentFuel} kg` : '--';
         document.getElementById('suivi-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
         document.getElementById('suivi-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) {
             suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
 
-Formule : Heure dernière arrivée au pélic + Durée transit Pélic sélectionné → Feu
+Règle v12.84 :
+- si la 1re ligne BLOC/FUEL est en mode Plein au départ, le premier transit part de l'OACI de cette 1re ligne ;
+- sinon, le premier transit part de la ligne BLOC DÉPART / FUEL DÉPART / BASE ;
+- après le premier transit, les calculs repartent du pélicandrome sélectionné.
 
-Pélic sélectionné : ${selectedPelicanOACI || 'N/A'}
-Heure dernière arrivée : ${formatTime(currentTime) || 'N/A'}
-Distance Pélic sélectionné → Feu : ${hasSelectedPelicForSuivi ? CALCULATOR_DATA.distPelicFeu : 'N/A'} Nm
+${transitSourceDetail}
+Source utilisée : ${transitSourceLabel}
+Heure départ retenue : ${formatTime(currentTime) || 'N/A'}
+Distance source → Feu : ${Number.isFinite(transitDistanceVersFeu) ? transitDistanceVersFeu : 'N/A'} Nm
 Règle vitesse : ≤70 Nm = 210 kt, >70 Nm = 240 kt
 Durée transit : ${transitTimeVersFeu !== null ? `${formatTime(transitTimeVersFeu)} (${transitTimeVersFeu} min)` : 'N/A'}
 
 Calcul : ${formatTime(currentTime) || 'N/A'} + ${transitTimeVersFeu !== null ? formatTime(transitTimeVersFeu) : 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}
 
-Cette heure sert aux limites CS/TMD/HDV. Le +1 temporel est validé avec le forfait 10 min avant largage. Le +1 fuel retour base/pélic reste neutralisé dans cet onglet car l'avion est considéré au pélicandrome/vide.`);
+Cette heure sert aux limites CS/TMD/HDV. Le +1 temporel est validé avec le forfait 10 min avant largage. Le +1 fuel retour base/pélic reste neutralisé dans cet onglet.`);
         }
-        updateAndSortRotations(document.getElementById('suivi-rotation-results-container'), { fuel: currentFuel, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: transitTimeVersFeu });
+        updateAndSortRotations(
+            document.getElementById('suivi-rotation-results-container'),
+            { fuel: currentFuel, time: heureSurFeu },
+            { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: transitTimeVersFeu, transitSourceLabel }
+        );
     }
 }
 
@@ -10208,9 +10284,7 @@ function initializeCalculator() {
         if (row) {
             row.classList.add('bloc-fuel-first-full-row');
             row.classList.add('bloc-fuel-first-full-row-pending');
-            const fuelInput = row.querySelector('.fuel-split-input-wrapper .display-input');
-            if (fuelInput) fuelInput.value = '';
-            row.dataset.airportOaci = '';
+            /* v12.84 — ne plus vider Fuel ni OACI en mode Plein au départ. */
             try { updateRowAirportOaci(row); } catch (_) {}
         }
 
@@ -10482,9 +10556,7 @@ function initializeCalculator() {
                 activeRltRow.classList.toggle('bloc-fuel-first-full-row', selectedMode === 'firstFull');
                 activeRltRow.classList.toggle('bloc-fuel-first-full-row-pending', selectedMode === 'firstFull');
                 if (selectedMode === 'firstFull') {
-                    const fuelInput = activeRltRow.querySelector('.fuel-split-input-wrapper .display-input');
-                    if (fuelInput) fuelInput.value = '';
-                    activeRltRow.dataset.airportOaci = '';
+                    /* v12.84 — Plein au départ ne vide plus Fuel ni OACI. */
                     try { updateRowAirportOaci(activeRltRow); } catch (_) {}
                 }
             }
