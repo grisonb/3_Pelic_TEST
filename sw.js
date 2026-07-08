@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-84-plein-depart-oaci-suivi';
+const SW_VERSION = 'sw-v12-85-plein-depart-toggle-pelic-prioritaire';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
