@@ -5849,7 +5849,7 @@ body.npf-resuming #npf-resume-overlay {
     grid-template-columns: 1fr !important;
 }
 
-/* v12.74 — Retardant : 1er Plein et fenêtre sans X */
+/* v12.74 — Retardant : Plein au départ et fenêtre sans X */
 #rlt-mass-close-btn {
     display: none !important;
 }
@@ -5894,10 +5894,18 @@ body.npf-resuming #npf-resume-overlay {
 }
 
 
-/* v12.78 — bouton 1er Plein centré et zone stable */
+/* v12.78 — bouton Plein au départ centré et zone stable */
 #rlt-first-full-btn.rlt-first-full-btn {
     align-self: center !important;
     justify-self: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+
+/* v12.79 — bouton Plein au départ : centrage renforcé */
+#rlt-first-full-btn.rlt-first-full-btn {
+    display: flex;
     margin-left: auto !important;
     margin-right: auto !important;
 }
