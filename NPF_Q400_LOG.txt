@@ -1,3 +1,20 @@
+# v12.83_plein_depart_ligne2 — TEST
+
+Date : 2026-07-08
+
+Objet : correction définitive du bouton Plein au départ.
+
+Corrections :
+- Le bouton Plein au départ n'est plus annulé quand la masse RLT vient de la ligne 2 `Volume × Densité = Masse`.
+- La validation donne maintenant priorité au mode Plein au départ dès que le bouton est actif et qu'une masse existe, que cette masse provienne :
+  - de la ligne 1 `Masse ÷ Densité = Volume`,
+  - ou de la ligne 2 `Volume × Densité = Masse` (exemple 8500 × 1,1).
+- Correction de la cause identifiée : dans v12.82, si la ligne 2 était complète, le code validait `volumeToMass` avant `firstFull`, ce qui désactivait le bouton à la réouverture.
+- Le tableau BLOC/FUEL conserve la logique Plein au départ : masse RLT affichée seule, Fuel Pélic vidé, colonnes suivantes vides.
+- Aucun changement sur CS/TMD/HDV, recherche commune, cartes, simulation, import offline ou lignes HT.
+
+---
+
 NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
 
 But du fichier
