@@ -1561,6 +1561,14 @@ function scoreCommuneSearchCandidate(candidate, searchWords) {
                 currentScore = 0;
             } else if (communeSoundex === wordSoundex) {
                 currentScore = 1;
+            } else if (word.length >= 4 && communePart.startsWith(word.slice(0, 3))) {
+                /*
+                 * v12.78 — recherche commune filtrée par département :
+                 * accepter les préfixes courts approximatifs. Cas visé :
+                 * "Talo 07" doit retrouver Talencieux (07), même si la
+                 * commune ne commence pas exactement par "talo".
+                 */
+                currentScore = 3.8 + Math.min(2, Math.abs(communePart.length - word.length) / 10);
             } else {
                 const dist = levenshteinDistance(word, communePart);
                 if (dist <= Math.floor(word.length / 3) + 1) {
@@ -10078,6 +10086,27 @@ function initializeCalculator() {
         return rows.indexOf(row) === 0;
     }
 
+    function setRltFirstFullActive(active, persistPending = true) {
+        const canUseFirstFull = isFirstBlocFuelRltRow(activeRltMassWrapper);
+        activeRltFirstFull = !!active && canUseFirstFull;
+
+        /*
+         * v12.78 — bouton 1er Plein : l'état doit rester stable si la fenêtre
+         * est réouverte avant validation. On stocke donc un état provisoire,
+         * sans appliquer le masquage des colonnes tant que Valider n'a pas été
+         * pressé.
+         */
+        if (persistPending && activeRltMassWrapper) {
+            activeRltMassWrapper.dataset.rltFirstFullPending = activeRltFirstFull ? '1' : '';
+        }
+
+        const { firstFullBtn } = getRltMassModalElements();
+        if (firstFullBtn) {
+            firstFullBtn.classList.toggle('active', activeRltFirstFull);
+            firstFullBtn.setAttribute('aria-pressed', activeRltFirstFull ? 'true' : 'false');
+        }
+    }
+
     function syncRltMassModalFromInputs() {
         const {
             massToVolumeMassInput,
@@ -10130,7 +10159,7 @@ function initializeCalculator() {
              */
             const canUseFirstFull = isFirstBlocFuelRltRow(activeRltMassWrapper);
             firstFullBtn.hidden = !canUseFirstFull;
-            firstFullBtn.style.display = canUseFirstFull ? 'inline-flex' : 'none';
+            firstFullBtn.style.display = canUseFirstFull ? 'flex' : 'none';
             if (!canUseFirstFull) activeRltFirstFull = false;
             firstFullBtn.classList.toggle('active', !!activeRltFirstFull && canUseFirstFull);
             firstFullBtn.setAttribute('aria-pressed', (!!activeRltFirstFull && canUseFirstFull) ? 'true' : 'false');
@@ -10304,6 +10333,7 @@ function initializeCalculator() {
             activeRltMassWrapper.dataset.bottomMass = bottomMass !== null ? String(Math.round(bottomMass)) : '';
             activeRltMassWrapper.dataset.rltMode = selectedMode;
             activeRltMassWrapper.dataset.rltFirstFull = selectedMode === 'firstFull' ? '1' : '';
+            activeRltMassWrapper.dataset.rltFirstFullPending = selectedMode === 'firstFull' ? '1' : '';
 
             const activeRltRow = activeRltMassWrapper.closest('tr');
             if (activeRltRow) {
@@ -10411,7 +10441,7 @@ function initializeCalculator() {
                     if (buttonContainsPoint(firstFullBtn, point)) {
                         stopRltButtonEvent(event);
                         runRltButtonActionOnce(() => {
-                            activeRltFirstFull = !activeRltFirstFull;
+                            setRltFirstFullActive(!activeRltFirstFull, true);
                             syncRltMassModalFromInputs();
                         }, 'rlt-firstfull-global');
                         return;
@@ -10473,7 +10503,7 @@ function initializeCalculator() {
         activeRltMassWrapper = wrapper;
         activeRltMassLastEdited = null;
         activeRltMassCalculationMode = null;
-        activeRltFirstFull = wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull';
+        activeRltFirstFull = wrapper.dataset.rltFirstFullPending === '1' || wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull';
 
         const storedVolume = wrapper.dataset.volume || '';
         const storedDensity = wrapper.dataset.density || '1.';
@@ -10548,6 +10578,7 @@ function initializeCalculator() {
         wrapper.dataset.bottomMass = data?.rltBottomMass || '';
         wrapper.dataset.rltMode = data?.rltMode || '';
         wrapper.dataset.rltFirstFull = data?.rltFirstFull || '';
+        wrapper.dataset.rltFirstFullPending = data?.rltFirstFull || '';
         const rowForFirstFull = wrapper.closest('tr');
         if (rowForFirstFull) rowForFirstFull.classList.toggle('bloc-fuel-first-full-row', wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull');
         if (displayInput) displayInput.value = data?.rltMass || '';
@@ -10581,6 +10612,7 @@ function initializeCalculator() {
                 wrapper.dataset.bottomMass = '';
                 wrapper.dataset.rltMode = '';
                 wrapper.dataset.rltFirstFull = '';
+                wrapper.dataset.rltFirstFullPending = '';
                 const rowForClear = wrapper.closest('tr');
                 if (rowForClear) rowForClear.classList.remove('bloc-fuel-first-full-row');
                 if (displayInput) displayInput.value = '';
