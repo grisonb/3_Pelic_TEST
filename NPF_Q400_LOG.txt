@@ -1,3 +1,21 @@
+# v12.84_plein_depart_oaci_suivi — TEST
+
+Date : 2026-07-08
+
+Objet : Plein au départ exploitable + premier transit Suivi rotations selon terrain réel de départ.
+
+Corrections :
+- En mode `Plein au départ`, les cases `Fuel Pélic.` et `OACI` de la première ligne BLOC/FUEL ne sont plus masquées ni vidées.
+- Le mode `Plein au départ` conserve la masse RLT mais laisse la ligne exploitable comme ligne de départ.
+- Les colonnes calculées de cette première ligne restent vides : `Durée Rotations`, `Fuel Rotations`, `Tps de Vol`, `Tps de Vol Restant`.
+- Quand la première ligne est en mode `Plein au départ`, le calcul Suivi rotations prend le premier transit depuis l'OACI de cette première ligne vers le feu.
+- Quand aucune première ligne `Plein au départ` n'est utilisée, le premier transit Suivi rotations part de la ligne `BLOC DÉPART / FUEL DÉPART / BASE`.
+- Dès qu'une ligne d'arrivée pélicandrome classique existe ensuite, Suivi rotations repart du pélicandrome sélectionné pour le transit vers feu.
+- Les aides `?` de l'heure sur feu en Suivi rotations indiquent explicitement la source utilisée pour le premier transit.
+- Aucun changement sur recherche commune, cartes, simulation, import offline ou lignes HT.
+
+---
+
 # v12.83_plein_depart_ligne2 — TEST
 
 Date : 2026-07-08
@@ -22,7 +40,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.77
+Version actuelle TEST : v12.84
 Date de génération : 2026-07-08
 
 Règle de méthode
