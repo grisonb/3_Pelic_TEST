@@ -7164,13 +7164,26 @@ function updateSuiviTab() {
 
         const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
         const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
-        const transitTimeVersFeu = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu));
-        const heureSurFeu = currentTime !== null ? currentTime + transitTimeVersFeu : null;
+        const hasSelectedPelicForSuivi = !!selectedPelicanOACI && Number.isFinite(CALCULATOR_DATA.distPelicFeu);
+        const transitTimeVersFeu = hasSelectedPelicForSuivi ? Math.round(calculateTransitTime(CALCULATOR_DATA.distPelicFeu)) : null;
+        const heureSurFeu = (currentTime !== null && transitTimeVersFeu !== null) ? currentTime + transitTimeVersFeu : null;
         document.getElementById('suivi-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
         document.getElementById('suivi-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) {
-            suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION\n\nFormule : Heure dernière arrivée pélic/base + Durée transit vers feu\n\nHeure dernière arrivée : ${formatTime(currentTime) || 'N/A'}\nDistance Base → Feu utilisée : ${CALCULATOR_DATA.distBaseFeu} Nm\nRègle vitesse : ≤70 Nm = 210 kt, >70 Nm = 240 kt\nDurée transit : ${formatTime(transitTimeVersFeu) || 'N/A'} (${transitTimeVersFeu} min)\n\nCalcul : ${formatTime(currentTime) || 'N/A'} + ${formatTime(transitTimeVersFeu) || 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}\n\nCette heure sert aux limites CS/TMD. Le +1 fuel est neutralisé dans cet onglet car l'avion est considéré au pélicandrome/vide.`);
+            suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
+
+Formule : Heure dernière arrivée au pélic + Durée transit Pélic sélectionné → Feu
+
+Pélic sélectionné : ${selectedPelicanOACI || 'N/A'}
+Heure dernière arrivée : ${formatTime(currentTime) || 'N/A'}
+Distance Pélic sélectionné → Feu : ${hasSelectedPelicForSuivi ? CALCULATOR_DATA.distPelicFeu : 'N/A'} Nm
+Règle vitesse : ≤70 Nm = 210 kt, >70 Nm = 240 kt
+Durée transit : ${transitTimeVersFeu !== null ? `${formatTime(transitTimeVersFeu)} (${transitTimeVersFeu} min)` : 'N/A'}
+
+Calcul : ${formatTime(currentTime) || 'N/A'} + ${transitTimeVersFeu !== null ? formatTime(transitTimeVersFeu) : 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}
+
+Cette heure sert aux limites CS/TMD/HDV. Le +1 temporel est validé avec le forfait 10 min avant largage. Le +1 fuel retour base/pélic reste neutralisé dans cet onglet car l'avion est considéré au pélicandrome/vide.`);
         }
         updateAndSortRotations(document.getElementById('suivi-rotation-results-container'), { fuel: currentFuel, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: transitTimeVersFeu });
     }
