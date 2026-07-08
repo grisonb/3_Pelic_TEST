@@ -32,6 +32,77 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+
+
+// =========================================================================
+// v12.90 — HAUTEUR CARTE iPAD / PWA
+// Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
+// avec -webkit-fill-available. On force une variable de hauteur réelle et on
+// redemande à Leaflet de recalculer sa taille.
+// =========================================================================
+(function setupNpfMapViewportHeightFix() {
+    const applyViewportHeight = () => {
+        try {
+            const docEl = document.documentElement;
+            const vv = window.visualViewport;
+            const candidates = [
+                window.innerHeight || 0,
+                docEl ? docEl.clientHeight || 0 : 0,
+                vv ? Math.round(vv.height + Math.max(0, vv.offsetTop || 0)) : 0,
+                window.screen ? Math.round(Math.max(window.screen.height || 0, window.screen.availHeight || 0)) : 0
+            ].filter(Boolean);
+
+            const height = Math.max(...candidates);
+            if (!height || !Number.isFinite(height)) return;
+
+            docEl.style.setProperty('--npf-app-vh', `${height}px`);
+            if (document.body) document.body.style.minHeight = `${height}px`;
+
+            const mapEl = document.getElementById('map');
+            if (mapEl) {
+                mapEl.style.height = `${height}px`;
+                mapEl.style.minHeight = `${height}px`;
+                mapEl.style.bottom = '0px';
+                mapEl.style.backgroundColor = '#dff3fb';
+            }
+
+            setTimeout(() => {
+                try {
+                    if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                        map.invalidateSize(true);
+                    }
+                    if (typeof baseTileLayer !== 'undefined' && baseTileLayer && typeof baseTileLayer.redraw === 'function') {
+                        baseTileLayer.redraw();
+                    }
+                } catch (_) {}
+            }, 80);
+        } catch (_) {}
+    };
+
+    const scheduleApply = () => {
+        applyViewportHeight();
+        setTimeout(applyViewportHeight, 250);
+        setTimeout(applyViewportHeight, 900);
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', scheduleApply, { once: true });
+    } else {
+        scheduleApply();
+    }
+
+    window.addEventListener('load', scheduleApply, { passive: true });
+    window.addEventListener('resize', scheduleApply, { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(scheduleApply, 350), { passive: true });
+    window.addEventListener('pageshow', scheduleApply, { passive: true });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleApply(); }, { passive: true });
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', scheduleApply, { passive: true });
+        window.visualViewport.addEventListener('scroll', scheduleApply, { passive: true });
+    }
+})();
+
 // =========================================================================
 // REPRISE iPAD / PWA APRÈS LONGUE PÉRIODE EN ARRIÈRE-PLAN
 // =========================================================================
