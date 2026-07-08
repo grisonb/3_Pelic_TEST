@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-86-suivi-precis-heure-to';
+const SW_VERSION = 'sw-v12-87-plein-depart-antidouble';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
