@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-77-retardant-1erplein-masse';
+const SW_VERSION = 'sw-v12-78-retardant-1erplein-talo';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
