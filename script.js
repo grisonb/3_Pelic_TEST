@@ -7289,7 +7289,7 @@ function updateSuiviTab() {
         if (suiviHeureHelpIcon) {
             suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
 
-Règle v12.87 :
+Règle v12.88 :
 - depuis BLOC DÉPART / FUEL DÉPART / BASE : premier transit depuis la base ;
 - depuis une ligne BLOC/FUEL en mode Plein au départ : premier transit depuis l'OACI de cette ligne ;
 - depuis une arrivée pélicandrome : 10 min de mise en œuvre/roulage/décollage, puis transit vers le feu ;
@@ -8980,7 +8980,7 @@ function initializeCalculator() {
 
     function refreshSharedHeaderMirrorValues() {
         /*
-         * v12.87 — Prévi indépendant : HEURE TO et FUEL Départ de
+         * v12.88 — Prévi indépendant : HEURE TO et FUEL Départ de
          * l'onglet Prévi ne sont plus synchronisés avec BLOC DÉPART / FUEL
          * DÉPART de BLOC/FUEL. Seuls TMD et LIMITE HDV restent communs.
          */
@@ -10530,14 +10530,8 @@ function initializeCalculator() {
 
         if (firstFullBtn && firstFullBtn.dataset.rltFirstFullBound !== '1') {
             firstFullBtn.dataset.rltFirstFullBound = '1';
-            const firstFullHandler = (event) => {
-                stopRltButtonEvent(event);
-                runRltButtonActionOnce(() => {
-                    toggleRltFirstFullActive();
-                }, 'rlt-firstfull-global');
-            };
-            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
-                firstFullBtn.addEventListener(type, firstFullHandler, { capture: true, passive: false });
+            ['touchstart', 'pointerdown', 'mousedown', 'click'].forEach(type => {
+                firstFullBtn.addEventListener(type, handleRltFirstFullButtonEvent, { capture: true, passive: false });
             });
         }
 
@@ -10554,15 +10548,7 @@ function initializeCalculator() {
             const now = Date.now();
             const lastRun = Number(modal?.dataset.rltLastButtonActionAt || '0');
             const lastKey = modal?.dataset.rltLastButtonActionKey || '';
-            /*
-             * v12.87 — Plein au départ : Safari/iPad peut générer plusieurs
-             * événements pour un seul appui (touchstart, pointerdown, mousedown,
-             * puis click synthétique). Le délai de 260 ms était trop court : le
-             * click final pouvait retomber après la fenêtre anti-double et
-             * inverser l'état du bouton, ce qui donnait un bouton apparemment
-             * inactif ou désactivé à la validation/réouverture.
-             */
-            const dedupeDelayMs = actionKey === 'rlt-firstfull-global' ? 1200 : 320;
+            const dedupeDelayMs = 320;
             if (lastKey === actionKey && now - lastRun < dedupeDelayMs) return;
             if (modal) {
                 modal.dataset.rltLastButtonActionAt = String(now);
@@ -10570,6 +10556,44 @@ function initializeCalculator() {
             }
             action();
         };
+
+        function handleRltFirstFullButtonEvent(event) {
+            /*
+             * v12.88 — Plein au départ : gestion tactile déterministe.
+             * Le bouton est volontairement traité sur le premier événement tactile
+             * réel, puis les événements souris/click synthétiques du même appui sont
+             * ignorés. Un second appui tactile reste possible pour désélectionner.
+             */
+            const now = Date.now();
+            const type = event?.type || '';
+            const pointerType = String(event?.pointerType || '').toLowerCase();
+            const isTouchLike = type === 'touchstart' || (type === 'pointerdown' && pointerType === 'touch');
+            const isMouseSyntheticCandidate = type === 'mousedown' || type === 'click' || (type === 'pointerdown' && pointerType === 'mouse');
+
+            stopRltButtonEvent(event);
+
+            if (isTouchLike) {
+                const lastTouchAt = Number(modal?.dataset.rltFirstFullLastTouchAt || '0');
+                if (now - lastTouchAt < 250) return;
+                if (modal) {
+                    modal.dataset.rltFirstFullLastTouchAt = String(now);
+                    modal.dataset.rltFirstFullIgnoreMouseUntil = String(now + 5000);
+                }
+                runRltButtonActionOnce(() => {
+                    toggleRltFirstFullActive();
+                }, 'rlt-firstfull-touch');
+                return;
+            }
+
+            if (isMouseSyntheticCandidate) {
+                const ignoreMouseUntil = Number(modal?.dataset.rltFirstFullIgnoreMouseUntil || '0');
+                if (now < ignoreMouseUntil) return;
+                if (type !== 'click') return;
+                runRltButtonActionOnce(() => {
+                    toggleRltFirstFullActive();
+                }, 'rlt-firstfull-click');
+            }
+        }
 
         const validateRltModalFields = () => {
             if (!activeRltMassWrapper) {
@@ -10746,10 +10770,7 @@ function initializeCalculator() {
                         return;
                     }
                     if (buttonContainsPoint(firstFullBtn, point)) {
-                        stopRltButtonEvent(event);
-                        runRltButtonActionOnce(() => {
-                            toggleRltFirstFullActive();
-                        }, 'rlt-firstfull-global');
+                        handleRltFirstFullButtonEvent(event);
                         return;
                     }
                     if (buttonContainsPoint(cancelBtn, point) || buttonContainsPoint(closeBtn, point)) {
