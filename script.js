@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // =========================================================================
-// v12.90 — HAUTEUR CARTE iPAD / PWA
+// v12.91 — DÉROUTEMENT 10 MIN / BASE LF / PATIENCE
 // Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
 // avec -webkit-fill-available. On force une variable de hauteur réelle et on
 // redemande à Leaflet de recalculer sa taille.
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         overlay = document.createElement('div');
         overlay.id = 'npf-resume-overlay';
         overlay.setAttribute('aria-live', 'polite');
-        overlay.innerHTML = '<div class="npf-resume-card">Reprise carte…</div>';
+        overlay.innerHTML = '<div class="npf-resume-card">Patience, je réfléchis ...</div>';
         document.body.appendChild(overlay);
         return overlay;
     };
@@ -3228,6 +3228,29 @@ function normalizeOaciCodeInput(value) {
     return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
 }
 
+
+function normalizeBaseOaciLockedLfInput(value) {
+    const raw = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!raw) return 'LF';
+    if (raw.startsWith('LF')) return `LF${raw.slice(2, 4)}`;
+    if (raw.length <= 2) return `LF${raw.slice(0, 2)}`;
+    return `LF${raw.slice(-2)}`;
+}
+
+function selectBaseOaciSuffix(input) {
+    if (!input) return;
+    if (!input.value || !String(input.value).toUpperCase().startsWith('LF')) {
+        input.value = normalizeBaseOaciLockedLfInput(input.value || selectedBaseOACI || 'LF');
+    }
+    try {
+        requestAnimationFrame(() => {
+            input.focus?.();
+            input.setSelectionRange?.(2, Math.min(4, String(input.value || '').length));
+        });
+        setTimeout(() => input.setSelectionRange?.(2, Math.min(4, String(input.value || '').length)), 80);
+    } catch (_) {}
+}
+
 function updateBaseOaciInputs() {
     const inputs = [
         document.getElementById('base-oaci-input'),
@@ -3246,7 +3269,7 @@ function updateBaseOaciInputs() {
 function applyBaseOaciFromInput(input, { silent = false } = {}) {
     if (!input) return false;
 
-    const requestedOaci = normalizeOaciCodeInput(input.value);
+    const requestedOaci = normalizeBaseOaciLockedLfInput(input.value);
     input.value = requestedOaci;
 
     if (!requestedOaci || requestedOaci.length !== 4) {
@@ -3286,8 +3309,12 @@ function setupBaseOaciInputs() {
         input.dataset.baseOaciBound = '1';
 
         input.addEventListener('input', () => {
-            input.value = normalizeOaciCodeInput(input.value);
+            const previousLength = input.value.length;
+            input.value = normalizeBaseOaciLockedLfInput(input.value);
             input.classList.remove('base-oaci-invalid');
+            if (input.value.length <= 2 || previousLength <= 2) {
+                try { input.setSelectionRange(2, 2); } catch (_) {}
+            }
         });
 
         input.addEventListener('change', () => {
@@ -3295,12 +3322,16 @@ function setupBaseOaciInputs() {
         });
 
         input.addEventListener('blur', () => {
-            if (normalizeOaciCodeInput(input.value) !== selectedBaseOACI) {
+            if (normalizeBaseOaciLockedLfInput(input.value) !== selectedBaseOACI) {
                 applyBaseOaciFromInput(input);
             } else {
                 updateBaseOaciInputs();
             }
         });
+
+        input.addEventListener('focus', () => selectBaseOaciSuffix(input));
+        input.addEventListener('click', () => selectBaseOaciSuffix(input));
+        input.addEventListener('pointerup', () => selectBaseOaciSuffix(input));
 
         input.addEventListener('keydown', event => {
             if (event.key === 'Enter') {
@@ -7081,6 +7112,9 @@ function recalculateBlocFuel() {
         const rltWrapper = row.querySelector('.rlt-mass-input-wrapper');
         const isFirstFullRlt = rltWrapper?.dataset.rltFirstFull === '1' || rltWrapper?.dataset.rltMode === 'firstFull';
         row.classList.toggle('bloc-fuel-first-full-row', !!isFirstFullRlt);
+        if (!isFirstFullRlt) {
+            row.classList.remove('bloc-fuel-first-full-row');
+        }
         if (isFirstFullRlt) {
             /*
              * v12.84 — Plein au départ : la ligne reste une ligne de départ
@@ -7468,7 +7502,7 @@ function updateDeroutementTab() {
     const transitTimeFromGps = firstLegDistance !== null
         ? (
             isEmptyRetardant
-                ? Math.round(calculateTransitTime(distGpsPelic)) + 20 + Math.round(calculateTransitTime(distFirstPelicFeu))
+                ? Math.round(calculateTransitTime(distGpsPelic)) + 10 + Math.round(calculateTransitTime(distFirstPelicFeu))
                 : Math.round(calculateTransitTime(distGpsFeu))
         )
         : null;
@@ -7494,7 +7528,7 @@ function updateDeroutementTab() {
         ? `GPS → Pélic (${selectedPelicForDeroutement ? selectedPelicForDeroutement.oaci : 'PÉLIC'}) → Feu`
         : 'GPS → Feu';
     const deroutFirstLegDetail = isEmptyRetardant
-        ? `Distance GPS → Pélic : ${distGpsPelic ?? 'N/A'} Nm\nDistance Pélic → Feu : ${distFirstPelicFeu ?? 'N/A'} Nm\nForfait remplissage Pélic : 20 min`
+        ? `Distance GPS → Pélic : ${distGpsPelic ?? 'N/A'} Nm\nDistance Pélic → Feu : ${distFirstPelicFeu ?? 'N/A'} Nm\nForfait sol Pélic : 10 min`
         : `Distance GPS → Feu : ${distGpsFeu ?? 'N/A'} Nm`;
 
     setHelp('derout-fuel-mini-base-help', consoTransitFromGps !== null
