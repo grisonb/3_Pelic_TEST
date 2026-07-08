@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.91';
+        const APP_VERSION = 'v12.92';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -155,6 +155,9 @@
                         if (previousVersion) {
                             localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
                             localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                            // v12.92 — afficher immédiatement la consigne de relance au premier chargement de la nouvelle version,
+                            // sans attendre un lancement supplémentaire de la PWA iPad.
+                            setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 0);
                         }
                         localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
                         sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
@@ -192,7 +195,9 @@
                 const pending = localStorage.getItem('npfPostUpdateRestartNoticePending') === '1';
                 const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
                 if (!pending && !noticeVersion) return;
-                if (noticeVersion && noticeVersion !== APP_VERSION && !pending) return;
+                // v12.92 — un marqueur pending doit toujours afficher l'alerte, même si la valeur
+                // enregistrée provient de l'ancienne version qui vient de demander la MAJ.
+                if (!pending && noticeVersion && noticeVersion !== APP_VERSION) return;
                 if (document.getElementById('post-update-restart-modal')) return;
 
                 const modal = document.createElement('div');
@@ -409,12 +414,12 @@
                             <div class="rotations-group previ-details-group">
                                 <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
                                 <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="cs-sur-feu">--:--</span></div>
+                                <div class="result-line"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
                                 <div class="result-line"><span class="label">Durée Transit :<span id="duree-transit-help" class="formula-help-icon">?</span></span><span class="value" id="duree-transit">--:--</span></div>
                                 <div class="result-line"><span class="label">Conso Transit :<span id="conso-aller-feu-help" class="formula-help-icon">?</span></span><span class="value" id="conso-aller-feu">-- kg</span></div>
                                 <div class="result-line"><span class="label">Fuel sur Feu :<span id="fuel-sur-feu-help" class="formula-help-icon">?</span></span><div style="display: flex; align-items: center;"><div id="fuel-sur-feu-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly></div><button class="manual-btn" id="fuel-sur-feu-manual-btn">AUTO</button></div></div>
                                 <div class="result-line"><span class="label">Durée Rotation :<span id="duree-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="duree-rotation">--:--</span></div>
                                 <div class="result-line"><span class="label">Conso Rotation :<span id="conso-par-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="conso-par-rotation">-- kg</span></div>
-                                <div class="result-line previ-hidden-detail" style="display:none;"><span class="label">Heure sur Feu :<span id="heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="heure-sur-feu">--:--</span></div>
                                 <div class="result-line previ-hidden-detail" style="display:none;"><span class="label">TMD :</span><span class="value" id="tmd-display">--:--</span></div>
                                 <div class="result-line previ-hidden-detail" style="display:none;"><span class="label">HdV restant :</span><span class="value" id="hdv-restant-display">--:--</span></div>
                             </div>
