@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-89-ui-infos-suivi-previ';
+const SW_VERSION = 'sw-v12-90-carte-ipad-bandeau';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
