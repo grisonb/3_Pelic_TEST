@@ -10009,6 +10009,12 @@ function initializeCalculator() {
 
     function formatDecimalValue(value, decimals = 2) {
         if (!Number.isFinite(value)) return '';
+        /*
+         * v12.77 — correction Masse RLT :
+         * ne jamais supprimer les zéros significatifs sur les valeurs entières.
+         * L'ancien nettoyage transformait par exemple 8500 en 85.
+         */
+        if (decimals === 0) return String(Math.round(value));
         return value.toFixed(decimals).replace(/\.?0+$/, '').replace('.', ',');
     }
 
@@ -10212,17 +10218,13 @@ function initializeCalculator() {
         bindInput(densityInput, 'density', 'volumeToMass');
 
         if (firstFullBtn && firstFullBtn.dataset.rltFirstFullBound !== '1') {
+            /*
+             * v12.77 — le bouton est traité par la capture globale document
+             * ci-dessous. Ne pas ajouter ici de second gestionnaire cible :
+             * la capture du contenu modal bloque certains événements iPad et
+             * un click résiduel pouvait annuler le basculement 1er Plein.
+             */
             firstFullBtn.dataset.rltFirstFullBound = '1';
-            const toggleFirstFull = (event) => {
-                stopRltButtonEvent(event);
-                runRltButtonActionOnce(() => {
-                    activeRltFirstFull = !activeRltFirstFull;
-                    syncRltMassModalFromInputs();
-                }, 'rlt-firstfull');
-            };
-            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
-                firstFullBtn.addEventListener(type, toggleFirstFull, { capture: true, passive: false });
-            });
         }
 
         const stopRltButtonEvent = (event) => {
@@ -10274,7 +10276,7 @@ function initializeCalculator() {
             let selectedMode = '';
 
             /*
-             * v12.72 — validation fiable iPad :
+             * v12.77 — validation fiable iPad + Masse RLT corrigée :
              * l'action est lancée dès pointerdown/touchstart afin qu'un premier
              * appui sur Valider ne serve pas seulement à fermer le clavier.
              * La priorité de calcul reste celle de v12.71 : ligne 2 prioritaire,
