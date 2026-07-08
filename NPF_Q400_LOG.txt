@@ -938,3 +938,12 @@ Non modifié :
 - La fenêtre post-MAJ reste sans bouton OK et doit rester affichée jusqu'à fermeture/relance de l'application.
 - PREVI. NBR ROTATIONS : ajout de la ligne visible `Heure sur Feu` juste après `CS sur Feu` dans la colonne de droite.
 - Aucun changement sur la hauteur de carte validée v12.90, Plein au départ, calculs CS/TMD/HDV, import offline ou recherche commune.
+
+================================================================================
+Version TEST v12.93_derout_ui_patience — 2026-07-08
+================================================================================
+- DÉROUT. / GAAR : libellés courts `Fuel mini 1 Lrg` au lieu de `Fuel mini 1 largage`.
+- DÉROUT. / GAAR : colonne droite réordonnée avec `CS sur Feu` placé avant `Heure sur Feu`.
+- DÉROUT. / GAAR : suppression visuelle de l'espace du titre masqué dans la colonne droite afin de remonter le contenu.
+- Vérification : le message de reprise carte reste actif avec le texte `Patience, je réfléchis ...` dans l’overlay de reprise iPad/PWA.
+- Aucun changement sur les calculs, Plein au départ, hauteur carte v12.90, post-MAJ v12.92 ou import offline.
