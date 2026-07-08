@@ -718,7 +718,7 @@ v12.80 — Correction bouton Plein au départ
 - Correction : ajout d'un gestionnaire direct sur Plein au départ en plus de la capture globale par coordonnées, avec anti-double événement.
 - Limite fonctionnelle conservée : Plein au départ uniquement sur la cellule Masse RLT de la première ligne BLOC/FUEL.
 
-v12.81 — Post-MAJ persistant + Plein au départ stabilisé
+v12.82 — Post-MAJ persistant + Plein au départ stabilisé
 - Modification : la fenêtre « Une mise à jour vient d’être effectuée. Fermez et relancez l’application. » n’a plus de bouton OK.
 - Modification : cette fenêtre ne se ferme plus au toucher ; elle reste visible jusqu’à fermeture/relance de la PWA, puis n’est pas réaffichée au lancement suivant.
 - Correction : le bouton « Plein au départ » devient une activation stable, pas un interrupteur soumis aux doubles événements tactiles iPad.
@@ -726,3 +726,13 @@ v12.81 — Post-MAJ persistant + Plein au départ stabilisé
 - Correction : en validation, « Plein au départ » est accepté sur la cellule Masse RLT de la première ligne BLOC/FUEL dès qu’une masse de ligne 1 est présente, même si la densité n’a pas été renseignée.
 - Conservation : aucune modification des calculs CS/TMD/HDV ni de l’import offline.
 
+
+
+v12.82 — Plein au départ : correction événementielle définitive
+- Constat utilisateur : le bouton Plein au départ devient bleu puis se désactive / ne produit pas l'effet attendu.
+- Diagnostic : les événements iPad touchstart/pointerdown/click pouvaient encore produire un comportement de type interrupteur ou une activation non appliquée au tableau.
+- Modification : Plein au départ devient une activation idempotente, jamais un toggle tactile.
+- Modification : tous les chemins événementiels activent explicitement l'état actif et n'appellent plus de désactivation implicite.
+- Modification : l'état est appliqué immédiatement sur la cellule Masse RLT active quand une masse de première ligne est disponible : mode firstFull, masse affichée, Fuel Pélic vidé, colonnes suivantes masquées via recalcul.
+- Portée : uniquement cellule Masse RLT de la première ligne du tableau BLOC/FUEL.
+- Aucun changement sur CS/TMD/HDV, Suivi rotations, cartes, simulation, import ZIP ou Lignes HT.
