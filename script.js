@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // =========================================================================
-// v12.91 — DÉROUTEMENT 10 MIN / BASE LF / PATIENCE
+// v12.93 — DÉROUTEMENT UI / PATIENCE ACTIVE
 // Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
 // avec -webkit-fill-available. On force une variable de hauteur réelle et on
 // redemande à Leaflet de recalculer sa taille.
@@ -3365,13 +3365,13 @@ function updateBaseLabels() {
         el.textContent = 'BINGO BASE';
     });
     const deroutFuelMiniBaseLabel = document.getElementById('derout-fuel-mini-base-label');
-    if (deroutFuelMiniBaseLabel) deroutFuelMiniBaseLabel.textContent = `Fuel mini 1 largage / BASE (${selectedBaseOACI}) :`;
+    if (deroutFuelMiniBaseLabel) deroutFuelMiniBaseLabel.textContent = `Fuel mini 1 Lrg / BASE (${selectedBaseOACI}) :`;
 
     const deroutFuelMiniPelicLabel = document.getElementById('derout-fuel-mini-pelic-label');
     if (deroutFuelMiniPelicLabel) {
         const selectedPelic = selectedPelicanOACI ? getAirportByOaci(selectedPelicanOACI) : null;
         const pelicCode = selectedPelic ? selectedPelic.oaci : 'PÉLIC';
-        deroutFuelMiniPelicLabel.textContent = `Fuel mini 1 largage / Pélic (${pelicCode}) :`;
+        deroutFuelMiniPelicLabel.textContent = `Fuel mini 1 Lrg / Pélic (${pelicCode}) :`;
     }
 }
 function refreshUI() { drawPermanentAirportMarkers(); if (currentCommune) displayCommuneDetails(currentCommune, false); }
@@ -7460,7 +7460,7 @@ function updateDeroutementTab() {
     if (deroutFuelMiniPelicLabel) {
         const selectedPelic = selectedPelicanOACI ? getAirportByOaci(selectedPelicanOACI) : null;
         const pelicCode = selectedPelic ? selectedPelic.oaci : 'PÉLIC';
-        deroutFuelMiniPelicLabel.textContent = `Fuel mini 1 largage / Pélic (${pelicCode}) :`;
+        deroutFuelMiniPelicLabel.textContent = `Fuel mini 1 Lrg / Pélic (${pelicCode}) :`;
     }
 
     if (!currentCommune) {
@@ -7533,12 +7533,12 @@ function updateDeroutementTab() {
         : `Distance GPS → Feu : ${distGpsFeu ?? 'N/A'} Nm`;
 
     setHelp('derout-fuel-mini-base-help', consoTransitFromGps !== null
-        ? `FUEL MINI 1 LARGAGE / BASE\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Base :\n700 kg + conso Feu → Base = ${bingoBase} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase} = ${fuelMiniBase} kg`
+        ? `FUEL MINI 1 LRG / BASE\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Base :\n700 kg + conso Feu → Base = ${bingoBase} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase} = ${fuelMiniBase} kg`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
     setHelp('derout-fuel-mini-pelic-help', consoTransitFromGps !== null
-        ? `FUEL MINI 1 LARGAGE / PÉLIC\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Pélic\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Pélic :\n700 kg + conso Feu → Pélic = ${bingoPelic} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic} = ${fuelMiniPelic} kg`
+        ? `FUEL MINI 1 LRG / PÉLIC\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Pélic\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Pélic :\n700 kg + conso Feu → Pélic = ${bingoPelic} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic} = ${fuelMiniPelic} kg`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
