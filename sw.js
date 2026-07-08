@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-91-derout-10-base-lf-patience';
+const SW_VERSION = 'sw-v12-92-postmaj-previ-heure-feu';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
