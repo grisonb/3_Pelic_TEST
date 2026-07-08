@@ -672,3 +672,14 @@ v12.75 — Retardant : 1er Plein lié à la première ligne du tableau
 - Les deux lignes de calcul restent indépendantes : ligne 1 Masse ÷ Densité = Volume, ligne 2 Volume × Densité = Masse.
 - Priorité conservée : si la ligne 2 est renseignée, le résultat Volume × Densité reste prioritaire pour la colonne Masse RLT.
 - Non modifié : Prévi/TMD/CS/HDV, aides, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
+
+v12.76 — Suivi rotations : CS/TMD/HDV basés sur le pélic sélectionné
+- Base : v12.75 TEST retardant_1er_plein_ligne.
+- Correction Suivi rotations : l’heure sur feu n’est plus calculée avec la distance Base → Feu.
+- Nouvelle règle : l’heure sur feu utilise uniquement le pélicandrome sélectionné et la distance Pélic sélectionné → Feu (`CALCULATOR_DATA.distPelicFeu`).
+- Conséquence : les calculs Coucher Soleil, TMD et HDV restantes en Suivi rotations utilisent maintenant le bon transit depuis le pélicandrome sélectionné.
+- Aucun recours à l’OACI de la dernière ligne du tableau BLOC/FUEL pour ce calcul.
+- Formules conservées : +1 CS si heure sur feu + 10 min ≤ CS ; +1 TMD si heure sur feu + 10 min + retour base ≤ TMD ; +1 HDV si transit pélic sélectionné → feu + 10 min + retour base ≤ HDV restante.
+- Rotations feu ↔ pélic inchangées : durée rotation = 20 min + temps aller-retour feu/pélic.
+- Modifications BLOC/FUEL de v12.75 conservées : bouton 1er Plein uniquement sur la cellule Masse RLT de la première ligne du tableau, calcul densité corrigé, lignes retardant indépendantes.
+- Non modifié : reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
