@@ -5928,7 +5928,7 @@ body.npf-resuming #npf-resume-overlay {
 }
 
 
-/* v12.81 — post-MAJ persistant sans bouton OK */
+/* v12.82 — post-MAJ persistant sans bouton OK */
 .post-update-restart-modal .update-reminder-actions,
 .post-update-restart-modal .post-update-restart-actions {
     display: none !important;
@@ -5937,7 +5937,7 @@ body.npf-resuming #npf-resume-overlay {
     pointer-events: auto !important;
 }
 
-/* v12.81 — Plein au départ : bouton réellement centré et état stable */
+/* v12.82 — Plein au départ : bouton réellement centré et état stable */
 #rlt-first-full-btn.rlt-first-full-btn {
     width: max-content !important;
     margin: 0 auto 12px auto !important;
