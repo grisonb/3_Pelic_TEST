@@ -1,3 +1,20 @@
+# v12.85_plein_depart_toggle_pelic_prioritaire — TEST
+
+Date : 2026-07-08
+
+Objet : désélection Plein au départ + priorité clic pélicandrome sur avion.
+
+Corrections :
+- Le bouton `Plein au départ` redevient désélectionnable volontairement.
+- Protection conservée contre les doubles événements iPad : un même appui tactile ne doit pas activer puis désactiver immédiatement le bouton.
+- Si `Plein au départ` est désélectionné puis validé, la cellule Masse RLT repasse en calcul normal selon les lignes renseignées.
+- La première ligne BLOC/FUEL conserve les cases `Fuel Pélic.` et `OACI` visibles et exploitables.
+- Les icônes de pélicandromes sont rendues prioritaires au clic par rapport à l'icône avion/GPS quand les deux sont superposées.
+- L'icône avion/GPS reste utilisable, mais avec une priorité d'affichage/toucher inférieure aux pélicandromes.
+- Aucun changement sur les formules CS/TMD/HDV ni sur l'import offline.
+
+---
+
 # v12.84_plein_depart_oaci_suivi — TEST
 
 Date : 2026-07-08
@@ -40,7 +57,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.84
+Version actuelle TEST : v12.85
 Date de génération : 2026-07-08
 
 Règle de méthode
