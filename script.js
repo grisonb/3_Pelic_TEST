@@ -3533,7 +3533,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -9] }) });
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -9] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div></div>`);
             marker.addTo(permanentAirportLayer);
             return;
@@ -3584,7 +3584,7 @@ function drawPermanentAirportMarkers() {
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
         const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -9] });
-        const marker = L.marker([airport.lat, airport.lon], { icon: icon });
+        const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
         const waterButtonText = isWater ? "RETARDANT" : "EAU";
@@ -5054,12 +5054,15 @@ function updateUserPosition(pos) {
 
     if (!userMarker) {
         const userIcon = buildOwnGpsIcon(ownAltitudeLabel, { simulation: isSimulationPosition });
-        userMarker = L.marker([latitude, longitude], { icon: userIcon }).bindPopup(ownGpsPopupHtml).addTo(map);
+        userMarker = L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 500, keyboard: false }).bindPopup(ownGpsPopupHtml).addTo(map);
     } else {
         userMarker.setLatLng([latitude, longitude]);
         userMarker.setIcon(buildOwnGpsIcon(ownAltitudeLabel, { simulation: isSimulationPosition }));
         userMarker.bindPopup(ownGpsPopupHtml);
     }
+
+    /* v12.85 — priorité tactile : les icônes pélicandrome restent au-dessus de l'avion si les deux sont superposées. */
+    try { if (userMarker && typeof userMarker.setZIndexOffset === 'function') userMarker.setZIndexOffset(500); } catch (_) {}
 
     applyOwnGpsPlaneHeading(motionHeading);
 
@@ -10186,8 +10189,8 @@ function initializeCalculator() {
         activeRltFirstFull = !!active && canUseFirstFull;
 
         /*
-         * v12.82 — Plein au départ : activation idempotente.
-         * Le bouton n'est plus un interrupteur tactile. Sur iPad, la même action
+         * v12.85 — Plein au départ : interrupteur volontaire protégé.
+         * Le bouton peut être activé/désactivé volontairement. Sur iPad, la même action
          * peut produire touchstart + pointerdown + click ; chaque événement doit
          * conduire au même état actif, jamais à une désactivation involontaire.
          */
@@ -10218,6 +10221,26 @@ function initializeCalculator() {
         if (firstFullBtn) {
             firstFullBtn.classList.toggle('active', activeRltFirstFull);
             firstFullBtn.setAttribute('aria-pressed', activeRltFirstFull ? 'true' : 'false');
+        }
+    }
+
+    function toggleRltFirstFullActive() {
+        const canUseFirstFull = isFirstBlocFuelRltRow(activeRltMassWrapper);
+        const nextActive = canUseFirstFull ? !(activeRltFirstFull === true) : false;
+
+        setRltFirstFullActive(nextActive, true);
+        syncRltMassModalFromInputs();
+
+        if (nextActive) {
+            applyRltFirstFullIfPossible();
+        } else {
+            const row = activeRltMassWrapper?.closest?.('tr');
+            if (row) {
+                row.classList.remove('bloc-fuel-first-full-row');
+                row.classList.remove('bloc-fuel-first-full-row-pending');
+            }
+            try { masterRecalculate(); } catch (_) {}
+            try { saveCalculatorState(); } catch (_) {}
         }
     }
 
@@ -10448,9 +10471,7 @@ function initializeCalculator() {
             const firstFullHandler = (event) => {
                 stopRltButtonEvent(event);
                 runRltButtonActionOnce(() => {
-                    setRltFirstFullActive(true, true);
-                    syncRltMassModalFromInputs();
-                    applyRltFirstFullIfPossible();
+                    toggleRltFirstFullActive();
                 }, 'rlt-firstfull-global');
             };
             ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
@@ -10656,9 +10677,7 @@ function initializeCalculator() {
                     if (buttonContainsPoint(firstFullBtn, point)) {
                         stopRltButtonEvent(event);
                         runRltButtonActionOnce(() => {
-                            setRltFirstFullActive(true, true);
-                            syncRltMassModalFromInputs();
-                            applyRltFirstFullIfPossible();
+                            toggleRltFirstFullActive();
                         }, 'rlt-firstfull-global');
                         return;
                     }
