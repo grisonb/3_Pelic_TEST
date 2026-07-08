@@ -1,3 +1,27 @@
+NPF-Q400 — MODIFICATIONS TEST v12.91 (v12_91_derout_10_base_lf_patience)
+Date : 2026-07-08
+
+Base : v12.90_carte_ipad_bandeau validée pour la hauteur de carte iPad.
+
+Modifications :
+- DÉROUT. / GAAR, mode vide retardant : remplacement du forfait pélic de 20 min par 10 min. La logique devient GPS → Pélic + 10 min sol/remplissage/roulage/décollage + Pélic → Feu, puis le calcul commun ajoute toujours les 10 min sur feu avant validation du premier largage CS/TMD/HDV.
+- Aides `?` Déroutement mises à jour : le libellé indique maintenant `Forfait sol Pélic : 10 min`.
+- Champ BASE : préfixe `LF` verrouillé en saisie ; au clic/focus, seules les deux dernières lettres du code OACI sont sélectionnées pour permettre de taper directement les deux nouvelles lettres.
+- Reprise carte : remplacement de `Reprise carte…` par `Patience, je réfléchis ...`.
+- BLOC/FUEL : consolidation du retour en calcul normal quand `Plein au départ` n'est pas actif ; la ligne doit recalculer `Durée Rotations` et `Fuel Rotations` selon la logique standard.
+
+Non modifié :
+- Correction hauteur carte iPad v12.90 conservée.
+- Logique générale Suivi rotations conservée hors correction Déroutement.
+- Recherche commune, import offline, lignes HT et cartes non modifiés.
+
+Contrôles :
+- Syntaxe JS script.js contrôlée par `node --check`.
+- JSON manifest.json contrôlé.
+- Syntaxe JS sw.js contrôlée par `node --check`.
+
+---
+
 NPF-Q400 — MODIFICATIONS TEST v12.89 (v12_89_ui_infos_suivi_previ)
 Date : 2026-07-08
 
