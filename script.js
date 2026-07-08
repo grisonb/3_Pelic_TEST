@@ -7143,6 +7143,8 @@ function updateSuiviTab() {
         document.getElementById('suivi-bingo-pelic').innerHTML = '-- kg';
         document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => { el.textContent = '--'; el.className = 'value rotation-value-default'; });
         document.getElementById('suivi-heure-sur-feu').textContent = '--:--';
+        const suiviDureeTransitNoCommune = document.getElementById('suivi-duree-transit'); if (suiviDureeTransitNoCommune) suiviDureeTransitNoCommune.textContent = '--:--';
+        const suiviFuelSurFeuNoCommune = document.getElementById('suivi-fuel-sur-feu'); if (suiviFuelSurFeuNoCommune) suiviFuelSurFeuNoCommune.textContent = '-- kg';
         document.getElementById('suivi-cs-sur-feu').textContent = '--:--';
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) { suiviHeureHelpIcon.onclick = () => alert('Données insuffisantes pour le calcul.'); }
@@ -7278,6 +7280,8 @@ function updateSuiviTab() {
         document.getElementById('suivi-fuel-actuel').textContent = '-- kg';
         document.getElementById('suivi-heure-sur-feu').textContent = '--:--';
         document.getElementById('suivi-cs-sur-feu').textContent = '--:--';
+        const suiviDureeTransitEl = document.getElementById('suivi-duree-transit'); if (suiviDureeTransitEl) suiviDureeTransitEl.textContent = '--:--';
+        const suiviFuelSurFeuEl = document.getElementById('suivi-fuel-sur-feu'); if (suiviFuelSurFeuEl) suiviFuelSurFeuEl.textContent = '-- kg';
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) { suiviHeureHelpIcon.onclick = () => alert('Données insuffisantes pour le calcul.'); }
         document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => { el.textContent = '--'; el.className = 'value rotation-value-default'; });
@@ -7285,6 +7289,8 @@ function updateSuiviTab() {
         document.getElementById('suivi-fuel-actuel').textContent = currentFuel !== null ? `${currentFuel} kg` : '--';
         document.getElementById('suivi-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
         document.getElementById('suivi-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
+        const suiviDureeTransitEl = document.getElementById('suivi-duree-transit'); if (suiviDureeTransitEl) suiviDureeTransitEl.textContent = transitTimeVersFeu !== null ? (formatTime(transitTimeVersFeu) || '--:--') : '--:--';
+        const suiviFuelSurFeuEl = document.getElementById('suivi-fuel-sur-feu'); if (suiviFuelSurFeuEl) suiviFuelSurFeuEl.textContent = fuelSurFeu !== null ? `${fuelSurFeu} kg` : '-- kg';
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) {
             suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
