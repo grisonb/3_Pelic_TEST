@@ -6717,7 +6717,7 @@ const formatTime = (totalMinutes) => { if (totalMinutes === null || isNaN(totalM
 const parseNumeric = (numericString) => { if (!numericString) return null; const value = parseInt(numericString.replace(/[^0-9]/g, ''), 10); return isNaN(value) ? null : value; };
 
 function updateAndSortRotations(container, current, params) {
-    const FIRST_DROP_FORFAIT_MIN = 10;
+    const FIRST_DROP_FORFAIT_MIN = Number.isFinite(params.firstDropForfaitMin) ? params.firstDropForfaitMin : 10;
     const lines = Array.from(container.querySelectorAll('.result-line'));
     const resultsData = [];
     let minTimeLimit = Infinity;
@@ -6727,7 +6727,7 @@ function updateAndSortRotations(container, current, params) {
     const isSuiviRotation = containerId === 'suivi-rotation-results-container';
     const isPreviRotation = containerId === 'previ-rotation-results-container';
     const isDeroutRotation = containerId === 'derout-rotation-results-container';
-    const fuelImmediateDropAllowed = !isSuiviRotation;
+    const fuelImmediateDropAllowed = (typeof params.allowFuelImmediateDrop === 'boolean') ? params.allowFuelImmediateDrop : !isSuiviRotation;
 
     const returnBaseTime = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu || 0));
     const effectivePelicDistance = Math.max(CALCULATOR_DATA.distPelicFeu || 0, 10);
@@ -6769,10 +6769,12 @@ function updateAndSortRotations(container, current, params) {
     ].join('\n');
 
     const currentContextDetails = () => [
-        `Heure sur feu = ${timeOrNA(current.time)}`,
+        params.currentTimeLabel ? `${params.currentTimeLabel} = ${timeOrNA(current.time)}` : `Heure sur feu = ${timeOrNA(current.time)}`,
         `Fuel sur feu = ${kgOrNA(current.fuel)}`,
         params.transitSourceLabel ? `Terrain départ premier transit = ${params.transitSourceLabel}` : null,
-        `Transit vers feu = ${minOrNA(params.transitTime)}`,
+        params.preTransitForfaitMin ? `Forfait départ/roulage/décollage = ${params.preTransitForfaitMin} min` : null,
+        `Transit vers feu = ${minOrNA(params.rawTransitTime ?? params.transitTime)}`,
+        params.effectiveTransitDistance !== undefined ? `Distance transit retenue = ${numberOrNA(params.effectiveTransitDistance)} Nm` : null,
         `Forfait validation premier largage = ${FIRST_DROP_FORFAIT_MIN} min`,
         `Retour feu → base = ${minOrNA(returnBaseTime)}`
     ].filter(Boolean).join('\n');
@@ -6801,12 +6803,12 @@ function updateAndSortRotations(container, current, params) {
                 rotationFormulaDetails(),
                 ``,
                 `Validation du +1 :`,
-                isSuiviRotation
-                    ? `Dans Suivi rotation, le +1 fuel est neutralisé : l'avion est considéré au pélicandrome/vide, donc il ne peut pas larguer immédiatement.`
-                    : `+1 possible si Fuel sur feu ≥ 250 kg + BINGO Base.`,
-                isSuiviRotation
-                    ? `+1 = 0`
-                    : `Test : ${kgOrNA(current.fuel)} ≥ 250 + ${kgOrNA(params.bingoBase)} = ${kgOrNA(250 + params.bingoBase)} → ${hasFuelForFirstDropBase ? 'OUI' : 'NON'}`,
+                fuelImmediateDropAllowed
+                    ? `+1 possible si Fuel sur feu ≥ 250 kg + BINGO Base.`
+                    : `+1 fuel neutralisé : l'avion n'est pas considéré en situation de largage immédiat.`,
+                fuelImmediateDropAllowed
+                    ? `Test : ${kgOrNA(current.fuel)} ≥ 250 + ${kgOrNA(params.bingoBase)} = ${kgOrNA(250 + params.bingoBase)} → ${hasFuelForFirstDropBase ? 'OUI' : 'NON'}`
+                    : `+1 = 0`,
                 ``,
                 `Formule finale :`,
                 `Nbr rotations = ((Fuel sur feu - BINGO Base) / Conso rotation) + ${plusOne}`,
@@ -6826,12 +6828,12 @@ function updateAndSortRotations(container, current, params) {
                 rotationFormulaDetails(),
                 ``,
                 `Validation du +1 :`,
-                isSuiviRotation
-                    ? `Dans Suivi rotation, le +1 fuel est neutralisé : l'avion est considéré au pélicandrome/vide, donc il ne peut pas larguer immédiatement.`
-                    : `+1 possible si Fuel sur feu ≥ 250 kg + BINGO Pélic.`,
-                isSuiviRotation
-                    ? `+1 = 0`
-                    : `Test : ${kgOrNA(current.fuel)} ≥ 250 + ${kgOrNA(params.bingoPelic)} = ${kgOrNA(250 + params.bingoPelic)} → ${hasFuelForFirstDropPelic ? 'OUI' : 'NON'}`,
+                fuelImmediateDropAllowed
+                    ? `+1 possible si Fuel sur feu ≥ 250 kg + BINGO Pélic.`
+                    : `+1 fuel neutralisé : l'avion n'est pas considéré en situation de largage immédiat.`,
+                fuelImmediateDropAllowed
+                    ? `Test : ${kgOrNA(current.fuel)} ≥ 250 + ${kgOrNA(params.bingoPelic)} = ${kgOrNA(250 + params.bingoPelic)} → ${hasFuelForFirstDropPelic ? 'OUI' : 'NON'}`
+                    : `+1 = 0`,
                 ``,
                 `Formule finale :`,
                 `Nbr rotations = ((Fuel sur feu - BINGO Pélic) / Conso rotation) + ${plusOne}`,
@@ -7091,23 +7093,23 @@ function updatePreviTab() {
     const bingoPelicDisplay = document.getElementById('previ-bingo-pelic');
     if (bingoPelic === 700 || !selectedPelicanOACI) { bingoPelicDisplay.innerHTML = '-- kg'; } else { bingoPelicDisplay.innerHTML = `${selectedPelicanOACI} / ${CALCULATOR_DATA.distPelicFeu} Nm /&nbsp;<b>${bingoPelic} kg</b>`; }
 
-    const blocDepart = parseTime(document.getElementById('bloc-depart').querySelector('.display-input').value);
-    const fuelDepart = parseNumeric(document.getElementById('fuel-depart').querySelector('.display-input').value);
-    const limiteHDV = parseTime(document.getElementById('limite-hdv').querySelector('.display-input').value);
-    const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
+    const heureTO = parseTime(document.getElementById('previ-bloc-depart').querySelector('.display-input').value);
+    const fuelDepart = parseNumeric(document.getElementById('previ-fuel-depart').querySelector('.display-input').value);
+    const limiteHDV = parseTime(document.getElementById('previ-limite-hdv').querySelector('.display-input').value);
+    const tmdTime = parseTime(document.getElementById('previ-tmd').querySelector('.display-input').value);
     const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
 
     const transitTime = Math.round(calculateTransitTime(CALCULATOR_DATA.distBaseFeu));
     const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu));
     const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu);
     const consoAller = calculateFuelToGo(CALCULATOR_DATA.distBaseFeu);
-    const heureSurFeu = blocDepart !== null ? blocDepart + transitTime : null;
+    const heureSurFeu = heureTO !== null ? heureTO + transitTime : null;
 
     document.getElementById('duree-transit').textContent = formatTime(transitTime) || '--:--';
     setHelp('duree-transit-help', `DURÉE TRANSIT BASE → FEU\n\nFormule : Distance Base → Feu × (60 / Vitesse)\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nDistance Base → Feu : ${CALCULATOR_DATA.distBaseFeu} Nm\nVitesse retenue : ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240} kt\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} × (60 / ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240}) = ${formatTime(transitTime)} (${transitTime} min)`);
 
     document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
-    setHelp('heure-sur-feu-help', `HEURE SUR FEU\n\nFormule : BLOC Départ + Durée transit Base → Feu\n\nBLOC Départ : ${formatTime(blocDepart) || 'N/A'}\nDurée transit : ${formatTime(transitTime)} (${transitTime} min)\n\nCalcul : ${formatTime(blocDepart) || 'N/A'} + ${formatTime(transitTime)} = ${formatTime(heureSurFeu) || 'N/A'}\n\nCette heure sert ensuite à vérifier le +1 Coucher Soleil et TMD avec le forfait de 10 min avant largage.`);
+    setHelp('heure-sur-feu-help', `HEURE SUR FEU\n\nFormule : HEURE TO + Durée transit Base → Feu\n\nHEURE TO : ${formatTime(heureTO) || 'N/A'}\nDurée transit : ${formatTime(transitTime)} (${transitTime} min)\n\nCalcul : ${formatTime(heureTO) || 'N/A'} + ${formatTime(transitTime)} = ${formatTime(heureSurFeu) || 'N/A'}\n\nCette heure sert ensuite à vérifier le +1 Coucher Soleil et TMD avec le forfait de 10 min avant largage.`);
 
     document.getElementById('conso-aller-feu').textContent = `${consoAller} kg`;
     setHelp('conso-aller-feu-help', `CONSO TRANSIT BASE → FEU\n\nFormule : Distance Base → Feu × Conso au Nm\n\nRègle consommation :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nDistance Base → Feu : ${CALCULATOR_DATA.distBaseFeu} Nm\nConso retenue : ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} kg/Nm\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} × ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} = ${consoAller} kg`);
@@ -7205,23 +7207,50 @@ function updateSuiviTab() {
     let currentTime = null;
     let currentHdv = null;
     let transitDistanceVersFeu = null;
+    let transitEffectiveDistanceVersFeu = null;
+    let transitConsoDistanceVersFeu = null;
+    let preTransitForfaitMin = 0;
     let transitSourceLabel = '';
     let transitSourceDetail = '';
+
+    const isKnownPelicOaci = (oaci) => {
+        const normalized = String(oaci || '').trim().toUpperCase();
+        if (!normalized) return false;
+        if (normalized === selectedPelicanOACI) return true;
+        return [...pelicanAirports, ...otherAirports].some(ap => {
+            if (ap.oaci !== normalized) return false;
+            return pelicanAirports.includes(ap) || customPelicanAirports.has(ap.oaci);
+        });
+    };
+
+    const setTransitDistancePolicy = ({ measuredDistance, usePelicMinimum = false }) => {
+        if (!Number.isFinite(measuredDistance)) {
+            transitDistanceVersFeu = null;
+            transitEffectiveDistanceVersFeu = null;
+            transitConsoDistanceVersFeu = null;
+            return;
+        }
+        transitDistanceVersFeu = measuredDistance;
+        transitEffectiveDistanceVersFeu = usePelicMinimum ? Math.max(measuredDistance, 10) : measuredDistance;
+        transitConsoDistanceVersFeu = measuredDistance;
+    };
 
     if (lastFilledRow) {
         currentFuel = getRowFuel(lastFilledRow);
         currentTime = getRowTime(lastFilledRow);
+        preTransitForfaitMin = 10;
 
         if (lastFilledRow === firstRow && isFirstRowFullDeparture) {
             const firstRowOaci = getRowOaci(firstRow);
-            transitDistanceVersFeu = getDistanceFromOaciToFire(firstRowOaci);
+            const firstRowDistance = getDistanceFromOaciToFire(firstRowOaci);
+            setTransitDistancePolicy({ measuredDistance: firstRowDistance, usePelicMinimum: isKnownPelicOaci(firstRowOaci) });
             currentHdv = limiteHdvDepart;
             transitSourceLabel = firstRowOaci ? `1re ligne Plein au départ (${firstRowOaci})` : '1re ligne Plein au départ — OACI non renseigné';
             transitSourceDetail = `Terrain départ retenu : 1re ligne BLOC/FUEL en mode Plein au départ`;
         } else {
             currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell')?.textContent || '');
             const hasSelectedPelicForSuivi = !!selectedPelicanOACI && Number.isFinite(CALCULATOR_DATA.distPelicFeu);
-            transitDistanceVersFeu = hasSelectedPelicForSuivi ? CALCULATOR_DATA.distPelicFeu : null;
+            setTransitDistancePolicy({ measuredDistance: hasSelectedPelicForSuivi ? CALCULATOR_DATA.distPelicFeu : null, usePelicMinimum: true });
             transitSourceLabel = selectedPelicanOACI ? `Pélic sélectionné (${selectedPelicanOACI})` : 'Pélic sélectionné non renseigné';
             transitSourceDetail = `Terrain départ retenu : pélicandrome sélectionné après le premier transit`;
         }
@@ -7229,7 +7258,8 @@ function updateSuiviTab() {
         currentFuel = fuelDepart;
         currentTime = blocDepartTime;
         currentHdv = limiteHdvDepart;
-        transitDistanceVersFeu = Number.isFinite(CALCULATOR_DATA.distBaseFeu) ? CALCULATOR_DATA.distBaseFeu : null;
+        preTransitForfaitMin = 0;
+        setTransitDistancePolicy({ measuredDistance: Number.isFinite(CALCULATOR_DATA.distBaseFeu) ? CALCULATOR_DATA.distBaseFeu : null, usePelicMinimum: false });
         transitSourceLabel = selectedBaseOACI ? `BLOC DÉPART / base (${selectedBaseOACI})` : 'BLOC DÉPART / base non renseignée';
         transitSourceDetail = `Terrain départ retenu : ligne BLOC DÉPART / FUEL DÉPART / BASE`;
     }
@@ -7238,8 +7268,11 @@ function updateSuiviTab() {
     const rotationTime = parseTime(suiviDureeInput.value);
     const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
     const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
-    const transitTimeVersFeu = Number.isFinite(transitDistanceVersFeu) ? Math.round(calculateTransitTime(transitDistanceVersFeu)) : null;
-    const heureSurFeu = (currentTime !== null && transitTimeVersFeu !== null) ? currentTime + transitTimeVersFeu : null;
+    const transitTimeVersFeu = Number.isFinite(transitEffectiveDistanceVersFeu) ? Math.round(calculateTransitTime(transitEffectiveDistanceVersFeu)) : null;
+    const consoTransitVersFeu = Number.isFinite(transitConsoDistanceVersFeu) ? calculateFuelToGo(transitConsoDistanceVersFeu) : null;
+    const tempsAvantFeu = (transitTimeVersFeu !== null) ? preTransitForfaitMin + transitTimeVersFeu : null;
+    const heureSurFeu = (currentTime !== null && tempsAvantFeu !== null) ? currentTime + tempsAvantFeu : null;
+    const fuelSurFeu = (currentFuel !== null && consoTransitVersFeu !== null) ? currentFuel - consoTransitVersFeu : currentFuel;
 
     if (currentFuel === null && currentTime === null) {
         document.getElementById('suivi-fuel-actuel').textContent = '-- kg';
@@ -7256,26 +7289,47 @@ function updateSuiviTab() {
         if (suiviHeureHelpIcon) {
             suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
 
-Règle v12.84 :
-- si la 1re ligne BLOC/FUEL est en mode Plein au départ, le premier transit part de l'OACI de cette 1re ligne ;
-- sinon, le premier transit part de la ligne BLOC DÉPART / FUEL DÉPART / BASE ;
-- après le premier transit, les calculs repartent du pélicandrome sélectionné.
+Règle v12.86 :
+- depuis BLOC DÉPART / FUEL DÉPART / BASE : premier transit depuis la base ;
+- depuis une ligne BLOC/FUEL en mode Plein au départ : premier transit depuis l'OACI de cette ligne ;
+- depuis une arrivée pélicandrome : 10 min de mise en œuvre/roulage/décollage, puis transit vers le feu ;
+- le largage est ensuite validé avec 10 min supplémentaires avant largage.
 
 ${transitSourceDetail}
 Source utilisée : ${transitSourceLabel}
 Heure départ retenue : ${formatTime(currentTime) || 'N/A'}
-Distance source → Feu : ${Number.isFinite(transitDistanceVersFeu) ? transitDistanceVersFeu : 'N/A'} Nm
+Forfait avant transit : ${preTransitForfaitMin} min
+Distance source → Feu mesurée : ${Number.isFinite(transitDistanceVersFeu) ? transitDistanceVersFeu : 'N/A'} Nm
+Distance transit retenue : ${Number.isFinite(transitEffectiveDistanceVersFeu) ? transitEffectiveDistanceVersFeu : 'N/A'} Nm
 Règle vitesse : ≤70 Nm = 210 kt, >70 Nm = 240 kt
 Durée transit : ${transitTimeVersFeu !== null ? `${formatTime(transitTimeVersFeu)} (${transitTimeVersFeu} min)` : 'N/A'}
+Conso transit : ${consoTransitVersFeu !== null ? `${consoTransitVersFeu} kg` : 'N/A'}
+Fuel sur feu retenu : ${fuelSurFeu !== null ? `${fuelSurFeu} kg` : 'N/A'}
 
-Calcul : ${formatTime(currentTime) || 'N/A'} + ${transitTimeVersFeu !== null ? formatTime(transitTimeVersFeu) : 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}
+Calcul heure sur feu : ${formatTime(currentTime) || 'N/A'} + ${preTransitForfaitMin} min + ${transitTimeVersFeu !== null ? formatTime(transitTimeVersFeu) : 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}
 
-Cette heure sert aux limites CS/TMD/HDV. Le +1 temporel est validé avec le forfait 10 min avant largage. Le +1 fuel retour base/pélic reste neutralisé dans cet onglet.`);
+Validation du largage : Heure sur feu + 10 min avant CS/TMD/HDV.`);
         }
         updateAndSortRotations(
             document.getElementById('suivi-rotation-results-container'),
-            { fuel: currentFuel, time: heureSurFeu },
-            { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV: currentHdv, transitTime: transitTimeVersFeu, transitSourceLabel }
+            { fuel: fuelSurFeu, time: heureSurFeu },
+            {
+                bingoBase,
+                bingoPelic,
+                consoRotation,
+                rotationTime,
+                csFeuTime,
+                tmdTime,
+                limiteHDV: currentHdv,
+                transitTime: tempsAvantFeu,
+                rawTransitTime: transitTimeVersFeu,
+                preTransitForfaitMin,
+                effectiveTransitDistance: transitEffectiveDistanceVersFeu,
+                transitSourceLabel,
+                currentTimeLabel: 'Heure sur feu',
+                allowFuelImmediateDrop: true,
+                firstDropForfaitMin: 10
+            }
         );
     }
 }
@@ -8925,7 +8979,12 @@ function initializeCalculator() {
     }
 
     function refreshSharedHeaderMirrorValues() {
-        ['bloc-depart', 'fuel-depart', 'tmd', 'limite-hdv'].forEach((mainId) => {
+        /*
+         * v12.86 — Prévi indépendant : HEURE TO et FUEL Départ de
+         * l'onglet Prévi ne sont plus synchronisés avec BLOC DÉPART / FUEL
+         * DÉPART de BLOC/FUEL. Seuls TMD et LIMITE HDV restent communs.
+         */
+        ['tmd', 'limite-hdv'].forEach((mainId) => {
             copyWrapperValue(document.getElementById(mainId), getSharedHeaderMirrorWrapper(mainId));
         });
 
@@ -8933,9 +8992,8 @@ function initializeCalculator() {
         const previCs = document.getElementById('previ-cs-lftw-display');
         if (mainCs && previCs) previCs.value = mainCs.value;
 
-        const mainBlocLabel = document.getElementById('bloc-depart-label');
         const previBlocLabel = document.getElementById('previ-bloc-depart-label');
-        if (mainBlocLabel && previBlocLabel) previBlocLabel.textContent = mainBlocLabel.textContent;
+        if (previBlocLabel) previBlocLabel.textContent = 'HEURE TO';
 
         const mainCsLabel = document.getElementById('cs-base-label');
         const previCsLabel = document.getElementById('previ-cs-base-label');
@@ -9089,7 +9147,7 @@ function initializeCalculator() {
         const text = oaci ? `BLOC DÉPART ${oaci}` : 'BLOC DÉPART';
 
         if (label) label.textContent = text;
-        if (previLabel) previLabel.textContent = text;
+        if (previLabel) previLabel.textContent = 'HEURE TO';
     }
 
     function updateRowAirportOaci(row, { forceDetect = false } = {}) {
@@ -9187,6 +9245,8 @@ function initializeCalculator() {
             state: {
                 'bloc-depart': '',
                 'fuel-depart': '3400 kg',
+                'previ-bloc-depart': '',
+                'previ-fuel-depart': '3400 kg',
                 'tmd': '21:30',
                 'limite-hdv': '08:00',
                 calculator_table_data: []
@@ -9423,6 +9483,8 @@ function initializeCalculator() {
             dailyFlights[0].state = {
                 'bloc-depart': legacyState['bloc-depart'] || '',
                 'fuel-depart': legacyState['fuel-depart'] || '3400 kg',
+                'previ-bloc-depart': legacyState['previ-bloc-depart'] || legacyState['bloc-depart'] || '',
+                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3400 kg',
                 'tmd': legacyState['tmd'] || '21:30',
                 'limite-hdv': legacyState['limite-hdv'] || '08:00',
                 'deroutement-heure-wrapper': legacyState['deroutement-heure-wrapper'] || '',
@@ -9518,8 +9580,8 @@ function initializeCalculator() {
             initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
 
-            initializeTimeInput(document.getElementById('previ-bloc-depart'), state['bloc-depart']);
-            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['fuel-depart'] || '3400 kg');
+            initializeTimeInput(document.getElementById('previ-bloc-depart'), state['previ-bloc-depart'] || state['bloc-depart'] || '');
+            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3400 kg');
             initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('previ-limite-hdv'), state['limite-hdv'] || '08:00');
 
@@ -11005,6 +11067,8 @@ function initializeCalculator() {
                 newFlight.state['tmd'] = activeFlight.state?.['tmd'] || document.getElementById('tmd')?.querySelector('.display-input')?.value || '21:30';
                 newFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '08:00';
                 newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
+                newFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || document.getElementById('previ-bloc-depart')?.querySelector('.display-input')?.value || '';
+                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
             }
             dailyFlights.push(newFlight);
             activeFlightId = newFlight.id;
@@ -11031,6 +11095,8 @@ function initializeCalculator() {
                     nextFlight.state['tmd'] = activeFlight.state?.['tmd'] || '21:30';
                     nextFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || '08:00';
                     nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3400 kg';
+                    nextFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || '';
+                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3400 kg';
                     dailyFlights.push(nextFlight);
                     activeFlightId = nextFlight.id;
                     persistFlights();
