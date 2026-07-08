@@ -5949,3 +5949,21 @@ body.npf-resuming #npf-resume-overlay {
     color: #ffffff !important;
     border-color: #003f74 !important;
 }
+
+
+/* v12.84 — Plein au départ : Fuel et OACI restent utilisables/visibles. */
+#bloc-fuel tr.bloc-fuel-first-full-row .fuel-split-input-wrapper {
+    display: flex !important;
+}
+#bloc-fuel tr.bloc-fuel-first-full-row .airport-oaci-cell {
+    color: inherit !important;
+}
+#bloc-fuel tr.bloc-fuel-first-full-row .airport-oaci-cell::before {
+    content: none !important;
+}
+#bloc-fuel tr.bloc-fuel-first-full-row .duree-rotation-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .fuel-rotation-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-cell,
+#bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-restant-cell {
+    color: transparent !important;
+}
