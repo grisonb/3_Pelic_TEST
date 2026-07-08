@@ -6059,3 +6059,54 @@ body {
     transform: translateY(1px);
 }
 
+
+
+/* v12.90 — iPad/PWA : suppression du grand bandeau bas de carte.
+   Cause corrigée : ne plus laisser -webkit-fill-available réduire #map.
+   La carte doit occuper toute la fenêtre réelle ; la bande résiduelle reste bleu carte. */
+:root {
+    --npf-app-vh: 100vh;
+}
+
+html,
+body {
+    width: 100vw !important;
+    height: var(--npf-app-vh) !important;
+    min-height: var(--npf-app-vh) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #dff3fb !important;
+}
+
+#map,
+.leaflet-container {
+    background: #dff3fb !important;
+}
+
+#map {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    height: var(--npf-app-vh) !important;
+    min-height: var(--npf-app-vh) !important;
+    max-height: none !important;
+    overflow: hidden !important;
+}
+
+@supports (height: 100lvh) {
+    :root { --npf-app-vh: 100lvh; }
+}
+
+@supports (-webkit-touch-callout: none) {
+    html,
+    body,
+    #map {
+        height: var(--npf-app-vh) !important;
+        min-height: var(--npf-app-vh) !important;
+    }
+}
