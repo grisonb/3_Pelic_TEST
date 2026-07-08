@@ -7289,7 +7289,7 @@ function updateSuiviTab() {
         if (suiviHeureHelpIcon) {
             suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
 
-Règle v12.86 :
+Règle v12.87 :
 - depuis BLOC DÉPART / FUEL DÉPART / BASE : premier transit depuis la base ;
 - depuis une ligne BLOC/FUEL en mode Plein au départ : premier transit depuis l'OACI de cette ligne ;
 - depuis une arrivée pélicandrome : 10 min de mise en œuvre/roulage/décollage, puis transit vers le feu ;
@@ -8980,7 +8980,7 @@ function initializeCalculator() {
 
     function refreshSharedHeaderMirrorValues() {
         /*
-         * v12.86 — Prévi indépendant : HEURE TO et FUEL Départ de
+         * v12.87 — Prévi indépendant : HEURE TO et FUEL Départ de
          * l'onglet Prévi ne sont plus synchronisés avec BLOC DÉPART / FUEL
          * DÉPART de BLOC/FUEL. Seuls TMD et LIMITE HDV restent communs.
          */
@@ -10554,7 +10554,16 @@ function initializeCalculator() {
             const now = Date.now();
             const lastRun = Number(modal?.dataset.rltLastButtonActionAt || '0');
             const lastKey = modal?.dataset.rltLastButtonActionKey || '';
-            if (lastKey === actionKey && now - lastRun < 260) return;
+            /*
+             * v12.87 — Plein au départ : Safari/iPad peut générer plusieurs
+             * événements pour un seul appui (touchstart, pointerdown, mousedown,
+             * puis click synthétique). Le délai de 260 ms était trop court : le
+             * click final pouvait retomber après la fenêtre anti-double et
+             * inverser l'état du bouton, ce qui donnait un bouton apparemment
+             * inactif ou désactivé à la validation/réouverture.
+             */
+            const dedupeDelayMs = actionKey === 'rlt-firstfull-global' ? 1200 : 320;
+            if (lastKey === actionKey && now - lastRun < dedupeDelayMs) return;
             if (modal) {
                 modal.dataset.rltLastButtonActionAt = String(now);
                 modal.dataset.rltLastButtonActionKey = actionKey;
