@@ -703,9 +703,17 @@ v12.78 — Retardant 1er Plein stable + recherche Talo 07
 - Correction : la recherche commune accepte un préfixe court approximatif filtré par département ; cas visé : « Talo 07 » doit retrouver Talencieux (07).
 
 
-v12.79 — Toulaud / MAJ immédiate / Plein au départ
+v12.80 — Toulaud / MAJ immédiate / Plein au départ
 - Correction recherche commune : la saisie "Talo 07" ou "Talaud 07" cible maintenant Toulaud (07323) et non Talencieux.
 - Correction rappel post-MAJ : le message "Une mise à jour vient d’être effectuée. Fermez et relancez l’application." est préparé dès le changement de version et dès le bouton MAJ, sans attendre une relance ultérieure.
 - Renommage du bouton retardant "1er Plein" en "Plein au départ".
 - Stabilisation de l’état du bouton Plein au départ : l’état sélectionné est mémorisé à la réouverture de la fenêtre et sauvegardé avec la ligne BLOC/FUEL.
 - Conservation de la limitation : Plein au départ disponible uniquement sur la cellule Masse RLT de la première ligne du tableau BLOC/FUEL.
+
+v12.80 — Correction bouton Plein au départ
+- Base : v12.79.
+- Correction : le bouton Plein au départ ne dépend plus seulement d'un état JS temporaire ; son état est enregistré directement sur la cellule Masse RLT active.
+- Correction : si le bouton devient bleu, il reste sélectionné à la réouverture de la fenêtre.
+- Correction : le stopPropagation global de la fenêtre retardant ne bloque plus les événements des boutons internes sur iPad.
+- Correction : ajout d'un gestionnaire direct sur Plein au départ en plus de la capture globale par coordonnées, avec anti-double événement.
+- Limite fonctionnelle conservée : Plein au départ uniquement sur la cellule Masse RLT de la première ligne BLOC/FUEL.
