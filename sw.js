@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-85-plein-depart-toggle-pelic-prioritaire';
+const SW_VERSION = 'sw-v12-86-suivi-precis-heure-to';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
