@@ -1561,12 +1561,18 @@ function scoreCommuneSearchCandidate(candidate, searchWords) {
                 currentScore = 0;
             } else if (communeSoundex === wordSoundex) {
                 currentScore = 1;
+            } else if (candidate.dep_code === '07' && (word === 'talo' || word === 'talaud') && communePart === 'toulaud') {
+                /*
+                 * v12.79 — recherche commune Ardèche : l'utilisateur saisit
+                 * souvent "Talo 07" ou "Talaud 07" pour Toulaud (07323).
+                 * Ce cas doit primer sur les autres communes du département.
+                 */
+                currentScore = -1;
             } else if (word.length >= 4 && communePart.startsWith(word.slice(0, 3))) {
                 /*
-                 * v12.78 — recherche commune filtrée par département :
-                 * accepter les préfixes courts approximatifs. Cas visé :
-                 * "Talo 07" doit retrouver Talencieux (07), même si la
-                 * commune ne commence pas exactement par "talo".
+                 * v12.78/v12.79 — recherche filtrée par département :
+                 * accepter les préfixes courts approximatifs, sans forcer
+                 * une commune précise hors du cas Toulaud ci-dessus.
                  */
                 currentScore = 3.8 + Math.min(2, Math.abs(communePart.length - word.length) / 10);
             } else {
@@ -2517,10 +2523,11 @@ async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = 
 
 function showPostUpdateRestartNoticeIfNeeded() {
     try {
+        const pending = localStorage.getItem('npfPostUpdateRestartNoticePending') === '1';
         const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
         const currentVersion = (typeof window.APP_VERSION !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '';
-        if (!noticeVersion) return;
-        if (currentVersion && noticeVersion !== currentVersion) return;
+        if (!pending && !noticeVersion) return;
+        if (!pending && currentVersion && noticeVersion && noticeVersion !== currentVersion) return;
         showPostUpdateRestartNoticeModal();
     } catch (_) {}
 }
@@ -2544,7 +2551,10 @@ function showPostUpdateRestartNoticeModal() {
     document.body.appendChild(modal);
 
     const close = () => {
-        try { localStorage.removeItem('npfPostUpdateRestartNoticeVersion'); } catch (_) {}
+        try {
+            localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
+            localStorage.removeItem('npfPostUpdateRestartNoticePending');
+        } catch (_) {}
         modal.remove();
     };
 
@@ -9129,6 +9139,8 @@ function initializeCalculator() {
             || rowData.rltBottomMass
             || rowData.rltMode
             || rowData.rltFirstFull
+            || rowData.rltFirstFullPending
+            || rowData.rltFirstFullWanted
         );
     }
 
@@ -9166,9 +9178,11 @@ function initializeCalculator() {
             const rltBottomMass = rltWrapper?.dataset.bottomMass || '';
             const rltMode = rltWrapper?.dataset.rltMode || '';
             const rltFirstFull = rltWrapper?.dataset.rltFirstFull || '';
+            const rltFirstFullPending = rltWrapper?.dataset.rltFirstFullPending || '';
+            const rltFirstFullWanted = rltWrapper?.dataset.rltFirstFullWanted || '';
             const oaci = row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || '';
-            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltMode || rltFirstFull) {
-                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltMode, rltFirstFull });
+            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltMode || rltFirstFull || rltFirstFullPending || rltFirstFullWanted) {
+                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltMode, rltFirstFull, rltFirstFullPending, rltFirstFullWanted });
             }
         });
         state.calculator_table_data = compactCalculatorTableData(tableData);
@@ -10091,13 +10105,17 @@ function initializeCalculator() {
         activeRltFirstFull = !!active && canUseFirstFull;
 
         /*
-         * v12.78 — bouton 1er Plein : l'état doit rester stable si la fenêtre
+         * v12.78 — bouton Plein au départ : l'état doit rester stable si la fenêtre
          * est réouverte avant validation. On stocke donc un état provisoire,
          * sans appliquer le masquage des colonnes tant que Valider n'a pas été
          * pressé.
          */
         if (persistPending && activeRltMassWrapper) {
             activeRltMassWrapper.dataset.rltFirstFullPending = activeRltFirstFull ? '1' : '';
+            activeRltMassWrapper.dataset.rltFirstFullWanted = activeRltFirstFull ? '1' : '';
+            const pendingRow = activeRltMassWrapper.closest('tr');
+            if (pendingRow) pendingRow.classList.toggle('bloc-fuel-first-full-row-pending', activeRltFirstFull);
+            try { saveCalculatorState(); } catch (_) {}
         }
 
         const { firstFullBtn } = getRltMassModalElements();
@@ -10153,7 +10171,7 @@ function initializeCalculator() {
 
         if (firstFullBtn) {
             /*
-             * v12.75 — le bouton 1er Plein dépend de la ligne du tableau
+             * v12.75 — le bouton Plein au départ dépend de la ligne du tableau
              * BLOC/FUEL ouverte, pas de la première ligne de calcul de la
              * fenêtre. Il n'est disponible que sur la première ligne du tableau.
              */
@@ -10251,7 +10269,7 @@ function initializeCalculator() {
              * v12.77 — le bouton est traité par la capture globale document
              * ci-dessous. Ne pas ajouter ici de second gestionnaire cible :
              * la capture du contenu modal bloque certains événements iPad et
-             * un click résiduel pouvait annuler le basculement 1er Plein.
+             * un click résiduel pouvait annuler le basculement Plein au départ.
              */
             firstFullBtn.dataset.rltFirstFullBound = '1';
         }
@@ -10334,10 +10352,12 @@ function initializeCalculator() {
             activeRltMassWrapper.dataset.rltMode = selectedMode;
             activeRltMassWrapper.dataset.rltFirstFull = selectedMode === 'firstFull' ? '1' : '';
             activeRltMassWrapper.dataset.rltFirstFullPending = selectedMode === 'firstFull' ? '1' : '';
+            activeRltMassWrapper.dataset.rltFirstFullWanted = selectedMode === 'firstFull' ? '1' : '';
 
             const activeRltRow = activeRltMassWrapper.closest('tr');
             if (activeRltRow) {
                 activeRltRow.classList.toggle('bloc-fuel-first-full-row', selectedMode === 'firstFull');
+                activeRltRow.classList.toggle('bloc-fuel-first-full-row-pending', selectedMode === 'firstFull');
                 if (selectedMode === 'firstFull') {
                     const fuelInput = activeRltRow.querySelector('.fuel-split-input-wrapper .display-input');
                     if (fuelInput) fuelInput.value = '';
@@ -10503,7 +10523,7 @@ function initializeCalculator() {
         activeRltMassWrapper = wrapper;
         activeRltMassLastEdited = null;
         activeRltMassCalculationMode = null;
-        activeRltFirstFull = wrapper.dataset.rltFirstFullPending === '1' || wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull';
+        activeRltFirstFull = wrapper.dataset.rltFirstFullPending === '1' || wrapper.dataset.rltFirstFullWanted === '1' || wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull';
 
         const storedVolume = wrapper.dataset.volume || '';
         const storedDensity = wrapper.dataset.density || '1.';
@@ -10578,9 +10598,13 @@ function initializeCalculator() {
         wrapper.dataset.bottomMass = data?.rltBottomMass || '';
         wrapper.dataset.rltMode = data?.rltMode || '';
         wrapper.dataset.rltFirstFull = data?.rltFirstFull || '';
-        wrapper.dataset.rltFirstFullPending = data?.rltFirstFull || '';
+        wrapper.dataset.rltFirstFullPending = data?.rltFirstFullPending || data?.rltFirstFull || '';
+        wrapper.dataset.rltFirstFullWanted = data?.rltFirstFullWanted || data?.rltFirstFullPending || data?.rltFirstFull || '';
         const rowForFirstFull = wrapper.closest('tr');
-        if (rowForFirstFull) rowForFirstFull.classList.toggle('bloc-fuel-first-full-row', wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull');
+        if (rowForFirstFull) {
+            rowForFirstFull.classList.toggle('bloc-fuel-first-full-row', wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull');
+            rowForFirstFull.classList.toggle('bloc-fuel-first-full-row-pending', wrapper.dataset.rltFirstFullPending === '1' || wrapper.dataset.rltFirstFullWanted === '1');
+        }
         if (displayInput) displayInput.value = data?.rltMass || '';
 
         setupRltMassModalOnce();
@@ -10613,8 +10637,12 @@ function initializeCalculator() {
                 wrapper.dataset.rltMode = '';
                 wrapper.dataset.rltFirstFull = '';
                 wrapper.dataset.rltFirstFullPending = '';
+                wrapper.dataset.rltFirstFullWanted = '';
                 const rowForClear = wrapper.closest('tr');
-                if (rowForClear) rowForClear.classList.remove('bloc-fuel-first-full-row');
+                if (rowForClear) {
+                    rowForClear.classList.remove('bloc-fuel-first-full-row');
+                    rowForClear.classList.remove('bloc-fuel-first-full-row-pending');
+                }
                 if (displayInput) displayInput.value = '';
                 masterRecalculate();
                 saveCalculatorState();
