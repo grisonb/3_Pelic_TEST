@@ -930,3 +930,11 @@ Non modifié :
 - bouton Plein au départ ;
 - recherche commune ;
 - import offline / tuiles / IndexedDB.
+
+
+## v12.92 — TEST — post-MAJ + Heure sur Feu Prévi
+
+- iPad/PWA : rétablit l'affichage immédiat du message persistant après mise à jour dès le premier chargement de la nouvelle version, sans attendre une relance supplémentaire.
+- La fenêtre post-MAJ reste sans bouton OK et doit rester affichée jusqu'à fermeture/relance de l'application.
+- PREVI. NBR ROTATIONS : ajout de la ligne visible `Heure sur Feu` juste après `CS sur Feu` dans la colonne de droite.
+- Aucun changement sur la hauteur de carte validée v12.90, Plein au départ, calculs CS/TMD/HDV, import offline ou recherche commune.
