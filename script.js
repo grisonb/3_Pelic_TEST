@@ -1563,14 +1563,14 @@ function scoreCommuneSearchCandidate(candidate, searchWords) {
                 currentScore = 1;
             } else if (candidate.dep_code === '07' && (word === 'talo' || word === 'talaud') && communePart === 'toulaud') {
                 /*
-                 * v12.79 — recherche commune Ardèche : l'utilisateur saisit
+                 * v12.80 — recherche commune Ardèche : l'utilisateur saisit
                  * souvent "Talo 07" ou "Talaud 07" pour Toulaud (07323).
                  * Ce cas doit primer sur les autres communes du département.
                  */
                 currentScore = -1;
             } else if (word.length >= 4 && communePart.startsWith(word.slice(0, 3))) {
                 /*
-                 * v12.78/v12.79 — recherche filtrée par département :
+                 * v12.78/v12.80 — recherche filtrée par département :
                  * accepter les préfixes courts approximatifs, sans forcer
                  * une commune précise hors du cas Toulaud ci-dessus.
                  */
@@ -9782,7 +9782,18 @@ function initializeCalculator() {
         if (modalContent && modalContent.dataset.rltStopBound !== '1') {
             modalContent.dataset.rltStopBound = '1';
             ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
-                modalContent.addEventListener(type, (event) => event.stopPropagation(), { capture: true });
+                modalContent.addEventListener(type, (event) => {
+                    /*
+                     * v12.80 — boutons Retardant : ne pas bloquer les événements
+                     * des boutons internes. Le stopPropagation global de la fenêtre
+                     * interceptait parfois Plein au départ avant le handler du bouton
+                     * sur iPad, ce qui donnait seulement un état visuel fugitif.
+                     */
+                    if (event.target?.closest?.('#rlt-first-full-btn, #rlt-mass-validate-btn, #rlt-mass-clear-btn, #rlt-mass-cancel-btn')) {
+                        return;
+                    }
+                    event.stopPropagation();
+                }, { capture: true });
             });
         }
 
@@ -10105,16 +10116,28 @@ function initializeCalculator() {
         activeRltFirstFull = !!active && canUseFirstFull;
 
         /*
-         * v12.78 — bouton Plein au départ : l'état doit rester stable si la fenêtre
-         * est réouverte avant validation. On stocke donc un état provisoire,
-         * sans appliquer le masquage des colonnes tant que Valider n'a pas été
-         * pressé.
+         * v12.80 — Plein au départ : l'état du bouton est enregistré directement
+         * sur la cellule active, pas seulement dans une variable JS temporaire.
+         * Ainsi, si le bouton devient bleu, il reste bleu à la réouverture de la
+         * fenêtre, et la validation peut appliquer le mode sans perdre l'état.
          */
         if (persistPending && activeRltMassWrapper) {
             activeRltMassWrapper.dataset.rltFirstFullPending = activeRltFirstFull ? '1' : '';
             activeRltMassWrapper.dataset.rltFirstFullWanted = activeRltFirstFull ? '1' : '';
+            if (!activeRltFirstFull) {
+                activeRltMassWrapper.dataset.rltFirstFull = '';
+                if (activeRltMassWrapper.dataset.rltMode === 'firstFull') {
+                    activeRltMassWrapper.dataset.rltMode = '';
+                }
+            }
+
             const pendingRow = activeRltMassWrapper.closest('tr');
-            if (pendingRow) pendingRow.classList.toggle('bloc-fuel-first-full-row-pending', activeRltFirstFull);
+            if (pendingRow) {
+                pendingRow.classList.toggle('bloc-fuel-first-full-row-pending', activeRltFirstFull);
+                if (!activeRltFirstFull) {
+                    pendingRow.classList.remove('bloc-fuel-first-full-row');
+                }
+            }
             try { saveCalculatorState(); } catch (_) {}
         }
 
@@ -10207,7 +10230,18 @@ function initializeCalculator() {
         if (modalContent && modalContent.dataset.rltStopBound !== '1') {
             modalContent.dataset.rltStopBound = '1';
             ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
-                modalContent.addEventListener(type, (event) => event.stopPropagation(), { capture: true });
+                modalContent.addEventListener(type, (event) => {
+                    /*
+                     * v12.80 — boutons Retardant : ne pas bloquer les événements
+                     * des boutons internes. Le stopPropagation global de la fenêtre
+                     * interceptait parfois Plein au départ avant le handler du bouton
+                     * sur iPad, ce qui donnait seulement un état visuel fugitif.
+                     */
+                    if (event.target?.closest?.('#rlt-first-full-btn, #rlt-mass-validate-btn, #rlt-mass-clear-btn, #rlt-mass-cancel-btn')) {
+                        return;
+                    }
+                    event.stopPropagation();
+                }, { capture: true });
             });
         }
 
@@ -10265,13 +10299,17 @@ function initializeCalculator() {
         bindInput(densityInput, 'density', 'volumeToMass');
 
         if (firstFullBtn && firstFullBtn.dataset.rltFirstFullBound !== '1') {
-            /*
-             * v12.77 — le bouton est traité par la capture globale document
-             * ci-dessous. Ne pas ajouter ici de second gestionnaire cible :
-             * la capture du contenu modal bloque certains événements iPad et
-             * un click résiduel pouvait annuler le basculement Plein au départ.
-             */
             firstFullBtn.dataset.rltFirstFullBound = '1';
+            const firstFullHandler = (event) => {
+                stopRltButtonEvent(event);
+                runRltButtonActionOnce(() => {
+                    setRltFirstFullActive(!activeRltFirstFull, true);
+                    syncRltMassModalFromInputs();
+                }, 'rlt-firstfull-global');
+            };
+            ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
+                firstFullBtn.addEventListener(type, firstFullHandler, { capture: true, passive: false });
+            });
         }
 
         const stopRltButtonEvent = (event) => {
