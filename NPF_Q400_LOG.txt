@@ -693,3 +693,11 @@ v12.77 — Retardant : 1er Plein et masse corrigés
 - Règle conservée : “1er Plein” apparaît uniquement quand la cellule Masse RLT ouverte appartient à la première ligne du tableau BLOC/FUEL.
 - Règle conservée : si “1er Plein” est validé, la ligne affiche uniquement la Masse RLT, masque Fuel Pélic. et laisse les colonnes suivantes vides.
 - Non modifié : calculs CS/TMD/HDV corrigés de v12.76, reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Communes, Lignes HT et PDF.
+
+v12.78 — Retardant 1er Plein stable + recherche Talo 07
+- Base : v12.77 TEST.
+- Correction : le bouton 1er Plein reste centré dans la fenêtre VOLUME/MASSE RETARDANT.
+- Correction : l'état 1er Plein reste sélectionné à la réouverture de la fenêtre, y compris avant validation, via un état provisoire séparé.
+- Correction : le mode 1er Plein reste limité à la cellule Masse RLT de la première ligne du tableau BLOC/FUEL.
+- Conservation : les calculs Masse ÷ Densité = Volume et Volume × Densité = Masse restent indépendants, avec priorité à la ligne 2 si elle est renseignée.
+- Correction : la recherche commune accepte un préfixe court approximatif filtré par département ; cas visé : « Talo 07 » doit retrouver Talencieux (07).
