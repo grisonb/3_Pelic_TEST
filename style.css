@@ -5967,3 +5967,11 @@ body.npf-resuming #npf-resume-overlay {
 #bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-restant-cell {
     color: transparent !important;
 }
+
+/* v12.88 — Plein au départ : limiter les doubles événements tactiles iPad. */
+#rlt-first-full-btn.rlt-first-full-btn {
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+}
