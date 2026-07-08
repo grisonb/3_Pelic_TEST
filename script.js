@@ -2542,27 +2542,21 @@ function showPostUpdateRestartNoticeModal() {
         <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
             <h3 id="post-update-restart-title">Mise à jour</h3>
             <p><strong>Une mise à jour vient d’être effectuée.</strong><br>Fermez et relancez l’application.</p>
-            <div class="update-reminder-actions post-update-restart-actions">
-                <button id="post-update-restart-ok-button" class="update-reminder-primary" type="button">OK</button>
-            </div>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    const close = () => {
-        try {
-            localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-            localStorage.removeItem('npfPostUpdateRestartNoticePending');
-        } catch (_) {}
-        modal.remove();
-    };
-
-    const okButton = document.getElementById('post-update-restart-ok-button');
-    if (okButton) okButton.addEventListener('click', close);
-    modal.addEventListener('click', (event) => {
-        if (event.target === modal) close();
-    });
+    /*
+     * v12.81 — fenêtre post-MAJ persistante : pas de bouton OK, pas de
+     * fermeture par clic extérieur. Elle reste affichée jusqu'à fermeture / 
+     * relance de l'app. On efface le marqueur dès l'affichage pour ne pas
+     * la revoir au lancement suivant.
+     */
+    try {
+        localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
+        localStorage.removeItem('npfPostUpdateRestartNoticePending');
+    } catch (_) {}
 }
 
 function showUpdateReminderIfDue() {
@@ -10303,7 +10297,7 @@ function initializeCalculator() {
             const firstFullHandler = (event) => {
                 stopRltButtonEvent(event);
                 runRltButtonActionOnce(() => {
-                    setRltFirstFullActive(!activeRltFirstFull, true);
+                    setRltFirstFullActive(true, true);
                     syncRltMassModalFromInputs();
                 }, 'rlt-firstfull-global');
             };
@@ -10361,24 +10355,30 @@ function initializeCalculator() {
             let selectedMode = '';
 
             /*
-             * v12.77 — validation fiable iPad + Masse RLT corrigée :
-             * l'action est lancée dès pointerdown/touchstart afin qu'un premier
-             * appui sur Valider ne serve pas seulement à fermer le clavier.
-             * La priorité de calcul reste celle de v12.71 : ligne 2 prioritaire,
-             * ligne 1 utilisée seulement si la ligne 2 est incomplète.
+             * v12.81 — Plein au départ : le bouton est une activation, pas un
+             * interrupteur. Le premier appui le rend actif et les événements
+             * tactiles iPad suivants ne peuvent plus le désactiver. En validation,
+             * le mode est accepté dès qu'une masse de ligne 1 existe ; la densité
+             * et le volume calculé restent utiles mais ne conditionnent plus
+             * l'application du Plein au départ.
              */
-            const isFirstFull = !!activeRltFirstFull && isFirstBlocFuelRltRow(activeRltMassWrapper) && topComplete && !bottomComplete;
+            const isFirstFull = !!activeRltFirstFull && isFirstBlocFuelRltRow(activeRltMassWrapper) && topMass !== null && !bottomComplete;
 
             if (bottomComplete) {
                 volume = bottomVolume;
                 density = bottomDensity;
                 mass = bottomMass !== null ? bottomMass : (bottomVolume * bottomDensity);
                 selectedMode = 'volumeToMass';
+            } else if (isFirstFull) {
+                volume = topComputedVolume;
+                density = topDensity;
+                mass = topMass;
+                selectedMode = 'firstFull';
             } else if (topComplete) {
                 volume = topComputedVolume;
                 density = topDensity;
                 mass = topMass;
-                selectedMode = isFirstFull ? 'firstFull' : 'massToVolume';
+                selectedMode = 'massToVolume';
             }
 
             activeRltMassWrapper.dataset.topMass = topMass !== null ? String(Math.round(topMass)) : '';
@@ -10561,7 +10561,7 @@ function initializeCalculator() {
         activeRltMassWrapper = wrapper;
         activeRltMassLastEdited = null;
         activeRltMassCalculationMode = null;
-        activeRltFirstFull = wrapper.dataset.rltFirstFullPending === '1' || wrapper.dataset.rltFirstFullWanted === '1' || wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull';
+        activeRltFirstFull = isFirstBlocFuelRltRow(wrapper) && (wrapper.dataset.rltFirstFullPending === '1' || wrapper.dataset.rltFirstFullWanted === '1' || wrapper.dataset.rltFirstFull === '1' || wrapper.dataset.rltMode === 'firstFull');
 
         const storedVolume = wrapper.dataset.volume || '';
         const storedDensity = wrapper.dataset.density || '1.';
