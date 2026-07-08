@@ -5903,9 +5903,26 @@ body.npf-resuming #npf-resume-overlay {
 }
 
 
-/* v12.79 — bouton Plein au départ : centrage renforcé */
+/* v12.80 — bouton Plein au départ : centrage renforcé */
 #rlt-first-full-btn.rlt-first-full-btn {
     display: flex;
     margin-left: auto !important;
     margin-right: auto !important;
+}
+
+
+/* v12.80 — bouton Plein au départ : centrage et état sélectionné renforcés */
+#rlt-first-full-btn.rlt-first-full-btn {
+    display: flex;
+    margin: 0 auto 10px auto !important;
+    align-self: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+#rlt-first-full-btn.rlt-first-full-btn[hidden] {
+    display: none !important;
+}
+#rlt-first-full-btn.rlt-first-full-btn.active {
+    background: #005a9c !important;
+    color: #ffffff !important;
 }
