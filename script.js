@@ -2598,6 +2598,7 @@ function showPostUpdateRestartNoticeIfNeeded() {
         const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
         const currentVersion = (typeof window.APP_VERSION !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '';
         if (!pending && !noticeVersion) return;
+        // v12.92 — si pending=1, afficher même si le marqueur de version vient de l'ancienne version.
         if (!pending && currentVersion && noticeVersion && noticeVersion !== currentVersion) return;
         showPostUpdateRestartNoticeModal();
     } catch (_) {}
