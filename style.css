@@ -6110,3 +6110,17 @@ body {
         min-height: var(--npf-app-vh) !important;
     }
 }
+
+
+/* v12.93 — Déroutement : remonter le contenu de droite et garder le message patience actif. */
+#deroutement .analyse-col:nth-child(2) .rotations-group .analyse-col-title {
+    display: none !important;
+}
+
+#deroutement .analyse-col:nth-child(2) .rotations-group {
+    padding-top: 14px !important;
+}
+
+#deroutement .analyse-col:nth-child(2) .rotations-group .result-line:first-of-type {
+    margin-top: 0 !important;
+}
