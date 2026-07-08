@@ -1,3 +1,23 @@
+# v12.86_suivi_precis_heure_to — TEST
+
+Date : 2026-07-08
+
+Objet : séparation Prévi / Bloc-Fuel + affinage du premier transit Suivi rotations.
+
+Corrections :
+- Dans `PREVI. NBR ROTATIONS`, le champ `BLOC DÉPART` devient `HEURE TO`.
+- `HEURE TO` est indépendant du `BLOC DÉPART` de l’onglet `BLOC / FUEL`.
+- Le `FUEL Départ` de Prévi est indépendant du `FUEL Départ` de Bloc/Fuel.
+- `BASE`, `TMD` et `LIMITE HDV` restent communs/synchronisés entre Prévi et Bloc/Fuel.
+- Dans Prévi, les calculs utilisent maintenant `HEURE TO` + transit Base → Feu, et le fuel départ propre à Prévi.
+- Dans Suivi rotations, depuis une ligne d’arrivée pélicandrome, l’heure sur feu est calculée avec : `Bloc arrivée + 10 min + transit pélic → feu`.
+- Le premier largage temporel reste validé avec `Heure sur feu + 10 min` avant CS/TMD/HDV, soit la logique opérationnelle `10 + transit + 10` depuis l’arrêt au pélicandrome.
+- Le fuel retenu pour Suivi rotations est désormais le fuel sur feu : `fuel actuel - conso transit vers feu`.
+- Le `+1` fuel est autorisé en Suivi rotations quand le premier largage est possible avec le fuel sur feu.
+- Aucun changement sur recherche commune, cartes, import offline ou lignes HT.
+
+---
+
 # v12.85_plein_depart_toggle_pelic_prioritaire — TEST
 
 Date : 2026-07-08
@@ -57,7 +77,7 @@ But du fichier
 Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
 Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
 
-Version actuelle TEST : v12.85
+Version actuelle TEST : v12.86
 Date de génération : 2026-07-08
 
 Règle de méthode
