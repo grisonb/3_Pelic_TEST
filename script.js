@@ -2548,7 +2548,7 @@ function showPostUpdateRestartNoticeModal() {
     document.body.appendChild(modal);
 
     /*
-     * v12.81 — fenêtre post-MAJ persistante : pas de bouton OK, pas de
+     * v12.82 — fenêtre post-MAJ persistante : pas de bouton OK, pas de
      * fermeture par clic extérieur. Elle reste affichée jusqu'à fermeture / 
      * relance de l'app. On efface le marqueur dès l'affichage pour ne pas
      * la revoir au lancement suivant.
@@ -10110,15 +10110,18 @@ function initializeCalculator() {
         activeRltFirstFull = !!active && canUseFirstFull;
 
         /*
-         * v12.80 — Plein au départ : l'état du bouton est enregistré directement
-         * sur la cellule active, pas seulement dans une variable JS temporaire.
-         * Ainsi, si le bouton devient bleu, il reste bleu à la réouverture de la
-         * fenêtre, et la validation peut appliquer le mode sans perdre l'état.
+         * v12.82 — Plein au départ : activation idempotente.
+         * Le bouton n'est plus un interrupteur tactile. Sur iPad, la même action
+         * peut produire touchstart + pointerdown + click ; chaque événement doit
+         * conduire au même état actif, jamais à une désactivation involontaire.
          */
         if (persistPending && activeRltMassWrapper) {
-            activeRltMassWrapper.dataset.rltFirstFullPending = activeRltFirstFull ? '1' : '';
-            activeRltMassWrapper.dataset.rltFirstFullWanted = activeRltFirstFull ? '1' : '';
-            if (!activeRltFirstFull) {
+            if (activeRltFirstFull) {
+                activeRltMassWrapper.dataset.rltFirstFullPending = '1';
+                activeRltMassWrapper.dataset.rltFirstFullWanted = '1';
+            } else {
+                activeRltMassWrapper.dataset.rltFirstFullPending = '';
+                activeRltMassWrapper.dataset.rltFirstFullWanted = '';
                 activeRltMassWrapper.dataset.rltFirstFull = '';
                 if (activeRltMassWrapper.dataset.rltMode === 'firstFull') {
                     activeRltMassWrapper.dataset.rltMode = '';
@@ -10140,6 +10143,68 @@ function initializeCalculator() {
             firstFullBtn.classList.toggle('active', activeRltFirstFull);
             firstFullBtn.setAttribute('aria-pressed', activeRltFirstFull ? 'true' : 'false');
         }
+    }
+
+    function applyRltFirstFullIfPossible() {
+        if (!activeRltMassWrapper || !isFirstBlocFuelRltRow(activeRltMassWrapper) || !activeRltFirstFull) return false;
+
+        const {
+            massToVolumeMassInput,
+            massToVolumeDensityInput,
+            massToVolumeVolumeInput,
+            volumeInput,
+            densityInput,
+            massInput
+        } = getRltMassModalElements();
+
+        const topMass = parseDecimalInput(massToVolumeMassInput?.value);
+        if (topMass === null) return false;
+
+        const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
+        const topComputedVolume = topDensity !== null ? (topMass / topDensity) : null;
+
+        /*
+         * Plein au départ = masse seule de la première ligne BLOC/FUEL.
+         * La ligne Volume × Densité = Masse ne doit pas prendre la priorité
+         * quand l'utilisateur a explicitement choisi ce mode.
+         */
+        if (volumeInput) volumeInput.value = '';
+        if (densityInput) densityInput.value = '1.';
+        if (massInput) massInput.value = '';
+        if (massToVolumeVolumeInput && topComputedVolume !== null) {
+            massToVolumeVolumeInput.value = formatDecimalValue(topComputedVolume, 0);
+        }
+
+        activeRltMassWrapper.dataset.topMass = String(Math.round(topMass));
+        activeRltMassWrapper.dataset.topDensity = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
+        activeRltMassWrapper.dataset.topVolume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
+        activeRltMassWrapper.dataset.bottomVolume = '';
+        activeRltMassWrapper.dataset.bottomDensity = '';
+        activeRltMassWrapper.dataset.bottomMass = '';
+        activeRltMassWrapper.dataset.volume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
+        activeRltMassWrapper.dataset.density = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
+        activeRltMassWrapper.dataset.mass = String(Math.round(topMass));
+        activeRltMassWrapper.dataset.rltMode = 'firstFull';
+        activeRltMassWrapper.dataset.rltFirstFull = '1';
+        activeRltMassWrapper.dataset.rltFirstFullPending = '1';
+        activeRltMassWrapper.dataset.rltFirstFullWanted = '1';
+
+        const displayInput = activeRltMassWrapper.querySelector('.display-input');
+        if (displayInput) displayInput.value = formatKgValue(topMass);
+
+        const row = activeRltMassWrapper.closest('tr');
+        if (row) {
+            row.classList.add('bloc-fuel-first-full-row');
+            row.classList.add('bloc-fuel-first-full-row-pending');
+            const fuelInput = row.querySelector('.fuel-split-input-wrapper .display-input');
+            if (fuelInput) fuelInput.value = '';
+            row.dataset.airportOaci = '';
+            try { updateRowAirportOaci(row); } catch (_) {}
+        }
+
+        try { masterRecalculate(); } catch (_) {}
+        try { saveCalculatorState(); } catch (_) {}
+        return true;
     }
 
     function syncRltMassModalFromInputs() {
@@ -10299,6 +10364,7 @@ function initializeCalculator() {
                 runRltButtonActionOnce(() => {
                     setRltFirstFullActive(true, true);
                     syncRltMassModalFromInputs();
+                    applyRltFirstFullIfPossible();
                 }, 'rlt-firstfull-global');
             };
             ['pointerdown', 'touchstart', 'mousedown', 'click'].forEach(type => {
@@ -10355,7 +10421,7 @@ function initializeCalculator() {
             let selectedMode = '';
 
             /*
-             * v12.81 — Plein au départ : le bouton est une activation, pas un
+             * v12.82 — Plein au départ : le bouton est une activation, pas un
              * interrupteur. Le premier appui le rend actif et les événements
              * tactiles iPad suivants ne peuvent plus le désactiver. En validation,
              * le mode est accepté dès qu'une masse de ligne 1 existe ; la densité
@@ -10499,8 +10565,9 @@ function initializeCalculator() {
                     if (buttonContainsPoint(firstFullBtn, point)) {
                         stopRltButtonEvent(event);
                         runRltButtonActionOnce(() => {
-                            setRltFirstFullActive(!activeRltFirstFull, true);
+                            setRltFirstFullActive(true, true);
                             syncRltMassModalFromInputs();
+                            applyRltFirstFullIfPossible();
                         }, 'rlt-firstfull-global');
                         return;
                     }
