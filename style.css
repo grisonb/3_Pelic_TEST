@@ -5926,3 +5926,26 @@ body.npf-resuming #npf-resume-overlay {
     background: #005a9c !important;
     color: #ffffff !important;
 }
+
+
+/* v12.81 — post-MAJ persistant sans bouton OK */
+.post-update-restart-modal .update-reminder-actions,
+.post-update-restart-modal .post-update-restart-actions {
+    display: none !important;
+}
+.post-update-restart-modal {
+    pointer-events: auto !important;
+}
+
+/* v12.81 — Plein au départ : bouton réellement centré et état stable */
+#rlt-first-full-btn.rlt-first-full-btn {
+    width: max-content !important;
+    margin: 0 auto 12px auto !important;
+    align-self: center !important;
+    justify-self: center !important;
+}
+#rlt-first-full-btn.rlt-first-full-btn.active {
+    background: #005a9c !important;
+    color: #ffffff !important;
+    border-color: #003f74 !important;
+}
