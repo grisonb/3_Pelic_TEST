@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-75-retardant-1er-plein-ligne';
+const SW_VERSION = 'sw-v12-76-suivi-pelic-cs-tmd';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
