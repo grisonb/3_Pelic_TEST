@@ -5857,6 +5857,8 @@ body.npf-resuming #npf-resume-overlay {
     display: none;
     align-items: center;
     justify-content: center;
+    width: fit-content;
+    min-width: 132px;
     margin: -4px auto 10px;
     min-height: 34px;
     padding: 6px 18px;
@@ -5889,4 +5891,13 @@ body.npf-resuming #npf-resume-overlay {
 #bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-cell::before,
 #bloc-fuel tr.bloc-fuel-first-full-row .tps-vol-restant-cell::before {
     content: '' !important;
+}
+
+
+/* v12.78 — bouton 1er Plein centré et zone stable */
+#rlt-first-full-btn.rlt-first-full-btn {
+    align-self: center !important;
+    justify-self: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
 }
