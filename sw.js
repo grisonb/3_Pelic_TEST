@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-80-plein-depart-bouton';
+const SW_VERSION = 'sw-v12-81-plein-depart-persistant';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
