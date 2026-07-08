@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.81-plein-depart-persistant">
-    <link rel="manifest" href="manifest.json?appv=v12.81-plein-depart-persistant">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.81-plein-depart-persistant">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.81-plein-depart-persistant">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.81-plein-depart-persistant">
+    <link rel="stylesheet" href="style.css?appv=v12.82-plein-depart-definitif">
+    <link rel="manifest" href="manifest.json?appv=v12.82-plein-depart-definitif">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.82-plein-depart-definitif">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.82-plein-depart-definitif">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.82-plein-depart-definitif">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.81';
+        const APP_VERSION = 'v12.82';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -207,7 +207,7 @@
                 document.body.appendChild(modal);
 
                 /*
-                 * v12.81 — fenêtre post-MAJ persistante : pas de bouton OK et
+                 * v12.82 — fenêtre post-MAJ persistante : pas de bouton OK et
                  * pas de fermeture au toucher. Le message reste affiché tant
                  * que l'application n'est pas fermée/relancée. On efface le
                  * marqueur dès l'affichage pour ne pas le revoir au lancement
@@ -344,7 +344,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.81-plein-depart-persistant"></script>
+    <script src="script.js?appv=v12.82-plein-depart-definitif"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
