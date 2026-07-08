@@ -10158,39 +10158,51 @@ function initializeCalculator() {
         } = getRltMassModalElements();
 
         const topMass = parseDecimalInput(massToVolumeMassInput?.value);
-        if (topMass === null) return false;
-
         const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
-        const topComputedVolume = topDensity !== null ? (topMass / topDensity) : null;
+        const bottomVolume = parseDecimalInput(volumeInput?.value);
+        const bottomDensity = parseRltDensityInput(densityInput?.value);
+        const existingBottomMass = parseDecimalInput(massInput?.value);
+
+        const topComputedVolume = (topMass !== null && topDensity !== null) ? (topMass / topDensity) : null;
+        const bottomComplete = bottomVolume !== null && bottomDensity !== null;
+        const bottomComputedMass = bottomComplete
+            ? (existingBottomMass !== null ? existingBottomMass : (bottomVolume * bottomDensity))
+            : null;
 
         /*
-         * Plein au départ = masse seule de la première ligne BLOC/FUEL.
-         * La ligne Volume × Densité = Masse ne doit pas prendre la priorité
-         * quand l'utilisateur a explicitement choisi ce mode.
+         * v12.83 — Plein au départ : ne plus dépendre uniquement de la
+         * ligne 1 « Masse ÷ Densité ». Si l'utilisateur travaille avec la
+         * ligne 2 « Volume × Densité = Masse » (ex. 8500 × 1,1), le bouton
+         * doit aussi appliquer le mode Plein au départ avec cette masse.
          */
-        if (volumeInput) volumeInput.value = '';
-        if (densityInput) densityInput.value = '1.';
-        if (massInput) massInput.value = '';
+        const selectedMass = bottomComputedMass !== null ? bottomComputedMass : topMass;
+        const selectedVolume = bottomComputedMass !== null ? bottomVolume : topComputedVolume;
+        const selectedDensity = bottomComputedMass !== null ? bottomDensity : topDensity;
+        if (selectedMass === null) return false;
+
         if (massToVolumeVolumeInput && topComputedVolume !== null) {
             massToVolumeVolumeInput.value = formatDecimalValue(topComputedVolume, 0);
         }
+        if (massInput && bottomComputedMass !== null) {
+            massInput.value = formatDecimalValue(bottomComputedMass, 0);
+        }
 
-        activeRltMassWrapper.dataset.topMass = String(Math.round(topMass));
+        activeRltMassWrapper.dataset.topMass = topMass !== null ? String(Math.round(topMass)) : '';
         activeRltMassWrapper.dataset.topDensity = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
         activeRltMassWrapper.dataset.topVolume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
-        activeRltMassWrapper.dataset.bottomVolume = '';
-        activeRltMassWrapper.dataset.bottomDensity = '';
-        activeRltMassWrapper.dataset.bottomMass = '';
-        activeRltMassWrapper.dataset.volume = topComputedVolume !== null ? formatDecimalValue(topComputedVolume, 0) : '';
-        activeRltMassWrapper.dataset.density = topDensity !== null ? formatDecimalValue(topDensity, 3) : '';
-        activeRltMassWrapper.dataset.mass = String(Math.round(topMass));
+        activeRltMassWrapper.dataset.bottomVolume = bottomVolume !== null ? formatDecimalValue(bottomVolume, 0) : '';
+        activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
+        activeRltMassWrapper.dataset.bottomMass = bottomComputedMass !== null ? String(Math.round(bottomComputedMass)) : '';
+        activeRltMassWrapper.dataset.volume = selectedVolume !== null ? formatDecimalValue(selectedVolume, 0) : '';
+        activeRltMassWrapper.dataset.density = selectedDensity !== null ? formatDecimalValue(selectedDensity, 3) : '';
+        activeRltMassWrapper.dataset.mass = String(Math.round(selectedMass));
         activeRltMassWrapper.dataset.rltMode = 'firstFull';
         activeRltMassWrapper.dataset.rltFirstFull = '1';
         activeRltMassWrapper.dataset.rltFirstFullPending = '1';
         activeRltMassWrapper.dataset.rltFirstFullWanted = '1';
 
         const displayInput = activeRltMassWrapper.querySelector('.display-input');
-        if (displayInput) displayInput.value = formatKgValue(topMass);
+        if (displayInput) displayInput.value = formatKgValue(selectedMass);
 
         const row = activeRltMassWrapper.closest('tr');
         if (row) {
@@ -10414,6 +10426,9 @@ function initializeCalculator() {
             const topComputedVolume = topComplete
                 ? (topVolume !== null ? topVolume : (topMass / topDensity))
                 : null;
+            const bottomComputedMass = bottomComplete
+                ? (bottomMass !== null ? bottomMass : (bottomVolume * bottomDensity))
+                : null;
 
             let volume = null;
             let density = null;
@@ -10421,25 +10436,29 @@ function initializeCalculator() {
             let selectedMode = '';
 
             /*
-             * v12.82 — Plein au départ : le bouton est une activation, pas un
-             * interrupteur. Le premier appui le rend actif et les événements
-             * tactiles iPad suivants ne peuvent plus le désactiver. En validation,
-             * le mode est accepté dès qu'une masse de ligne 1 existe ; la densité
-             * et le volume calculé restent utiles mais ne conditionnent plus
-             * l'application du Plein au départ.
+             * v12.83 — Plein au départ : l'appui sur le bouton doit primer sur
+             * le choix de ligne de calcul. Avant, si la ligne 2 était remplie
+             * (Volume × Densité = Masse), le bloc `bottomComplete` passait avant
+             * `firstFull` et réécrivait l'état en `volumeToMass`, ce qui
+             * désactivait le bouton à la réouverture. Désormais, dès que le
+             * bouton est actif et qu'une masse existe, le mode validé reste
+             * `firstFull`.
              */
-            const isFirstFull = !!activeRltFirstFull && isFirstBlocFuelRltRow(activeRltMassWrapper) && topMass !== null && !bottomComplete;
+            const firstFullMass = bottomComputedMass !== null ? bottomComputedMass : topMass;
+            const firstFullVolume = bottomComputedMass !== null ? bottomVolume : topComputedVolume;
+            const firstFullDensity = bottomComputedMass !== null ? bottomDensity : topDensity;
+            const isFirstFull = !!activeRltFirstFull && isFirstBlocFuelRltRow(activeRltMassWrapper) && firstFullMass !== null;
 
-            if (bottomComplete) {
+            if (isFirstFull) {
+                volume = firstFullVolume;
+                density = firstFullDensity;
+                mass = firstFullMass;
+                selectedMode = 'firstFull';
+            } else if (bottomComplete) {
                 volume = bottomVolume;
                 density = bottomDensity;
-                mass = bottomMass !== null ? bottomMass : (bottomVolume * bottomDensity);
+                mass = bottomComputedMass;
                 selectedMode = 'volumeToMass';
-            } else if (isFirstFull) {
-                volume = topComputedVolume;
-                density = topDensity;
-                mass = topMass;
-                selectedMode = 'firstFull';
             } else if (topComplete) {
                 volume = topComputedVolume;
                 density = topDensity;
