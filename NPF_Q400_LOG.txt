@@ -1,3 +1,27 @@
+NPF-Q400 — MODIFICATIONS TEST v12.89 (v12_89_ui_infos_suivi_previ)
+Date : 2026-07-08
+
+Base : v12.88_plein_depart_touchfix
+
+Modifications :
+- iPad / carte : ajout d'un override plein écran pour réduire la bande blanche en bas de carte, également présente sur la version pérenne.
+- Reprise carte : message `Reprise carte…` agrandi, contrasté, fond assombri et texte en majuscule.
+- Onglets calculateur : titres d'onglets rendus plus visibles (taille, graisse, contraste, actif bleu/rouge).
+- PREVI. NBR ROTATIONS : réorganisation de la colonne droite dans l'ordre demandé : CS sur Feu, Durée Transit, Conso Transit, Fuel sur Feu, Durée Rotation, Conso Rotation.
+- SUIVI ROTATIONS : réorganisation de la colonne droite dans l'ordre demandé : CS sur Feu, Heure sur Feu, Durée Transit Pélic<->Feu, Fuel sur Feu, Durée Rotation modifiable, Conso Rotation modifiable.
+- SUIVI ROTATIONS : ajout de l'affichage `Durée Transit Pélic<->Feu` et `Fuel sur Feu` alimentés par le calcul existant.
+
+Non modifié :
+- Logique Plein au départ v12.88 conservée.
+- Calculs CS/TMD/HDV et import offline non modifiés.
+- Recherche commune non modifiée.
+
+Contrôles :
+- Syntaxe JS script.js contrôlée par `node --check`.
+- JSON manifest.json contrôlé.
+- Syntaxe JS sw.js contrôlée par `node --check`.
+
+
 # v12.86_suivi_precis_heure_to — TEST
 
 Date : 2026-07-08
