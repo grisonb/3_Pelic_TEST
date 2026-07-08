@@ -881,3 +881,28 @@ Contrôles réalisés
 - Syntaxe script.js : OK.
 - Syntaxe sw.js : OK.
 - Manifest JSON : OK.
+
+
+
+================================================================================
+VERSION TEST v12.90 — carte_ipad_bandeau
+================================================================================
+Date : 2026-07-08
+
+Objectif : corriger le grand bandeau clair en bas de carte observé sur iPad/PWA.
+
+Modifications :
+- correction CSS de la hauteur carte : suppression de l'effet réducteur lié à
+  `-webkit-fill-available` sur Safari/iPad ;
+- ajout d'une variable `--npf-app-vh` pilotée par JavaScript pour forcer la carte
+  à la hauteur réelle de l'écran ;
+- recalcul Leaflet (`invalidateSize` + redraw tuiles) au chargement, resize,
+  orientationchange, pageshow et reprise de visibilité ;
+- fond résiduel de carte remis en bleu très clair `#dff3fb`, pour ne plus avoir
+  de bande blanche visuelle si Safari conserve une zone sûre temporaire.
+
+Non modifié :
+- calculs Prévi / Suivi ;
+- bouton Plein au départ ;
+- recherche commune ;
+- import offline / tuiles / IndexedDB.
