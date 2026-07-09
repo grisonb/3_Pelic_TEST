@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // =========================================================================
-// v12.94 — suppression feu sans recentrage, onglets arrondis, Déroutement GPS décalé
+// v12.95 — Déroutement GPS automatique, bouton hors fenêtre gauche
 // Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
 // avec -webkit-fill-available. On force une variable de hauteur réelle et on
 // redemande à Leaflet de recalculer sa taille.
@@ -5178,6 +5178,10 @@ function updateUserPosition(pos) {
         window.refreshCalculatorAirportContext();
     }
 
+    if (typeof updateDeroutementGpsStatus === 'function') {
+        updateDeroutementGpsStatus(isSimulationPosition ? 'GPS simulation' : 'GPS actualisé');
+    }
+
     // Synchronise les calculs (dont GPS->Feu) dès qu'une position GPS est reçue.
     if (currentCommune) {
         updateCalculatorData();
@@ -7488,12 +7492,19 @@ function updateDeroutementTab() {
     const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
     const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
     const limiteHDV = parseTime(document.getElementById('limite-hdv').querySelector('.display-input').value);
-    const hasGpsPosition = !!(userMarker && userMarker.getLatLng());
-    const userLatLng = hasGpsPosition ? userMarker.getLatLng() : null;
+    const markerLatLng = (userMarker && typeof userMarker.getLatLng === 'function') ? userMarker.getLatLng() : null;
+    const lastGpsLat = lastPosition ? Number(lastPosition.lat ?? lastPosition.latitude) : NaN;
+    const lastGpsLng = lastPosition ? Number(lastPosition.lng ?? lastPosition.longitude) : NaN;
+    const userLatLng = (markerLatLng && Number.isFinite(markerLatLng.lat) && Number.isFinite(markerLatLng.lng))
+        ? markerLatLng
+        : (Number.isFinite(lastGpsLat) && Number.isFinite(lastGpsLng) ? { lat: lastGpsLat, lng: lastGpsLng } : null);
+    const hasGpsPosition = !!userLatLng;
     const selectedPelicForDeroutement = selectedPelicanOACI ? getAirportByOaci(selectedPelicanOACI) : null;
     const isEmptyRetardant = document.getElementById('derout-empty-retardant-checkbox')?.checked === true;
 
-    const distGpsFeu = hasGpsPosition ? CALCULATOR_DATA.distGpsFeu : null;
+    const distGpsFeu = (hasGpsPosition && currentCommune)
+        ? Math.round(calculateDistanceInNm(userLatLng.lat, userLatLng.lng, currentCommune.latitude_mairie, currentCommune.longitude_mairie))
+        : null;
     const distGpsPelic = (hasGpsPosition && selectedPelicForDeroutement)
         ? Math.round(calculateDistanceInNm(userLatLng.lat, userLatLng.lng, selectedPelicForDeroutement.lat, selectedPelicForDeroutement.lon))
         : null;
@@ -9138,17 +9149,24 @@ function initializeCalculator() {
         const status = document.getElementById('derout-gps-status');
         if (!status) return;
 
-        if (!lastPosition || !lastPosition.timestamp) {
-            status.textContent = extraText || 'GPS non actualisé';
+        const hasMarkerGps = !!(userMarker && typeof userMarker.getLatLng === 'function' && userMarker.getLatLng());
+        const hasLastGps = !!(lastPosition && Number.isFinite(Number(lastPosition.lat ?? lastPosition.latitude)) && Number.isFinite(Number(lastPosition.lng ?? lastPosition.longitude)));
+
+        if (!hasMarkerGps && !hasLastGps) {
+            status.textContent = extraText || 'GPS non disponible';
             status.className = 'derout-gps-status derout-gps-status-missing';
             return;
         }
 
-        const updatedAt = new Date(Number(lastPosition.timestamp));
+        const timestamp = lastPosition && lastPosition.timestamp ? Number(lastPosition.timestamp) : Date.now();
+        const updatedAt = new Date(timestamp);
         const hhmm = updatedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const ageLabel = getCurrentGpsAgeLabel();
-        status.textContent = `${extraText || 'GPS actualisé'} à ${hhmm}${ageLabel ? ` — ${ageLabel}` : ''}`;
-        status.className = 'derout-gps-status derout-gps-status-ok';
+        const ageMs = Number.isFinite(timestamp) ? Date.now() - timestamp : 0;
+        const isOld = Number.isFinite(ageMs) && ageMs > 15 * 60000;
+        const label = extraText || (isOld ? 'GPS ancien' : 'GPS actualisé');
+        status.textContent = `${label} à ${hhmm}${ageLabel ? ` — ${ageLabel}` : ''}`;
+        status.className = `derout-gps-status ${isOld ? 'derout-gps-status-old' : 'derout-gps-status-ok'}`;
     }
 
     if (deroutEmptyRetardantCheckbox) {
@@ -9161,7 +9179,7 @@ function initializeCalculator() {
 
     updateDeroutementGpsStatus();
 
-    refreshGpsBtn.addEventListener('click', () => {
+    if (refreshGpsBtn) refreshGpsBtn.addEventListener('click', () => {
         if (!navigator.geolocation) {
             alert("La géolocalisation n'est pas supportée par votre navigateur.");
             return;
@@ -9170,11 +9188,11 @@ function initializeCalculator() {
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 updateUserPosition(pos);
-                updateDeroutementGpsStatus('GPS actualisé manuellement');
+                updateDeroutementGpsStatus('GPS actualisé');
                 masterRecalculate();
             },
             () => {
-                updateDeroutementGpsStatus('GPS non actualisé');
+                updateDeroutementGpsStatus('GPS non disponible');
                 alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
