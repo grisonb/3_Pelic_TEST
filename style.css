@@ -6221,3 +6221,59 @@ body {
     }
 }
 
+
+
+/* v12.95 — DÉROUT. / GAAR : bouton GPS hors fenêtre, sous NBR ROTATIONS POSSIBLES */
+#deroutement .derout-gps-status-row-outside {
+    margin: 14px 0 0 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 0 4px !important;
+    box-sizing: border-box !important;
+}
+
+#deroutement .derout-gps-status-row-outside #refresh-gps-btn {
+    margin: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 280px !important;
+    padding: 12px 18px !important;
+    font-size: 22px !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+}
+
+#deroutement .derout-gps-status-row-outside .derout-gps-status {
+    width: auto !important;
+    max-width: 100% !important;
+    justify-content: flex-start !important;
+    white-space: normal !important;
+    box-sizing: border-box !important;
+}
+
+.derout-gps-status-old {
+    color: #664d03;
+    background: #fff8dd;
+    border-color: #ffec99;
+}
+
+@media (max-width: 760px) {
+    #deroutement .derout-gps-status-row-outside {
+        align-items: stretch !important;
+    }
+    #deroutement .derout-gps-status-row-outside #refresh-gps-btn {
+        min-width: 0 !important;
+        width: 100% !important;
+        font-size: 18px !important;
+        white-space: normal !important;
+    }
+    #deroutement .derout-gps-status-row-outside .derout-gps-status {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+}
