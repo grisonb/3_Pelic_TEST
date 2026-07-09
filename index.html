@@ -7,11 +7,11 @@
     <title>NPF-Q400-TEST</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.94-delete-tabs-derout">
-    <link rel="manifest" href="manifest.json?appv=v12.94-delete-tabs-derout">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.94-delete-tabs-derout">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.94-delete-tabs-derout">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.94-delete-tabs-derout">
+    <link rel="stylesheet" href="style.css?appv=v12.95-gps-auto-derout">
+    <link rel="manifest" href="manifest.json?appv=v12.95-gps-auto-derout">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.95-gps-auto-derout">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.95-gps-auto-derout">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.95-gps-auto-derout">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.94';
+        const APP_VERSION = 'v12.95';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -349,7 +349,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.88-plein-depart-touchfix"></script>
+    <script src="script.js?appv=v12.95-gps-auto-derout"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -495,6 +495,10 @@
                                     <div class="result-line" data-rotation-type="hdv"><span class="label">HDV RESTANTES :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
                                 </div>
                             </div>
+                            <div class="derout-gps-status-row derout-gps-status-row-outside">
+                                <button id="refresh-gps-btn">🛰️ Rafraîchir GPS</button>
+                                <span id="derout-gps-status" class="derout-gps-status">GPS non disponible</span>
+                            </div>
                         </div>
                         <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="derout-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
@@ -507,7 +511,7 @@
                                 <div class="result-line"><span class="label">Heure sur Feu :<span id="derout-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="derout-heure-sur-feu">--:--</span></div>
                                 <div class="result-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 Lrg / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
                                 <div class="result-line"><span class="label"><span id="derout-fuel-mini-pelic-label">Fuel mini 1 Lrg / Pélic :</span><span id="derout-fuel-mini-pelic-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
-                                <div class="derout-gps-status-row"><button id="refresh-gps-btn">🛰️ Actualiser position GPS</button><span id="derout-gps-status" class="derout-gps-status">GPS non actualisé</span></div>
+                                
                             </div>
                         </div>
                     </div>
