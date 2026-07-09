@@ -465,11 +465,11 @@ let showHighVoltageLinesLayer = localStorage.getItem(HIGH_VOLTAGE_LINES_LAYER_KE
 let hasLoadedHighVoltageLines = false;
 let isHighVoltageLinesLoading = false;
 const TRAFFIC_LAYER_KEY = 'showTrafficLayer';
-const TRAFFIC_PROVIDER_LABEL = 'adsb.fi / adsb.lol';
+const TRAFFIC_PROVIDER_LABEL = 'adsb.fi v3 / adsb.lol / airplanes.live';
 const TRAFFIC_API_PROVIDERS = [
-    { label: 'adsb.fi v2', baseUrl: 'https://opendata.adsb.fi/api/v2' },
-    { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3' },
-    { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2' }
+    { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3', urlFormat: 'latlon' },
+    { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2', urlFormat: 'latlon' },
+    { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point' }
 ];
 const TRAFFIC_RADIUS_NM = 50;
 const TRAFFIC_REFRESH_INTERVAL_MS = 30000;
@@ -3139,6 +3139,11 @@ function buildTrafficApiUrl(point, provider = null) {
     const lat = Number(point.lat).toFixed(4);
     const lon = Number(point.lon).toFixed(4);
     const radius = Math.max(1, Math.min(250, TRAFFIC_RADIUS_NM));
+
+    if (activeProvider.urlFormat === 'point') {
+        return `${activeProvider.baseUrl}/point/${lat}/${lon}/${radius}`;
+    }
+
     return `${activeProvider.baseUrl}/lat/${lat}/lon/${lon}/dist/${radius}`;
 }
 
@@ -3152,9 +3157,14 @@ function extractTrafficAircraftList(data) {
 async function fetchTrafficAircraftFromProvider(point, provider) {
     const url = buildTrafficApiUrl(point, provider);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6500);
+    const timeoutId = setTimeout(() => controller.abort(), 7500);
     try {
-        const response = await fetch(url, { cache: 'no-store', mode: 'cors', signal: controller.signal });
+        const response = await fetch(url, {
+            cache: 'no-store',
+            mode: 'cors',
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+        });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         return { provider, aircraft: extractTrafficAircraftList(data), raw: data };
@@ -5026,9 +5036,44 @@ function drawUserToTargetRoute() {
     updateCommuneGpsRouteDisplay();
 }
 
+
+function getOrCreateNearestCommuneDisplay() {
+    let display = document.getElementById('nearest-commune-display');
+    if (!display && document.body) {
+        display = document.createElement('div');
+        display.id = 'nearest-commune-display';
+        display.className = 'gps-waiting';
+        display.innerHTML = '📍 Survolée: <b>GPS en attente</b>';
+        document.body.appendChild(display);
+    }
+    return display;
+}
+
+function forceNearestCommuneHudVisible(display) {
+    if (!display) return;
+    const importantStyles = {
+        position: 'fixed',
+        display: 'flex',
+        visibility: 'visible',
+        opacity: '1',
+        zIndex: '2147483000',
+        pointerEvents: 'none'
+    };
+
+    Object.entries(importantStyles).forEach(([prop, value]) => {
+        try { display.style.setProperty(prop.replace(/[A-Z]/g, m => '-' + m.toLowerCase()), value, 'important'); } catch (_) {}
+    });
+
+    try {
+        display.setAttribute('aria-live', 'polite');
+        display.dataset.npfHud = 'commune-survolee';
+    } catch (_) {}
+}
+
 function updateNearestCommuneDisplay(lat, lon) {
-    const nearestDisplay = document.getElementById('nearest-commune-display');
+    const nearestDisplay = getOrCreateNearestCommuneDisplay();
     if (!nearestDisplay) return;
+    forceNearestCommuneHudVisible(nearestDisplay);
 
     const showDisplay = (html, extraClass = '') => {
         nearestDisplay.style.display = 'flex';
@@ -5051,13 +5096,13 @@ function updateNearestCommuneDisplay(lat, lon) {
     const numericLat = Number(lat);
     const numericLon = Number(lon);
     if (!Number.isFinite(numericLat) || !Number.isFinite(numericLon)) {
-        showDisplay('📍 Commune: <b>GPS en attente</b>', 'gps-waiting');
+        showDisplay('📍 Survolée: <b>GPS en attente</b>', 'gps-waiting');
         return;
     }
 
     const containedCommune = findCommuneContainingPoint(numericLat, numericLon);
     if (containedCommune) {
-        showDisplay(buildLabel(containedCommune, 'Commune'));
+        showDisplay(buildLabel(containedCommune, 'Survolée'));
         return;
     }
 
@@ -5068,7 +5113,7 @@ function updateNearestCommuneDisplay(lat, lon) {
      * dès que les polygones deviennent disponibles.
      */
     if (!hasLoadedCommunes) {
-        showDisplay('📍 Commune: <b>chargement...</b>', 'loading');
+        showDisplay('📍 Survolée: <b>chargement...</b>', 'loading');
         ensureCommunesLayerDataLoaded()
             .then(() => {
                 const preciseCommune = findCommuneContainingPoint(numericLat, numericLon);
@@ -5077,11 +5122,11 @@ function updateNearestCommuneDisplay(lat, lon) {
                 if (preciseCommune) {
                     display.style.display = 'flex';
                     display.className = 'nearest-commune-display';
-                    display.innerHTML = buildLabel(preciseCommune, 'Commune');
+                    display.innerHTML = buildLabel(preciseCommune, 'Survolée');
                 } else {
                     display.style.display = 'flex';
                     display.className = 'nearest-commune-display unknown';
-                    display.innerHTML = '📍 Commune: <b>non déterminée</b>';
+                    display.innerHTML = '📍 Survolée: <b>non déterminée</b>';
                 }
                 repairManualFireCommuneLabelsFromPolygons();
             })
@@ -5091,12 +5136,12 @@ function updateNearestCommuneDisplay(lat, lon) {
                 if (!display) return;
                 display.style.display = 'flex';
                 display.className = 'nearest-commune-display unavailable';
-                display.innerHTML = '📍 Commune: <b>indisponible</b>';
+                display.innerHTML = '📍 Survolée: <b>indisponible</b>';
             });
         return;
     }
 
-    showDisplay('📍 Commune: <b>non déterminée</b>', 'unknown');
+    showDisplay('📍 Survolée: <b>non déterminée</b>', 'unknown');
 }
 
 function refreshNearestCommuneDisplayFromKnownGps() {
@@ -5136,12 +5181,12 @@ function refreshNearestCommuneDisplayFromKnownGps() {
 }
 
 function ensureNearestCommuneDisplayBootstrapped() {
-    const display = document.getElementById('nearest-commune-display');
+    const display = getOrCreateNearestCommuneDisplay();
     if (!display) return;
-    display.style.display = 'flex';
+    forceNearestCommuneHudVisible(display);
     display.classList.add('gps-waiting');
     if (!display.innerHTML || !display.textContent.trim()) {
-        display.innerHTML = '📍 Commune: <b>GPS en attente</b>';
+        display.innerHTML = '📍 Survolée: <b>GPS en attente</b>';
     }
 }
 
@@ -5157,8 +5202,20 @@ function ensureNearestCommuneDisplayBootstrapped() {
     } else {
         run();
     }
-    [700, 2000, 5000].forEach(delay => setTimeout(run, delay));
-    setInterval(run, 15000);
+    [100, 700, 2000, 5000].forEach(delay => setTimeout(run, delay));
+    setInterval(run, 5000);
+
+    try {
+        const observer = new MutationObserver(() => {
+            const display = getOrCreateNearestCommuneDisplay();
+            if (!display) return;
+            forceNearestCommuneHudVisible(display);
+            if (!display.textContent || !display.textContent.trim()) {
+                display.innerHTML = '📍 Survolée: <b>GPS en attente</b>';
+            }
+        });
+        if (document.documentElement) observer.observe(document.documentElement, { childList: true, subtree: true });
+    } catch (_) {}
 })();
 
 
