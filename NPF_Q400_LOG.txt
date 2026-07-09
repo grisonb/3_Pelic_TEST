@@ -1,3 +1,21 @@
+# NPF-Q400 — MODIFICATIONS v12.98_commune_trafic_stabilite
+
+Base : TEST v12.97_trafic_stabilite_carte.
+
+## Corrections TEST
+- Restauration robuste du bandeau bas droit `commune survolée` : il reste visible avec `chargement...`, `GPS en attente` ou la commune calculée par polygone dès que disponible.
+- Repositionnement CSS du bandeau commune pour éviter qu’il soit masqué par les boutons carte à droite.
+- Trafic ADS-B : correction du badge `null` sur le bouton `TRAFIC`; il affiche maintenant `0`, `…` ou `!` selon l’état.
+- Trafic ADS-B : message d’erreur rendu explicitement temporaire en cas d’indisponibilité HTTP/timeout.
+
+## Non modifié
+- Calculs mission.
+- BLOC/FUEL et Plein au départ.
+- Hauteur carte iPad validée v12.90.
+- Pérenne v2026.52.
+
+---
+
 # NPF-Q400 — MODIFICATIONS v12.96_trafic_adsb
 
 Base : version pérenne v2026.52, elle-même issue de TEST v12.95.
