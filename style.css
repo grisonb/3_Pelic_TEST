@@ -5398,6 +5398,174 @@ body {
     cursor: pointer;
 }
 
+
+
+/* v12.96 TEST — calque trafic ADS-B indicatif */
+.traffic-map-button {
+    font-size: 34px;
+    overflow: hidden;
+}
+
+.traffic-map-button.active {
+    background: linear-gradient(180deg, #0b6fb3 0%, #064f8a 100%);
+    border-color: #064f8a;
+    color: #ffffff;
+}
+
+.traffic-map-button.loading .traffic-icon {
+    animation: trafficPulse 0.9s ease-in-out infinite alternate;
+}
+
+.traffic-icon {
+    display: block;
+    transform: translateY(-5px) rotate(-18deg);
+    font-size: 44px;
+    line-height: 1;
+    font-weight: 900;
+}
+
+.traffic-label {
+    position: absolute;
+    left: 50%;
+    bottom: 7px;
+    transform: translateX(-50%);
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.94);
+    color: var(--primary-color);
+    border: 1px solid rgba(0,90,156,.28);
+    font-size: 11px;
+    font-weight: 950;
+    letter-spacing: .03em;
+}
+
+.traffic-button-count {
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #e9002f;
+    color: #ffffff;
+    border: 1px solid rgba(255,255,255,.9);
+    font-size: 12px;
+    font-weight: 950;
+    line-height: 20px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.left-map-action-button.active .traffic-label {
+    background: rgba(255,255,255,.96);
+    color: var(--primary-color);
+}
+
+.traffic-status-display {
+    position: absolute;
+    left: 130px;
+    top: calc(var(--safe-area-top) + var(--map-action-top-offset) + 10px);
+    z-index: 1002;
+    max-width: min(560px, calc(100vw - 300px));
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.92);
+    color: #073763;
+    border: 1px solid rgba(0,90,156,.22);
+    box-shadow: 0 3px 12px rgba(0,0,0,.16);
+    font-size: 14px;
+    font-weight: 800;
+    pointer-events: none;
+}
+
+.traffic-status-loading { color: #0b5e93; }
+.traffic-status-error { color: #9b1c1c; border-color: rgba(220,38,38,.35); background: rgba(255,245,245,.95); }
+.traffic-status-ok { color: #064e3b; border-color: rgba(16,185,129,.35); background: rgba(240,253,244,.95); }
+
+.traffic-aircraft-icon {
+    background: transparent;
+    border: none;
+}
+
+.traffic-aircraft-arrow {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #101828;
+    background: #ffd400;
+    border: 2px solid #111827;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 1;
+    font-weight: 950;
+    box-shadow: 0 1px 6px rgba(0,0,0,.35);
+    transform-origin: center center;
+}
+
+.traffic-tooltip {
+    background: rgba(17,24,39,.90) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-weight: 900 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.28) !important;
+}
+
+.traffic-popup {
+    min-width: 180px;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.traffic-popup-title {
+    font-size: 17px;
+    font-weight: 950;
+    color: #003b70;
+    margin-bottom: 2px;
+}
+
+.traffic-popup-subtitle {
+    color: #667085;
+    font-weight: 800;
+    margin-bottom: 6px;
+}
+
+.traffic-popup-warning {
+    margin-top: 7px;
+    padding: 5px 7px;
+    border-radius: 8px;
+    background: #fff5f5;
+    color: #9b1c1c;
+    font-weight: 900;
+    font-size: 12px;
+}
+
+@keyframes trafficPulse {
+    from { opacity: .55; transform: translateY(-5px) rotate(-18deg) scale(.96); }
+    to { opacity: 1; transform: translateY(-5px) rotate(-18deg) scale(1.06); }
+}
+
+@media (max-width: 760px) {
+    .traffic-icon { font-size: 26px !important; transform: translateY(-4px) rotate(-18deg); }
+    .traffic-label { bottom: 3px !important; padding: 0 4px !important; font-size: 8px !important; }
+    .traffic-button-count { top: 2px !important; right: 3px !important; min-width: 16px !important; height: 14px !important; font-size: 9px !important; line-height: 14px !important; padding: 0 3px !important; }
+    .traffic-status-display {
+        left: 68px;
+        top: calc(env(safe-area-inset-top, 0px) + 31px);
+        max-width: calc(100vw - 160px);
+        padding: 5px 8px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 430px) {
+    .traffic-status-display { left: 72px; top: 42px; max-width: calc(100vw - 150px); }
+}
+
 .update-reminder-primary {
     background: var(--primary-color);
     color: #ffffff;
@@ -6223,7 +6391,7 @@ body {
 
 
 
-/* v12.95 — DÉROUT. / GAAR : bouton GPS hors fenêtre, sous NBR ROTATIONS POSSIBLES */
+/* v2026.52 — Pérenne : DÉROUT. / GAAR GPS auto et UI validée */
 #deroutement .derout-gps-status-row-outside {
     margin: 14px 0 0 0 !important;
     width: 100% !important;
