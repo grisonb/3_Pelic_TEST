@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-96-trafic-adsb';
+const SW_VERSION = 'sw-v12-97-trafic-stabilite-carte';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -203,6 +203,25 @@ self.addEventListener('message', event => {
     }
 });
 
+
+async function swFetchWithTimeout(input, init = {}, timeoutMs = 3500) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function swFetchFallbackToCache(request, timeoutMs = 8000) {
+    try {
+        return await swFetchWithTimeout(request, {}, timeoutMs);
+    } catch (_) {
+        return await caches.match(request, { ignoreSearch: true }) || new Response('', { status: 504, statusText: 'Offline asset unavailable' });
+    }
+}
+
 self.addEventListener('fetch', event => {
     const request = event.request;
 
@@ -223,7 +242,7 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    event.respondWith(fetch(request).catch(() => caches.match(request, { ignoreSearch: true })));
+    event.respondWith(swFetchFallbackToCache(request, 8000));
 });
 
 
@@ -279,7 +298,7 @@ async function handleAppShellRequest(request) {
     if (isCriticalAppShellRequest(request)) {
         try {
             const freshRequest = new Request(request, { cache: 'reload' });
-            const fresh = await fetch(freshRequest);
+            const fresh = await swFetchWithTimeout(freshRequest, {}, 2800);
             if (fresh && fresh.ok) {
                 const cacheKey = request.mode === 'navigate' ? './index.html' : request;
                 await cache.put(cacheKey, fresh.clone());
