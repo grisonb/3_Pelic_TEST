@@ -1,23 +1,682 @@
-NPF-Q400 — TEST v12.95 — gps_auto_derout
+# NPF-Q400 — MODIFICATIONS v12.96_trafic_adsb
 
-Base : v12.94_delete_tabs_derout.
+Base : version pérenne v2026.52, elle-même issue de TEST v12.95.
+
+## Ajouts TEST
+- Ajout d’un bouton carte `TRAFIC` dans la colonne gauche, sous le bouton `HT`.
+- Ajout d’un calque trafic ADS-B indicatif, désactivé par défaut et mémorisé en localStorage.
+- Source utilisée en TEST : API publique adsb.fi Open Data, endpoint v3 `lat/lon/dist`, rayon 50 Nm.
+- Requête autour du feu sélectionné ; à défaut autour de la position GPS connue ; à défaut autour du centre carte.
+- Rafraîchissement automatique toutes les 30 secondes quand le calque est actif.
+- Limitation locale d’affichage : 80 appareils maximum, positions âgées de plus de 90 s filtrées.
+- Popup trafic : callsign, type/immat/hex si disponible, altitude, vitesse sol, route, distance au point de référence, âge de la position.
+- Bandeau statut : nombre d’appareils, point de référence et heure de mise à jour.
+
+## Avertissement intégré
+- Les popups affichent `ADS-B indicatif — non certifié`.
+- Ce calque ne doit pas être traité comme anticollision ni comme source opérationnelle certifiée.
+
+## Non modifié
+- Calculs Prévi / Bloc-Fuel / Suivi / Déroutement.
+- Hauteur carte iPad validée v12.90.
+- GPS automatique DÉROUT/GAAR v12.95.
+- Import offline, tuiles, lignes HT, recherche commune.
+
+---
+
+NPF-Q400 — JOURNAL DES MODIFICATIONS TECHNIQUES
+
+But du fichier
+-------------
+Ce fichier sert de mémoire technique en cas de perte d'historique de chat.
+Il doit rester à la racine du dépôt, à côté de index.html, script.js, style.css, manifest.json et sw.js.
+
+Version actuelle pérenne : v2026.51
+Date de génération : 2026-07-06
+
+Règle de méthode
+----------------
+- Tester en dépôt TEST avant production.
+- Ne jamais modifier l'import offline, le service worker ou IndexedDB en production sans validation TEST.
+- Quand une version fonctionne, elle devient la nouvelle base.
+- Conserver ce fichier et l'enrichir à chaque version.
+
+Historique résumé
+-----------------
+
+v11.42 — Restauration ouverture hors ligne
+- Base : v11.41 / v2026.33.
+- Modification : cache applicatif app shell dans sw.js.
+- Pourquoi : l'application ne s'ouvrait pas sans connexion.
+- Résultat validé : mode hors ligne fonctionnel.
+
+v11.43 — Sélection carte offline + derniers feux
+- Modification : sélection de la carte offline par case à cocher à gauche du nom.
+- Modification : suppression individuelle et globale des derniers feux.
+- Modification : reprise plus rapide après arrière-plan via invalidateSize/redraw.
+- Pourquoi : rendre la sélection plus simple et gérer l'historique des feux.
+
+v11.44 — Boutons rouges derniers feux
+- Modification : bouton individuel de suppression en rond rouge.
+- Modification : bouton global rouge “Tout effacer”.
+- Pourquoi : rendre les actions destructives plus visibles.
+
+v11.50 — Bandeau BINGO compact
+- État reconstitué depuis les fichiers fournis.
+- Version utilisée comme base correcte après perte partielle d'historique.
+- Pourquoi : l'historique de chat avait divergé et il fallait repartir de la bonne version.
+
+v11.51 / v11.52 — Corrections smartphone
+- Modification : bandeau BINGO/BASE plus compact.
+- Modification : texte du bandeau condensé pour éviter la coupure en portrait.
+- Pourquoi : le bandeau occupait trop d'espace et le texte était tronqué.
+
+v12.11 — Import gros volume renforcé
+- Modification : transactions IndexedDB avec durability relaxed si supporté.
+- Modification : lots d'écriture plus prudents pour gros ZIP.
+- Pourquoi : OpenStreet ~900 Mo pouvait planter ou ralentir fortement en fin d'installation.
+
+v12.12 — Groupes de packs offline
+- Modification : regroupement des ZIP OpenStreet_01, OpenStreet_02, etc.
+- Modification : activation/désactivation d'une carte multi-ZIP en une seule ligne.
+- Pourquoi : permettre le téléchargement/import d'une carte en plusieurs ZIP.
+
+v12.13 — Progression offline + points d'eau + écran de reprise
+- Modification : version TEST offline_progress_waterpoints_startup.
+- Modification : conservation de l'app shell et des icônes dans sw.js.
+- Pourquoi : améliorer le démarrage PWA et conserver les évolutions fonctionnelles.
+
+v12.14 — Tentative accélération IGN
+- Modification : distinction prévue entre OpenStreet et IGN.
+- Modification : host logique prévu pour IGN.
+- Pourquoi : IGN en gros ZIP était très lent alors qu'OpenStreet fonctionnait.
+- Limite constatée : la distinction IGN n'était pas complète.
+
+v12.15 — Suppression packs + host IGN corrigé
+- Modification : suppression robuste des groupes multi-ZIP.
+- Modification : moins de confirmations répétées lors de la suppression.
+- Modification : IGN_01, IGN_02, IGN_part04 reconnus comme même groupe.
+- Modification : host local stable “ign.tile.openstreetmap.org”.
+- Pourquoi : les packs installés ne se désinstallaient pas correctement et IGN devait être isolé d'OpenStreet.
+- Limite constatée : la première carte importée charge vite, la deuxième devient très lente, quel que soit l'ordre.
+
+v12.16 — Suspension de carte pendant import
+- Modification : ajout de suspendOfflineMapRenderingDuringImport().
+- Modification : au début d'un import ZIP, le pack offline actif est temporairement désactivé.
+- Modification : la couche tuiles Leaflet est retirée pendant l'écriture IndexedDB.
+- Modification : le service worker reçoit OFFLINE_ACTIVE_PACKS_CHANGED avec une liste vide.
+- Pourquoi : quand une première carte est active, Leaflet et le service worker lisent les tuiles dans IndexedDB pendant que le deuxième import écrit massivement. Sur Safari/iPadOS, cette concurrence lecture/écriture ralentit fortement, voire bloque l'import.
+- Effet attendu : le deuxième gros import doit être beaucoup plus rapide.
+- Risque : pendant l'import, la carte peut disparaître temporairement. C'est volontaire. À la fin, la carte importée est réactivée et l'application recharge.
+
+Ordre de fichiers à fournir désormais
+-------------------------------------
+À la demande de l'utilisateur, toujours donner les fichiers dans cet ordre :
+1. index.html
+2. manifest.json
+3. script.js
+4. style.css
+5. sw.js
+6. NPF_Q400_MODIFICATIONS.txt si modifié
+
+Rappel de diagnostic actuel
+---------------------------
+- IGN importé en premier : fonctionne parfaitement.
+- OpenStreet importé en second : devient lent/bloqué.
+- Avant, OpenStreet en premier fonctionnait et IGN en second devenait lent.
+- Conclusion : ce n'est pas un problème spécifique IGN ou OpenStreet ; c'est un problème de deuxième gros import avec une carte déjà active et une IndexedDB déjà sollicitée.
+
+v12.17 — Troisième import + suppression par blocs
+- Constat utilisateur : IGN en premier fonctionne, OpenStreet en second fonctionne avec v12.16, mais OACI installée en troisième rame. La suppression d'IGN n'avance pas non plus.
+- Diagnostic : après deux gros imports, IndexedDB est volumineuse. Même si la carte Leaflet est suspendue, le service worker peut garder une connexion IndexedDB ouverte et son cache mémoire. Les suppressions en une grosse transaction donnent aussi l'impression de bloquer car l'interface ne se rafraîchit pas.
+- Modification script.js : suspendOfflineMapRenderingDuringImport() envoie maintenant OFFLINE_IMPORT_START au service worker.
+- Modification sw.js : réception de OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START, vidage du cache mémoire, désactivation temporaire des packs actifs côté SW, fermeture de la connexion IndexedDB du SW.
+- Modification script.js : la suppression de pack se fait par blocs de 750 tuiles avec transactions courtes et progression affichée.
+- Modification script.js : fallback scan complet si l'index packName ne trouve rien, pour supprimer d'anciens packs mal indexés.
+- Modification script.js : les cartes non OpenStreet, dont IGN et OACI, utilisent le mode lecture arraybuffer et des lots plus larges.
+- Pourquoi : éviter les conflits lecture/écriture/suppression IndexedDB et rendre visible l'avancement de la suppression.
+- Effet attendu : OACI en troisième doit être plus fluide ; suppression IGN doit afficher une progression et finir.
+
+v12.18 — Libération IndexedDB attendue + OACI repassée en blob
+- Constat utilisateur : suppression IGN affiche le message mais ne démarre pas ; OACI bloque à “Préparation terminée...” en troisième carte.
+- Diagnostic : v12.17 envoyait un postMessage au service worker, mais sans attendre que le service worker ferme réellement sa connexion IndexedDB. L'opération lourde pouvait donc démarrer trop tôt.
+- Modification script.js : ajout de releaseOfflineDatabaseForHeavyOperation(), qui suspend la carte, prévient le service worker, ferme la connexion IndexedDB de la page, attend 900 ms, puis rouvre une connexion propre.
+- Modification import : OpenStreet reste en profil conservateur ; IGN garde arraybuffer ; OACI revient en blob avec lots plus petits, car l'arraybuffer généralisé pouvait bloquer OACI au début de lecture.
+- Modification import : affichage d'un message “Début lecture des tuiles...” puis progression toutes les 10 tuiles pour voir si le blocage est en lecture ZIP ou en écriture IndexedDB.
+- Modification suppression : remplacement de la suppression curseur par une suppression getAllKeys + lots de 500 clés ; fallback scan complet si besoin.
+- Modification sw.js : OFFLINE_IMPORT_START / OFFLINE_MASS_DELETE_START utilise event.waitUntil(closeOfflineDBForHeavyWrite()) pour fiabiliser la fermeture IndexedDB côté service worker.
+- Pourquoi : traiter les deux blocages observés, suppression silencieuse et import OACI bloqué immédiatement après préparation.
+
+v12.19 — Reset complet offline + mode sécurisé OACI
+- Constat utilisateur : suppression IGN bloquée sur “Suppression 1/7 : IGN-01...” ; import OACI bloque/crashe à “Lecture tuiles 51/3347”.
+- Diagnostic suppression : la base IndexedDB est probablement verrouillée ou trop fragmentée pour une suppression pack par pack fiable après plusieurs gros imports.
+- Modification UI : ajout d'un bouton “Tout réinitialiser” dans la gestion des cartes offline. Il supprime toute la base OfflineTilesDB et tous les packs offline, puis recharge l'application.
+- Pourquoi : fournir une méthode de réparation fiable quand les suppressions pack par pack ne démarrent pas.
+- Diagnostic OACI : OACI plantait très tôt en troisième import, probablement par pression mémoire/IndexedDB après IGN + OpenStreet.
+- Modification import OACI : mode sécurisé avec lots de 10 tuiles, réouverture IndexedDB toutes les 200 tuiles, lecture blob, progression toutes les 10 tuiles.
+- Modification import OACI : si une tuile échoue deux fois à la lecture, elle est ignorée au lieu de faire planter tout l'import.
+- Risque : OACI peut être un peu plus lente, mais doit cesser de planter à 51/3347.
+- Recommandation : si la base actuelle est déjà bloquée, utiliser d'abord “Tout réinitialiser”, puis réinstaller les cartes.
+
+v12.20 — Nouvelle base IndexedDB offline
+- Constat utilisateur : reset complet bloqué vers la moitié avec “Suppression bloquée”.
+- Diagnostic : indexedDB.deleteDatabase('OfflineTilesDB') reste bloqué si Safari/iPadOS ou l'ancien service worker garde une connexion ouverte. Tant que cette connexion existe, la suppression complète ne peut pas aboutir.
+- Décision : ne plus dépendre de la suppression de l'ancienne base. La v12.20 abandonne l'ancienne base OfflineTilesDB et utilise une nouvelle base OfflineTilesDB_v12_20 côté script.js et sw.js.
+- Modification script.js : ajout de OFFLINE_DB_NAME = 'OfflineTilesDB_v12_20' et ouverture IndexedDB via cette constante.
+- Modification sw.js : DB_NAME = 'OfflineTilesDB_v12_20'.
+- Modification reset : le bouton “Tout réinitialiser” devient un reset logique. Il vide les listes locales, désactive les packs actifs, nettoie les caches de tuiles, crée/ouvre la nouvelle base et recharge. L'ancienne base est seulement supprimée en tentative non bloquante.
+- Pourquoi : retrouver une application utilisable même si l'ancienne base est verrouillée.
+- Limite : les anciennes tuiles peuvent rester dans les données Safari du site et consommer de l'espace. Si le quota iPad devient insuffisant, il faudra supprimer les données du site NPF-Q400 dans Réglages Safari.
+- Test conseillé : installer v12.20, faire MAJ, fermer/réouvrir, cliquer “Tout réinitialiser”, puis réimporter OpenStreet, IGN et OACI.
+
+v12.21 — Version de récupération service worker
+- Constat utilisateur : après installation v12.20, la carte ne charge pas ; les icônes sont visibles mais les boutons ne fonctionnent pas.
+- Diagnostic : très probablement mélange de fichiers ou ancien service worker encore actif après les essais de suppression IndexedDB. Le HTML/CSS s'affiche mais le JavaScript applicatif ne s'initialise pas correctement.
+- Modification index.html : ajout d'une séquence de récupération exécutée une seule fois en v12.21. Elle désenregistre les anciens service workers, supprime les caches app-shell NPF-Q400, puis recharge une URL fraîche.
+- Modification script.js/sw.js : nouvelle base IndexedDB OfflineTilesDB_v12_21 pour éviter toute base verrouillée précédente.
+- Pourquoi : repartir sur un couple index/script/sw cohérent et éviter les anciens caches après blocage.
+- Test conseillé : remplacer les fichiers, ouvrir avec connexion, laisser l'application recharger automatiquement une fois, puis cliquer MAJ et fermer/réouvrir.
+
+v12.22 — Stabilisation offline, reprise iPad, chat
+- Constat utilisateur : suppression OpenStreet trop lente/inutilisable ; message “importation en cours” puis suppression extrêmement lente ; OACI redevient lent après nettoyage ; reprise iPad après veille un peu lente ; besoin d'un bouton chat Reconnecter et d'une fermeture plus visible.
+- Modification script.js : remise à zéro de isZipImportRunning au chargement pour éviter qu'un import interrompu bloque les actions suivantes.
+- Modification script.js : OpenStreet passe en suppression logique. L'application retire le groupe OpenStreet de la liste et le désactive sans parcourir physiquement 1 Go de tuiles IndexedDB.
+- Pourquoi : la suppression physique d'OpenStreet est trop lourde et instable sur iPad/Safari ; “Vider le cache” reste la méthode de nettoyage lourd.
+- Modification import OACI : lots augmentés de 10 à 35 et réouverture IndexedDB toutes les 350 tuiles pour accélérer sans revenir au mode trop agressif qui plantait.
+- Modification reprise veille : plusieurs invalidateSize/redraw espacés après focus/pageshow/visibilitychange.
+- Modification chat : ajout d'un bouton “↻ Reconnecter” pour forcer la reconnexion après changement de pseudo ou de canal.
+- Modification chat : bouton de fermeture rendu rouge et plus visible.
+- Non inclus volontairement : Base OACI saisissable, multi-vols Bloc/Fuel, et déroutement “vide retardant”. Ces fonctions seront traitées ensuite par versions séparées pour éviter les régressions.
+
+v12.23 — Chat auto-reconnect + fermeture plus propre
+- Constat utilisateur : le bouton fermeture chat de v12.22 n'est pas esthétique ; le bouton Reconnecter fonctionne mais il serait préférable de reconnecter automatiquement quand le canal ou le pseudo change.
+- Modification script.js : le bouton de fermeture chat affiche désormais “✕ Fermer” au lieu d'un symbole moins + ajout CSS.
+- Modification script.js : ajout d'une reconnexion automatique après modification du canal ou du pseudo, avec temporisation 1,2 s pour éviter une reconnexion à chaque lettre.
+- Modification script.js : si le chat n'est pas connecté, la modification canal/pseudo est simplement mémorisée ; si le chat est connecté ou en connexion, l'app déconnecte puis reconnecte automatiquement.
+- Modification style.css : fermeture en bouton pilule blanc/rouge plus propre, suppression du pseudo-texte CSS précédent.
+- Non modifié : import OpenStreet. Le mode OpenStreet reste volontairement conservateur car c'est le pack de 1 Go le plus risqué pour Safari/iPadOS. À réévaluer après un test complet de durée.
+
+v12.24 — Chat Valider + OpenStreet découpé plus rapide
+- Constat utilisateur : l'auto-reconnexion chat n'est pas souhaitée ; il faut un bouton “Valider” qui se dégrise quand canal/pseudo change. OpenStreet était rapide quelques versions avant ; les ZIP actuels ne sont pas volumineux mais l'import est redevenu très long.
+- Modification chat : suppression de la reconnexion automatique à chaque changement stabilisé.
+- Modification chat : ajout d'un bouton “Valider”, grisé par défaut, qui se dégrise uniquement quand le canal ou le pseudo diffère de la configuration validée.
+- Modification chat : au clic Valider, la configuration est mémorisée et le chat se déconnecte/reconnecte si nécessaire.
+- Modification OpenStreet : pour les ZIP OpenStreet non volumineux (<300 Mo), on évite la libération lourde IndexedDB avec attente de 900 ms avant import.
+- Modification OpenStreet : lots d'écriture non-gros OpenStreet portés à 260 tuiles pour revenir vers un profil plus rapide.
+- Pourquoi : les ZIP OpenStreet découpés ne doivent pas subir le profil très conservateur prévu pour un gros ZIP unique d'environ 1 Go.
+
+v12.25 — OpenStreet import progressif
+- Constat utilisateur : OpenStreet fichier 1 bloque par paliers à 251/7176 puis 511/7176 puis 771/7176.
+- Diagnostic : ces valeurs correspondent au profil v12.24 avec gros lots d'écriture. L'import n'est pas forcément arrêté, mais l'iPad/Safari reste longtemps occupé entre deux rafraîchissements UI.
+- Modification script.js : pour les ZIP OpenStreet non volumineux, lots d'écriture réduits de 260 à 70 tuiles.
+- Modification script.js : réouverture/stabilisation IndexedDB toutes les 420 tuiles pour les ZIP OpenStreet découpés.
+- Modification script.js : message spécifique “OpenStreet : écriture progressive...” pour distinguer lecture ZIP et écriture IndexedDB.
+- Pourquoi : rendre l'import OpenStreet plus régulier et éviter les longues pauses apparentes.
+- Limite : le temps total peut ne pas être beaucoup plus court, mais l'interface doit moins donner l'impression d'être bloquée.
+
+v12.26 — Cellule Base OACI
+- Modification demandée : dans la barre du haut des deux premiers onglets, remplacement de “CS BASE” par une cellule “Base”.
+- Modification index.html : ajout d'une saisie OACI “Base” dans l'onglet prévision/suivi et dans l'onglet Bloc/Fuel.
+- Modification script.js : validation stricte du code OACI. Un code inconnu est refusé avec alerte et la base précédente est restaurée.
+- Modification script.js : la base saisie devient la base utilisée pour les calculs BINGO, déroutement et Bloc/Fuel via selectedBaseOACI.
+- Modification script.js : la base est mémorisée dans localStorage via selected_base_oaci et restaurée au lancement.
+- Modification script.js : les deux cellules Base restent synchronisées.
+- Modification style.css : style spécifique pour saisie Base et état invalide.
+- Non modifié : import cartes OpenStreet mis de côté ; multi-vols Bloc/Fuel et déroutement “vide retardant” seront traités ensuite.
+
+v12.27 — Alignement bandeau PREVI / BLOC-FUEL
+- Constat utilisateur : dans l'onglet PREVI. NBR ROTATIONS, le bandeau supérieur ne touche pas la zone des titres d'onglets et ne touche pas les bords, contrairement à l'onglet BLOC/FUEL.
+- Modification style.css : suppression de la marge spécifique de .previ-shared-header-section.
+- Modification style.css : le bandeau PREVI reprend le même principe visuel que le bandeau BLOC/FUEL : pleine largeur, fond identique, bord inférieur identique, padding identique.
+- Modification responsive : alignement aussi conservé sur iPad/smartphone avec les paddings mobiles existants.
+- Non modifié : multi-vols Bloc/Fuel, déroutement “vide retardant”, et import OpenStreet.
+
+v12.28 — Bloc/Fuel multi-vols première version
+- Ajout dans l'onglet BLOC/FUEL d'une barre “Vol n°” avec sélection, Nouveau, Clôturer/Réouvrir et Supprimer.
+- Un vol correspond à un bloc départ et à ses lignes bloc arrivée/fuel.
+- Les vols sont conservés localement dans calculator_flights_v12_28.
+- À l'ouverture, l'application restaure le dernier vol actif.
+- Si tous les vols sont clôturés, la clôture du dernier vol ouvre automatiquement un nouveau vol vierge.
+- Les vols clôturés restent sélectionnables et modifiables.
+- La limite HDV affichée dans le tableau du vol actif prend en compte le cumul des temps de vol des vols précédents.
+- Le bouton corbeille global supprime désormais tous les vols et repart à Vol n°1.
+- Limite volontaire : première version prudente. Le suivi global multi-vols sera à valider en usage avant ajout du déroutement “vide retardant”.
+
+v12.29 — Déroutement vide retardant
+- Ajout dans l'onglet DEROUT./GAAR d'une case “Vide retardant”.
+- Si la case est décochée : fonctionnement inchangé, calcul depuis la position GPS vers le feu.
+- Si la case est cochée : la première rotation utilise le trajet position GPS actuelle → pélicandrome sélectionné → feu.
+- Le pélicandrome utilisé est celui déjà sélectionné dans l'application, pas le plus proche automatiquement.
+- Le calcul de temps inclut un forfait de 20 min au pélicandrome, cohérent avec le forfait de rotation existant.
+- Le calcul carburant “Fuel mini 1 largage / Base ou Pélic” utilise la consommation du trajet GPS → Pélic → Feu + forfait largage + BINGO.
+- Les rotations suivantes restent calculées avec la logique normale feu ↔ pélicandrome.
+- La case est mémorisée localement.
+
+v12.30 — Correctifs Bloc/Fuel après multi-vols
+- Constat utilisateur : dans BLOC/FUEL, après validation d'un fuel saisi, la fenêtre Fuel reste ouverte alors que la valeur est prise en compte.
+- Correction script.js : fermeture renforcée de la fenêtre Fuel après validation, avec blur des champs, aria-hidden et display:none prioritaire.
+- Constat utilisateur : les colonnes Durée rotation, Fuel rotation, Tps de vol et Tps de vol restant restent vides malgré la saisie du bloc arrivée.
+- Correction script.js : recalcul forcé des lignes BLOC/FUEL après validation Fuel et après toute modification d'une ligne.
+- Correction script.js : recalculateBlocFuel rendu plus robuste avec sélecteurs protégés et valeurs “--” explicites.
+- Objectif : conserver la logique multi-vols v12.28/v12.29 mais rétablir le comportement immédiat du tableau Bloc/Fuel.
+
+v12.31 — Ordre Bloc/Fuel + Limite HDV multi-vols
+- Constat utilisateur : dans l'onglet Vol n°2, la limite HDV affichée à 08:00 n'est pas actualisée avec le temps de vol du Vol n°1.
+- Modification script.js : la limite HDV du Vol n°1 sert de limite journée de référence.
+- Modification script.js : pour les vols suivants, le champ LIMITE HDV affiche la limite restante avant le vol actif, c'est-à-dire limite journée moins les temps de vol des vols précédents.
+- Modification script.js : le tableau du vol actif calcule ensuite le temps de vol restant à partir de cette limite restante, sans double déduction.
+- Constat utilisateur : il faut inverser la ligne “Vol n°...” et la ligne “Bloc départ / Fuel départ / Base / TMD / Limite HDV”.
+- Modification index.html/style.css : dans BLOC/FUEL, la ligne Bloc départ/Fuel départ/Base/TMD/Limite HDV est désormais au-dessus de la barre Vol n°.
+
+v12.32 — Correctif runtime multi-vols
+- Constat utilisateur : après v12.31, le menu Vol n° n'est plus renseigné, les boutons Nouveau/Clôturer/Supprimer sont inactifs et les colonnes Bloc/Fuel ne se remplissent plus.
+- Diagnostic : la fonction getCumulativeHdvBeforeActiveFlight avait été supprimée involontairement lors de la correction Limite HDV v12.31, ce qui provoquait une erreur JavaScript à l'initialisation du module Bloc/Fuel.
+- Correction script.js : restauration de getCumulativeHdvBeforeActiveFlight.
+- Correction script.js : sécurisation de getEffectiveLimitHdvForActiveFlight pour éviter qu'une erreur de cumul bloque toute l'interface.
+- Correction script.js : sécurité supplémentaire dans refreshFlightSelector pour recréer un Vol n°1 si le stockage local est vide ou incohérent.
+- Aucun changement de mise en page autre que le numéro de version.
+
+v12.33 — Statut GPS DEROUTEMENT/GAAR
+- Renommage du bouton “Rafraîchir GPS” en “Actualiser position GPS”.
+- Ajout d'un statut visible dans DEROUT./GAAR : “GPS non actualisé” ou “GPS actualisé à HH:MM — âge”.
+- Le bouton force toujours une position fraîche avec maximumAge: 0.
+- Après actualisation manuelle, les calculs DEROUT./GAAR sont recalculés immédiatement.
+- La position GPS mémorise désormais aussi son timestamp dans lastPosition pour afficher l'âge de la position utilisée.
+- Objectif : rendre visible si le calcul utilise une position récente ou ancienne.
+
+v12.34 — Feux de l'historique sur carte + centrage vecteurs
+- Ajout d'un calque fireHistoryLayer pour afficher sur la carte les feux présents dans l'historique de recherche.
+- Chaque feu historique est représenté par une flamme rouge.
+- Clic sur une flamme historique : le feu est sélectionné comme feu courant et les calculs/routes sont recalculés.
+- Le feu courant n'est pas doublonné : s'il est sélectionné, il reste affiché comme feu courant, pas comme historique superposé.
+- Suppression d'un feu historique ou effacement complet : mise à jour immédiate des flammes sur la carte.
+- Correction des ancres Leaflet des flammes : l'ancrage est au centre de l'icône, pour que les vecteurs passent par le milieu.
+- Correction des ancres Leaflet des icônes pélicandromes personnalisées : ancrage au centre.
+- Correction de l'ancre de l'icône GPS altitude : le vecteur GPS/temps part visuellement du centre du point violet, pas du côté/bas de l'icône.
+
+v12.35 — Taille feux historiques + sélection par popup
+- Constat utilisateur : les icônes feu sont trop grandes.
+- Modification script.js/style.css : les flammes feu passent à 24 px, avec ancrage central conservé.
+- Constat utilisateur : les icônes pélicandromes ont grossi en v12.34.
+- Modification script.js/style.css : retour à la taille normale des icônes pélicandromes.
+- Constat utilisateur : un clic sur un feu historique ne doit pas sélectionner immédiatement le feu.
+- Modification script.js : un clic sur une flamme historique ouvre désormais une étiquette avec le nom du feu et un bouton “Sélectionner”.
+- Le feu est sélectionné uniquement après appui sur “Sélectionner”.
+
+v12.36 — Correctif fort tailles icônes carte
+- Constat utilisateur : en v12.35, la taille des icônes n'a pas changé visuellement ; les feux restent trop gros et les pélicandromes restent trop gros.
+- Cause probable : anciennes classes .custom-marker-icon et règles Leaflet/globales 32 px encore prioritaires selon l'ordre CSS/cache.
+- Modification script.js : les flammes historiques et le feu actif utilisent désormais des classes dédiées, sans .custom-marker-icon, pour éviter l'héritage 32 px.
+- Modification script.js/style.css : flammes feu forcées à 18 px avec ancrage central 9/9.
+- Modification script.js/style.css : pélicandromes forcés à 20 px avec ancrage central 10/10.
+- Le comportement popup “nom du feu + bouton Sélectionner” est conservé.
+
+v12.37 — Taille mini icônes carte
+- Constat utilisateur : les icônes restent trop grosses malgré v12.36.
+- Modification script.js : flammes feu historiques et feu actif réduits de 18 px à 14 px, ancrage central 7/7.
+- Modification script.js : pélicandromes réduits de 20 px à 14 px, ancrage central 7/7.
+- Modification style.css : surcharge CSS forte Leaflet pour imposer 14 px sur feux, pélicandromes, points eau/retardant et pélicandromes désactivés.
+- Le popup des feux historiques “nom + Sélectionner” est conservé.
+
+v12.38 — Consolidation offline + calque départements
+- Objectif : ne pas reproduire le problème récurrent d'application qui ne se lance plus hors connexion après modification.
+- Modification sw.js : installation du service worker refusée si un fichier cœur est absent du cache (index.html, script.js, style.css, manifest, Leaflet, SunCalc, JSZip, communes).
+- Modification sw.js : l'ancien cache applicatif n'est donc plus remplacé par un nouveau cache incomplet.
+- Modification sw.js : ajout du GeoJSON départements dans le pré-cache lors de l'installation/mise à jour en ligne.
+- Modification sw.js : ajout d'un gestionnaire cache-first pour l'URL externe des départements.
+- Modification script.js : le calque départements tente d'abord Cache Storage, puis réseau, puis erreur explicite.
+- Limite importante : si un appareil n'a jamais ouvert l'application en ligne après cette mise à jour, le fichier départements ne peut pas apparaître hors ligne par magie.
+- Après ouverture en ligne de la v12.38, le calque départements doit pouvoir se lancer hors ligne sans avoir été activé manuellement auparavant, sous réserve que le pré-cache ait bien réussi.
+
+v12.39 — Correction démarrage hors ligne après modification
+- Diagnostic : l'application contenait encore un bloc de récupération automatique v12.38 exécuté une fois par version.
+- Ce bloc désenregistrait le service worker, supprimait les caches app-shell et rechargeait une URL fraîche.
+- Conséquence : après une modification/version, un lancement hors ligne pouvait échouer car l'application supprimait elle-même son cache local.
+- Modification index.html : suppression/désactivation de cette purge automatique au démarrage.
+- La récupération manuelle reste disponible via le bouton MAJ / forceRecoveryReload.
+- sw.js conserve la logique v12.38 : il refuse de remplacer l'ancien cache si les fichiers cœur ne sont pas précachés correctement.
+- Objectif : conserver un cache fonctionnel tant qu'une nouvelle version n'est pas installée proprement.
+
+v12.40 — Colonne Masse Rlt Bloc/Fuel
+- Ajout dans l'onglet BLOC/FUEL d'une colonne “Masse Rlt” après la colonne OACI.
+- Chaque cellule Masse Rlt fonctionne comme la saisie Fuel : appui sur la cellule pour ouvrir une fenêtre dédiée.
+- Ajout d'une fenêtre “Masse retardant” avec trois champs : Volume × Densité = Masse.
+- Si Volume et Densité sont saisis, la Masse est calculée automatiquement.
+- Si Masse et Densité sont saisies, le Volume est calculé automatiquement.
+- Validation : la masse calculée/saisie est affichée en kg dans la colonne Masse Rlt.
+- Les données Volume, Densité et Masse sont sauvegardées avec chaque ligne Bloc/Fuel et dans chaque vol multi-vols.
+
+v12.41 — Correction Masse Rlt : largeur et calcul
+- Constat utilisateur : la colonne OACI est trop large et la colonne Masse Rlt trop étroite.
+- Modification style.css : réduction forcée de la colonne OACI à 52 px.
+- Modification style.css : élargissement de la colonne Masse Rlt à 128 px.
+- Constat utilisateur : la fenêtre Masse retardant déborde horizontalement.
+- Modification style.css : fenêtre élargie et grille corrigée avec champs à largeur contrôlée, sans débordement.
+- Constat utilisateur : le calcul affichait 864 kg pour Volume 8000 et Densité 1,08.
+- Modification script.js : calcul rendu déterministe ; Volume + Densité recalculent toujours la Masse.
+- Exemple attendu : 8000 × 1,08 = 8640 kg.
+- Si Masse + Densité sont saisies sans Volume, le Volume est recalculé.
+
+v12.42 — Masse Rlt : densité préremplie, ordre inverse, surlignage calcul
+- Densité : le champ affiche toujours le préfixe “1.” par défaut, adapté aux densités retardant attendues entre 1.06 et 1.10.
+- Saisie densité : l'utilisateur peut saisir directement la partie décimale ; le champ reste au format 1.xx.
+- Boutons : ordre modifié en Annuler / Effacer / Valider.
+- Bouton Effacer : couleur changée pour mieux le distinguer.
+- Mode normal : Volume + Densité calcule la Masse ; le champ Masse calculé s'affiche sur fond vert pastel.
+- Mode prévision : Masse + Densité calcule le Volume ; le champ Volume calculé s'affiche sur fond vert pastel.
+- Validation : la colonne du tableau continue d'afficher la Masse en kg.
+
+v12.43 — Bloc/Fuel boutons + Volume entier Masse Rlt
+- Modification style.css : police du sélecteur Vol n° légèrement augmentée sans augmenter la hauteur de cellule.
+- Modification style.css : police des boutons Nouveau / Clôturer / Supprimer légèrement augmentée sans augmenter la hauteur des boutons.
+- Modification style.css : bouton Nouveau en fond bleu avec texte blanc.
+- Modification style.css : bouton Clôturer en fond vert avec texte blanc.
+- Modification style.css : bouton Supprimer en fond rouge avec texte blanc.
+- Demande précédente intégrée : Volume Masse Rlt sans décimale, y compris quand il est calculé depuis Masse / Densité.
+- Modification script.js : saisie Volume limitée à des entiers.
+
+v12.44 — Verrouillage des vols clôturés
+- Constat utilisateur : un vol clôturé restait modifiable sans cliquer sur “Réouvrir”.
+- Modification script.js : ajout d'un état visuel et fonctionnel de verrouillage pour le vol actif lorsqu'il est clôturé.
+- Les cellules Bloc/Fuel et les champs du bandeau sont lisibles mais non modifiables tant que le vol est clôturé.
+- Les boutons de gestion restent actifs : sélection du vol, Nouveau, Réouvrir, Supprimer.
+- Ajout d'un indicateur “Vol clôturé — verrouillé”.
+- Le bouton Clôturer devient toujours “Réouvrir” sur un vol clôturé ; la modification redevient possible uniquement après clic sur Réouvrir.
+
+v12.45 — Étiquettes permanentes des feux sur carte
+- Constat utilisateur : les feux affichés sur la carte doivent garder en permanence la petite étiquette avec le nom et le département.
+- Modification script.js : les feux de l'historique ont désormais une étiquette permanente nom + département.
+- Modification script.js : le feu actif conserve aussi une étiquette permanente.
+- Comportement au clic inchangé : un clic sur une flamme historique ouvre la popup avec le nom et le bouton “Sélectionner”.
+- Modification style.css : ajout d'un style spécifique pour les étiquettes permanentes des feux.
+
+v12.46 — Étiquettes feu réduites, zone tactile, icône GPS avion
+- Modification style.css : taille des étiquettes permanentes feu réduite d'environ 1,5 fois.
+- Modification script.js/style.css : zone tactile des icônes feu agrandie à 34 px sans agrandir visuellement la flamme.
+- Comportement au clic inchangé : clic sur feu historique => popup avec bouton “Sélectionner”.
+- Ajout d'une icône GPS en forme d'avion.
+- Orientation : l'icône GPS avion s'oriente selon le cap GPS fourni par le navigateur ; à défaut, l'estimation de route déjà calculée par l'application est utilisée.
+- Ancrage GPS conservé au centre pour que les vecteurs partent du centre de l'icône.
+
+v12.47 — Taille étiquettes feu
+- Constat utilisateur : les étiquettes permanentes des feux ont été trop réduites en v12.46.
+- Modification style.css : augmentation légère des étiquettes feu permanentes.
+- Taille cible : intermédiaire entre v12.45 et v12.46.
+- Aucun autre comportement modifié : zone tactile des feux, popup “Sélectionner” et icône GPS avion conservées.
+
+v12.48 — Retour profil rapide ZIP fractionné cartes offline
+- Constat utilisateur : le téléchargement/import des cartes est redevenu très lent alors que le mode ZIP fractionné fonctionnait correctement.
+- Modification script.js : ajout d'un profil “ZIP fractionné rapide” pour les packs OpenStreet non volumineux.
+- Les ZIP fractionnés OpenStreet repassent en lots IndexedDB de 260 tuiles au lieu de 70.
+- Suppression de la réouverture périodique IndexedDB pour les ZIP fractionnés OpenStreet.
+- Réduction des rafraîchissements d'affichage pendant l'import pour éviter de ralentir Safari/iPad.
+- Les gros ZIP OpenStreet restent sur le profil conservateur de sécurité.
+- Les profils OACI et IGN sont conservés.
+
+v12.49 — ZIP fractionné TURBO + popup feu Supprimer
+- Constat utilisateur : les ZIP font environ 180 Mo ; le profil restait trop lent.
+- Modification script.js : création d'un mode “ZIP fractionné TURBO” pour les ZIP OpenStreet non volumineux.
+- Lecture des tuiles par paquets parallèles de 48 au lieu d'une lecture strictement séquentielle.
+- Lecture des tuiles en Uint8Array pour éviter le coût de création de Blob tuile par tuile.
+- Écriture IndexedDB par gros lots de 1000 tuiles pour les ZIP fractionnés.
+- Rafraîchissement d'écran limité pendant l'import pour ne pas ralentir Safari/iPad.
+- Les gros ZIP OpenStreet restent en mode conservateur.
+- Les profils OACI/IGN restent séparés.
+- Feux : étiquette permanente rapprochée de l'icône.
+- Feux historiques : popup enrichie avec bouton “Sélectionner” et bouton “Supprimer”.
+- Supprimer enlève le feu de l'historique et retire immédiatement l'icône de la carte.
 
 
-Modifications :
-- DÉROUT. / GAAR : bouton renommé « Rafraîchir GPS ».
-- DÉROUT. / GAAR : bouton GPS et statut déplacés hors de la fenêtre de droite, sous le bloc « NBR ROTATIONS POSSIBLES ».
-- DÉROUT. / GAAR : si une position GPS valide existe déjà, elle est utilisée automatiquement pour le statut et les calculs ; le bouton devient une action de secours.
-- Statut GPS : « GPS actualisé », « GPS ancien » ou « GPS non disponible » selon l’état réel de la position.
-- Le calcul DÉROUT. / GAAR peut utiliser la dernière position GPS connue même si le marqueur Leaflet n’est pas encore recréé.
 
-Non modifié :
-- hauteur de carte iPad validée en v12.90 ;
-- calculs Déroutement/GAAR sauf source GPS ;
-- Plein au départ ;
-- recherche commune ;
-- import offline / IndexedDB.
+v12.50 — Import ZIP fluide + étiquette feu intégrée
+- Constat utilisateur : les ZIP fractionnés font environ 180 Mo et le blocage arrive tous les 1008 tuiles.
+- Diagnostic : v12.49 écrivait les ZIP OpenStreet non volumineux par grosses transactions IndexedDB d'environ 1000 tuiles. Avec une lecture par 48, le premier palier tombait à 1008 tuiles.
+- Modification script.js : remplacement du profil “TURBO” par un profil “ZIP fractionné fluide”.
+- Modification script.js : lecture parallèle conservée mais réduite à 24 tuiles à la fois.
+- Modification script.js : écriture IndexedDB réduite à des transactions de 120 tuiles pour éviter les longues pauses Safari/iPadOS.
+- Modification script.js : rafraîchissement UI forcé après les écritures des ZIP fractionnés pour éviter l'impression de blocage.
+- Modification script.js : lecture des ZIP fractionnés en Blob au lieu de Uint8Array afin de conserver un type directement exploitable pour les réponses tuiles.
+- Modification script.js/style.css : l'étiquette du nom du feu est maintenant intégrée à l'icône Leaflet, collée à droite de la flamme, au lieu d'un tooltip séparé au-dessus.
+- Modification script.js : l'icône du feu actif ouvre une popup avec bouton “Supprimer”.
+- Comportement suppression : supprime le feu de l'historique, retire l'icône active de la carte et efface la sélection courante.
+
+
+v12.51 — Étiquette feu au-dessus + coordonnées + import ZIP accéléré
+- Constat utilisateur : l'étiquette collée à droite de l'icône feu ne convient pas ; souhait de revenir à l'étiquette au-dessus avec la petite flèche, comme avant, mais plus proche de l'icône.
+- Modification script.js : l'icône feu redevient une flamme seule ; le nom du feu est affiché via un tooltip Leaflet permanent au-dessus de l'icône.
+- Modification script.js/style.css : tooltip rapproché de la flamme avec tooltipAnchor et offset, tout en conservant la petite flèche Leaflet.
+- Modification script.js : clic sur un feu historique non sélectionné affiche désormais aussi les coordonnées géographiques du feu dans la popup.
+- Modification script.js : profil ZIP fractionné accéléré pour les packs OpenStreet non volumineux : 48 lectures parallèles et transactions IndexedDB de 240 tuiles.
+- Objectif import : aller plus vite que v12.50, sans revenir aux transactions d'environ 1000 tuiles qui provoquaient le blocage observé à 1008.
+- Les gros ZIP OpenStreet restent en profil conservateur ; les profils OACI/IGN restent séparés.
+
+
+v12.52 — Calque lignes haute tension RTE
+- Constat utilisateur : besoin d'un calque avec les lignes haute tension, utilisable hors ligne dans l'application.
+- Source préparée : fichier local `lignes_ht_rte_simplifiees.geojson`, issu du shapefile RTE/data.gouv, reprojeté en WGS84 et simplifié avec Mapshaper.
+- Données intégrées : 13 287 tronçons `LineString`, fichier final d'environ 8,7 Mo.
+- Modification index.html : ajout d'un bouton “Lignes HT” dans les contrôles supplémentaires.
+- Modification script.js : ajout du calque haute tension chargé à la demande uniquement quand le bouton est activé.
+- Performance : calque désactivé par défaut, rendu Canvas Leaflet, tracés non interactifs pour limiter la charge iPad.
+- Style : 400 kV et 225 kV en trait plus épais ; 90 kV et 63 kV en pointillé plus fin.
+- Modification sw.js : ajout du GeoJSON lignes HT dans le cache applicatif pour usage hors ligne après mise à jour.
+- Moteur d'import ZIP non modifié en v12.52, car l'utilisateur a confirmé que le téléchargement/import fonctionne parfaitement après suppression puis réinstallation de l'application.
+
+v12.53 — Bouton Lignes HT déplacé sur la carte
+- Modification index.html : retrait du bouton “Lignes HT” de la grille de recherche/options.
+- Modification index.html : ajout d’un bouton carte fixe à gauche, en opposition visuelle au bouton loupe situé à droite.
+- Modification style.css : ajout d’un style dédié au bouton carte Lignes HT, avec icône SVG de poteau électrique et badge “HT”.
+- Modification script.js : logique fonctionnelle inchangée ; le même identifiant `high-voltage-lines-button` pilote toujours l’activation/désactivation du calque.
+- Modification sw.js / manifest.json : passage de version v12.52 à v12.53 pour forcer la prise en compte des nouveaux fichiers.
+- Aucun changement sur l’import ZIP offline, confirmé fonctionnel après suppression/réinstallation de l’application.
+
+
+v12.54 — Ouverture centrée sur la position GPS
+- Constat utilisateur : souhait d'ouvrir systématiquement la carte centrée sur la position GPS, avec un zoom léger.
+- Modification script.js : ajout d'un recentrage automatique GPS au démarrage avec zoom 10.
+- Comportement : si une dernière position GPS est stockée, la carte peut se centrer provisoirement dessus pour ouvrir rapidement.
+- Comportement : dès qu'une position GPS réelle est reçue, la carte se recentre une seule fois dessus au démarrage.
+- Sécurité d'usage : le recentrage automatique ne suit pas l'utilisateur en permanence ; après le premier recentrage GPS réel, l'utilisateur peut déplacer la carte librement.
+- Cas dégradé : si le GPS est refusé ou indisponible et qu'aucune dernière position n'est stockée, l'ancien centrage France reste utilisé.
+- Modification index.html / manifest.json / sw.js : passage de version v12.53 à v12.54 pour forcer la prise en compte des nouveaux fichiers.
+- Aucun changement sur l'import ZIP offline ni sur le calque Lignes HT.
+v12.55 — Mise à jour PWA sécurisée avant nouvelle pérenne
+- Constat utilisateur : passage v2026.46 vers v2026.47 pérenne impossible sans désinstaller/réinstaller ; carte qui ne charge pas et boutons inactifs.
+- Diagnostic probable : transition trop importante avec ancien service worker et ancien app-shell cache-first. L'application pouvait mélanger ancien index, ancien script, nouveau cache ou nouvelle version, surtout en PWA iPad.
+- Modification sw.js : index.html, script.js, style.css et manifest.json passent en stratégie réseau d'abord avec cache en secours hors ligne.
+- Modification sw.js : après activation d'un nouveau service worker, navigation forcée des fenêtres ouvertes vers la même URL avec paramètre `swrefresh`, pour sortir de l'ancien app-shell sans désinstallation.
+- Modification index.html : ajout d'un rechargement unique lors du changement de contrôleur service worker.
+- Modification index.html : si un service worker neuf est déjà en attente, envoi explicite de `SKIP_WAITING` et demande `registration.update()`.
+- Sécurité : aucune suppression IndexedDB ; les cartes offline et les tuiles importées ne sont pas touchées.
+- Fonctionnalités conservées : import ZIP inchangé, centrage GPS v12.54 conservé, calque Lignes HT conservé.
+- Cette version reste une version TEST avant préparation d'une nouvelle version pérenne.
+
+v12.56 — Rappel MAJ 5 jours + fermeture feu centrée GPS
+- Base : v12.55 TEST maj_pwa.
+- Modification : ajout d’un rappel non bloquant à l’ouverture tous les 5 jours.
+- Message : “Pensez à cliquer sur [icône MAJ] de temps en temps pour être certain d’avoir la dernière version à jour.”
+- Action : bouton “Vérifier maintenant” lance la logique MAJ existante ; “Plus tard” mémorise le rappel pour 5 jours.
+- Modification : le bouton X du bandeau feu ne renvoie plus sur la vue France dézoomée.
+- Nouvelle logique : après fermeture du feu, la carte reprend la logique d’ouverture GPS avec zoom 10, en utilisant la position GPS courante, la dernière position connue ou la position stockée.
+- Non modifié : import ZIP, cartes offline, IndexedDB, calque Lignes HT.
+
+v12.57 — Interface iPad, GPS chat et communes par polygones
+- Base : v12.56 TEST info_maj_5j_zoom_x.
+- Modification rappel MAJ : dans la fenêtre de rappel, l'icône générique est remplacée par un petit bouton “🔄 MAJ” reprenant le visuel du bouton réel de l'application.
+- Modification GPS avion : l'altitude n'est plus affichée sur l'icône avion par défaut. Elle est affichée uniquement si le chat est connecté et si le partage de position GPS du chat est activé.
+- Modification communes/feux : le nom d'un feu manuel ou GPS est déterminé par le polygone communal uniquement. La commune la plus proche n'est plus utilisée pour nommer ou enrichir un feu.
+- Modification affichage commune GPS : pendant le chargement des polygones, l'application affiche “chargement...” et non plus une commune provisoire par proximité. Cela supprime le flash Plan-de-Cuques avant Marseille.
+- Modification historique feux : lorsque les polygones sont disponibles, les feux manuels/GPS mémorisés peuvent être réajustés avec la commune réellement contenant les coordonnées.
+- Modification interface carte : les colonnes d'icônes carte gauche et droite sont légèrement descendues pour éviter le collage avec la date, l'heure et la batterie iPad.
+- Non modifié : import ZIP, IndexedDB, cartes offline, calque Lignes HT, rappel 5 jours, logique MAJ existante et correction du X du bandeau feu.
+
+
+v12.58 — Retardant, PDF aérodromes et clôture vols
+- Base : v12.57 TEST interface_gps_communes.
+- Modification PDF : le bouton PDF des pélicandromes/aérodromes ne dirige plus vers une page inexistante si aucun PDF offline ni serveur n'est disponible. L'application affiche désormais “Aucun PDF associé à OACI”.
+- Modification fenêtre retardant : titre renommé “VOLUME/MASSE RETARDANT”.
+- Modification fenêtre retardant : ajout d'une première ligne “Masse ÷ Densité = Volume”.
+- Modification fenêtre retardant : la ligne “Volume × Densité = Masse” est conservée, mais les cellules résultats sont désormais en lecture seule.
+- Modification Bloc/Fuel : la masse de la colonne “Masse Rlt” est affichée en gras.
+- Modification vols clôturés : les lignes vides du tableau Bloc/Fuel ne sont plus affichées lorsqu'un vol est clôturé.
+- Modification vols : ajout d'une synthèse à droite du bouton Supprimer : temps du vol actif, puis temps total à partir du vol n°2.
+- Modification vols clôturés : suppression de l'affichage du message “Vol clôturé — verrouillé”. Le verrouillage fonctionnel du vol clôturé reste conservé.
+- Non modifié : import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS, logique MAJ et nommage des feux par polygones.
+
+
+v12.59 — Masse RLT issue du calcul Volume × Densité
+- Base : v12.58 TEST retardant_pdf_vols.
+- Précision utilisateur : dans la colonne “Masse RLT”, la masse affichée doit correspondre au résultat de la ligne “Volume × Densité = Masse”.
+- Modification script.js : la valeur validée pour la colonne “Masse RLT” est désormais toujours calculée à partir de Volume × Densité.
+- Si l'utilisateur utilise la ligne “Masse ÷ Densité = Volume”, le volume calculé sert d'entrée implicite pour recalculer ensuite la masse via Volume × Densité.
+- La masse saisie directement dans la première ligne ne sert donc plus d'affichage direct dans la colonne “Masse RLT”.
+- Non modifié : PDF aérodromes, clôture vols, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS, logique MAJ et nommage des feux par polygones.
+
+
+v12.60 — Clavier Masse RLT et libellé temps de vol
+- Base : v12.59 TEST masse_rlt_resultat_volume.
+- Modification Bloc/Fuel : la synthèse à droite du bouton Supprimer affiche maintenant “Tps de vol n°X : HH:MM”.
+- Modification Bloc/Fuel : la taille de police de cette synthèse est légèrement augmentée pour améliorer la lisibilité sur iPad.
+- Modification fenêtre VOLUME/MASSE RETARDANT : à l'ouverture d'une cellule Masse RLT vide, le focus est placé sur la ligne opérationnelle “Volume × Densité = Masse”.
+- Modification iPad/clavier : la fenêtre Masse RLT remonte désormais aussi lorsque la cellule était vide, afin d'éviter que le clavier masque les boutons et la seconde ligne.
+- Non modifié : calcul Masse RLT par Volume × Densité, PDF aérodromes, clôture vols, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS et nommage des feux par polygones.
+
+
+v12.61 — Retardant, rappel MAJ et résumé temps de vol
+- Base : v12.60 TEST clavier_rlt_tps_vol.
+- Modification fenêtre VOLUME/MASSE RETARDANT : le bouton “Annuler” utilise désormais la même fermeture immédiate que le bouton X, même quand le clavier iPad est ouvert.
+- Modification Bloc/Fuel : le résumé affiche “Tps de vol n°X : HHhMM / Total : HHhMM” à partir du vol n°2.
+- Modification Bloc/Fuel : le séparateur entre le temps du vol et le total est “/”.
+- Modification Bloc/Fuel : “Total : HHhMM” est affiché en rouge, tout en conservant le fond bleu du bandeau.
+- Modification rappel MAJ 5 jours : ajout du texte “Relancer l’application après mise à jour.”
+- Non modifié : calcul Masse RLT par Volume × Densité, PDF aérodromes, nommage des feux par polygones, import ZIP, IndexedDB, cartes offline, calque Lignes HT et centrage GPS.
+
+
+v12.62 — Calque Communes limité à l'écran
+- Base : v12.61 TEST retardant_maj_tps_vol.
+- Constat utilisateur : lorsque le calque Communes est activé, les déplacements et zooms deviennent très lents sur iPad.
+- Décision utilisateur : ne pas modifier les seuils de zoom ni l'affichage des noms de communes.
+- Modification script.js : les polygones des communes ne sont plus tous ajoutés simultanément à la carte.
+- Nouvelle logique : seules les communes dont les limites intersectent l'emprise visible de l'écran sont ajoutées au calque Leaflet.
+- Modification script.js : le recalcul des communes visibles se fait en fin de déplacement ou de zoom (`moveend` / `zoomend`), et non en continu pendant le geste.
+- Objectif : conserver le rendu et les noms existants tout en réduisant fortement le nombre d'objets Leaflet actifs pendant la navigation.
+- Non modifié : seuils de zoom des communes, noms des communes, feux par polygones, retardant, PDF aérodromes, import ZIP, IndexedDB, cartes offline, calque Lignes HT, centrage GPS et rappel MAJ.
+
+v12.63 — Gestion des cartes, simulation avion et onglets
+- Base : v12.62 TEST communes_ecran.
+- Modification interface Cartes : titre renommé “Gestion des Cartes”, sans mention “hors ligne”.
+- Modification interface Cartes : suppression du texte explicatif “Importez un pack de tuiles...” au-dessus du bouton d'import ZIP.
+- Modification interface Cartes : ajout du bouton “Mode simulation avion” au-dessus du bouton “Importer un pack de tuiles (.zip)”.
+- Modification interface Cartes : les boutons techniques “Rafraîchir l'affichage des cartes” et “Vider le cache des packs désélectionnés” sont déplacés dans une section repliable “Maintenance / dépannage”.
+- Ajout mode simulation avion : après activation, toucher la carte place l'avion à la position choisie.
+- Le mode simulation interrompt le suivi GPS affiché afin que le GPS réel ne remplace pas la position simulée.
+- La position simulée est visuellement identifiée par un badge “SIM” et n'est pas enregistrée comme dernière position GPS réelle.
+- Le chat continue à demander et publier la vraie position GPS lorsqu'il est activé ; la position simulée ne sert qu'aux calculs/affichages locaux basés sur l'icône avion.
+- Retour GPS : quitter le mode simulation relance une demande GPS ponctuelle pour rétablir la position réelle.
+- Correction onglets calculateur : toute la barre d'onglets devient une zone tactile effective, avec interception de sécurité par coordonnées écran.
+- Correction CSS onglets : hauteur tactile renforcée et texte recentré pour éviter que seuls le bas ou le dessous du titre soient cliquables.
+- Non modifié : calque Communes limité à l'écran, retardant, PDF aérodromes, feux par polygones, import ZIP, IndexedDB, calque Lignes HT, centrage GPS et rappel MAJ.
+
+
+v12.64 — Simulation avion/feu par appui long
+- Base : v12.63 TEST cartes_sim_onglets.
+- Modification interface recherche/carte : suppression du bouton “Route BASE LFTW” à côté du bouton “Circuits GAAR”. La logique interne de route base reste disponible pour les calculs existants.
+- Modification mode simulation : un appui long sur la carte ouvre une petite fenêtre avec deux actions : “Positionner avion” et “Positionner feu”.
+- En mode simulation, le toucher simple conserve le positionnement rapide de l’avion.
+- Le feu créé depuis le mode simulation utilise la même logique de nommage par polygone communal que les feux manuels/GPS.
+- Protection ajoutée : après un appui long simulation, le clic résiduel éventuel est ignoré pour éviter de positionner l’avion en plus de l’action choisie.
+- Non modifié : import ZIP, IndexedDB, cartes offline, calque Communes limité à l'écran, calque Lignes HT, retardant, PDF aérodromes, rappel MAJ et centrage GPS.
+
+v12.65 — Simulation uniquement par appui long
+- Base : v12.64 TEST sim_feu.
+- Demande utilisateur : supprimer le toucher simple en mode simulation.
+- Modification mode simulation : le toucher simple ne positionne plus l'avion ; la carte reste donc manipulable normalement.
+- En mode simulation, seul l'appui long ouvre la fenêtre avec deux choix : “Positionner avion” et “Positionner feu”.
+- Hors mode simulation, l'appui long conserve le comportement opérationnel existant : création directe d'un feu à l'endroit touché, avec nommage par polygone communal.
+- Texte d'information du mode simulation ajusté pour indiquer l'appui long uniquement.
+- Non modifié : suppression du bouton Route BASE LFTW, import ZIP, IndexedDB, cartes offline, calque Communes limité à l'écran, calque Lignes HT, retardant, PDF aérodromes, rappel MAJ et centrage GPS.
+
+
+
+v12.66 — Simulation GPS et ajustements interface
+- Base : v12.65 TEST sim_appui_long.
+- Modification simulation : à la sortie du mode simulation, le positionnement GPS est relancé automatiquement par un watch GPS, et non plus par une simple demande ponctuelle.
+- Modification simulation : ajout d'une bordure rouge tout autour de la carte lorsque le mode simulation est actif, afin d'éviter toute confusion avec le mode opérationnel normal.
+- Modification interface recherche : les boutons Circuits GAAR / Départements / Communes / Plan d'eau / Cartes sont recentrés dans la fenêtre.
+- Modification onglets calculateur : zone tactile encore élargie vers le haut ; la détection par coordonnées accepte maintenant une marge verticale plus importante au-dessus de la barre.
+- Modification statut bas de recherche : le texte est limité à “Mode ONLINE” ou “Mode OFFLINE”. Les messages de chargement du calque Communes ne remplacent plus cette indication.
+- Modification recherche feu : si un feu est déjà dans la barre de recherche et que l'utilisateur clique sur X, le focus est forcé immédiatement pour rouvrir/conserver le clavier iPad.
+- Non modifié : appui long simulation avion/feu, appui long normal feu direct, suppression Route BASE LFTW, import ZIP, IndexedDB, cartes offline, calque Communes limité à l'écran, calque Lignes HT, retardant, PDF aérodromes et rappel MAJ.
+
+
+v12.67 — Route base active sans bouton
+- Base : v12.66 TEST sim_gps_ui.
+- Correction : le bouton “Route BASE LFTW” reste supprimé de l’interface, mais la fonction de route base est de nouveau forcée active.
+- Modification script.js : l’ancien état local `showLftwRoute=false` est ignoré, car il n’y a plus de bouton pour réactiver manuellement la route.
+- Résultat attendu : la route vers la base sélectionnée reste affichée/calculée automatiquement lorsqu’un feu est sélectionné, même après mise à jour depuis une version où l’utilisateur avait désactivé le bouton.
+- Non modifié : simulation par appui long, GPS, bordure rouge simulation, interface Cartes, Communes, Lignes HT, retardant, PDF, import ZIP, IndexedDB et rappel MAJ.
+
+
+v12.68 — Onglets plus hauts et popup simulation persistante
+- Base : v12.67 TEST route_base_active.
+- Correction onglets calculateur : la zone tactile des titres d'onglets est encore remontée. La détection par coordonnées accepte désormais une marge supérieure plus importante et intercepte aussi pointerdown, pointerup, touchend et click.
+- Protection onglets : les boutons et champs hors barre d'onglets ne sont pas détournés par cette interception, afin d'éviter une activation parasite lors d'un clic sur le X ou sur un champ.
+- Correction mode simulation : la fenêtre ouverte par appui long ne se ferme plus au relâchement du doigt. Le popup Leaflet n'est plus fermé par le clic résiduel de la carte.
+- Modification popup simulation : les événements tactiles/clics dans la fenêtre sont isolés de la carte ; fermeture uniquement par le X Leaflet ou par les boutons Positionner avion / Positionner feu.
+- Non modifié : route base active sans bouton, GPS, bordure rouge simulation, interface Cartes, Communes, Lignes HT, retardant, PDF, import ZIP, IndexedDB et rappel MAJ.
+
+v12.69 — Reprise iPad après arrière-plan prolongé
+- Base : v12.68 TEST sim_popup_onglets.
+- Correction ciblée : réduire les écrans blancs de quelques secondes après une mise en arrière-plan prolongée sur iPad/PWA.
+- Modification script.js : ajout d’une séquence de reprise renforcée sur visibilitychange/pageshow/focus.
+- Modification script.js : l’application force immédiatement app-ready, rend le conteneur carte visible, puis répète invalidateSize/redraw à plusieurs délais courts.
+- Modification script.js : redessin doux des couches visibles après reprise : tuiles, communes visibles, départements, GAAR, lignes HT et UI.
+- Modification script.js : si aucune tuile utilisable n’est présente après reprise longue, reconstruction douce de la couche de tuiles sans purge IndexedDB ni suppression de pack offline.
+- Modification style.css : ajout d’un petit écran non bloquant “Reprise carte…” pendant les reprises longues, pour éviter l’impression de page blanche.
+- Non modifié : calculs Prévi rotation/TMD/CS/HDV, import ZIP, IndexedDB, cartes offline, simulation, route base, Lignes HT, Communes, retardant, PDF et rappel MAJ.
+
+v12.70 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées
+- Base : v12.69 TEST reprise_ipad.
+- Correction calcul Coucher Soleil : le +1 n'est plus automatique à l'arrivée sur feu. Il est validé uniquement si l'heure sur feu + forfait 10 min est avant ou égale au coucher du soleil.
+- Correction calcul TMD : le +1 est validé uniquement si l'heure sur feu + forfait 10 min + retour base reste avant ou égal à l'heure de fin TMD.
+- Correction calcul HDV restantes : même logique que TMD en durée relative. Le +1 est validé uniquement si transit vers feu + forfait 10 min + retour base reste dans la limite HDV restante.
+- Les rotations supplémentaires après validation du +1 conservent la formule existante feu ↔ pélic : durée rotation = 20 min + temps aller-retour feu/pélic.
+- Correction Suivi rotation : suppression du +1 fuel retour base/pélic dans cet onglet, car l'avion est considéré au pélicandrome/vide et ne peut pas larguer immédiatement.
+- Les calculs Fuel retour base/pélic en Prévi et Déroute conservent un +1 seulement si le fuel sur feu permet un largage immédiat de 250 kg et la conservation du BINGO retour concerné.
+- Refonte des aides “?” dans l'onglet Prévi rotation : chaque aide détaille désormais les sous-formules utiles sans obliger à ouvrir une autre aide.
+- Refonte des aides des résultats rotations : Fuel retour base, Fuel retour pélic, Coucher Soleil, TMD et HDV détaillent maintenant les distances, BINGO, conso rotation, forfaits, conditions du +1 et calcul final.
+- Amélioration des aides Suivi rotation et Déroute : détail plus explicite de l'heure sur feu et des fuel mini 1 largage.
+- Non modifié : reprise iPad, simulation, cartes offline, import ZIP, IndexedDB, Lignes HT, Communes, retardant, PDF et rappel MAJ.
+
+v2026.51 — Version pérenne issue de v12.70 TEST
+- Base : v12.70 TEST previ_plus1_aides.
+- Passage en version pérenne : APP_VERSION = v2026.51.
+- Suppression des mentions applicatives TEST : titre, nom PWA, short_name et manifest.
+- Manifest pérenne : id ./index.html, start_url ./index.html?appv=v2026.51, description version pérenne.
+- Service worker pérenne : sw-v2026-51-perenne.
+- Conservation intégrale des corrections v12.70 : +1 CS/TMD/HDV avec forfait 10 min, aides détaillées Prévi/Suivi/Déroute, suppression du +1 fuel en Suivi rotation.
+- Conservation des corrections précédentes : reprise iPad, simulation, route base active sans bouton, calque Communes limité à l'écran, Lignes HT, rappel MAJ, retardant, PDF et import ZIP inchangé.
+
+v2026.52 — Version pérenne issue de v12.95 TEST
+- Base : v12.95 TEST gps_auto_derout.
+- Passage en version pérenne : APP_VERSION = v2026.52.
+- Suppression des mentions applicatives TEST : titre HTML, titre PWA, name/short_name et manifest.
+- Manifest pérenne : id ./index.html, start_url ./index.html?appv=v2026.52, description version pérenne.
+- Service worker pérenne : sw-v2026-52-perenne.
+- Conservation des corrections v12.71 à v12.95 validées ou intégrées en TEST :
+  - retardant / Masse RLT : calculs indépendants Masse ÷ Densité et Volume × Densité, correction densité 1,1, mode Plein au départ activable/désactivable, cases Fuel Pélic. et OACI utilisables en Plein au départ ;
+  - Suivi rotations : logique de premier transit affinée, prise en compte du départ depuis la première ligne Plein au départ si applicable, puis pélicandrome sélectionné pour les rotations suivantes ;
+  - Prévi Nbr Rotations : BLOC DÉPART renommé HEURE TO, HEURE TO et FUEL DÉPART indépendants de BLOC/FUEL, BASE/TMD/LIMITE HDV communs ;
+  - DÉROUT. / GAAR : mode vide retardant avec forfait 10 min au pélic + 10 min sur feu, GPS automatique avec bouton Rafraîchir GPS en secours, statut GPS actualisé/ancien/non disponible ;
+  - carte iPad : correction de la hauteur de carte / bandeau bas validée en v12.90 ;
+  - UI : message de reprise « Patience, je réfléchis ... », onglets plus visibles, réorganisation des informations Prévi/Suivi/Déroute, déplacement du bouton GPS sous NBR ROTATIONS POSSIBLES ;
+  - suppression d’un feu depuis la carte sans recentrage ni modification du zoom ;
+  - recherche commune : correction validée sur la saisie Talo/Talaud 07 ;
+  - icône pélicandrome prioritaire au clic quand superposée à l’icône avion/GPS.
+- Non modifié volontairement : import ZIP/offline, IndexedDB, moteur tuiles validé, calque Lignes HT, données pélicandromes et logique de carte validée hors corrections listées.
 
 Contrôles :
 - script.js : syntaxe OK ;
 - sw.js : syntaxe OK ;
-- manifest.json : JSON OK.
+- manifest.json : JSON OK ;
+- archive ZIP complète : OK.
