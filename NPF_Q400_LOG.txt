@@ -16,6 +16,24 @@ Contrôles :
 - manifest.json OK.
 
 
+NPF-Q400 — TEST v13.00_commune_hud_trafic_v3
+Date : 2026-07-09
+Base : TEST v12.99_commune_trafic_fallback
+
+Corrections :
+- Bandeau bas droit « commune survolée » transformé en HUD fixe auto-réparant : création automatique si l'élément HTML manque, position fixed, visibilité/opacité forcées et garde-fou toutes les 5 s.
+- Libellé du bandeau renommé « Survolée » pour éviter la confusion avec la commune recherchée/feu sélectionné.
+- Le bandeau reste visible pendant les reprises iPad/PWA et même si une ancienne règle CSS `display:none` persiste en cache.
+- Trafic ADS-B : priorité à adsb.fi v3 pour les recherches lat/lon/dist ; retrait de la tentative v2 en premier.
+- Ajout d'une troisième source de secours Airplanes.live v2 avec format `/point/lat/lon/radius`.
+- Service worker : les requêtes ADS-B ne sont plus transformées en réponse cache/504 par le fallback générique ; elles passent en réseau direct.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+
 --- Historique précédent ---
 # NPF-Q400 — MODIFICATIONS v12.98_commune_trafic_stabilite
 
