@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-93-derout-ui-patience';
+const SW_VERSION = 'sw-v12-94-delete-tabs-derout';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
