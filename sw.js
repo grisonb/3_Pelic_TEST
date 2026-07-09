@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-94-delete-tabs-derout';
+const SW_VERSION = 'sw-v12-95-gps-auto-derout';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
