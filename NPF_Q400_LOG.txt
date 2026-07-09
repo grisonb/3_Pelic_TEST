@@ -2,6 +2,7 @@ NPF-Q400 — TEST v12.95 — gps_auto_derout
 
 Base : v12.94_delete_tabs_derout.
 
+
 Modifications :
 - DÉROUT. / GAAR : bouton renommé « Rafraîchir GPS ».
 - DÉROUT. / GAAR : bouton GPS et statut déplacés hors de la fenêtre de droite, sous le bloc « NBR ROTATIONS POSSIBLES ».
