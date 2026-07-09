@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // =========================================================================
-// v12.95 — Déroutement GPS automatique, bouton hors fenêtre gauche
+// v2026.52 — version pérenne issue de v12.95 TEST
 // Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
 // avec -webkit-fill-available. On force une variable de hauteur réelle et on
 // redemande à Leaflet de recalculer sa taille.
@@ -464,6 +464,19 @@ const HIGH_VOLTAGE_LINES_GEOJSON_URL = 'lignes_ht_rte_simplifiees.geojson';
 let showHighVoltageLinesLayer = localStorage.getItem(HIGH_VOLTAGE_LINES_LAYER_KEY) === 'true';
 let hasLoadedHighVoltageLines = false;
 let isHighVoltageLinesLoading = false;
+const TRAFFIC_LAYER_KEY = 'showTrafficLayer';
+const TRAFFIC_PROVIDER_LABEL = 'adsb.fi';
+const TRAFFIC_API_BASE_URL = 'https://opendata.adsb.fi/api/v3';
+const TRAFFIC_RADIUS_NM = 50;
+const TRAFFIC_REFRESH_INTERVAL_MS = 30000;
+const TRAFFIC_MAX_AIRCRAFT = 80;
+const TRAFFIC_MAX_SEEN_SECONDS = 90;
+let trafficLayer = null;
+let showTrafficLayer = localStorage.getItem(TRAFFIC_LAYER_KEY) === 'true';
+let isTrafficLoading = false;
+let trafficRefreshTimer = null;
+let lastTrafficRefreshAt = 0;
+let lastTrafficError = '';
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
 const FIRE_HISTORY_MAX_ITEMS = 20;
 const FORCE_DISPLAY_MODE = new URLSearchParams(window.location.search).get('force_display') === '1';
@@ -1749,6 +1762,11 @@ function initMap() {
         const htPane = map.getPane('highVoltageLinesPane');
         if (htPane) htPane.style.zIndex = '385';
     }
+    if (map.createPane && !map.getPane('trafficPane')) {
+        map.createPane('trafficPane');
+        const trafficPane = map.getPane('trafficPane');
+        if (trafficPane) trafficPane.style.zIndex = '690';
+    }
     highVoltageLinesRenderer = L.canvas ? L.canvas({ padding: 0.35 }) : null;
 
     setupBaseTileLayer();
@@ -1762,6 +1780,7 @@ function initMap() {
     departmentsLayerGroup = L.layerGroup();
     departmentsLabelsLayer = L.layerGroup();
     highVoltageLinesLayer = L.layerGroup();
+    trafficLayer = L.layerGroup();
     communesLayerGroup = L.layerGroup();
     communesLabelsLayer = L.layerGroup();
     drawPermanentAirportMarkers();
@@ -1774,6 +1793,10 @@ function initMap() {
 
     if (showHighVoltageLinesLayer) {
         setTimeout(() => { toggleHighVoltageLinesLayer(true); }, 350);
+    }
+
+    if (showTrafficLayer) {
+        setTimeout(() => { toggleTrafficLayer(true); }, 600);
     }
 
     areCommunesVisible = localStorage.getItem(SHOW_COMMUNES_LAYER_KEY) === 'true';
@@ -2034,6 +2057,7 @@ function setupEventListeners() {
     const communesLayerButton = document.getElementById('communes-layer-button');
     const waterPointsButton = document.getElementById('water-points-button');
     const highVoltageLinesButton = document.getElementById('high-voltage-lines-button');
+    const trafficLayerButton = document.getElementById('traffic-layer-button');
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
     const closeOfflineMapButton = document.getElementById('close-offline-map-btn');
@@ -2111,6 +2135,13 @@ function setupEventListeners() {
         refreshHighVoltageLinesButtonState();
         highVoltageLinesButton.addEventListener('click', () => {
             toggleHighVoltageLinesLayer();
+        });
+    }
+
+    if (trafficLayerButton) {
+        refreshTrafficButtonState();
+        trafficLayerButton.addEventListener('click', () => {
+            toggleTrafficLayer();
         });
     }
 
@@ -3043,6 +3074,259 @@ async function toggleHighVoltageLinesLayer(forceState = null) {
 }
 
 
+
+
+// =========================================================================
+// v12.96 TEST — calque trafic ADS-B indicatif
+// =========================================================================
+function getTrafficQueryPoint() {
+    if (currentCommune) {
+        const lat = Number(currentCommune.latitude_mairie);
+        const lon = Number(currentCommune.longitude_mairie);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            return { lat, lon, label: buildFireDisplayName(currentCommune) || 'feu' };
+        }
+    }
+
+    if (userMarker && typeof userMarker.getLatLng === 'function') {
+        const ll = userMarker.getLatLng();
+        if (ll && Number.isFinite(ll.lat) && Number.isFinite(ll.lng)) {
+            return { lat: ll.lat, lon: ll.lng, label: 'GPS' };
+        }
+    }
+
+    if (lastPosition) {
+        const lat = Number(lastPosition.lat ?? lastPosition.latitude);
+        const lon = Number(lastPosition.lng ?? lastPosition.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            return { lat, lon, label: 'GPS' };
+        }
+    }
+
+    if (map && typeof map.getCenter === 'function') {
+        const center = map.getCenter();
+        if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+            return { lat: center.lat, lon: center.lng, label: 'centre carte' };
+        }
+    }
+
+    return null;
+}
+
+function buildTrafficApiUrl(point) {
+    const lat = Number(point.lat).toFixed(4);
+    const lon = Number(point.lon).toFixed(4);
+    const radius = Math.max(1, Math.min(250, TRAFFIC_RADIUS_NM));
+    return `${TRAFFIC_API_BASE_URL}/lat/${lat}/lon/${lon}/dist/${radius}`;
+}
+
+function normalizeTrafficAircraft(raw) {
+    if (!raw || !Number.isFinite(Number(raw.lat)) || !Number.isFinite(Number(raw.lon))) return null;
+
+    const callsign = String(raw.flight || raw.callsign || raw.r || raw.hex || '').trim() || 'N/A';
+    const hex = String(raw.hex || '').trim().toUpperCase();
+    const lat = Number(raw.lat);
+    const lon = Number(raw.lon);
+    const seenPos = Number.isFinite(Number(raw.seen_pos)) ? Number(raw.seen_pos) : (Number.isFinite(Number(raw.seen)) ? Number(raw.seen) : null);
+    const altitudeRaw = raw.alt_baro ?? raw.alt_geom ?? raw.altitude;
+    const altitude = altitudeRaw === 'ground' ? 'GND' : (Number.isFinite(Number(altitudeRaw)) ? `${Math.round(Number(altitudeRaw))} ft` : '--');
+    const gs = Number.isFinite(Number(raw.gs)) ? `${Math.round(Number(raw.gs))} kt` : '--';
+    const track = Number.isFinite(Number(raw.track)) ? Number(raw.track) : null;
+    const type = String(raw.t || raw.type || '').trim();
+    const registration = String(raw.r || '').trim();
+    const source = String(raw.type || raw.dbFlags || '').trim();
+
+    return { callsign, hex, lat, lon, seenPos, altitude, gs, track, type, registration, source, raw };
+}
+
+function formatTrafficAge(seconds) {
+    if (!Number.isFinite(seconds)) return 'âge inconnu';
+    if (seconds < 60) return `${Math.round(seconds)} s`;
+    return `${Math.round(seconds / 60)} min`;
+}
+
+function buildTrafficMarkerIcon(aircraft) {
+    const track = Number.isFinite(aircraft.track) ? aircraft.track : 0;
+    return L.divIcon({
+        className: 'traffic-aircraft-icon',
+        html: `<span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -14]
+    });
+}
+
+function renderTrafficAircraft(aircraftList, meta = {}) {
+    if (!trafficLayer) return;
+    trafficLayer.clearLayers();
+
+    const aircraft = aircraftList
+        .map(normalizeTrafficAircraft)
+        .filter(Boolean)
+        .filter(ac => !Number.isFinite(ac.seenPos) || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS)
+        .slice(0, TRAFFIC_MAX_AIRCRAFT);
+
+    aircraft.forEach(ac => {
+        const marker = L.marker([ac.lat, ac.lon], {
+            icon: buildTrafficMarkerIcon(ac),
+            pane: 'trafficPane',
+            zIndexOffset: 7000,
+            keyboard: false
+        });
+
+        const title = escapeHtml(ac.callsign);
+        const subtitle = [ac.type, ac.registration, ac.hex].filter(Boolean).map(escapeHtml).join(' · ');
+        const distance = meta.point ? calculateDistanceInNm(meta.point.lat, meta.point.lon, ac.lat, ac.lon) : null;
+        const popup = `
+            <div class="traffic-popup">
+                <div class="traffic-popup-title">${title}</div>
+                ${subtitle ? `<div class="traffic-popup-subtitle">${subtitle}</div>` : ''}
+                <div>Altitude : <b>${escapeHtml(ac.altitude)}</b></div>
+                <div>Vitesse sol : <b>${escapeHtml(ac.gs)}</b></div>
+                <div>Route : <b>${Number.isFinite(ac.track) ? Math.round(ac.track) + '°' : '--'}</b></div>
+                ${Number.isFinite(distance) ? `<div>Distance : <b>${Math.round(distance)} Nm</b></div>` : ''}
+                <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
+                <div class="traffic-popup-warning">ADS-B indicatif — non certifié</div>
+            </div>`;
+        marker.bindPopup(popup);
+        marker.bindTooltip(title, { direction: 'top', offset: [0, -10], className: 'traffic-tooltip' });
+        marker.addTo(trafficLayer);
+    });
+
+    refreshTrafficButtonState(aircraft.length);
+    updateTrafficStatus({
+        visible: showTrafficLayer,
+        state: 'ok',
+        count: aircraft.length,
+        pointLabel: meta.point?.label || '',
+        now: meta.now || Date.now()
+    });
+}
+
+function updateTrafficStatus({ visible = showTrafficLayer, state = 'idle', count = null, pointLabel = '', message = '', now = Date.now() } = {}) {
+    const status = document.getElementById('traffic-status-display');
+    if (!status) return;
+
+    if (!visible) {
+        status.style.display = 'none';
+        status.textContent = '';
+        status.className = 'traffic-status-display';
+        return;
+    }
+
+    status.style.display = 'block';
+    status.className = `traffic-status-display traffic-status-${state}`;
+
+    if (state === 'loading') {
+        status.textContent = 'Trafic ADS-B : chargement…';
+    } else if (state === 'error') {
+        status.textContent = message || 'Trafic ADS-B indisponible';
+    } else if (state === 'ok') {
+        const time = new Date(now).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        const where = pointLabel ? ` autour ${pointLabel}` : '';
+        status.textContent = `Trafic ADS-B indicatif : ${count ?? 0} avion(s)${where} · MAJ ${time}`;
+    } else {
+        status.textContent = 'Trafic ADS-B indicatif';
+    }
+}
+
+function refreshTrafficButtonState(count = null) {
+    const button = document.getElementById('traffic-layer-button');
+    const countEl = document.getElementById('traffic-button-count');
+    if (!button) return;
+
+    button.classList.toggle('active', showTrafficLayer);
+    button.classList.toggle('loading', isTrafficLoading);
+    button.disabled = isTrafficLoading && !showTrafficLayer;
+    button.title = isTrafficLoading
+        ? 'Chargement du trafic ADS-B…'
+        : 'Afficher/Masquer le trafic ADS-B indicatif';
+
+    if (countEl) {
+        if (showTrafficLayer && Number.isFinite(Number(count))) {
+            countEl.textContent = String(count);
+            countEl.style.display = 'inline-flex';
+        } else {
+            countEl.textContent = '0';
+            countEl.style.display = showTrafficLayer ? 'inline-flex' : 'none';
+        }
+    }
+}
+
+async function refreshTrafficLayer(options = {}) {
+    const { force = false } = options;
+    if (!showTrafficLayer || !trafficLayer) return;
+
+    const now = Date.now();
+    if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 5000) return;
+
+    const point = getTrafficQueryPoint();
+    if (!point) {
+        updateTrafficStatus({ state: 'error', message: 'Trafic ADS-B : aucun point de référence', visible: true });
+        return;
+    }
+
+    isTrafficLoading = true;
+    refreshTrafficButtonState();
+    updateTrafficStatus({ state: 'loading', visible: true });
+
+    try {
+        const url = buildTrafficApiUrl(point);
+        const response = await fetch(url, { cache: 'no-store', mode: 'cors' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const aircraft = Array.isArray(data?.ac) ? data.ac : [];
+        lastTrafficRefreshAt = Date.now();
+        lastTrafficError = '';
+        renderTrafficAircraft(aircraft, { point, now: lastTrafficRefreshAt });
+    } catch (error) {
+        lastTrafficError = error && error.message ? error.message : String(error);
+        console.warn('Trafic ADS-B indisponible:', error);
+        if (trafficLayer) trafficLayer.clearLayers();
+        refreshTrafficButtonState(0);
+        updateTrafficStatus({ state: 'error', visible: true, message: `Trafic ADS-B indisponible (${lastTrafficError})` });
+    } finally {
+        isTrafficLoading = false;
+        refreshTrafficButtonState();
+    }
+}
+
+function startTrafficAutoRefresh() {
+    stopTrafficAutoRefresh();
+    trafficRefreshTimer = setInterval(() => {
+        refreshTrafficLayer({ force: false, reason: 'timer' });
+    }, TRAFFIC_REFRESH_INTERVAL_MS);
+}
+
+function stopTrafficAutoRefresh() {
+    if (trafficRefreshTimer) {
+        clearInterval(trafficRefreshTimer);
+        trafficRefreshTimer = null;
+    }
+}
+
+function toggleTrafficLayer(forceState = null) {
+    const shouldShow = forceState === null ? !showTrafficLayer : Boolean(forceState);
+    showTrafficLayer = shouldShow;
+    localStorage.setItem(TRAFFIC_LAYER_KEY, showTrafficLayer ? 'true' : 'false');
+
+    if (showTrafficLayer) {
+        if (trafficLayer && map && !map.hasLayer(trafficLayer)) trafficLayer.addTo(map);
+        startTrafficAutoRefresh();
+        refreshTrafficButtonState();
+        refreshTrafficLayer({ force: true, reason: 'toggle' });
+    } else {
+        stopTrafficAutoRefresh();
+        if (trafficLayer) trafficLayer.clearLayers();
+        if (trafficLayer && map && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
+        refreshTrafficButtonState(0);
+        updateTrafficStatus({ visible: false });
+    }
+}
+
+window.toggleTrafficLayer = toggleTrafficLayer;
+window.refreshTrafficLayer = refreshTrafficLayer;
+
 function updateMapBingoDisplay() {
     const bingoDisplay = document.getElementById('bingo-map-display');
     if (!currentCommune) {
@@ -3151,6 +3435,10 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
                 map.setView([lat, lon], 10);
             }
         }, 300);
+    }
+
+    if (showTrafficLayer) {
+        refreshTrafficLayer({ force: true, reason: 'commune' });
     }
 
     document.dispatchEvent(new Event('communeSelected'));
