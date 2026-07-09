@@ -680,3 +680,22 @@ Contrôles :
 - sw.js : syntaxe OK ;
 - manifest.json : JSON OK ;
 - archive ZIP complète : OK.
+
+
+============================================================
+NPF-Q400 — TEST v12.97_trafic_stabilite_carte
+============================================================
+Base : TEST v12.96_trafic_adsb.
+
+Corrections :
+- Restauration/renforcement de la fenêtre bas droite indiquant la commune survolée.
+  Elle est recréée depuis la dernière position GPS connue après reprise PWA, mauvais réseau ou chargement différé des polygones.
+- Pop-up feu sur la carte : boutons Sélectionner et Supprimer agrandis pour usage tactile iPad.
+- Suppression d’un feu depuis la carte : confirmation obligatoire avant suppression.
+- Stabilité mauvais réseau : les requêtes critiques du service worker basculent sur le cache après délai court au lieu de laisser une page blanche en attente réseau.
+- Trafic ADS-B : ajout d’un timeout de requête pour éviter un blocage prolongé en réseau très faible.
+
+Non modifié :
+- Calculs mission / BLOC-FUEL / Plein au départ.
+- Hauteur carte validée v12.90.
+- Version pérenne v2026.52.
