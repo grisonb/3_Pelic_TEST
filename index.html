@@ -4,18 +4,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NPF-Q400-TEST</title>
+    <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.95-gps-auto-derout">
-    <link rel="manifest" href="manifest.json?appv=v12.95-gps-auto-derout">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.95-gps-auto-derout">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.95-gps-auto-derout">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.95-gps-auto-derout">
+    <link rel="stylesheet" href="style.css?appv=v12.96-trafic-adsb">
+    <link rel="manifest" href="manifest.json?appv=v12.96-trafic-adsb">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.96-trafic-adsb">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.96-trafic-adsb">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.96-trafic-adsb">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="NPF-Q400-TEST">
+    <meta name="apple-mobile-web-app-title" content="NPF-Q400">
 
     <style id="early-boot-style">
         html, body {
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.95';
+        const APP_VERSION = 'v12.96';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -64,7 +64,7 @@
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
         /*
-         * v12.74 — retardant 1er plein et suppression X fenêtre.
+         * v12.96 TEST — calque trafic ADS-B indicatif, basé sur v2026.52 pérenne.
          * Quand un nouveau service worker prend le contrôle, on recharge une
          * seule fois la page pour éviter un mélange ancien index / nouveau cache
          * ou nouveau index / ancien script. Les tuiles offline IndexedDB ne sont
@@ -261,7 +261,13 @@
             </span>
             <span class="powerline-label">HT</span>
         </button>
+        <button id="traffic-layer-button" class="left-map-action-button traffic-map-button" title="Afficher/Masquer le trafic ADS-B indicatif" aria-label="Afficher/Masquer le trafic ADS-B indicatif">
+            <span class="traffic-icon" aria-hidden="true">✈</span>
+            <span id="traffic-button-count" class="traffic-button-count">0</span>
+            <span class="traffic-label">TRAFIC</span>
+        </button>
     </div>
+    <div id="traffic-status-display" class="traffic-status-display" style="display: none;"></div>
     <div id="main-action-buttons">
         <button id="toggle-search-button" title="Rechercher une commune"><img class="map-action-icon search-commune-icon" src="icons/search-commune-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
         <button id="calculator-button" title="Ouvrir le calculateur de mission" aria-label="Calculateur"><img class="map-action-icon calculator-fms-icon" src="icons/calculator-fms-icon.png?appv=v12.13-offline-progress-waterpoints-startup" alt=""></button>
@@ -349,7 +355,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.95-gps-auto-derout"></script>
+    <script src="script.js?appv=v12.96-trafic-adsb"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
