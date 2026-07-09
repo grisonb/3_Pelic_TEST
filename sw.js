@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-97-trafic-stabilite-carte';
+const SW_VERSION = 'sw-v12-98-commune-trafic-stabilite';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
