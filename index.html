@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v12.99-commune-trafic-fallback">
-    <link rel="manifest" href="manifest.json?appv=v12.99-commune-trafic-fallback">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v12.99-commune-trafic-fallback">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v12.99-commune-trafic-fallback">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v12.99-commune-trafic-fallback">
+    <link rel="stylesheet" href="style.css?appv=v13.00-commune-hud-trafic-v3">
+    <link rel="manifest" href="manifest.json?appv=v13.00-commune-hud-trafic-v3">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.00-commune-hud-trafic-v3">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.00-commune-hud-trafic-v3">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.00-commune-hud-trafic-v3">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v12.99';
+        const APP_VERSION = 'v13.00';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -64,7 +64,7 @@
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
         /*
-         * v12.99 TEST — restauration permanente commune survolée + trafic ADS-B avec sources de secours, basé sur v12.98.
+         * v13.00 TEST — HUD commune survolée auto-réparant + trafic ADS-B v3/source de secours, basé sur v12.99.
          * Quand un nouveau service worker prend le contrôle, on recharge une
          * seule fois la page pour éviter un mélange ancien index / nouveau cache
          * ou nouveau index / ancien script. Les tuiles offline IndexedDB ne sont
@@ -283,7 +283,7 @@
         <span id="map-bingo-pelic"></span>
     </div>
     <div id="commune-info-display"></div>
-    <div id="nearest-commune-display" class="gps-waiting" style="display: flex;">📍 Commune: <b>GPS en attente</b></div>
+    <div id="nearest-commune-display" class="gps-waiting" style="position:fixed;display:flex;visibility:visible;opacity:1;z-index:2147483000;right:16px;bottom:16px;">📍 Survolée: <b>GPS en attente</b></div>
     <div id="team-chat-panel" style="display: none;">
         <div class="chat-header">
             <span id="chat-online-users">Vus <30 min: --</span>
@@ -355,7 +355,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v12.99-commune-trafic-fallback"></script>
+    <script src="script.js?appv=v13.00-commune-hud-trafic-v3"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
