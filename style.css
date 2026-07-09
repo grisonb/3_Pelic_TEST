@@ -6496,3 +6496,76 @@ body {
         border-radius: 16px !important;
     }
 }
+
+
+/* ========================================================================== 
+   v12.98 — commune survolée restaurée + trafic ADS-B erreur lisible
+   ========================================================================== */
+#nearest-commune-display {
+    position: absolute !important;
+    display: none;
+    z-index: 1600 !important;
+    left: auto !important;
+    right: calc(env(safe-area-inset-right, 0px) + 130px) !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 18px) !important;
+    width: auto !important;
+    max-width: min(560px, calc(100vw - 260px)) !important;
+    min-width: 260px !important;
+    max-height: none !important;
+    padding: 11px 18px !important;
+    border-radius: 18px !important;
+    background: rgba(255,255,255,.97) !important;
+    border: 1px solid rgba(0,0,0,.22) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,.24) !important;
+    color: #20242a !important;
+    font-size: 24px !important;
+    line-height: 1.15 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    box-sizing: border-box !important;
+    pointer-events: none !important;
+}
+#nearest-commune-display,
+#nearest-commune-display * {
+    font-size: 24px !important;
+}
+#nearest-commune-display b {
+    font-size: 28px !important;
+    font-weight: 900 !important;
+    color: var(--primary-color) !important;
+}
+#nearest-commune-display.gps-waiting b,
+#nearest-commune-display.loading b,
+#nearest-commune-display.unavailable b,
+#nearest-commune-display.unknown b {
+    color: #6f7780 !important;
+}
+.traffic-button-count {
+    min-width: 20px !important;
+}
+.traffic-status-display.traffic-status-error {
+    z-index: 1500 !important;
+    max-width: min(520px, calc(100vw - 220px)) !important;
+    white-space: normal !important;
+}
+
+@media (max-width: 760px) {
+    #nearest-commune-display {
+        left: 76px !important;
+        right: 88px !important;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        padding: 8px 12px !important;
+        font-size: 17px !important;
+        white-space: normal !important;
+    }
+    #nearest-commune-display,
+    #nearest-commune-display * {
+        font-size: 17px !important;
+    }
+    #nearest-commune-display b {
+        font-size: 22px !important;
+    }
+}
