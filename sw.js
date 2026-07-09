@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-99-commune-trafic-fallback';
+const SW_VERSION = 'sw-v13-00-commune-hud-trafic-v3';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -227,6 +227,11 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
+    if (isTrafficApiRequest(request.url)) {
+        event.respondWith(fetch(request));
+        return;
+    }
+
     if (isOpenStreetMapTileRequest(request.url)) {
         event.respondWith(handleTileRequest(request));
         return;
@@ -245,6 +250,20 @@ self.addEventListener('fetch', event => {
     event.respondWith(swFetchFallbackToCache(request, 8000));
 });
 
+
+
+function isTrafficApiRequest(url) {
+    try {
+        const parsed = new URL(url);
+        return [
+            'opendata.adsb.fi',
+            'api.adsb.lol',
+            'api.airplanes.live'
+        ].includes(parsed.hostname);
+    } catch (_) {
+        return false;
+    }
+}
 
 function isAppShellRequest(request) {
     try {
