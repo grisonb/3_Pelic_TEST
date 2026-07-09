@@ -6603,3 +6603,97 @@ body {
         display: flex !important;
     }
 }
+
+
+/* ========================================================================== 
+   v13.00 — HUD commune survolée auto-réparant
+   Objectif : ne plus dépendre d'un ancien display:none, d'un parent Leaflet,
+   d'un écran de reprise iPad ou d'un ordre CSS antérieur.
+   ========================================================================== */
+#nearest-commune-display {
+    position: fixed !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 2147483000 !important;
+    left: auto !important;
+    top: auto !important;
+    right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px) !important;
+    width: auto !important;
+    min-width: 250px !important;
+    max-width: min(560px, calc(100vw - 34px)) !important;
+    min-height: 44px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 10px 16px !important;
+    border-radius: 18px !important;
+    box-sizing: border-box !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 2px solid rgba(0, 90, 156, 0.35) !important;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.30) !important;
+    color: #20242a !important;
+    font-size: 22px !important;
+    line-height: 1.12 !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    transform: none !important;
+    pointer-events: none !important;
+    contain: layout paint style !important;
+}
+
+#nearest-commune-display,
+#nearest-commune-display * {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#nearest-commune-display b {
+    color: var(--primary-color) !important;
+    font-size: 26px !important;
+    font-weight: 950 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#nearest-commune-display.gps-waiting b,
+#nearest-commune-display.loading b,
+#nearest-commune-display.unavailable b,
+#nearest-commune-display.unknown b {
+    color: #6f7780 !important;
+}
+
+#nearest-commune-display:empty::before {
+    content: "📍 Survolée: GPS en attente";
+    color: #20242a;
+    font-weight: 900;
+}
+
+body.npf-resuming #nearest-commune-display,
+html:not(.app-ready) #nearest-commune-display,
+body:not(.app-ready) #nearest-commune-display {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+@media (max-width: 760px) {
+    #nearest-commune-display {
+        left: 10px !important;
+        right: 10px !important;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        min-height: 38px !important;
+        padding: 8px 11px !important;
+        font-size: 16px !important;
+        white-space: normal !important;
+    }
+
+    #nearest-commune-display b {
+        font-size: 21px !important;
+    }
+}
