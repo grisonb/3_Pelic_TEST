@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // =========================================================================
-// v12.93 — DÉROUTEMENT UI / PATIENCE ACTIVE
+// v12.94 — suppression feu sans recentrage, onglets arrondis, Déroutement GPS décalé
 // Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
 // avec -webkit-fill-available. On force une variable de hauteur réelle et on
 // redemande à Leaflet de recalculer sa taille.
@@ -1961,7 +1961,8 @@ function setupBaseTileLayer() {
     applyMapNoBackgroundStyle();
 }
 
-function clearCurrentSelection() {
+function clearCurrentSelection(options = {}) {
+    const preserveMapView = !!options.preserveMapView;
     selectedPelicanOACI = null;
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -1981,7 +1982,9 @@ function clearCurrentSelection() {
     masterRecalculate();
     updateCommuneDisplay(null);
     document.getElementById('bingo-map-display').style.display = 'none';
-    centerMapOnGpsOverviewAfterClear();
+    if (!preserveMapView) {
+        centerMapOnGpsOverviewAfterClear();
+    }
 }
 
 
@@ -3101,7 +3104,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
             deleteButton.title = 'Supprimer ce feu de la carte et de l’historique';
             deleteButton.addEventListener('click', () => {
                 deleteFireHistoryItemByCommune(commune);
-                clearCurrentSelection();
+                clearCurrentSelection({ preserveMapView: true });
                 try { map.closePopup(); } catch (_) {}
             });
 
