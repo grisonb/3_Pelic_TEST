@@ -947,3 +947,13 @@ Version TEST v12.93_derout_ui_patience — 2026-07-08
 - DÉROUT. / GAAR : suppression visuelle de l'espace du titre masqué dans la colonne droite afin de remonter le contenu.
 - Vérification : le message de reprise carte reste actif avec le texte `Patience, je réfléchis ...` dans l’overlay de reprise iPad/PWA.
 - Aucun changement sur les calculs, Plein au départ, hauteur carte v12.90, post-MAJ v12.92 ou import offline.
+
+## v12.94 — suppression feu sans recentrage / onglets arrondis / Déroutement GPS visible
+
+- Suppression d’un feu depuis la carte : ne modifie plus le zoom et ne recentre plus automatiquement sur la position GPS.
+- Message de reprise/chargement : `Patience, je réfléchis ...` conservé et renforcé ; suppression des occurrences visibles de l’ancien libellé.
+- Écran de chargement iPad : sous-texte remplacé par `Patience, je réfléchis ...` pour éviter l’ancien message aperçu.
+- Onglets : style moins carré, plus visible, avec coins arrondis, dégradé et active tab renforcé.
+- Onglet DÉROUT. / GAAR : bouton `Actualiser position GPS` et statut GPS décalés vers la gauche pour rester visibles sans devoir scroller horizontalement.
+- Aucun changement sur les calculs, Plein au départ, hauteur de carte v12.90, recherche commune ou import offline.
+
