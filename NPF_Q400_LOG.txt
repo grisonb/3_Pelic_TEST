@@ -1,3 +1,22 @@
+NPF-Q400 — TEST v12.99_commune_trafic_fallback
+Date : 2026-07-09
+Base : TEST v12.98_commune_trafic_stabilite
+
+Corrections :
+- Bandeau bas droit « Commune survolée » forcé visible en permanence dès le HTML initial et au démarrage JS.
+- Le bandeau affiche au minimum « GPS en attente » même sans position/polygones prêts.
+- Actualisation de la commune maintenue à la réception GPS, à la reprise PWA et par garde-fou léger périodique.
+- Trafic ADS-B : passage en sources multiples/fallback : adsb.fi v2, adsb.fi v3, adsb.lol v2.
+- En cas d'échec d'une source ADS-B, essai automatique de la source suivante avant d'afficher une indisponibilité.
+- Message erreur trafic rendu moins bloquant visuellement.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+
+--- Historique précédent ---
 # NPF-Q400 — MODIFICATIONS v12.98_commune_trafic_stabilite
 
 Base : TEST v12.97_trafic_stabilite_carte.
