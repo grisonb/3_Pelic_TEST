@@ -3254,18 +3254,28 @@ function refreshTrafficButtonState(count = null) {
 
     button.classList.toggle('active', showTrafficLayer);
     button.classList.toggle('loading', isTrafficLoading);
-    button.disabled = isTrafficLoading && !showTrafficLayer;
+    button.disabled = false;
     button.title = isTrafficLoading
         ? 'Chargement du trafic ADS-B…'
         : 'Afficher/Masquer le trafic ADS-B indicatif';
 
     if (countEl) {
-        if (showTrafficLayer && Number.isFinite(Number(count))) {
-            countEl.textContent = String(count);
+        const hasExplicitCount = count !== null && count !== undefined && count !== '';
+        const numericCount = hasExplicitCount ? Number(count) : NaN;
+        if (showTrafficLayer) {
+            if (Number.isFinite(numericCount)) {
+                countEl.textContent = String(Math.max(0, Math.round(numericCount)));
+            } else if (lastTrafficError) {
+                countEl.textContent = '!';
+            } else if (isTrafficLoading) {
+                countEl.textContent = '…';
+            } else {
+                countEl.textContent = '0';
+            }
             countEl.style.display = 'inline-flex';
         } else {
             countEl.textContent = '0';
-            countEl.style.display = showTrafficLayer ? 'inline-flex' : 'none';
+            countEl.style.display = 'none';
         }
     }
 }
@@ -3308,7 +3318,7 @@ async function refreshTrafficLayer(options = {}) {
         console.warn('Trafic ADS-B indisponible:', error);
         if (trafficLayer) trafficLayer.clearLayers();
         refreshTrafficButtonState(0);
-        updateTrafficStatus({ state: 'error', visible: true, message: `Trafic ADS-B indisponible (${lastTrafficError})` });
+        updateTrafficStatus({ state: 'error', visible: true, message: `Trafic ADS-B temporairement indisponible (${lastTrafficError})` });
     } finally {
         isTrafficLoading = false;
         refreshTrafficButtonState();
@@ -4984,6 +4994,12 @@ function updateNearestCommuneDisplay(lat, lon) {
     const nearestDisplay = document.getElementById('nearest-commune-display');
     if (!nearestDisplay) return;
 
+    const showDisplay = (html, extraClass = '') => {
+        nearestDisplay.style.display = 'block';
+        nearestDisplay.className = extraClass ? `nearest-commune-display ${extraClass}` : 'nearest-commune-display';
+        nearestDisplay.innerHTML = html;
+    };
+
     const enrichCommuneForDisplay = (commune) => {
         if (!commune) return null;
         return getCommuneFromDatabaseByNameAndDepartment(commune) || commune;
@@ -4996,54 +5012,65 @@ function updateNearestCommuneDisplay(lat, lon) {
         return `📍 ${prefix}: <b>${displayCommune.nom_standard || displayCommune.name || 'non déterminée'}${depLabel ? ` (${depLabel})` : ''}</b>`;
     };
 
-    const showUndetermined = () => {
-        nearestDisplay.style.display = 'block';
-        nearestDisplay.innerHTML = '📍 Commune: <b>non déterminée</b>';
-    };
+    const numericLat = Number(lat);
+    const numericLon = Number(lon);
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLon)) {
+        showDisplay('📍 Commune: <b>GPS en attente</b>', 'gps-waiting');
+        return;
+    }
 
-    const containedCommune = findCommuneContainingPoint(lat, lon);
+    const containedCommune = findCommuneContainingPoint(numericLat, numericLon);
     if (containedCommune) {
-        nearestDisplay.style.display = 'block';
-        nearestDisplay.innerHTML = buildLabel(containedCommune, 'Commune');
+        showDisplay(buildLabel(containedCommune, 'Commune'));
         return;
     }
 
     /*
-     * v12.58 — affichage GPS par polygone obligatoire.
-     * On n'affiche plus temporairement la commune la plus proche pendant le
-     * chargement, car cela provoquait un flash Plan-de-Cuques avant Marseille.
+     * v12.98 — restauration robuste du bandeau "commune survolée".
+     * Le bandeau doit rester visible même si les polygones ne sont pas encore
+     * chargés ou si le réseau est mauvais. La valeur précise est mise à jour
+     * dès que les polygones deviennent disponibles.
      */
     if (!hasLoadedCommunes) {
-        nearestDisplay.style.display = 'block';
-        nearestDisplay.innerHTML = '📍 Commune: <b>chargement...</b>';
-
+        showDisplay('📍 Commune: <b>chargement...</b>', 'loading');
         ensureCommunesLayerDataLoaded()
             .then(() => {
-                const preciseCommune = findCommuneContainingPoint(lat, lon);
+                const preciseCommune = findCommuneContainingPoint(numericLat, numericLon);
                 const display = document.getElementById('nearest-commune-display');
                 if (!display) return;
-                display.style.display = 'block';
-                display.innerHTML = preciseCommune ? buildLabel(preciseCommune, 'Commune') : '📍 Commune: <b>non déterminée</b>';
+                if (preciseCommune) {
+                    display.style.display = 'block';
+                    display.className = 'nearest-commune-display';
+                    display.innerHTML = buildLabel(preciseCommune, 'Commune');
+                } else {
+                    display.style.display = 'block';
+                    display.className = 'nearest-commune-display unknown';
+                    display.innerHTML = '📍 Commune: <b>non déterminée</b>';
+                }
                 repairManualFireCommuneLabelsFromPolygons();
             })
             .catch((error) => {
                 console.warn('Chargement du calque communes pour identification impossible:', error);
-                showUndetermined();
+                const display = document.getElementById('nearest-commune-display');
+                if (!display) return;
+                display.style.display = 'block';
+                display.className = 'nearest-commune-display unavailable';
+                display.innerHTML = '📍 Commune: <b>indisponible</b>';
             });
         return;
     }
 
-    showUndetermined();
+    showDisplay('📍 Commune: <b>non déterminée</b>', 'unknown');
 }
 
 function refreshNearestCommuneDisplayFromKnownGps() {
     /*
-     * v12.97 — restauration du bandeau "commune survolée".
-     * Si une position GPS existe déjà, le bandeau bas droit doit être recréé
-     * même après reprise PWA, mauvais réseau ou chargement différé des polygones.
+     * v12.98 — le bandeau bas droit doit être visible en permanence :
+     * - commune précise si GPS + polygones disponibles ;
+     * - chargement/attente si la position ou les polygones ne sont pas prêts.
      */
-    let lat = null;
-    let lon = null;
+    let lat = NaN;
+    let lon = NaN;
 
     try {
         if (userMarker && typeof userMarker.getLatLng === 'function') {
@@ -5068,11 +5095,8 @@ function refreshNearestCommuneDisplayFromKnownGps() {
         }
     }
 
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        updateNearestCommuneDisplay(lat, lon);
-        return true;
-    }
-    return false;
+    updateNearestCommuneDisplay(lat, lon);
+    return Number.isFinite(lat) && Number.isFinite(lon);
 }
 
 
@@ -5532,6 +5556,7 @@ function updateUserPosition(pos) {
     applyOwnGpsPlaneHeading(motionHeading);
 
     updateNearestCommuneDisplay(latitude, longitude);
+    setTimeout(() => { if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps(); }, 250);
 
     if (typeof window.refreshCalculatorAirportContext === 'function') {
         window.refreshCalculatorAirportContext();
