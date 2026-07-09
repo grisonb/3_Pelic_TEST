@@ -465,8 +465,12 @@ let showHighVoltageLinesLayer = localStorage.getItem(HIGH_VOLTAGE_LINES_LAYER_KE
 let hasLoadedHighVoltageLines = false;
 let isHighVoltageLinesLoading = false;
 const TRAFFIC_LAYER_KEY = 'showTrafficLayer';
-const TRAFFIC_PROVIDER_LABEL = 'adsb.fi';
-const TRAFFIC_API_BASE_URL = 'https://opendata.adsb.fi/api/v3';
+const TRAFFIC_PROVIDER_LABEL = 'adsb.fi / adsb.lol';
+const TRAFFIC_API_PROVIDERS = [
+    { label: 'adsb.fi v2', baseUrl: 'https://opendata.adsb.fi/api/v2' },
+    { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3' },
+    { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2' }
+];
 const TRAFFIC_RADIUS_NM = 50;
 const TRAFFIC_REFRESH_INTERVAL_MS = 30000;
 const TRAFFIC_MAX_AIRCRAFT = 80;
@@ -3130,11 +3134,33 @@ function getTrafficQueryPoint() {
     return null;
 }
 
-function buildTrafficApiUrl(point) {
+function buildTrafficApiUrl(point, provider = null) {
+    const activeProvider = provider || TRAFFIC_API_PROVIDERS[0];
     const lat = Number(point.lat).toFixed(4);
     const lon = Number(point.lon).toFixed(4);
     const radius = Math.max(1, Math.min(250, TRAFFIC_RADIUS_NM));
-    return `${TRAFFIC_API_BASE_URL}/lat/${lat}/lon/${lon}/dist/${radius}`;
+    return `${activeProvider.baseUrl}/lat/${lat}/lon/${lon}/dist/${radius}`;
+}
+
+function extractTrafficAircraftList(data) {
+    if (Array.isArray(data?.ac)) return data.ac;
+    if (Array.isArray(data?.aircraft)) return data.aircraft;
+    if (Array.isArray(data)) return data;
+    return [];
+}
+
+async function fetchTrafficAircraftFromProvider(point, provider) {
+    const url = buildTrafficApiUrl(point, provider);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6500);
+    try {
+        const response = await fetch(url, { cache: 'no-store', mode: 'cors', signal: controller.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        return { provider, aircraft: extractTrafficAircraftList(data), raw: data };
+    } finally {
+        clearTimeout(timeoutId);
+    }
 }
 
 function normalizeTrafficAircraft(raw) {
@@ -3215,7 +3241,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         visible: showTrafficLayer,
         state: 'ok',
         count: aircraft.length,
-        pointLabel: meta.point?.label || '',
+        pointLabel: [meta.point?.label || '', meta.provider?.label || ''].filter(Boolean).join(' · '),
         now: meta.now || Date.now()
     });
 }
@@ -3298,27 +3324,37 @@ async function refreshTrafficLayer(options = {}) {
     updateTrafficStatus({ state: 'loading', visible: true });
 
     try {
-        const url = buildTrafficApiUrl(point);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 7000);
-        let response;
-        try {
-            response = await fetch(url, { cache: 'no-store', mode: 'cors', signal: controller.signal });
-        } finally {
-            clearTimeout(timeoutId);
+        const providers = Array.isArray(TRAFFIC_API_PROVIDERS) && TRAFFIC_API_PROVIDERS.length
+            ? TRAFFIC_API_PROVIDERS
+            : [{ label: TRAFFIC_PROVIDER_LABEL || 'ADS-B', baseUrl: 'https://opendata.adsb.fi/api/v2' }];
+        const errors = [];
+        let result = null;
+
+        for (const provider of providers) {
+            try {
+                result = await fetchTrafficAircraftFromProvider(point, provider);
+                break;
+            } catch (providerError) {
+                const errText = providerError && providerError.message ? providerError.message : String(providerError);
+                errors.push(`${provider.label}: ${errText}`);
+                console.warn(`Trafic ADS-B indisponible via ${provider.label}:`, providerError);
+            }
         }
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-        const aircraft = Array.isArray(data?.ac) ? data.ac : [];
+
+        if (!result) {
+            const detail = errors.length ? errors.join(' / ') : 'aucune source disponible';
+            throw new Error(detail);
+        }
+
         lastTrafficRefreshAt = Date.now();
         lastTrafficError = '';
-        renderTrafficAircraft(aircraft, { point, now: lastTrafficRefreshAt });
+        renderTrafficAircraft(result.aircraft, { point, provider: result.provider, now: lastTrafficRefreshAt });
     } catch (error) {
         lastTrafficError = error && error.message ? error.message : String(error);
-        console.warn('Trafic ADS-B indisponible:', error);
+        console.warn('Trafic ADS-B temporairement indisponible:', error);
         if (trafficLayer) trafficLayer.clearLayers();
         refreshTrafficButtonState(0);
-        updateTrafficStatus({ state: 'error', visible: true, message: `Trafic ADS-B temporairement indisponible (${lastTrafficError})` });
+        updateTrafficStatus({ state: 'error', visible: true, message: 'Trafic ADS-B temporairement indisponible — nouvelle tentative automatique' });
     } finally {
         isTrafficLoading = false;
         refreshTrafficButtonState();
@@ -4995,7 +5031,7 @@ function updateNearestCommuneDisplay(lat, lon) {
     if (!nearestDisplay) return;
 
     const showDisplay = (html, extraClass = '') => {
-        nearestDisplay.style.display = 'block';
+        nearestDisplay.style.display = 'flex';
         nearestDisplay.className = extraClass ? `nearest-commune-display ${extraClass}` : 'nearest-commune-display';
         nearestDisplay.innerHTML = html;
     };
@@ -5026,7 +5062,7 @@ function updateNearestCommuneDisplay(lat, lon) {
     }
 
     /*
-     * v12.98 — restauration robuste du bandeau "commune survolée".
+     * v12.99 — restauration robuste du bandeau "commune survolée".
      * Le bandeau doit rester visible même si les polygones ne sont pas encore
      * chargés ou si le réseau est mauvais. La valeur précise est mise à jour
      * dès que les polygones deviennent disponibles.
@@ -5039,11 +5075,11 @@ function updateNearestCommuneDisplay(lat, lon) {
                 const display = document.getElementById('nearest-commune-display');
                 if (!display) return;
                 if (preciseCommune) {
-                    display.style.display = 'block';
+                    display.style.display = 'flex';
                     display.className = 'nearest-commune-display';
                     display.innerHTML = buildLabel(preciseCommune, 'Commune');
                 } else {
-                    display.style.display = 'block';
+                    display.style.display = 'flex';
                     display.className = 'nearest-commune-display unknown';
                     display.innerHTML = '📍 Commune: <b>non déterminée</b>';
                 }
@@ -5053,7 +5089,7 @@ function updateNearestCommuneDisplay(lat, lon) {
                 console.warn('Chargement du calque communes pour identification impossible:', error);
                 const display = document.getElementById('nearest-commune-display');
                 if (!display) return;
-                display.style.display = 'block';
+                display.style.display = 'flex';
                 display.className = 'nearest-commune-display unavailable';
                 display.innerHTML = '📍 Commune: <b>indisponible</b>';
             });
@@ -5065,7 +5101,7 @@ function updateNearestCommuneDisplay(lat, lon) {
 
 function refreshNearestCommuneDisplayFromKnownGps() {
     /*
-     * v12.98 — le bandeau bas droit doit être visible en permanence :
+     * v12.99 — le bandeau bas droit doit être visible en permanence :
      * - commune précise si GPS + polygones disponibles ;
      * - chargement/attente si la position ou les polygones ne sont pas prêts.
      */
@@ -5098,6 +5134,32 @@ function refreshNearestCommuneDisplayFromKnownGps() {
     updateNearestCommuneDisplay(lat, lon);
     return Number.isFinite(lat) && Number.isFinite(lon);
 }
+
+function ensureNearestCommuneDisplayBootstrapped() {
+    const display = document.getElementById('nearest-commune-display');
+    if (!display) return;
+    display.style.display = 'flex';
+    display.classList.add('gps-waiting');
+    if (!display.innerHTML || !display.textContent.trim()) {
+        display.innerHTML = '📍 Commune: <b>GPS en attente</b>';
+    }
+}
+
+(function bootstrapNearestCommuneDisplayPersistence() {
+    const run = () => {
+        ensureNearestCommuneDisplayBootstrapped();
+        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+            refreshNearestCommuneDisplayFromKnownGps();
+        }
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run, { once: true });
+    } else {
+        run();
+    }
+    [700, 2000, 5000].forEach(delay => setTimeout(run, delay));
+    setInterval(run, 15000);
+})();
 
 
 function findClosestCommune(lat, lon, maxDistanceNm = null) {
