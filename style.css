@@ -6499,7 +6499,7 @@ body {
 
 
 /* ========================================================================== 
-   v12.98 — commune survolée restaurée + trafic ADS-B erreur lisible
+   v12.99 — commune survolée restaurée + trafic ADS-B erreur lisible
    ========================================================================== */
 #nearest-commune-display {
     position: absolute !important;
@@ -6567,5 +6567,39 @@ body {
     }
     #nearest-commune-display b {
         font-size: 22px !important;
+    }
+}
+
+
+/* ========================================================================== 
+   v12.99 — commune survolée visible en permanence + trafic ADS-B fallback
+   ========================================================================== */
+#nearest-commune-display {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    z-index: 1800 !important;
+    pointer-events: none !important;
+}
+
+#nearest-commune-display:empty::before {
+    content: "📍 Commune: GPS en attente";
+    color: #20242a;
+    font-weight: 900;
+}
+
+.traffic-status-display.traffic-status-error {
+    top: calc(var(--safe-area-top) + var(--map-action-top-offset) + 112px) !important;
+    left: 18px !important;
+    max-width: 340px !important;
+    border-radius: 14px !important;
+    font-size: 13px !important;
+    white-space: normal !important;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    #nearest-commune-display {
+        display: flex !important;
     }
 }
