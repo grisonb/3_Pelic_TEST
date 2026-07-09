@@ -5976,7 +5976,7 @@ body.npf-resuming #npf-resume-overlay {
     -webkit-user-select: none !important;
 }
 
-/* v12.89 — iPad carte plein écran, message Reprise Carte renforcé, onglets plus visibles */
+/* v12.89 — iPad carte plein écran, message Patience renforcé, onglets plus visibles */
 html,
 body {
     background: #eef2f5 !important;
@@ -6124,3 +6124,100 @@ body {
 #deroutement .analyse-col:nth-child(2) .rotations-group .result-line:first-of-type {
     margin-top: 0 !important;
 }
+
+/* v12.94 — suppression feu sans recentrage, onglets arrondis, Déroutement GPS visible */
+.onglets-navigation {
+    gap: 6px !important;
+    padding: 8px 10px 0 10px !important;
+    background: linear-gradient(180deg, #f7fbff 0%, #e7f2ff 100%) !important;
+    border-bottom: 0 !important;
+}
+
+.onglet-bouton {
+    min-height: 58px !important;
+    margin: 0 2px !important;
+    border: 1px solid #b9d5ef !important;
+    border-bottom: 4px solid transparent !important;
+    border-radius: 18px 18px 10px 10px !important;
+    background: linear-gradient(180deg, #ffffff 0%, #e7f2ff 100%) !important;
+    color: #0b3f78 !important;
+    box-shadow: 0 4px 12px rgba(0, 90, 156, .12) !important;
+    font-size: 18px !important;
+    font-weight: 950 !important;
+    letter-spacing: .015em !important;
+}
+
+.onglet-bouton.active {
+    color: #ffffff !important;
+    background: linear-gradient(180deg, #0077bd 0%, #004f91 100%) !important;
+    border-color: #0066ad !important;
+    border-bottom-color: #e3001b !important;
+    box-shadow: 0 6px 16px rgba(0, 90, 156, .28), inset 0 -5px 0 #e3001b !important;
+}
+
+.onglet-bouton:not(.active):active {
+    transform: translateY(1px) scale(.99) !important;
+}
+
+#app-boot-screen .boot-version {
+    font-size: 16px !important;
+    font-weight: 950 !important;
+    opacity: .95 !important;
+    color: #005a9c !important;
+}
+
+#npf-resume-overlay .npf-resume-card::before {
+    content: '⏳ ';
+}
+
+#deroutement .analyse-col:nth-child(2) .rotations-group {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+}
+
+#deroutement .derout-gps-status-row {
+    margin-left: -28px !important;
+    width: calc(100% + 28px) !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+#deroutement #refresh-gps-btn {
+    margin-left: 0 !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+}
+
+#deroutement .derout-gps-status {
+    max-width: 100% !important;
+    white-space: normal !important;
+}
+
+@media (max-width: 760px) {
+    .onglets-navigation {
+        gap: 4px !important;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+    }
+
+    .onglet-bouton {
+        min-height: 54px !important;
+        border-radius: 15px 15px 8px 8px !important;
+        font-size: 15px !important;
+    }
+
+    #deroutement .derout-gps-status-row {
+        margin-left: -16px !important;
+        width: calc(100% + 16px) !important;
+    }
+
+    #deroutement .derout-gps-status-row #refresh-gps-btn,
+    #deroutement .derout-gps-status {
+        width: auto !important;
+        max-width: 100% !important;
+    }
+}
+
