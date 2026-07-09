@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v12-95-gps-auto-derout';
+const SW_VERSION = 'sw-v12-96-trafic-adsb';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
