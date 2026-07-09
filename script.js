@@ -989,6 +989,7 @@ function drawFireHistoryMarkers() {
             deleteButton.textContent = 'Supprimer';
             deleteButton.className = 'fire-history-map-delete-btn';
             deleteButton.addEventListener('click', () => {
+                if (!confirm('Supprimer ce feu de la carte et de l’historique ?')) return;
                 deleteFireHistoryItemByCommune(item);
                 try { map.closePopup(); } catch (_) {}
             });
@@ -1362,10 +1363,26 @@ async function initializeApp() {
     setupGpsResumeHandlers();
     setTimeout(() => {
         ensureCommunesLayerDataLoaded()
-            .then(() => repairManualFireCommuneLabelsFromPolygons())
-            .catch((error) => console.warn('Préchargement polygones communes impossible:', error));
+            .then(() => {
+                repairManualFireCommuneLabelsFromPolygons();
+                if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+                    refreshNearestCommuneDisplayFromKnownGps();
+                }
+            })
+            .catch((error) => {
+                console.warn('Préchargement polygones communes impossible:', error);
+                if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+                    refreshNearestCommuneDisplayFromKnownGps();
+                }
+            });
     }, 500);
     primeGpsFromStoredPosition();
+    setTimeout(() => {
+        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps();
+    }, 900);
+    setTimeout(() => {
+        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps();
+    }, 2600);
     if (localStorage.getItem('liveGpsActive') === 'true') {
         restartLiveGpsWatch({ silent: true });
     } else {
@@ -3272,7 +3289,14 @@ async function refreshTrafficLayer(options = {}) {
 
     try {
         const url = buildTrafficApiUrl(point);
-        const response = await fetch(url, { cache: 'no-store', mode: 'cors' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
+        let response;
+        try {
+            response = await fetch(url, { cache: 'no-store', mode: 'cors', signal: controller.signal });
+        } finally {
+            clearTimeout(timeoutId);
+        }
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         const aircraft = Array.isArray(data?.ac) ? data.ac : [];
@@ -3387,6 +3411,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
             deleteButton.className = 'fire-history-map-delete-btn';
             deleteButton.title = 'Supprimer ce feu de la carte et de l’historique';
             deleteButton.addEventListener('click', () => {
+                if (!confirm('Supprimer ce feu de la carte et de l’historique ?')) return;
                 deleteFireHistoryItemByCommune(commune);
                 clearCurrentSelection({ preserveMapView: true });
                 try { map.closePopup(); } catch (_) {}
@@ -4875,11 +4900,17 @@ function restartLiveGpsWatch({ silent = true } = {}) {
 
 function setupGpsResumeHandlers() {
     const resumeGps = () => {
+        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+            refreshNearestCommuneDisplayFromKnownGps();
+        }
         if (localStorage.getItem('liveGpsActive') === 'true') {
             restartLiveGpsWatch({ silent: true });
         } else {
             requestOneShotGps({ silent: true, highAccuracy: true, timeout: 30000, maximumAge: 600000 });
         }
+        setTimeout(() => {
+            if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps();
+        }, 1500);
     };
 
     window.addEventListener('online', resumeGps);
@@ -5004,6 +5035,46 @@ function updateNearestCommuneDisplay(lat, lon) {
 
     showUndetermined();
 }
+
+function refreshNearestCommuneDisplayFromKnownGps() {
+    /*
+     * v12.97 — restauration du bandeau "commune survolée".
+     * Si une position GPS existe déjà, le bandeau bas droit doit être recréé
+     * même après reprise PWA, mauvais réseau ou chargement différé des polygones.
+     */
+    let lat = null;
+    let lon = null;
+
+    try {
+        if (userMarker && typeof userMarker.getLatLng === 'function') {
+            const ll = userMarker.getLatLng();
+            if (ll && Number.isFinite(Number(ll.lat)) && Number.isFinite(Number(ll.lng))) {
+                lat = Number(ll.lat);
+                lon = Number(ll.lng);
+            }
+        }
+    } catch (_) {}
+
+    if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && lastPosition) {
+        lat = Number(lastPosition.lat ?? lastPosition.latitude);
+        lon = Number(lastPosition.lng ?? lastPosition.longitude);
+    }
+
+    if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && typeof getStoredGpsPosition === 'function') {
+        const stored = getStoredGpsPosition();
+        if (stored) {
+            lat = Number(stored.lat);
+            lon = Number(stored.lng);
+        }
+    }
+
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        updateNearestCommuneDisplay(lat, lon);
+        return true;
+    }
+    return false;
+}
+
 
 function findClosestCommune(lat, lon, maxDistanceNm = null) {
     if (!allCommunes || allCommunes.length === 0) return null;
