@@ -7318,7 +7318,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.10 TEST — vecteur trafic centré + partage BLOC/FUEL
+   v13.11 TEST — vecteur trafic centré + partage BLOC/FUEL
    ========================================================================== */
 #export-bloc-fuel-pdf-btn {
     background: #005a9c !important;
@@ -7381,4 +7381,94 @@ body:not(.app-ready) #nearest-commune-display {
     left: 78px !important;
     top: 51px !important;
     z-index: 4 !important;
+}
+
+
+/* ========================================================================== 
+   v13.11 TEST — aperçu export BLOC/FUEL intégré à l'application
+   ========================================================================== */
+#bloc-fuel-export-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483200;
+    background: rgba(15, 23, 42, 0.58);
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    box-sizing: border-box;
+}
+
+.bloc-fuel-export-panel {
+    width: min(1180px, 100%);
+    height: 100%;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.bloc-fuel-export-toolbar {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #cbd5e1;
+    background: #f8fafc;
+}
+
+.bloc-fuel-export-title {
+    flex: 1;
+    color: #0f172a;
+    font-size: 18px;
+    font-weight: 950;
+}
+
+.bloc-fuel-export-toolbar button {
+    border: none;
+    border-radius: 12px;
+    background: var(--primary-color);
+    color: #ffffff;
+    min-height: 42px;
+    padding: 0 14px;
+    font-size: 15px;
+    font-weight: 950;
+}
+
+.bloc-fuel-export-toolbar button.secondary {
+    background: #334155;
+}
+
+#bloc-fuel-export-frame {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: #ffffff;
+}
+
+@media (max-width: 760px) {
+    #bloc-fuel-export-overlay {
+        padding: calc(env(safe-area-inset-top, 0px) + 6px) 6px calc(env(safe-area-inset-bottom, 0px) + 6px);
+    }
+
+    .bloc-fuel-export-toolbar {
+        gap: 6px;
+        padding: 8px;
+        flex-wrap: wrap;
+    }
+
+    .bloc-fuel-export-title {
+        flex-basis: 100%;
+        font-size: 16px;
+    }
+
+    .bloc-fuel-export-toolbar button {
+        flex: 1;
+        min-width: 0;
+        padding: 0 8px;
+        font-size: 13px;
+    }
 }
