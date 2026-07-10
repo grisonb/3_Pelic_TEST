@@ -1,3 +1,21 @@
+NPF-Q400 — TEST v13.02_trafic_modal_commune_decalee
+Date : 2026-07-10
+Base : TEST v13.01_commune_gauche_trafic_filtres
+
+Corrections :
+- Filtres ADS-B regroupés dans une seule fenêtre de réglage plus conviviale.
+- Suppression des fenêtres successives `prompt` pour le rayon, le nombre d’avions et les altitudes.
+- Appui long sur le bouton TRAFIC conservé pour ouvrir les réglages.
+- Correction de la zone bleue de sélection de texte sur le bouton TRAFIC lors de l’appui long.
+- Bandeau « Survolée » remis en bas à droite, avec simple décalage vers la gauche pour éviter le bouton MAJ.
+- Ordre de livraison modifié : fichier modifications fourni en premier.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.01_commune_gauche_trafic_filtres
 Date : 2026-07-10
 Base : TEST v13.00_commune_hud_trafic_v3
