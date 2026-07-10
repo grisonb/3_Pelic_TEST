@@ -10829,7 +10829,7 @@ function initializeCalculator() {
             <h1>NPF-Q400 — Export BLOC/FUEL</h1>
             <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.10')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.11')}</div>
     </div>
     ${flightSections}
     <script>
@@ -10869,57 +10869,247 @@ function initializeCalculator() {
 </html>`;
     }
 
-    function buildBlocFuelExportFileName() {
+    function buildBlocFuelExportFileName(extension = 'pdf') {
         const date = new Date();
         const yyyy = date.getFullYear();
         const mm = String(date.getMonth() + 1).padStart(2, '0');
         const dd = String(date.getDate()).padStart(2, '0');
-        return `NPF_Q400_BLOC_FUEL_${yyyy}${mm}${dd}.html`;
+        return `NPF_Q400_BLOC_FUEL_${yyyy}${mm}${dd}.${extension}`;
     }
 
-    async function shareBlocFuelExportHtml(html) {
-        if (!navigator.share) return false;
+    function normalizePdfText(value) {
+        return String(value ?? '')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[’‘]/g, "'")
+            .replace(/[“”]/g, '"')
+            .replace(/[–—]/g, '-')
+            .replace(/°/g, 'deg')
+            .replace(/[^\x20-\x7E]/g, ' ');
+    }
 
-        const fileName = buildBlocFuelExportFileName();
-        const file = new File([html], fileName, { type: 'text/html' });
+    function escapePdfText(value) {
+        return normalizePdfText(value)
+            .replace(/\\/g, '\\\\')
+            .replace(/\(/g, '\\(')
+            .replace(/\)/g, '\\)');
+    }
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-                title: 'NPF-Q400 — BLOC/FUEL',
-                text: 'Export BLOC/FUEL NPF-Q400',
-                files: [file]
+    function fitPdfCell(value, width) {
+        const text = normalizePdfText(value).replace(/\s+/g, ' ').trim();
+        if (text.length <= width) return text.padEnd(width, ' ');
+        return (text.slice(0, Math.max(0, width - 1)) + '…').replace(/[^\x20-\x7E]/g, '.');
+    }
+
+    function splitPdfLine(value, maxChars = 118) {
+        const text = normalizePdfText(value).replace(/\s+/g, ' ').trimEnd();
+        if (text.length <= maxChars) return [text];
+
+        const lines = [];
+        let rest = text;
+        while (rest.length > maxChars) {
+            let cut = rest.lastIndexOf(' ', maxChars);
+            if (cut < 40) cut = maxChars;
+            lines.push(rest.slice(0, cut).trimEnd());
+            rest = rest.slice(cut).trimStart();
+        }
+        if (rest) lines.push(rest);
+        return lines;
+    }
+
+    function buildBlocFuelExportPdfPages() {
+        updateActiveFlightStateFromDom();
+        ensureFlightsLoadedFromStorage();
+        normalizeFlightNumbers();
+
+        const pages = [[]];
+        const maxLinesPerPage = 36;
+        const addLine = (line = '') => {
+            const parts = splitPdfLine(line, 118);
+            parts.forEach((part) => {
+                if (pages[pages.length - 1].length >= maxLinesPerPage) pages.push([]);
+                pages[pages.length - 1].push(part);
             });
-            return true;
+        };
+        const addBlank = () => addLine('');
+        const addSeparator = () => addLine('-'.repeat(118));
+
+        const exportDate = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+        const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+
+        addLine('NPF-Q400 - Export BLOC/FUEL');
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.11'}`);
+        addLine(`Total vols : ${dailyFlights.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
+        addSeparator();
+
+        dailyFlights.forEach((flight, index) => {
+            const state = flight.state || {};
+            const rows = getBlocFuelExportRowCalculations(state, index);
+            addBlank();
+            addLine(`VOL N°${flight.number || index + 1}${flight.closed ? ' - cloture' : ''}    Tps de vol : ${formatDurationForFlightSummary(getFlightDurationFromState(state))}`);
+            addLine(`BLOC DEPART : ${state['bloc-depart'] || '--:--'}    FUEL Depart : ${state['fuel-depart'] || '-- kg'}    Base : ${state['base-oaci-input'] || selectedBaseOACI || DEFAULT_BASE_OACI}    TMD : ${state['tmd'] || '--:--'}    LIMITE HDV : ${state['limite-hdv'] || '--:--'}`);
+            addLine('BLOC Arr | FUEL Pelic | OACI | Masse Rlt | Duree Rot | Fuel Rot | Tps Vol | Restant');
+            addSeparator();
+
+            if (!rows.length) {
+                addLine('Aucune ligne BLOC arrivee saisie');
+                return;
+            }
+
+            rows.forEach((row) => {
+                addLine([
+                    fitPdfCell(row.blocArrivee || '--:--', 8),
+                    fitPdfCell(row.fuelPelic || '--', 10),
+                    fitPdfCell(row.oaci || '--', 4),
+                    fitPdfCell(row.rlt || '--', 9),
+                    fitPdfCell(row.dureeRotation || '--', 9),
+                    fitPdfCell(row.fuelRotation || '--', 8),
+                    fitPdfCell(row.tpsVol || '--', 7),
+                    fitPdfCell(row.tpsVolRestant || '--', 7)
+                ].join(' | '));
+            });
+        });
+
+        return pages;
+    }
+
+    function createSimplePdfBlobFromPages(pages) {
+        const pageWidth = 842;
+        const pageHeight = 595;
+        const marginLeft = 32;
+        const startY = 560;
+        const lineHeight = 13;
+        const objects = [];
+
+        const addObject = (body) => {
+            objects.push(body);
+            return objects.length;
+        };
+
+        const catalogId = addObject('');
+        const pagesId = addObject('');
+        const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>');
+        const pageIds = [];
+
+        pages.forEach((lines, pageIndex) => {
+            const contentLines = [
+                'BT',
+                `/F1 ${pageIndex === 0 ? 10 : 9.5} Tf`,
+                `${marginLeft} ${startY} Td`,
+                `${lineHeight} TL`
+            ];
+            lines.forEach((line) => {
+                contentLines.push(`(${escapePdfText(line)}) Tj`);
+                contentLines.push('T*');
+            });
+            contentLines.push('ET');
+            const stream = contentLines.join('\n');
+            const contentId = addObject(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+            const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+            pageIds.push(pageId);
+        });
+
+        objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+        objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map(id => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
+
+        let pdf = '%PDF-1.4\n%NPF-Q400\n';
+        const offsets = [0];
+        objects.forEach((body, index) => {
+            offsets[index + 1] = pdf.length;
+            pdf += `${index + 1} 0 obj\n${body}\nendobj\n`;
+        });
+        const xrefOffset = pdf.length;
+        pdf += `xref\n0 ${objects.length + 1}\n`;
+        pdf += '0000000000 65535 f \n';
+        for (let i = 1; i <= objects.length; i += 1) {
+            pdf += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+        }
+        pdf += `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+
+        return new Blob([pdf], { type: 'application/pdf' });
+    }
+
+    function buildBlocFuelExportPdfBlob() {
+        const pages = buildBlocFuelExportPdfPages();
+        return createSimplePdfBlobFromPages(pages);
+    }
+
+    async function shareBlocFuelPdfFile() {
+        if (!navigator.share || typeof File === 'undefined') return false;
+
+        const pdfBlob = buildBlocFuelExportPdfBlob();
+        const pdfFile = new File([pdfBlob], buildBlocFuelExportFileName('pdf'), { type: 'application/pdf' });
+
+        if (!navigator.canShare || !navigator.canShare({ files: [pdfFile] })) {
+            return false;
         }
 
         await navigator.share({
             title: 'NPF-Q400 — BLOC/FUEL',
-            text: 'Export BLOC/FUEL NPF-Q400'
+            text: 'Export PDF BLOC/FUEL NPF-Q400',
+            files: [pdfFile]
         });
         return true;
     }
 
     function openBlocFuelExportPreview() {
-        const html = buildBlocFuelExportHtml({ includeControls: true });
-        const previewWindow = window.open('', '_blank');
-        if (!previewWindow) {
-            alert('Aperçu export impossible : la fenêtre a été bloquée. Autorisez les fenêtres pop-up pour NPF-Q400.');
-            return;
-        }
-        previewWindow.document.open();
-        previewWindow.document.write(html);
-        previewWindow.document.close();
+        const html = buildBlocFuelExportHtml({ includeControls: false });
+        let overlay = document.getElementById('bloc-fuel-export-overlay');
+        if (overlay) overlay.remove();
+
+        overlay = document.createElement('div');
+        overlay.id = 'bloc-fuel-export-overlay';
+        overlay.innerHTML = `
+            <div class="bloc-fuel-export-panel" role="dialog" aria-modal="true" aria-label="Aperçu export BLOC/FUEL">
+                <div class="bloc-fuel-export-toolbar">
+                    <div class="bloc-fuel-export-title">Export BLOC/FUEL</div>
+                    <button type="button" id="bloc-fuel-export-share-btn">Partager PDF</button>
+                    <button type="button" id="bloc-fuel-export-print-btn">PDF / Imprimer</button>
+                    <button type="button" id="bloc-fuel-export-close-btn" class="secondary">Fermer</button>
+                </div>
+                <iframe id="bloc-fuel-export-frame" title="Aperçu BLOC/FUEL"></iframe>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const frame = overlay.querySelector('#bloc-fuel-export-frame');
+        if (frame) frame.srcdoc = html;
+
+        overlay.querySelector('#bloc-fuel-export-close-btn')?.addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) overlay.remove();
+        });
+        overlay.querySelector('#bloc-fuel-export-print-btn')?.addEventListener('click', () => {
+            try {
+                const win = frame?.contentWindow;
+                if (win) {
+                    win.focus();
+                    win.print();
+                }
+            } catch (error) {
+                alert(`Impression impossible : ${error.message || error}`);
+            }
+        });
+        overlay.querySelector('#bloc-fuel-export-share-btn')?.addEventListener('click', async () => {
+            try {
+                const shared = await shareBlocFuelPdfFile();
+                if (!shared) {
+                    alert('Partage direct de fichier PDF non disponible sur ce navigateur. Utilisez PDF / Imprimer.');
+                }
+            } catch (error) {
+                if (error && error.name === 'AbortError') return;
+                alert(`Partage PDF impossible : ${error.message || error}`);
+            }
+        });
     }
 
     async function exportBlocFuelPdf() {
         try {
-            const html = buildBlocFuelExportHtml({ includeControls: false });
             try {
-                const shared = await shareBlocFuelExportHtml(html);
+                const shared = await shareBlocFuelPdfFile();
                 if (shared) return;
             } catch (shareError) {
                 if (shareError && shareError.name === 'AbortError') return;
-                console.warn('Partage BLOC/FUEL indisponible, bascule aperçu:', shareError);
+                console.warn('Partage PDF BLOC/FUEL indisponible, bascule aperçu:', shareError);
             }
             openBlocFuelExportPreview();
         } catch (error) {
