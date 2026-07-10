@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-06-trafic-zones-alt-relative-vector';
+const SW_VERSION = 'sw-v13-08-post-maj-retablie';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
