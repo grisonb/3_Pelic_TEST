@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-03-trafic-bouton-altitude-refresh';
+const SW_VERSION = 'sw-v13-04-refresh-5s-ligne-position-visible';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
