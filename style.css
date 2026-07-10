@@ -7315,3 +7315,70 @@ body:not(.app-ready) #nearest-commune-display {
     left: 52px !important;
     top: 52px !important;
 }
+
+
+/* ==========================================================================
+   v13.10 TEST — vecteur trafic centré + partage BLOC/FUEL
+   ========================================================================== */
+#export-bloc-fuel-pdf-btn {
+    background: #005a9c !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255,255,255,.5) !important;
+    font-weight: 950 !important;
+}
+
+.traffic-aircraft-icon {
+    overflow: visible !important;
+}
+
+.traffic-aircraft-symbol-wrap {
+    display: block !important;
+    position: relative !important;
+    width: 128px !important;
+    height: 128px !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+}
+
+.traffic-aircraft-vector-wrap {
+    position: absolute !important;
+    left: 64px !important;
+    top: 64px !important;
+    width: 0 !important;
+    height: 0 !important;
+    transform-origin: 0 0 !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+}
+
+.traffic-aircraft-dotted-vector {
+    position: absolute !important;
+    left: -2px !important;
+    top: -82px !important;
+    width: 4px !important;
+    height: 82px !important;
+    border-left: none !important;
+    background-image: radial-gradient(circle, rgba(17, 24, 39, 0.98) 0 2px, transparent 2.6px) !important;
+    background-size: 4px 9px !important;
+    background-repeat: repeat-y !important;
+    background-position: center top !important;
+    transform: none !important;
+    filter: drop-shadow(0 0 2px rgba(255,255,255,.98)) drop-shadow(0 1px 2px rgba(0,0,0,.45)) !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    position: absolute !important;
+    left: 64px !important;
+    top: 64px !important;
+    width: 26px !important;
+    height: 26px !important;
+    z-index: 3 !important;
+    transform-origin: center center !important;
+}
+
+.traffic-aircraft-altitude-label {
+    position: absolute !important;
+    left: 78px !important;
+    top: 51px !important;
+    z-index: 4 !important;
+}
