@@ -475,8 +475,10 @@ const TRAFFIC_RADIUS_NM = 50;
 const TRAFFIC_REFRESH_INTERVAL_MS = 5000;
 const TRAFFIC_MAX_AIRCRAFT = 80;
 const TRAFFIC_MAX_SEEN_SECONDS = 90;
+const TRAFFIC_DISABLED_FOR_NOW = true;
 let trafficLayer = null;
-let showTrafficLayer = localStorage.getItem(TRAFFIC_LAYER_KEY) === 'true';
+let showTrafficLayer = false;
+try { localStorage.setItem(TRAFFIC_LAYER_KEY, 'false'); } catch (_) {}
 let isTrafficLoading = false;
 let trafficRefreshTimer = null;
 let lastTrafficRefreshAt = 0;
@@ -3904,6 +3906,16 @@ function stopTrafficAutoRefresh() {
 }
 
 function toggleTrafficLayer(forceState = null) {
+    if (TRAFFIC_DISABLED_FOR_NOW) {
+        showTrafficLayer = false;
+        try { localStorage.setItem(TRAFFIC_LAYER_KEY, 'false'); } catch (_) {}
+        stopTrafficAutoRefresh();
+        if (trafficLayer) trafficLayer.clearLayers();
+        if (trafficLayer && map && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
+        updateTrafficStatus({ visible: false });
+        refreshTrafficButtonState(0);
+        return;
+    }
     const shouldShow = forceState === null ? !showTrafficLayer : Boolean(forceState);
     showTrafficLayer = shouldShow;
     localStorage.setItem(TRAFFIC_LAYER_KEY, showTrafficLayer ? 'true' : 'false');
@@ -6233,17 +6245,13 @@ function updateUserPosition(pos) {
         });
     }
 
-    const ownGpsPopupHtml = isSimulationPosition
-        ? 'Position simulée'
-        : (ownAltitudeLabel ? `Votre position<br>${escapeHtml(ownAltitudeLabel)}` : 'Votre position');
-
     if (!userMarker) {
         const userIcon = buildOwnGpsIcon(ownAltitudeLabel, { simulation: isSimulationPosition });
-        userMarker = L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 500, keyboard: false }).bindPopup(ownGpsPopupHtml).addTo(map);
+        userMarker = L.marker([latitude, longitude], { icon: userIcon, zIndexOffset: 500, keyboard: false, interactive: false }).addTo(map);
     } else {
         userMarker.setLatLng([latitude, longitude]);
         userMarker.setIcon(buildOwnGpsIcon(ownAltitudeLabel, { simulation: isSimulationPosition }));
-        userMarker.bindPopup(ownGpsPopupHtml);
+        try { if (typeof userMarker.unbindPopup === 'function') userMarker.unbindPopup(); } catch (_) {}
     }
 
     /* v12.85 — priorité tactile : les icônes pélicandrome restent au-dessus de l'avion si les deux sont superposées. */
@@ -10592,8 +10600,7 @@ function initializeCalculator() {
 
         const flightDuration = getFlightDurationFromState(state);
         const activeIndex = getActiveFlightIndex();
-        const flightNumber = activeIndex >= 0 ? activeIndex + 1 : 1;
-        const flightText = `Tps de vol n°${flightNumber} : ${formatDurationForFlightSummary(flightDuration)}`;
+        const flightText = `Tps de vol : ${formatDurationForFlightSummary(flightDuration)}`;
 
         if (activeIndex > 0) {
             const totalDuration = getCumulativeHdvBeforeActiveFlight() + flightDuration;
@@ -10821,9 +10828,11 @@ function initializeCalculator() {
     h2 { margin: 0; font-size: 21px; color: #0f172a; }
     .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; white-space: nowrap; }
     .header-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 74px; overflow: hidden; }
-    .header-grid b { display: block; min-height: 27px; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
-    .header-grid span { display: block; margin-top: 4px; font-size: 20px; line-height: 1.05; font-weight: 950; color: #111827; white-space: nowrap; }
+    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 78px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
+    .header-grid b { display: block; min-height: 0; margin-bottom: 7px; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
+    .header-grid span { display: flex; align-items: baseline; justify-content: flex-start; width: 100%; margin-top: 0; font-size: 20px; line-height: 1.05; font-weight: 950; color: #111827; white-space: nowrap; overflow: hidden; }
+    .header-grid span .kg-inline { justify-content: flex-start !important; max-width: 100%; }
+    .header-grid span .kg-unit { font-size: .54em !important; }
     .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
     .kg-number { display: inline-block; line-height: 1 !important; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
@@ -10853,7 +10862,7 @@ function initializeCalculator() {
             <h1>NPF-Q400 — Export BLOC/FUEL</h1>
             <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.13')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.14')}</div>
     </div>
     ${flightSections}
     <script>
@@ -10962,7 +10971,7 @@ function initializeCalculator() {
         const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
 
         addLine('NPF-Q400 - Export BLOC/FUEL');
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.13'}`);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.14'}`);
         addLine(`Total vols : ${dailyFlights.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
