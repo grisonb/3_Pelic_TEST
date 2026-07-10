@@ -3249,7 +3249,7 @@ function ensureTrafficSettingsModal() {
                     </div>
                 </label>
 
-                <label class="traffic-settings-field">
+                <label id="traffic-min-altitude-field" class="traffic-settings-field traffic-absolute-altitude-field">
                     <span>Altitude mini</span>
                     <div class="traffic-settings-input-row">
                         <input id="traffic-min-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100">
@@ -3257,11 +3257,21 @@ function ensureTrafficSettingsModal() {
                     </div>
                 </label>
 
-                <label class="traffic-settings-field">
+                <label id="traffic-max-altitude-field" class="traffic-settings-field traffic-absolute-altitude-field">
                     <span>Altitude maxi</span>
                     <div class="traffic-settings-input-row">
                         <input id="traffic-max-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100" placeholder="vide">
                         <em>ft</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
+                    <div class="traffic-settings-check-row traffic-settings-inline-band-row">
+                        <input id="traffic-relative-altitude-input" type="checkbox">
+                        <em>Tranche autour de mon altitude</em>
+                        <span class="traffic-relative-plusminus">±</span>
+                        <input id="traffic-relative-band-input" type="number" inputmode="numeric" min="100" max="10000" step="100">
+                        <strong>ft</strong>
                     </div>
                 </label>
 
@@ -3276,18 +3286,6 @@ function ensureTrafficSettingsModal() {
                     <div class="traffic-settings-check-row">
                         <input id="traffic-around-fire-input" type="checkbox">
                         <em>Trafic autour du feu</em>
-                    </div>
-                </label>
-
-                <label class="traffic-settings-field traffic-settings-checkbox-field">
-                    <div class="traffic-settings-check-row">
-                        <input id="traffic-relative-altitude-input" type="checkbox">
-                        <em>Tranche autour de mon altitude</em>
-                    </div>
-                    <div class="traffic-settings-input-row traffic-settings-nested-input-row">
-                        <span>±</span>
-                        <input id="traffic-relative-band-input" type="number" inputmode="numeric" min="100" max="10000" step="100">
-                        <em>ft</em>
                     </div>
                 </label>
 
@@ -3316,6 +3314,22 @@ function ensureTrafficSettingsModal() {
         modal.setAttribute('aria-hidden', 'true');
     };
 
+    const updateAltitudeModeUi = () => {
+        const relativeAltitudeInput = modal.querySelector('#traffic-relative-altitude-input');
+        const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
+        const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
+        const minAltitudeField = modal.querySelector('#traffic-min-altitude-field');
+        const maxAltitudeField = modal.querySelector('#traffic-max-altitude-field');
+        const disabled = !!relativeAltitudeInput?.checked;
+
+        [minAltitudeInput, maxAltitudeInput].forEach(input => {
+            if (input) input.disabled = disabled;
+        });
+        [minAltitudeField, maxAltitudeField].forEach(field => {
+            if (field) field.classList.toggle('traffic-settings-field-disabled', disabled);
+        });
+    };
+
     const fillDefaults = () => {
         const defaults = sanitizeTrafficSettings(DEFAULT_TRAFFIC_SETTINGS);
         modal.querySelector('#traffic-radius-input').value = String(defaults.radiusNm);
@@ -3327,7 +3341,10 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-relative-altitude-input').checked = !!defaults.relativeAltitudeEnabled;
         modal.querySelector('#traffic-relative-band-input').value = String(defaults.relativeAltitudeBandFt);
         modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
+        updateAltitudeModeUi();
     };
+
+    modal.querySelector('#traffic-relative-altitude-input').addEventListener('change', updateAltitudeModeUi);
 
     modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-cancel').addEventListener('click', closeModal);
@@ -3385,6 +3402,17 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-relative-altitude-input').checked = !!current.relativeAltitudeEnabled;
     modal.querySelector('#traffic-relative-band-input').value = String(current.relativeAltitudeBandFt);
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
+
+    try {
+        const relativeAltitudeInput = modal.querySelector('#traffic-relative-altitude-input');
+        const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
+        const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
+        const minAltitudeField = modal.querySelector('#traffic-min-altitude-field');
+        const maxAltitudeField = modal.querySelector('#traffic-max-altitude-field');
+        const disabled = !!relativeAltitudeInput?.checked;
+        [minAltitudeInput, maxAltitudeInput].forEach(input => { if (input) input.disabled = disabled; });
+        [minAltitudeField, maxAltitudeField].forEach(field => { if (field) field.classList.toggle('traffic-settings-field-disabled', disabled); });
+    } catch (_) {}
 
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
@@ -3665,10 +3693,10 @@ function buildTrafficMarkerIcon(aircraft) {
         : '';
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-dotted-vector" style="transform: rotate(${track}deg);"></span><span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
-        iconSize: [96, 52],
-        iconAnchor: [48, 26],
-        popupAnchor: [0, -24]
+        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
+        iconSize: [128, 128],
+        iconAnchor: [64, 64],
+        popupAnchor: [0, -52]
     });
 }
 
@@ -3689,8 +3717,8 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
         .filter(ac => !Number.isFinite(ac.seenPos) || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS)
-        .filter(ac => ac.altitudeFeet === null || ac.altitudeFeet >= settings.minAltitudeFt)
-        .filter(ac => settings.maxAltitudeFt === null || ac.altitudeFeet === null || ac.altitudeFeet <= settings.maxAltitudeFt)
+        .filter(ac => settings.relativeAltitudeEnabled || ac.altitudeFeet === null || ac.altitudeFeet >= settings.minAltitudeFt)
+        .filter(ac => settings.relativeAltitudeEnabled || settings.maxAltitudeFt === null || ac.altitudeFeet === null || ac.altitudeFeet <= settings.maxAltitudeFt)
         .filter(ac => !useRelativeAltitude || ac.altitudeFeet === null || (ac.altitudeFeet >= relativeMinAltitudeFt && ac.altitudeFeet <= relativeMaxAltitudeFt))
         .forEach(ac => {
             const reference = getNearestTrafficReference(ac, points);
