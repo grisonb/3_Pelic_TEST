@@ -1,3 +1,19 @@
+NPF-Q400 — TEST v13.16_export_nom_pdf_fuel_depart
+Date : 2026-07-10
+Base : TEST v13.15_export_horodatage_filtre_vols
+
+Corrections :
+- Export BLOC/FUEL : le titre utilisé par l’impression iPad est maintenant horodaté avec un nom compatible fichier, par exemple `NPF-Q400 10-07-26 15h10`.
+- Le titre visible dans le document conserve le format demandé avec date/heure d’export.
+- Correction de la carte `FUEL DÉPART` dans l’export : largeur de colonne augmentée, overflow supprimé, police légèrement réduite et unité `kg` intégrée sans masquer le dernier chiffre.
+- Conservation de l’export stylé imprimable et du bouton Fermer.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.15_export_horodatage_filtre_vols
 Date : 2026-07-10
 Base : TEST v13.14_ui_export_sans_trafic
