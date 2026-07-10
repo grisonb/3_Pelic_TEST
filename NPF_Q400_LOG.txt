@@ -1,3 +1,21 @@
+NPF-Q400 — TEST v13.10_partage_bloc_fuel_vecteur_centre
+Date : 2026-07-10
+Base : TEST v13.09_export_bloc_fuel_vecteur_trafic
+
+Corrections :
+- Vecteur pointillé des trafics recentré sur le centre exact de l’icône trafic.
+- Vecteur trafic redessiné en CSS pour éviter le décalage visuel lié à la bordure pointillée.
+- Export BLOC/FUEL : suppression de l’ouverture automatique de l’impression.
+- Export BLOC/FUEL : le bouton lance d’abord le partage natif iPad/navigateur quand disponible.
+- Export BLOC/FUEL : fallback sur un aperçu ouvrable avec boutons Partager, PDF/Imprimer et Fermer.
+- Le bouton d’export BLOC/FUEL est renommé « Partager ».
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.09_export_bloc_fuel_vecteur_trafic
 Date : 2026-07-10
 Base : TEST v13.08_post_maj_retablie
