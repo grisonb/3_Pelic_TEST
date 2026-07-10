@@ -472,7 +472,7 @@ const TRAFFIC_API_PROVIDERS = [
     { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point' }
 ];
 const TRAFFIC_RADIUS_NM = 50;
-const TRAFFIC_REFRESH_INTERVAL_MS = 15000;
+const TRAFFIC_REFRESH_INTERVAL_MS = 5000;
 const TRAFFIC_MAX_AIRCRAFT = 80;
 const TRAFFIC_MAX_SEEN_SECONDS = 90;
 let trafficLayer = null;
@@ -3611,7 +3611,7 @@ async function refreshTrafficLayer(options = {}) {
     if (!showTrafficLayer || !trafficLayer) return;
 
     const now = Date.now();
-    if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 5000) return;
+    if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 4500) return;
 
     const point = getTrafficQueryPoint();
     if (!point) {
@@ -3862,12 +3862,33 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         labelText = `${Math.round(distance)} Nm`;
     }
 
-    L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
-
     if (isUser) {
+        /* v13.04 — route GPS -> feu rendue plus lisible : halo blanc + trait rouge épais. */
+        L.polyline([startLatLng, endLatLng], {
+            color: '#ffffff',
+            weight: 9,
+            opacity: 0.95,
+            dashArray,
+            interactive: false,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(layer);
+        L.polyline([startLatLng, endLatLng], {
+            color: '#e3001b',
+            weight: 5,
+            opacity: 1,
+            dashArray,
+            interactive: false,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(layer);
         // Pas d'étiquette sur la route rouge GPS -> Feu : l'information est affichée dans le bandeau commune.
         return;
-    } else if (isLftwRoute) {
+    }
+
+    L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
+
+    if (isLftwRoute) {
         const tooltipOptions = getRouteLabelNearAirportOptions(startLatLng, endLatLng, 'base');
         L.tooltip({
             permanent: true,
@@ -5871,7 +5892,7 @@ function buildOwnGpsVectorLabel(minutes, latLng) {
         interactive: false,
         icon: L.divIcon({
             className: 'own-gps-vector-time-marker',
-            html: `<div style="font-size:12px;font-weight:900;color:#111;text-shadow:-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff,0 1px 4px rgba(0,0,0,.55);white-space:nowrap;line-height:1;">${minutes}'</div>`,
+            html: `<div style="font-size:12px;font-weight:900;color:#ffea00;text-shadow:-1px -1px 0 #111827,1px -1px 0 #111827,-1px 1px 0 #111827,1px 1px 0 #111827,0 1px 5px rgba(0,0,0,.75);white-space:nowrap;line-height:1;">${minutes}'</div>`,
             iconSize: [28, 16],
             iconAnchor: [-6, 8]
         })
@@ -5895,12 +5916,25 @@ function updateOwnGpsVector(latitude, longitude, headingDeg, speedMps) {
     const endDistanceMeters = speedMps * maxMinutes * 60;
     const end = calculateDestinationLatLng(latitude, longitude, headingDeg, endDistanceMeters);
 
+    /* v13.04 — vecteur de position plus visible : halo noir + trait jaune. */
+    L.polyline([start, end], {
+        color: '#111827',
+        weight: 9,
+        opacity: 0.82,
+        dashArray: '12,7',
+        interactive: false,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }).addTo(layer);
+
     const vectorLine = L.polyline([start, end], {
-        color: '#7c3aed',
-        weight: 4,
-        opacity: 0.9,
-        dashArray: '10,7',
-        interactive: false
+        color: '#ffea00',
+        weight: 5,
+        opacity: 1,
+        dashArray: '12,7',
+        interactive: false,
+        lineCap: 'round',
+        lineJoin: 'round'
     }).addTo(layer);
 
     timeMarksMinutes.forEach((minutes) => {
@@ -5908,10 +5942,10 @@ function updateOwnGpsVector(latitude, longitude, headingDeg, speedMps) {
         const point = calculateDestinationLatLng(latitude, longitude, headingDeg, markDistanceMeters);
 
         L.circleMarker(point, {
-            radius: 4,
-            color: '#7c3aed',
-            weight: 2,
-            fillColor: '#ffffff',
+            radius: 5,
+            color: '#111827',
+            weight: 3,
+            fillColor: '#ffea00',
             fillOpacity: 1,
             interactive: false
         }).addTo(layer);
