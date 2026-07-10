@@ -1,3 +1,23 @@
+NPF-Q400 — TEST v13.12_export_print_styled_preview
+Date : 2026-07-10
+Base : TEST v13.11_export_pdf_partage_reel
+
+Corrections :
+- Export BLOC/FUEL : abandon du PDF texte généré en interne, jugé trop pauvre visuellement.
+- Retour au rendu imprimable HTML stylé, équivalent au premier rendu propre, avec cartes/sections/tableaux bien mis en forme.
+- L’aperçu reste intégré dans l’application avec bouton Fermer : plus besoin de relancer la PWA.
+- Le bouton ouvre directement l’aperçu imprimable ; le PDF se fait via « PDF / Imprimer » puis partage/enregistrement PDF iPad.
+- Bouton renommé « Export PDF ».
+
+Note :
+- Sans bibliothèque PDF dédiée ou service serveur, un vrai PDF graphique fidèle à l’écran est moins fiable qu’un rendu HTML imprimable. La solution retenue privilégie le rendu propre et la fermeture sûre de l’aperçu.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.11_export_pdf_partage_reel
 Date : 2026-07-10
 Base : TEST v13.10_partage_bloc_fuel_vecteur_centre
