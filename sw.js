@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-18-fuel-depart-kg-meme-taille';
+const SW_VERSION = 'sw-v13-19-fuel-depart-kg-pleine-taille';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
