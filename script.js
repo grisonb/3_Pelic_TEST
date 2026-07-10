@@ -3820,6 +3820,13 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     document.dispatchEvent(new Event('communeSelected'));
 }
 
+function selectPelicanOaciFromRoute(oaci) {
+    const normalizedOaci = String(oaci || '').trim().toUpperCase();
+    if (!normalizedOaci) return;
+    selectedPelicanOACI = normalizedOaci;
+    displayCommuneDetails(currentCommune, false);
+}
+
 function drawRoute(startLatLng, endLatLng, options = {}) {
     const { oaci, isUser, isLftwRoute, magneticBearing } = options;
     const distance = calculateDistanceInNm(startLatLng[0], startLatLng[1], endLatLng[0], endLatLng[1]);
@@ -3844,19 +3851,30 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8 }).addTo(layer);
 
         const hitbox = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 20, opacity: 0 }).addTo(layer);
-        hitbox.on('click', () => {
-            selectedPelicanOACI = oaci;
-            displayCommuneDetails(currentCommune, false);
-        });
+        const selectPelicRoute = (event) => {
+            try {
+                if (event && event.originalEvent && typeof event.originalEvent.stopPropagation === 'function') {
+                    event.originalEvent.stopPropagation();
+                }
+            } catch (_) {}
+            selectPelicanOaciFromRoute(oaci);
+        };
+
+        hitbox.on('click', selectPelicRoute);
 
         const tooltipOptions = getRouteLabelNearAirportOptions(startLatLng, endLatLng, 'pelic');
 
-        L.tooltip({
+        const tooltip = L.tooltip({
             permanent: true,
+            interactive: true,
             direction: tooltipOptions.direction,
             offset: tooltipOptions.offset,
-            className: tooltipClass
+            className: `${tooltipClass} route-tooltip-clickable`,
+            bubblingMouseEvents: false
         }).setLatLng(tooltipOptions.latLng).setContent(labelText).addTo(layer);
+
+        tooltip.on('click', selectPelicRoute);
+        tooltip.on('touchstart', selectPelicRoute);
         return;
     } else {
         labelText = `${Math.round(distance)} Nm`;
