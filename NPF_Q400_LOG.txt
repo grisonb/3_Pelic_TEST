@@ -1,3 +1,20 @@
+NPF-Q400 — TEST v13.04_refresh_5s_ligne_position_visible
+Date : 2026-07-10
+Base : TEST v13.03_trafic_bouton_altitude_refresh
+
+Corrections :
+- Rafraîchissement ADS-B passé à 5 secondes.
+- Garde anti-requête ADS-B ajustée à 4,5 secondes pour éviter qu’un cycle à 5 secondes soit ignoré par quelques millisecondes de décalage.
+- Route GPS -> feu rendue plus lisible par double tracé : halo blanc épais + trait rouge renforcé.
+- Vecteur de position propre rendu plus visible : halo noir épais + trait jaune vif, repères 2/5/10 minutes plus contrastés.
+- Icône avion GPS propre renforcée : contour noir, halo blanc et contraste jaune/noir.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.03_trafic_bouton_altitude_refresh
 Date : 2026-07-10
 Base : TEST v13.02_trafic_modal_commune_decalee
