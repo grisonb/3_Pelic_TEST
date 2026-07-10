@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-11-export-pdf-partage-reel';
+const SW_VERSION = 'sw-v13-12-export-print-styled-preview';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
