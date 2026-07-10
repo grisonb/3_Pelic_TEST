@@ -3179,40 +3179,143 @@ function getTrafficSettingsSummary() {
     return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel}`;
 }
 
-function openTrafficSettingsDialog() {
-    const current = sanitizeTrafficSettings(trafficSettings);
-    const radiusInput = window.prompt("Trafic ADS-B — rayon d'affichage en Nm (5 à 250)", String(current.radiusNm));
-    if (radiusInput === null) return;
+function ensureTrafficSettingsModal() {
+    let modal = document.getElementById('traffic-settings-modal');
+    if (modal) return modal;
 
-    const maxAircraftInput = window.prompt("Trafic ADS-B — nombre maximal d'avions affichés (1 à 150)", String(current.maxAircraft));
-    if (maxAircraftInput === null) return;
+    modal = document.createElement('div');
+    modal.id = 'traffic-settings-modal';
+    modal.className = 'traffic-settings-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+        <div class="traffic-settings-card" role="dialog" aria-modal="true" aria-labelledby="traffic-settings-title">
+            <div class="traffic-settings-header">
+                <div>
+                    <div id="traffic-settings-title" class="traffic-settings-title">Filtres ADS-B</div>
+                    <div class="traffic-settings-subtitle">Réglages du calque trafic indicatif</div>
+                </div>
+                <button type="button" id="traffic-settings-close" class="traffic-settings-close" aria-label="Fermer">×</button>
+            </div>
 
-    const minAltitudeInput = window.prompt('Trafic ADS-B — altitude mini en ft (0 = sans mini)', String(current.minAltitudeFt));
-    if (minAltitudeInput === null) return;
+            <div class="traffic-settings-grid">
+                <label class="traffic-settings-field">
+                    <span>Rayon d'affichage</span>
+                    <div class="traffic-settings-input-row">
+                        <input id="traffic-radius-input" type="number" inputmode="numeric" min="5" max="250" step="1">
+                        <em>Nm</em>
+                    </div>
+                </label>
 
-    const maxAltitudeInput = window.prompt('Trafic ADS-B — altitude maxi en ft (laisser vide = sans maxi)', current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt));
-    if (maxAltitudeInput === null) return;
+                <label class="traffic-settings-field">
+                    <span>Nombre maximal d'avions</span>
+                    <div class="traffic-settings-input-row">
+                        <input id="traffic-max-aircraft-input" type="number" inputmode="numeric" min="1" max="150" step="1">
+                        <em>avions</em>
+                    </div>
+                </label>
 
-    saveTrafficSettings({
-        radiusNm: radiusInput,
-        maxAircraft: maxAircraftInput,
-        minAltitudeFt: minAltitudeInput,
-        maxAltitudeFt: maxAltitudeInput.trim() === '' ? null : maxAltitudeInput
+                <label class="traffic-settings-field">
+                    <span>Altitude mini</span>
+                    <div class="traffic-settings-input-row">
+                        <input id="traffic-min-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100">
+                        <em>ft</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field">
+                    <span>Altitude maxi</span>
+                    <div class="traffic-settings-input-row">
+                        <input id="traffic-max-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100" placeholder="vide">
+                        <em>ft</em>
+                    </div>
+                </label>
+            </div>
+
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. Ces filtres ne changent pas la nature indicative/non certifiée de l'ADS-B.</div>
+
+            <div class="traffic-settings-actions">
+                <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
+                <button type="button" id="traffic-settings-cancel" class="traffic-settings-secondary">Annuler</button>
+                <button type="button" id="traffic-settings-apply" class="traffic-settings-primary">Appliquer</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeModal = () => {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+    };
+
+    const fillDefaults = () => {
+        const defaults = sanitizeTrafficSettings(DEFAULT_TRAFFIC_SETTINGS);
+        modal.querySelector('#traffic-radius-input').value = String(defaults.radiusNm);
+        modal.querySelector('#traffic-max-aircraft-input').value = String(defaults.maxAircraft);
+        modal.querySelector('#traffic-min-altitude-input').value = String(defaults.minAltitudeFt);
+        modal.querySelector('#traffic-max-altitude-input').value = '';
+    };
+
+    modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
+    modal.querySelector('#traffic-settings-cancel').addEventListener('click', closeModal);
+    modal.querySelector('#traffic-settings-reset').addEventListener('click', fillDefaults);
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal();
     });
 
-    refreshTrafficButtonState(lastTrafficDisplayedCount);
+    modal.querySelector('#traffic-settings-apply').addEventListener('click', () => {
+        const radiusInput = modal.querySelector('#traffic-radius-input');
+        const maxAircraftInput = modal.querySelector('#traffic-max-aircraft-input');
+        const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
+        const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
 
-    if (showTrafficLayer) {
-        refreshTrafficLayer({ force: true, reason: 'settings' });
-    }
+        saveTrafficSettings({
+            radiusNm: radiusInput.value,
+            maxAircraft: maxAircraftInput.value,
+            minAltitudeFt: minAltitudeInput.value,
+            maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value
+        });
 
-    alert(`Filtres trafic enregistrés.
-${getTrafficSettingsSummary()}`);
+        refreshTrafficButtonState(lastTrafficDisplayedCount);
+
+        if (showTrafficLayer) {
+            refreshTrafficLayer({ force: true, reason: 'settings' });
+        }
+
+        closeModal();
+    });
+
+    return modal;
+}
+
+function openTrafficSettingsDialog() {
+    const current = sanitizeTrafficSettings(trafficSettings);
+    const modal = ensureTrafficSettingsModal();
+
+    modal.querySelector('#traffic-radius-input').value = String(current.radiusNm);
+    modal.querySelector('#traffic-max-aircraft-input').value = String(current.maxAircraft);
+    modal.querySelector('#traffic-min-altitude-input').value = String(current.minAltitudeFt);
+    modal.querySelector('#traffic-max-altitude-input').value = current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt);
+
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+
+    setTimeout(() => {
+        try {
+            modal.querySelector('#traffic-radius-input').focus({ preventScroll: true });
+        } catch (_) {}
+    }, 50);
 }
 
 function installTrafficButtonInteractions(button) {
     if (!button || button.dataset.trafficBound === '1') return;
     button.dataset.trafficBound = '1';
+
+    try {
+        button.setAttribute('draggable', 'false');
+        button.querySelectorAll('*').forEach(child => child.setAttribute('draggable', 'false'));
+    } catch (_) {}
 
     let longPressTimer = null;
     let longPressTriggered = false;
@@ -3224,7 +3327,8 @@ function installTrafficButtonInteractions(button) {
         }
     };
 
-    const startLongPress = () => {
+    const startLongPress = (event) => {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
         clearLongPress();
         longPressTriggered = false;
         longPressTimer = setTimeout(() => {
@@ -3233,6 +3337,8 @@ function installTrafficButtonInteractions(button) {
         }, 650);
     };
 
+    button.addEventListener('selectstart', (event) => event.preventDefault());
+    button.addEventListener('dragstart', (event) => event.preventDefault());
     button.addEventListener('pointerdown', startLongPress);
     button.addEventListener('pointerup', clearLongPress);
     button.addEventListener('pointerleave', clearLongPress);
