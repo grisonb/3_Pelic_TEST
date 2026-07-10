@@ -7098,3 +7098,19 @@ body:not(.app-ready) #nearest-commune-display {
     color: #111827 !important;
     text-shadow: -1px -1px 0 #ffea00, 1px -1px 0 #ffea00, -1px 1px 0 #ffea00, 1px 1px 0 #ffea00 !important;
 }
+
+
+/* ==========================================================================
+   v13.05 TEST — étiquette pélicandrome cliquable
+   ========================================================================== */
+.leaflet-tooltip.route-tooltip-clickable {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    touch-action: manipulation !important;
+}
+
+.leaflet-tooltip.route-tooltip-clickable:active {
+    transform: scale(0.98);
+}
