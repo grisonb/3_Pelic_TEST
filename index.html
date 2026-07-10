@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.06-trafic-zones-alt-relative-vector">
-    <link rel="manifest" href="manifest.json?appv=v13.06-trafic-zones-alt-relative-vector">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.06-trafic-zones-alt-relative-vector">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.06-trafic-zones-alt-relative-vector">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.06-trafic-zones-alt-relative-vector">
+    <link rel="stylesheet" href="style.css?appv=v13.08-post-maj-retablie">
+    <link rel="manifest" href="manifest.json?appv=v13.08-post-maj-retablie">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.08-post-maj-retablie">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.08-post-maj-retablie">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.08-post-maj-retablie">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.06';
+        const APP_VERSION = 'v13.08';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -148,6 +148,50 @@
             window.location.replace(refreshUrl.toString());
         };
         if ('serviceWorker' in navigator) {
+            const activateWaitingServiceWorker = (registration) => {
+                try {
+                    if (registration && registration.waiting) {
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                } catch (_) {}
+            };
+
+            const watchServiceWorkerUpdate = (registration) => {
+                if (!registration || registration.datasetNpfWatched === '1') return;
+                registration.datasetNpfWatched = '1';
+
+                registration.addEventListener('updatefound', () => {
+                    const worker = registration.installing;
+                    if (!worker) return;
+
+                    worker.addEventListener('statechange', () => {
+                        if (worker.state === 'installed') {
+                            try {
+                                localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
+                                localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                            } catch (_) {}
+                            worker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    });
+                });
+            };
+
+            const checkForServiceWorkerUpdate = async () => {
+                try {
+                    const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+                    console.log('Service Worker enregistré:', reg);
+                    watchServiceWorkerUpdate(reg);
+                    activateWaitingServiceWorker(reg);
+                    if (typeof reg.update === 'function') {
+                        const updatedReg = await reg.update().catch(() => reg);
+                        watchServiceWorkerUpdate(updatedReg || reg);
+                        activateWaitingServiceWorker(updatedReg || reg);
+                    }
+                } catch (err) {
+                    console.log('Erreur enregistrement Service Worker:', err);
+                }
+            };
+
             window.addEventListener('load', async () => {
                 try {
                     const previousVersion = localStorage.getItem(APP_VERSION_STORAGE_KEY);
@@ -155,9 +199,6 @@
                         if (previousVersion) {
                             localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
                             localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
-                            // v12.92 — afficher immédiatement la consigne de relance au premier chargement de la nouvelle version,
-                            // sans attendre un lancement supplémentaire de la PWA iPad.
-                            setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 0);
                         }
                         localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
                         sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
@@ -166,27 +207,16 @@
                     console.log('Version refresh warning:', e);
                 }
 
-                try {
-                    const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-                    console.log('Service Worker enregistré:', reg);
-
-                    /*
-                     * v12.55 — demande explicite d'activation quand un SW neuf
-                     * est déjà en attente. Cela évite de garder l'ancien cache
-                     * applicatif jusqu'à une fermeture complète de la PWA.
-                     */
-                    try {
-                        if (reg.waiting) {
-                            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                        }
-                        if (typeof reg.update === 'function') {
-                            reg.update().catch(() => {});
-                        }
-                    } catch (_) {}
-                } catch (err) {
-                    console.log('Erreur enregistrement Service Worker:', err);
-                }
+                await checkForServiceWorkerUpdate();
             });
+
+            window.addEventListener('pageshow', () => {
+                checkForServiceWorkerUpdate();
+            }, { passive: true });
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) checkForServiceWorkerUpdate();
+            }, { passive: true });
         }
 
 
@@ -195,8 +225,8 @@
                 const pending = localStorage.getItem('npfPostUpdateRestartNoticePending') === '1';
                 const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
                 if (!pending && !noticeVersion) return;
-                // v12.92 — un marqueur pending doit toujours afficher l'alerte, même si la valeur
-                // enregistrée provient de l'ancienne version qui vient de demander la MAJ.
+                // Un marqueur pending doit afficher l'alerte même si la valeur enregistrée
+                // provient de l'ancienne version qui vient de demander la MAJ.
                 if (!pending && noticeVersion && noticeVersion !== APP_VERSION) return;
                 if (document.getElementById('post-update-restart-modal')) return;
 
@@ -212,11 +242,10 @@
                 document.body.appendChild(modal);
 
                 /*
-                 * v12.82 — fenêtre post-MAJ persistante : pas de bouton OK et
-                 * pas de fermeture au toucher. Le message reste affiché tant
-                 * que l'application n'est pas fermée/relancée. On efface le
-                 * marqueur dès l'affichage pour ne pas le revoir au lancement
-                 * suivant.
+                 * v13.08 : la fenêtre post-MAJ est rétablie.
+                 * Elle sert d'indication volontaire après bascule de version.
+                 * Le marqueur est effacé dès l'affichage pour ne pas la revoir
+                 * au lancement suivant.
                  */
                 try {
                     localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
@@ -355,7 +384,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.06-trafic-zones-alt-relative-vector"></script>
+    <script src="script.js?appv=v13.08-post-maj-retablie"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
