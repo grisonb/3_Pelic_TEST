@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-04-refresh-5s-ligne-position-visible';
+const SW_VERSION = 'sw-v13-05-pelic-label-click';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
