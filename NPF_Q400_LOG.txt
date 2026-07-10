@@ -1,3 +1,21 @@
+NPF-Q400 — TEST v13.09_export_bloc_fuel_vecteur_trafic
+Date : 2026-07-10
+Base : TEST v13.08_post_maj_retablie
+
+Corrections :
+- Vecteur pointillé trafic recentré sur le milieu exact de l’icône avion trafic.
+- Vecteur trafic légèrement allongé pour mieux matérialiser la route ADS-B.
+- Dans BLOC/FUEL, suppression du bouton « Nouveau » dans la barre des vols.
+- Ajout d’un bouton « Export PDF » après « Supprimer ».
+- Export BLOC/FUEL tous vols : le bouton exporte tous les vols enregistrés, quelle que soit la page de vol actuellement sélectionnée.
+- Export sous forme de page imprimable/PDF reprenant les champs BLOC départ, FUEL départ, Base, TMD, limite HDV et le tableau jusqu’à la dernière ligne BLOC arrivée de chaque vol.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.08_post_maj_retablie
 Date : 2026-07-10
 Base : TEST v13.07_maj_trafic_modal_vecteurs
