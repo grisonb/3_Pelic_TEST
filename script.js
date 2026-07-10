@@ -3691,9 +3691,10 @@ function buildTrafficMarkerIcon(aircraft) {
     const altitudeHtml = settings.showAltitudeLabel && aircraft.altitude && aircraft.altitude !== '--'
         ? `<span class="traffic-aircraft-altitude-label">${escapeHtml(aircraft.altitude)}</span>`
         : '';
+
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
+        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: translate(-50%, -50%) rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
         iconSize: [128, 128],
         iconAnchor: [64, 64],
         popupAnchor: [0, -52]
@@ -10730,12 +10731,13 @@ function initializeCalculator() {
         return rows;
     }
 
-    function buildBlocFuelExportHtml() {
+    function buildBlocFuelExportHtml(options = {}) {
         updateActiveFlightStateFromDom();
         ensureFlightsLoadedFromStorage();
         normalizeFlightNumbers();
 
         const exportDate = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+        const includeControls = !!options.includeControls;
         const safe = (value) => escapeHtml(value || '');
         const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
 
@@ -10800,7 +10802,9 @@ function initializeCalculator() {
     .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; border-bottom: 3px solid #005a9c; padding-bottom: 10px; }
     h1 { margin: 0; font-size: 26px; color: #005a9c; }
     .meta { text-align: right; font-size: 13px; color: #475569; font-weight: 700; }
-    .print-button { position: fixed; right: 18px; bottom: 18px; z-index: 10; border: 0; border-radius: 12px; background: #005a9c; color: #fff; padding: 12px 18px; font-size: 16px; font-weight: 900; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+    .export-toolbar { position: fixed; right: 18px; bottom: 18px; z-index: 10; display: flex; gap: 8px; align-items: center; }
+    .export-toolbar button { border: 0; border-radius: 12px; background: #005a9c; color: #fff; padding: 12px 16px; font-size: 15px; font-weight: 900; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+    .export-toolbar .close-export-btn { background: #334155; }
     .flight-section { page-break-inside: avoid; margin: 0 0 18px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; }
     .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
     h2 { margin: 0; font-size: 21px; color: #0f172a; }
@@ -10815,38 +10819,112 @@ function initializeCalculator() {
     td { font-weight: 800; }
     tr.first-full-row td { background: #fff7ed; }
     .empty-row { color: #64748b; font-style: italic; padding: 16px; }
-    @media print { .print-button { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
+    @media print { .export-toolbar { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
 </style>
 </head>
 <body>
-    <button class="print-button" onclick="window.print()">Exporter / Imprimer en PDF</button>
+    ${includeControls ? `<div class="export-toolbar"><button onclick="shareBlocFuelPreview()">Partager</button><button onclick="window.print()">PDF / Imprimer</button><button class="close-export-btn" onclick="closeBlocFuelPreview()">Fermer</button></div>` : ''}
     <div class="topbar">
         <div>
             <h1>NPF-Q400 — Export BLOC/FUEL</h1>
             <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.09')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.10')}</div>
     </div>
     ${flightSections}
-    <script>setTimeout(() => { try { window.print(); } catch (_) {} }, 450);<\/script>
+    <script>
+    function closeBlocFuelPreview() {
+        try { window.close(); } catch (_) {}
+        setTimeout(function () {
+            try {
+                if (!window.closed) {
+                    document.body.classList.add('export-close-failed');
+                    alert("Fermez cet aperçu avec le bouton retour ou la gestion des fenêtres de l’iPad.");
+                }
+            } catch (_) {}
+        }, 250);
+    }
+    async function shareBlocFuelPreview() {
+        try {
+            const clone = document.documentElement.cloneNode(true);
+            clone.querySelectorAll('.export-toolbar, script').forEach(function (el) { el.remove(); });
+            const html = '<!doctype html>\n' + clone.outerHTML;
+            const file = new File([html], 'NPF_Q400_BLOC_FUEL.html', { type: 'text/html' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ title: 'NPF-Q400 BLOC/FUEL', text: 'Export BLOC/FUEL NPF-Q400', files: [file] });
+                return;
+            }
+            if (navigator.share) {
+                await navigator.share({ title: 'NPF-Q400 BLOC/FUEL', text: 'Export BLOC/FUEL NPF-Q400' });
+                return;
+            }
+            alert('Partage natif non disponible sur ce navigateur. Utilisez PDF / Imprimer.');
+        } catch (error) {
+            if (error && error.name === 'AbortError') return;
+            alert('Partage impossible : ' + (error && error.message ? error.message : error));
+        }
+    }
+    <\/script>
 </body>
 </html>`;
     }
 
-    function exportBlocFuelPdf() {
+    function buildBlocFuelExportFileName() {
+        const date = new Date();
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `NPF_Q400_BLOC_FUEL_${yyyy}${mm}${dd}.html`;
+    }
+
+    async function shareBlocFuelExportHtml(html) {
+        if (!navigator.share) return false;
+
+        const fileName = buildBlocFuelExportFileName();
+        const file = new File([html], fileName, { type: 'text/html' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                title: 'NPF-Q400 — BLOC/FUEL',
+                text: 'Export BLOC/FUEL NPF-Q400',
+                files: [file]
+            });
+            return true;
+        }
+
+        await navigator.share({
+            title: 'NPF-Q400 — BLOC/FUEL',
+            text: 'Export BLOC/FUEL NPF-Q400'
+        });
+        return true;
+    }
+
+    function openBlocFuelExportPreview() {
+        const html = buildBlocFuelExportHtml({ includeControls: true });
+        const previewWindow = window.open('', '_blank');
+        if (!previewWindow) {
+            alert('Aperçu export impossible : la fenêtre a été bloquée. Autorisez les fenêtres pop-up pour NPF-Q400.');
+            return;
+        }
+        previewWindow.document.open();
+        previewWindow.document.write(html);
+        previewWindow.document.close();
+    }
+
+    async function exportBlocFuelPdf() {
         try {
-            const html = buildBlocFuelExportHtml();
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                alert('Export PDF impossible : la fenêtre a été bloquée. Autorisez les fenêtres pop-up pour NPF-Q400.');
-                return;
+            const html = buildBlocFuelExportHtml({ includeControls: false });
+            try {
+                const shared = await shareBlocFuelExportHtml(html);
+                if (shared) return;
+            } catch (shareError) {
+                if (shareError && shareError.name === 'AbortError') return;
+                console.warn('Partage BLOC/FUEL indisponible, bascule aperçu:', shareError);
             }
-            printWindow.document.open();
-            printWindow.document.write(html);
-            printWindow.document.close();
+            openBlocFuelExportPreview();
         } catch (error) {
             console.error('Export BLOC/FUEL impossible:', error);
-            alert(`Export PDF impossible : ${error.message || error}`);
+            alert(`Export BLOC/FUEL impossible : ${error.message || error}`);
         }
     }
 
