@@ -1,3 +1,18 @@
+NPF-Q400 — TEST v13.05_pelic_label_click
+Date : 2026-07-10
+Base : TEST v13.04_refresh_5s_ligne_position_visible
+
+Corrections :
+- Sélection du pélicandrome possible directement par clic/tap sur son étiquette OACI.
+- Conservation de l’ancien comportement : le clic sur le vecteur feu-pélicandrome fonctionne toujours.
+- Étiquette pélicandrome rendue interactive avec curseur/touch-action dédiée et sélection de texte désactivée.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.04_refresh_5s_ligne_position_visible
 Date : 2026-07-10
 Base : TEST v13.03_trafic_bouton_altitude_refresh
