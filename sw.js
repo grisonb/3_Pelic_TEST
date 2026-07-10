@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-08-post-maj-retablie';
+const SW_VERSION = 'sw-v13-09-export-bloc-fuel-vecteur-trafic';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
