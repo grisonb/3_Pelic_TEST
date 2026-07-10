@@ -1,3 +1,17 @@
+NPF-Q400 — TEST v13.19_fuel_depart_kg_pleine_taille
+Date : 2026-07-10
+Base : TEST v13.18_fuel_depart_kg_meme_taille
+
+Correction :
+- Export BLOC/FUEL : correction de spécificité CSS. Dans la carte FUEL DÉPART, l’unité « kg » prend maintenant strictement la même taille que la quantité.
+- Aucune modification du comportement d’export ni du nom de fichier PDF, laissé tel quel à cause de la limite iPadOS/PWA constatée.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.18_fuel_depart_kg_meme_taille
 Date : 2026-07-10
 Base : TEST v13.17_export_layout_filename_blob
