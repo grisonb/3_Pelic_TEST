@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-10-partage-bloc-fuel-vecteur-centre';
+const SW_VERSION = 'sw-v13-11-export-pdf-partage-reel';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
