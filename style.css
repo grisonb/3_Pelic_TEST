@@ -7496,3 +7496,71 @@ body:not(.app-ready) #nearest-commune-display {
         padding-right: 6px;
     }
 }
+
+
+/* ==========================================================================
+   v13.14 TEST — ajustements UI, export, position et trafic masqué
+   ========================================================================== */
+#traffic-layer-button {
+    display: none !important;
+}
+
+#bloc-fuel .flight-manager-bar {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+#bloc-fuel .flight-manager-bar label.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+#bloc-fuel #flight-select {
+    flex: 0 0 250px !important;
+    min-width: 250px !important;
+}
+
+#bloc-fuel .flight-manager-bar button {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+}
+
+#bloc-fuel .flight-duration-summary {
+    margin-left: 0 !important;
+    flex: 0 0 auto !important;
+    min-height: 36px !important;
+    white-space: nowrap !important;
+}
+
+#previ-rotations .analyse-col:nth-child(2) .rotations-group .analyse-col-title,
+#suivi-rotations .analyse-col:nth-child(2) .rotations-group .analyse-col-title {
+    display: none !important;
+}
+
+#previ-rotations .analyse-col:nth-child(2) .rotations-group,
+#suivi-rotations .analyse-col:nth-child(2) .rotations-group {
+    padding-top: 14px !important;
+}
+
+#previ-rotations .analyse-col:nth-child(2) .rotations-group .result-line:first-of-type,
+#suivi-rotations .analyse-col:nth-child(2) .rotations-group .result-line:first-of-type {
+    margin-top: 0 !important;
+}
+
+@media (max-width: 760px) {
+    #bloc-fuel .flight-manager-bar {
+        flex-wrap: wrap !important;
+    }
+    #bloc-fuel #flight-select {
+        flex: 1 1 210px !important;
+        min-width: 210px !important;
+    }
+}
