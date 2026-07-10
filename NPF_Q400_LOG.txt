@@ -1,3 +1,22 @@
+NPF-Q400 — TEST v13.06_trafic_zones_alt_relative_vector
+Date : 2026-07-10
+Base : TEST v13.05_pelic_label_click
+
+Corrections :
+- Bandeau « Survolée » abaissé en priorité d'affichage : il reste visible sur la carte mais ne passe plus devant les fenêtres/panneaux comme Suivi rotation ou Importation cartes.
+- Filtres trafic ADS-B enrichis : cases « Trafic autour de ma position » et « Trafic autour du feu ».
+- Si les deux cases sont cochées, les requêtes ADS-B sont faites autour des deux points puis les aéronefs sont fusionnés/dédoublonnés.
+- Ajout du filtre « Tranche autour de mon altitude » avec valeur paramétrable, par défaut ±1500 ft, basé sur l'altitude GPS disponible.
+- Renommage de la case altitude en « Etiquette Alt. Trafics » sans titre séparé.
+- Ajout d'un petit vecteur de déplacement en pointillés sur les symboles trafic, orienté selon la route/track ADS-B.
+- Conservation du rafraîchissement ADS-B à 5 secondes avec garde interne 4,5 secondes.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.05_pelic_label_click
 Date : 2026-07-10
 Base : TEST v13.04_refresh_5s_ligne_position_visible
