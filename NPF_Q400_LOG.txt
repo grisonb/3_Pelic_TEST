@@ -1,3 +1,22 @@
+NPF-Q400 — TEST v13.14_ui_export_sans_trafic
+Date : 2026-07-10
+Base : TEST v13.13_export_bloc_fuel_layout_fix
+
+Corrections :
+- Export BLOC/FUEL : alignement renforcé des cartes d’en-tête, notamment FUEL DÉPART et son unité kg.
+- Position GPS : suppression du popup « Votre position » au clic sur l’avion, pour éviter de masquer/surcharger le clic lorsqu’il est confondu avec un pélicandrome.
+- BLOC/FUEL : suppression visuelle du libellé « Vol n° » dans la barre, car l’information est déjà dans le menu déroulant.
+- BLOC/FUEL : résumé des heures de vol placé sur la même ligne que les boutons quand la largeur le permet.
+- BLOC/FUEL : résumé simplifié en « Tps de vol : … / Total : … ».
+- Trafic ADS-B : code conservé, mais fonction désactivée par défaut et bouton TRAFIC masqué.
+- Prévi rotations et Suivi rotations : contenu de la fenêtre de droite remonté comme dans Déroutement / GAAR.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.13_export_bloc_fuel_layout_fix
 Date : 2026-07-10
 Base : TEST v13.12_export_print_styled_preview
