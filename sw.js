@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-05-pelic-label-click';
+const SW_VERSION = 'sw-v13-06-trafic-zones-alt-relative-vector';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
