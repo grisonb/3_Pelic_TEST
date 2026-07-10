@@ -10738,12 +10738,41 @@ function initializeCalculator() {
         return rows;
     }
 
+    function getBlocFuelExportTimestamp(date = new Date()) {
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yy = String(date.getFullYear()).slice(-2);
+        const hh = String(date.getHours()).padStart(2, '0');
+        const min = String(date.getMinutes()).padStart(2, '0');
+        return `${dd}/${mm}/${yy} ${hh}:${min}`;
+    }
+
+    function getBlocFuelExportTitle(date = new Date()) {
+        return `NPF-Q400 ${getBlocFuelExportTimestamp(date)}`;
+    }
+
+    function getBlocFuelExportSafeFileName(extension = 'pdf', date = new Date()) {
+        const timestamp = getBlocFuelExportTimestamp(date)
+            .replace(/\//g, '-')
+            .replace(/:/g, 'h');
+        return `NPF-Q400 ${timestamp}.${extension}`;
+    }
+
+    function getBlocFuelFlightsForExport() {
+        return dailyFlights
+            .map((flight, originalIndex) => ({ flight, originalIndex }))
+            .filter(({ flight }) => parseTime(flight?.state?.['bloc-depart']) !== null);
+    }
+
     function buildBlocFuelExportHtml(options = {}) {
         updateActiveFlightStateFromDom();
         ensureFlightsLoadedFromStorage();
         normalizeFlightNumbers();
 
-        const exportDate = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+        const exportGeneratedAt = options.exportGeneratedAt instanceof Date ? options.exportGeneratedAt : new Date();
+        const exportDate = getBlocFuelExportTimestamp(exportGeneratedAt);
+        const exportTitle = getBlocFuelExportTitle(exportGeneratedAt);
+        const exportHtmlFileName = getBlocFuelExportSafeFileName('html', exportGeneratedAt);
         const includeControls = !!options.includeControls;
         const safe = (value) => escapeHtml(value || '');
         const stripKgForExport = (value) => String(value ?? '')
@@ -10757,11 +10786,19 @@ function initializeCalculator() {
             return `<span class="kg-inline"><span class="kg-number">${safe(clean)}</span><span class="kg-unit">kg</span></span>`;
         };
         const plainExportHtml = (value, fallback = '--') => safe(String(value ?? '').trim() || fallback);
-        const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+        const flightsForExport = getBlocFuelFlightsForExport();
+        const totalHdv = flightsForExport.reduce((total, item) => total + getFlightDurationFromState(item.flight.state), 0);
+        let cumulativeExportHdv = 0;
 
-        const flightSections = dailyFlights.map((flight, index) => {
+        const flightSections = flightsForExport.length ? flightsForExport.map(({ flight, originalIndex }, exportIndex) => {
             const state = flight.state || {};
-            const rows = getBlocFuelExportRowCalculations(state, index);
+            const rows = getBlocFuelExportRowCalculations(state, originalIndex);
+            const flightDuration = getFlightDurationFromState(state);
+            cumulativeExportHdv += flightDuration;
+            const flightDurationLabel = formatDurationForFlightSummary(flightDuration);
+            const titleDurationLabel = exportIndex > 0
+                ? `Tps de vol : ${safe(flightDurationLabel)} / Total : ${safe(formatDurationForFlightSummary(cumulativeExportHdv))}`
+                : `Tps de vol : ${safe(flightDurationLabel)}`;
             const rowsHtml = rows.length
                 ? rows.map(row => `
                     <tr${row.isFirstFullRlt ? ' class="first-full-row"' : ''}>
@@ -10779,8 +10816,8 @@ function initializeCalculator() {
             return `
                 <section class="flight-section">
                     <div class="flight-title-row">
-                        <h2>Vol n°${flight.number || index + 1}${flight.closed ? ' — clôturé' : ''}</h2>
-                        <span>Tps de vol : ${safe(formatDurationForFlightSummary(getFlightDurationFromState(state)))}</span>
+                        <h2>Vol n°${flight.number || exportIndex + 1}${flight.closed ? ' — clôturé' : ''}</h2>
+                        <span>${titleDurationLabel}</span>
                     </div>
                     <div class="header-grid">
                         <div><b>BLOC DÉPART</b><span>${plainExportHtml(state['bloc-depart'], '--:--')}</span></div>
@@ -10805,13 +10842,13 @@ function initializeCalculator() {
                         <tbody>${rowsHtml}</tbody>
                     </table>
                 </section>`;
-        }).join('');
+        }).join('') : '<section class="flight-section"><h2>Aucun vol avec BLOC DÉPART renseigné</h2></section>';
 
         return `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>NPF-Q400 — Export BLOC/FUEL</title>
+<title>${safe(exportTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
     @page { size: A4 landscape; margin: 10mm; }
@@ -10828,11 +10865,11 @@ function initializeCalculator() {
     h2 { margin: 0; font-size: 21px; color: #0f172a; }
     .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; white-space: nowrap; }
     .header-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 78px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
-    .header-grid b { display: block; min-height: 0; margin-bottom: 7px; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
-    .header-grid span { display: flex; align-items: baseline; justify-content: flex-start; width: 100%; margin-top: 0; font-size: 20px; line-height: 1.05; font-weight: 950; color: #111827; white-space: nowrap; overflow: hidden; }
-    .header-grid span .kg-inline { justify-content: flex-start !important; max-width: 100%; }
-    .header-grid span .kg-unit { font-size: .54em !important; }
+    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 84px; overflow: hidden; display: grid; grid-template-rows: 30px 1fr; align-items: stretch; }
+    .header-grid b { display: flex; align-items: flex-start; min-height: 30px; margin: 0; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
+    .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 20px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: hidden; }
+    .header-grid span .kg-inline { justify-content: flex-start !important; max-width: 100%; min-width: 0; }
+    .header-grid span .kg-unit { font-size: .50em !important; }
     .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
     .kg-number { display: inline-block; line-height: 1 !important; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
@@ -10859,10 +10896,10 @@ function initializeCalculator() {
     ${includeControls ? `<div class="export-toolbar"><button onclick="shareBlocFuelPreview()">Partager</button><button onclick="window.print()">PDF / Imprimer</button><button class="close-export-btn" onclick="closeBlocFuelPreview()">Fermer</button></div>` : ''}
     <div class="topbar">
         <div>
-            <h1>NPF-Q400 — Export BLOC/FUEL</h1>
-            <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
+            <h1>${safe(exportTitle)}</h1>
+            <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.14')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.15')}</div>
     </div>
     ${flightSections}
     <script>
@@ -10882,13 +10919,13 @@ function initializeCalculator() {
             const clone = document.documentElement.cloneNode(true);
             clone.querySelectorAll('.export-toolbar, script').forEach(function (el) { el.remove(); });
             const html = '<!doctype html>\n' + clone.outerHTML;
-            const file = new File([html], 'NPF_Q400_BLOC_FUEL.html', { type: 'text/html' });
+            const file = new File([html], '${safe(exportHtmlFileName)}', { type: 'text/html' });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ title: 'NPF-Q400 BLOC/FUEL', text: 'Export BLOC/FUEL NPF-Q400', files: [file] });
+                await navigator.share({ title: '${safe(exportTitle)}', text: 'Export BLOC/FUEL NPF-Q400', files: [file] });
                 return;
             }
             if (navigator.share) {
-                await navigator.share({ title: 'NPF-Q400 BLOC/FUEL', text: 'Export BLOC/FUEL NPF-Q400' });
+                await navigator.share({ title: '${safe(exportTitle)}', text: 'Export BLOC/FUEL NPF-Q400' });
                 return;
             }
             alert('Partage natif non disponible sur ce navigateur. Utilisez PDF / Imprimer.');
@@ -10903,11 +10940,7 @@ function initializeCalculator() {
     }
 
     function buildBlocFuelExportFileName(extension = 'pdf') {
-        const date = new Date();
-        const yyyy = date.getFullYear();
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const dd = String(date.getDate()).padStart(2, '0');
-        return `NPF_Q400_BLOC_FUEL_${yyyy}${mm}${dd}.${extension}`;
+        return getBlocFuelExportSafeFileName(extension, new Date());
     }
 
     function normalizePdfText(value) {
@@ -10967,19 +11000,28 @@ function initializeCalculator() {
         const addBlank = () => addLine('');
         const addSeparator = () => addLine('-'.repeat(118));
 
-        const exportDate = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-        const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+        const exportGeneratedAt = new Date();
+        const exportDate = getBlocFuelExportTimestamp(exportGeneratedAt);
+        const exportTitle = getBlocFuelExportTitle(exportGeneratedAt);
+        const flightsForExport = getBlocFuelFlightsForExport();
+        const totalHdv = flightsForExport.reduce((total, item) => total + getFlightDurationFromState(item.flight.state), 0);
+        let cumulativeExportHdv = 0;
 
-        addLine('NPF-Q400 - Export BLOC/FUEL');
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.14'}`);
-        addLine(`Total vols : ${dailyFlights.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
+        addLine(exportTitle);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.15'}`);
+        addLine(`Total vols exportes : ${flightsForExport.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
-        dailyFlights.forEach((flight, index) => {
+        flightsForExport.forEach(({ flight, originalIndex }, exportIndex) => {
             const state = flight.state || {};
-            const rows = getBlocFuelExportRowCalculations(state, index);
+            const rows = getBlocFuelExportRowCalculations(state, originalIndex);
+            const flightDuration = getFlightDurationFromState(state);
+            cumulativeExportHdv += flightDuration;
+            const durationText = exportIndex > 0
+                ? `Tps de vol : ${formatDurationForFlightSummary(flightDuration)} / Total : ${formatDurationForFlightSummary(cumulativeExportHdv)}`
+                : `Tps de vol : ${formatDurationForFlightSummary(flightDuration)}`;
             addBlank();
-            addLine(`VOL N°${flight.number || index + 1}${flight.closed ? ' - cloture' : ''}    Tps de vol : ${formatDurationForFlightSummary(getFlightDurationFromState(state))}`);
+            addLine(`VOL N°${flight.number || exportIndex + 1}${flight.closed ? ' - cloture' : ''}    ${durationText}`);
             addLine(`BLOC DEPART : ${state['bloc-depart'] || '--:--'}    FUEL Depart : ${state['fuel-depart'] || '-- kg'}    Base : ${state['base-oaci-input'] || selectedBaseOACI || DEFAULT_BASE_OACI}    TMD : ${state['tmd'] || '--:--'}    LIMITE HDV : ${state['limite-hdv'] || '--:--'}`);
             addLine('BLOC Arr | FUEL Pelic | OACI | Masse Rlt | Duree Rot | Fuel Rot | Tps Vol | Restant');
             addSeparator();
