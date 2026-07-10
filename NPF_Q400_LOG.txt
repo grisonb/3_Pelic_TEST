@@ -1,3 +1,21 @@
+NPF-Q400 — TEST v13.11_export_pdf_partage_reel
+Date : 2026-07-10
+Base : TEST v13.10_partage_bloc_fuel_vecteur_centre
+
+Corrections :
+- Export BLOC/FUEL : suppression du fallback de partage texte simple, qui produisait un fichier texte avec une seule ligne.
+- Création d’un vrai fichier PDF BLOC/FUEL généré localement dans le navigateur.
+- Le bouton Partager tente maintenant de partager ce fichier PDF via la feuille de partage native si le navigateur l’autorise.
+- Si le partage direct de fichier PDF n’est pas disponible, ouverture d’un aperçu intégré à l’application avec boutons Partager PDF, PDF / Imprimer et Fermer.
+- L’aperçu n’ouvre plus une fenêtre externe impossible à fermer dans la PWA.
+- L’export continue de reprendre tous les vols enregistrés, quelle que soit la page de vol active.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.10_partage_bloc_fuel_vecteur_centre
 Date : 2026-07-10
 Base : TEST v13.09_export_bloc_fuel_vecteur_trafic
