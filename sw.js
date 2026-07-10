@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-01-commune-gauche-trafic-filtres';
+const SW_VERSION = 'sw-v13-02-trafic-modal-commune-decalee';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
