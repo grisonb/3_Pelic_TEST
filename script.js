@@ -488,7 +488,11 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     maxAircraft: TRAFFIC_MAX_AIRCRAFT,
     minAltitudeFt: 0,
     maxAltitudeFt: null,
-    showAltitudeLabel: false
+    showAltitudeLabel: false,
+    relativeAltitudeEnabled: false,
+    relativeAltitudeBandFt: 1500,
+    trafficAroundOwnPosition: true,
+    trafficAroundFire: true
 });
 let trafficSettings = loadTrafficSettings();
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
@@ -3138,6 +3142,11 @@ function sanitizeTrafficSettings(candidate = {}) {
         return Number.isFinite(num) ? Math.round(num) : defaultValue;
     };
 
+    const asBool = (value, defaultValue = false) => {
+        if (value === undefined || value === null || value === '') return !!defaultValue;
+        return value === true || value === 'true' || value === '1' || value === 'on' || value === 1;
+    };
+
     const radiusNm = Math.max(5, Math.min(250, parseIntOr(candidate.radiusNm, fallback.radiusNm)));
     const maxAircraft = Math.max(1, Math.min(150, parseIntOr(candidate.maxAircraft, fallback.maxAircraft)));
     const minAltitudeFt = Math.max(0, Math.min(60000, parseIntOr(candidate.minAltitudeFt, fallback.minAltitudeFt)));
@@ -3153,9 +3162,27 @@ function sanitizeTrafficSettings(candidate = {}) {
         maxAltitudeFt = minAltitudeFt;
     }
 
-    const showAltitudeLabel = candidate.showAltitudeLabel === true || candidate.showAltitudeLabel === 'true' || candidate.showAltitudeLabel === '1' || candidate.showAltitudeLabel === 'on';
+    const showAltitudeLabel = asBool(candidate.showAltitudeLabel, fallback.showAltitudeLabel);
+    const relativeAltitudeEnabled = asBool(candidate.relativeAltitudeEnabled, fallback.relativeAltitudeEnabled);
+    const relativeAltitudeBandFt = Math.max(100, Math.min(10000, parseIntOr(candidate.relativeAltitudeBandFt, fallback.relativeAltitudeBandFt)));
+    let trafficAroundOwnPosition = asBool(candidate.trafficAroundOwnPosition, fallback.trafficAroundOwnPosition);
+    let trafficAroundFire = asBool(candidate.trafficAroundFire, fallback.trafficAroundFire);
 
-    return { radiusNm, maxAircraft, minAltitudeFt, maxAltitudeFt, showAltitudeLabel };
+    if (!trafficAroundOwnPosition && !trafficAroundFire) {
+        trafficAroundOwnPosition = true;
+    }
+
+    return {
+        radiusNm,
+        maxAircraft,
+        minAltitudeFt,
+        maxAltitudeFt,
+        showAltitudeLabel,
+        relativeAltitudeEnabled,
+        relativeAltitudeBandFt,
+        trafficAroundOwnPosition,
+        trafficAroundFire
+    };
 }
 
 function loadTrafficSettings() {
@@ -3179,8 +3206,12 @@ function saveTrafficSettings(settings) {
 function getTrafficSettingsSummary() {
     const settings = sanitizeTrafficSettings(trafficSettings);
     const altitudeMaxLabel = settings.maxAltitudeFt === null ? 'sans maxi' : `${settings.maxAltitudeFt} ft`;
-    const altitudeLabel = settings.showAltitudeLabel ? 'étiquette altitude ON' : 'étiquette altitude OFF';
-    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel} · ${altitudeLabel}`;
+    const altitudeLabel = settings.showAltitudeLabel ? 'étiquette alt ON' : 'étiquette alt OFF';
+    const relativeLabel = settings.relativeAltitudeEnabled ? `±${settings.relativeAltitudeBandFt} ft autour GPS` : 'altitude absolue';
+    const referenceLabels = [];
+    if (settings.trafficAroundOwnPosition) referenceLabels.push('GPS');
+    if (settings.trafficAroundFire) referenceLabels.push('feu');
+    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel} · ${relativeLabel} · ${altitudeLabel} · autour ${referenceLabels.join(' + ')}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -3235,15 +3266,40 @@ function ensureTrafficSettingsModal() {
                 </label>
 
                 <label class="traffic-settings-field traffic-settings-checkbox-field">
-                    <span>Étiquette altitude</span>
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-around-own-input" type="checkbox">
+                        <em>Trafic autour de ma position</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-around-fire-input" type="checkbox">
+                        <em>Trafic autour du feu</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-relative-altitude-input" type="checkbox">
+                        <em>Tranche autour de mon altitude</em>
+                    </div>
+                    <div class="traffic-settings-input-row traffic-settings-nested-input-row">
+                        <span>±</span>
+                        <input id="traffic-relative-band-input" type="number" inputmode="numeric" min="100" max="10000" step="100">
+                        <em>ft</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
                     <div class="traffic-settings-check-row">
                         <input id="traffic-altitude-label-input" type="checkbox">
-                        <em>Afficher l'altitude à côté des avions</em>
+                        <em>Etiquette Alt. Trafics</em>
                     </div>
                 </label>
             </div>
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. Rafraîchissement ADS-B toutes les 15 secondes. Ces filtres ne changent pas la nature indicative/non certifiée de l'ADS-B.</div>
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. La tranche autour de mon altitude utilise l'altitude GPS disponible. Rafraîchissement ADS-B toutes les 5 secondes. Ces filtres ne changent pas la nature indicative/non certifiée de l'ADS-B.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -3266,6 +3322,10 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-max-aircraft-input').value = String(defaults.maxAircraft);
         modal.querySelector('#traffic-min-altitude-input').value = String(defaults.minAltitudeFt);
         modal.querySelector('#traffic-max-altitude-input').value = '';
+        modal.querySelector('#traffic-around-own-input').checked = !!defaults.trafficAroundOwnPosition;
+        modal.querySelector('#traffic-around-fire-input').checked = !!defaults.trafficAroundFire;
+        modal.querySelector('#traffic-relative-altitude-input').checked = !!defaults.relativeAltitudeEnabled;
+        modal.querySelector('#traffic-relative-band-input').value = String(defaults.relativeAltitudeBandFt);
         modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
     };
 
@@ -3282,6 +3342,10 @@ function ensureTrafficSettingsModal() {
         const maxAircraftInput = modal.querySelector('#traffic-max-aircraft-input');
         const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
+        const aroundOwnInput = modal.querySelector('#traffic-around-own-input');
+        const aroundFireInput = modal.querySelector('#traffic-around-fire-input');
+        const relativeAltitudeInput = modal.querySelector('#traffic-relative-altitude-input');
+        const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
         const altitudeLabelInput = modal.querySelector('#traffic-altitude-label-input');
 
         saveTrafficSettings({
@@ -3289,6 +3353,10 @@ function ensureTrafficSettingsModal() {
             maxAircraft: maxAircraftInput.value,
             minAltitudeFt: minAltitudeInput.value,
             maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value,
+            trafficAroundOwnPosition: !!aroundOwnInput.checked,
+            trafficAroundFire: !!aroundFireInput.checked,
+            relativeAltitudeEnabled: !!relativeAltitudeInput.checked,
+            relativeAltitudeBandFt: relativeBandInput.value,
             showAltitudeLabel: !!altitudeLabelInput.checked
         });
 
@@ -3312,6 +3380,10 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-max-aircraft-input').value = String(current.maxAircraft);
     modal.querySelector('#traffic-min-altitude-input').value = String(current.minAltitudeFt);
     modal.querySelector('#traffic-max-altitude-input').value = current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt);
+    modal.querySelector('#traffic-around-own-input').checked = !!current.trafficAroundOwnPosition;
+    modal.querySelector('#traffic-around-fire-input').checked = !!current.trafficAroundFire;
+    modal.querySelector('#traffic-relative-altitude-input').checked = !!current.relativeAltitudeEnabled;
+    modal.querySelector('#traffic-relative-band-input').value = String(current.relativeAltitudeBandFt);
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
 
     modal.classList.add('open');
@@ -3387,22 +3459,11 @@ function parseTrafficAltitudeFeet(raw) {
     return Number.isFinite(altitudeNumber) ? Math.round(altitudeNumber) : null;
 }
 
-// =========================================================================
-// v12.96 TEST — calque trafic ADS-B indicatif
-// =========================================================================
-function getTrafficQueryPoint() {
-    if (currentCommune) {
-        const lat = Number(currentCommune.latitude_mairie);
-        const lon = Number(currentCommune.longitude_mairie);
-        if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            return { lat, lon, label: buildFireDisplayName(currentCommune) || 'feu' };
-        }
-    }
-
+function getOwnTrafficPoint() {
     if (userMarker && typeof userMarker.getLatLng === 'function') {
         const ll = userMarker.getLatLng();
         if (ll && Number.isFinite(ll.lat) && Number.isFinite(ll.lng)) {
-            return { lat: ll.lat, lon: ll.lng, label: 'GPS' };
+            return { lat: ll.lat, lon: ll.lng, label: 'GPS', kind: 'own' };
         }
     }
 
@@ -3410,18 +3471,125 @@ function getTrafficQueryPoint() {
         const lat = Number(lastPosition.lat ?? lastPosition.latitude);
         const lon = Number(lastPosition.lng ?? lastPosition.longitude);
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            return { lat, lon, label: 'GPS' };
-        }
-    }
-
-    if (map && typeof map.getCenter === 'function') {
-        const center = map.getCenter();
-        if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
-            return { lat: center.lat, lon: center.lng, label: 'centre carte' };
+            return { lat, lon, label: 'GPS', kind: 'own' };
         }
     }
 
     return null;
+}
+
+function getFireTrafficPoint() {
+    if (!currentCommune) return null;
+    const lat = Number(currentCommune.latitude_mairie);
+    const lon = Number(currentCommune.longitude_mairie);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon, label: buildFireDisplayName(currentCommune) || 'feu', kind: 'fire' };
+}
+
+function getTrafficQueryPoints() {
+    const settings = sanitizeTrafficSettings(trafficSettings);
+    const points = [];
+
+    if (settings.trafficAroundOwnPosition) {
+        const ownPoint = getOwnTrafficPoint();
+        if (ownPoint) points.push(ownPoint);
+    }
+
+    if (settings.trafficAroundFire) {
+        const firePoint = getFireTrafficPoint();
+        if (firePoint) points.push(firePoint);
+    }
+
+    if (!points.length) {
+        const ownPoint = getOwnTrafficPoint();
+        if (ownPoint) points.push(ownPoint);
+    }
+
+    if (!points.length) {
+        const firePoint = getFireTrafficPoint();
+        if (firePoint) points.push(firePoint);
+    }
+
+    if (!points.length && map && typeof map.getCenter === 'function') {
+        const center = map.getCenter();
+        if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+            points.push({ lat: center.lat, lon: center.lng, label: 'centre carte', kind: 'map' });
+        }
+    }
+
+    const unique = [];
+    const keys = new Set();
+    points.forEach(point => {
+        const key = `${point.kind}:${Number(point.lat).toFixed(4)}:${Number(point.lon).toFixed(4)}`;
+        if (keys.has(key)) return;
+        keys.add(key);
+        unique.push(point);
+    });
+
+    return unique;
+}
+
+function getOwnTrafficAltitudeFeet() {
+    const candidates = [
+        lastPosition?.altitudeFt,
+        lastPosition?.altitudeFeet
+    ];
+
+    for (const candidate of candidates) {
+        const num = Number(candidate);
+        if (Number.isFinite(num)) return Math.round(num);
+    }
+
+    return null;
+}
+
+function getNearestTrafficReference(ac, points = []) {
+    if (!ac || !Array.isArray(points) || !points.length) return null;
+    let best = null;
+    points.forEach(point => {
+        const distance = calculateDistanceInNm(point.lat, point.lon, ac.lat, ac.lon);
+        if (!Number.isFinite(distance)) return;
+        if (!best || distance < best.distance) {
+            best = { point, distance };
+        }
+    });
+    return best;
+}
+
+function buildTrafficReferenceLabel(points = []) {
+    if (!Array.isArray(points) || !points.length) return '';
+    return points.map(point => point.label).filter(Boolean).join(' + ');
+}
+
+function buildTrafficAircraftKey(ac) {
+    if (!ac) return '';
+    if (ac.hex) return `hex:${ac.hex}`;
+    return `pos:${ac.callsign}:${Number(ac.lat).toFixed(4)}:${Number(ac.lon).toFixed(4)}`;
+}
+
+async function fetchTrafficAircraftForPoint(point, providers) {
+    const errors = [];
+
+    for (const provider of providers) {
+        try {
+            const result = await fetchTrafficAircraftFromProvider(point, provider);
+            return { provider: result.provider, aircraft: result.aircraft, raw: result.raw, point };
+        } catch (providerError) {
+            const errText = providerError && providerError.message ? providerError.message : String(providerError);
+            errors.push(`${provider.label}: ${errText}`);
+            console.warn(`Trafic ADS-B indisponible via ${provider.label} autour ${point.label}:`, providerError);
+        }
+    }
+
+    throw new Error(errors.length ? `${point.label}: ${errors.join(' / ')}` : `${point.label}: aucune source disponible`);
+}
+
+// =========================================================================
+// v12.96 TEST — calque trafic ADS-B indicatif
+// =========================================================================
+function getTrafficQueryPoint() {
+    const points = getTrafficQueryPoints();
+    return points.length ? points[0] : null;
 }
 
 function buildTrafficApiUrl(point, provider = null) {
@@ -3497,10 +3665,10 @@ function buildTrafficMarkerIcon(aircraft) {
         : '';
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
-        iconSize: [82, 44],
-        iconAnchor: [41, 22],
-        popupAnchor: [0, -22]
+        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-dotted-vector" style="transform: rotate(${track}deg);"></span><span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
+        iconSize: [96, 52],
+        iconAnchor: [48, 26],
+        popupAnchor: [0, -24]
     });
 }
 
@@ -3509,14 +3677,32 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     trafficLayer.clearLayers();
 
     const settings = sanitizeTrafficSettings(trafficSettings);
-    const aircraft = aircraftList
+    const points = Array.isArray(meta.points) && meta.points.length ? meta.points : (meta.point ? [meta.point] : []);
+    const ownAltitudeFt = getOwnTrafficAltitudeFeet();
+    const useRelativeAltitude = settings.relativeAltitudeEnabled && Number.isFinite(ownAltitudeFt);
+    const relativeMinAltitudeFt = useRelativeAltitude ? ownAltitudeFt - settings.relativeAltitudeBandFt : null;
+    const relativeMaxAltitudeFt = useRelativeAltitude ? ownAltitudeFt + settings.relativeAltitudeBandFt : null;
+    const uniqueAircraft = [];
+    const seenAircraft = new Set();
+
+    aircraftList
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
         .filter(ac => !Number.isFinite(ac.seenPos) || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS)
         .filter(ac => ac.altitudeFeet === null || ac.altitudeFeet >= settings.minAltitudeFt)
         .filter(ac => settings.maxAltitudeFt === null || ac.altitudeFeet === null || ac.altitudeFeet <= settings.maxAltitudeFt)
-        .filter(ac => !meta.point || calculateDistanceInNm(meta.point.lat, meta.point.lon, ac.lat, ac.lon) <= settings.radiusNm + 0.5)
-        .slice(0, settings.maxAircraft);
+        .filter(ac => !useRelativeAltitude || ac.altitudeFeet === null || (ac.altitudeFeet >= relativeMinAltitudeFt && ac.altitudeFeet <= relativeMaxAltitudeFt))
+        .forEach(ac => {
+            const reference = getNearestTrafficReference(ac, points);
+            if (points.length && (!reference || reference.distance > settings.radiusNm + 0.5)) return;
+            ac._trafficReference = reference;
+            const key = buildTrafficAircraftKey(ac);
+            if (seenAircraft.has(key)) return;
+            seenAircraft.add(key);
+            uniqueAircraft.push(ac);
+        });
+
+    const aircraft = uniqueAircraft.slice(0, settings.maxAircraft);
 
     aircraft.forEach(ac => {
         const marker = L.marker([ac.lat, ac.lon], {
@@ -3528,7 +3714,9 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
 
         const title = escapeHtml(ac.callsign);
         const subtitle = [ac.type, ac.registration, ac.hex].filter(Boolean).map(escapeHtml).join(' · ');
-        const distance = meta.point ? calculateDistanceInNm(meta.point.lat, meta.point.lon, ac.lat, ac.lon) : null;
+        const reference = ac._trafficReference;
+        const distance = reference ? reference.distance : null;
+        const referenceLabel = reference?.point?.label ? escapeHtml(reference.point.label) : '';
         const popup = `
             <div class="traffic-popup">
                 <div class="traffic-popup-title">${title}</div>
@@ -3536,8 +3724,9 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 <div>Altitude : <b>${escapeHtml(ac.altitude)}</b></div>
                 <div>Vitesse sol : <b>${escapeHtml(ac.gs)}</b></div>
                 <div>Route : <b>${Number.isFinite(ac.track) ? Math.round(ac.track) + '°' : '--'}</b></div>
-                ${Number.isFinite(distance) ? `<div>Distance : <b>${Math.round(distance)} Nm</b></div>` : ''}
+                ${Number.isFinite(distance) ? `<div>Distance ${referenceLabel ? `à ${referenceLabel}` : ''} : <b>${Math.round(distance)} Nm</b></div>` : ''}
                 <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
+                ${useRelativeAltitude ? `<div>Filtre altitude GPS : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
                 <div class="traffic-popup-warning">ADS-B indicatif — non certifié</div>
             </div>`;
         marker.bindPopup(popup);
@@ -3551,7 +3740,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         visible: showTrafficLayer,
         state: 'ok',
         count: aircraft.length,
-        pointLabel: [meta.point?.label || '', meta.provider?.label || ''].filter(Boolean).join(' · '),
+        pointLabel: buildTrafficReferenceLabel(points),
         now: meta.now || Date.now()
     });
 }
@@ -3613,8 +3802,8 @@ async function refreshTrafficLayer(options = {}) {
     const now = Date.now();
     if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 4500) return;
 
-    const point = getTrafficQueryPoint();
-    if (!point) {
+    const points = getTrafficQueryPoints();
+    if (!points.length) {
         lastTrafficError = 'Aucun point de référence';
         lastTrafficDisplayedCount = 0;
         refreshTrafficButtonState(0);
@@ -3631,27 +3820,33 @@ async function refreshTrafficLayer(options = {}) {
             ? TRAFFIC_API_PROVIDERS
             : [{ label: TRAFFIC_PROVIDER_LABEL || 'ADS-B', baseUrl: 'https://opendata.adsb.fi/api/v2' }];
         const errors = [];
-        let result = null;
+        const combinedAircraft = [];
+        const usedProviders = [];
 
-        for (const provider of providers) {
+        for (const point of points) {
             try {
-                result = await fetchTrafficAircraftFromProvider(point, provider);
-                break;
-            } catch (providerError) {
-                const errText = providerError && providerError.message ? providerError.message : String(providerError);
-                errors.push(`${provider.label}: ${errText}`);
-                console.warn(`Trafic ADS-B indisponible via ${provider.label}:`, providerError);
+                const result = await fetchTrafficAircraftForPoint(point, providers);
+                combinedAircraft.push(...result.aircraft);
+                if (result.provider?.label && !usedProviders.includes(result.provider.label)) {
+                    usedProviders.push(result.provider.label);
+                }
+            } catch (pointError) {
+                const errText = pointError && pointError.message ? pointError.message : String(pointError);
+                errors.push(errText);
             }
         }
 
-        if (!result) {
-            const detail = errors.length ? errors.join(' / ') : 'aucune source disponible';
-            throw new Error(detail);
+        if (!combinedAircraft.length && errors.length === points.length) {
+            throw new Error(errors.join(' / ') || 'aucune source disponible');
         }
 
         lastTrafficRefreshAt = Date.now();
         lastTrafficError = '';
-        renderTrafficAircraft(result.aircraft, { point, provider: result.provider, now: lastTrafficRefreshAt });
+        renderTrafficAircraft(combinedAircraft, {
+            points,
+            provider: { label: usedProviders.join(' + ') },
+            now: lastTrafficRefreshAt
+        });
     } catch (error) {
         lastTrafficError = error && error.message ? error.message : String(error);
         lastTrafficDisplayedCount = 0;
@@ -5390,7 +5585,7 @@ function forceNearestCommuneHudVisible(display) {
         display: 'flex',
         visibility: 'visible',
         opacity: '1',
-        zIndex: '2147483000',
+        zIndex: '980',
         pointerEvents: 'none'
     };
 
@@ -5996,7 +6191,13 @@ function updateUserPosition(pos) {
         lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs, simulation: true };
     } else {
         updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
-        lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs };
+        lastPosition = {
+            lat: latitude,
+            lng: longitude,
+            timestamp: gpsTimestampMs,
+            altitudeFt: Number.isFinite(Number(pos.coords.altitude)) ? Math.round(Number(pos.coords.altitude) * 3.28084) : null,
+            altitudeTimeMs: Number.isFinite(Number(pos.coords.altitude)) ? gpsTimestampMs : null
+        };
         saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
         applyStartupGpsAutoCenter(latitude, longitude, {
             source: pos && pos.npfIsStoredPosition ? 'stored' : 'real'
