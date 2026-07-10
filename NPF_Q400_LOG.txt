@@ -1,3 +1,22 @@
+NPF-Q400 — TEST v13.01_commune_gauche_trafic_filtres
+Date : 2026-07-10
+Base : TEST v13.00_commune_hud_trafic_v3
+
+Corrections :
+- Bandeau bas « Survolée » déplacé sur la gauche et légèrement agrandi.
+- Affichage du département fiabilisé dans le bandeau commune avec parenthèses quand le code département est disponible.
+- Bandeau texte trafic ADS-B supprimé en fonctionnement nominal ; il ne s’affiche plus qu’en cas d’erreur temporaire.
+- Bouton TRAFIC coloré selon l’état : normal actif, chargement, erreur.
+- Correction du badge TRAFIC : il affiche désormais le nombre réel d’avions affichés, au lieu de retomber à 0 après une mise à jour réussie.
+- Ajout de filtres configurables pour le trafic ADS-B : rayon, nombre maximal d’avions, altitude mini et altitude maxi.
+- Accès aux filtres trafic par appui long sur le bouton TRAFIC.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v12.99_commune_trafic_fallback
 Date : 2026-07-09
 Base : TEST v12.98_commune_trafic_stabilite
