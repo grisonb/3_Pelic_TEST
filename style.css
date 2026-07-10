@@ -7176,3 +7176,105 @@ body:not(.app-ready) #nearest-commune-display {
         gap: 10px !important;
     }
 }
+
+
+/* ==========================================================================
+   v13.07 TEST — MAJ PWA, modal trafic et vecteurs trafic corrigés
+   ========================================================================== */
+.traffic-settings-relative-line {
+    grid-column: 1 / -1;
+}
+
+.traffic-settings-inline-band-row {
+    display: grid !important;
+    grid-template-columns: auto 1fr auto minmax(110px, 150px) auto;
+    align-items: center;
+    gap: 10px !important;
+    min-height: 46px;
+}
+
+.traffic-settings-inline-band-row input[type="number"] {
+    width: 100%;
+    height: 42px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 0 10px;
+    font-size: 20px;
+    font-weight: 900;
+    color: #0f172a;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.traffic-relative-plusminus,
+.traffic-settings-inline-band-row strong {
+    font-size: 16px;
+    font-weight: 950;
+    color: #334155;
+}
+
+.traffic-settings-field-disabled {
+    opacity: 0.48;
+    filter: grayscale(0.25);
+}
+
+.traffic-settings-field-disabled input {
+    background: #e2e8f0 !important;
+    color: #64748b !important;
+}
+
+.traffic-aircraft-symbol-wrap {
+    width: 128px !important;
+    height: 128px !important;
+    position: relative !important;
+}
+
+.traffic-aircraft-vector-wrap {
+    position: absolute;
+    left: 64px;
+    top: 64px;
+    width: 0;
+    height: 0;
+    transform-origin: center center;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.traffic-aircraft-dotted-vector {
+    position: absolute;
+    left: -2px !important;
+    top: -86px !important;
+    width: 0 !important;
+    height: 72px !important;
+    border-left: 4px dotted rgba(17, 24, 39, 0.95) !important;
+    border-top: none !important;
+    transform: none !important;
+    transform-origin: center bottom !important;
+    filter: drop-shadow(0 0 2px rgba(255,255,255,.98)) drop-shadow(0 1px 2px rgba(0,0,0,.45)) !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    left: 52px !important;
+    top: 52px !important;
+    z-index: 3 !important;
+}
+
+.traffic-aircraft-altitude-label {
+    left: 75px !important;
+    top: 54px !important;
+    z-index: 4 !important;
+}
+
+@media (max-width: 760px) {
+    .traffic-settings-inline-band-row {
+        grid-template-columns: auto 1fr auto minmax(96px, 130px) auto;
+        gap: 8px !important;
+    }
+
+    .traffic-settings-inline-band-row em {
+        font-size: 13px !important;
+    }
+}
+
+
+/* v13.08 TEST — fenêtre post-MAJ rétablie côté index.html ; styles existants conservés. */
