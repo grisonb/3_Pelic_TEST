@@ -10829,7 +10829,7 @@ function initializeCalculator() {
             <h1>NPF-Q400 — Export BLOC/FUEL</h1>
             <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.11')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.12')}</div>
     </div>
     ${flightSections}
     <script>
@@ -10938,7 +10938,7 @@ function initializeCalculator() {
         const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
 
         addLine('NPF-Q400 - Export BLOC/FUEL');
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.11'}`);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.12'}`);
         addLine(`Total vols : ${dailyFlights.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
@@ -11063,8 +11063,8 @@ function initializeCalculator() {
             <div class="bloc-fuel-export-panel" role="dialog" aria-modal="true" aria-label="Aperçu export BLOC/FUEL">
                 <div class="bloc-fuel-export-toolbar">
                     <div class="bloc-fuel-export-title">Export BLOC/FUEL</div>
-                    <button type="button" id="bloc-fuel-export-share-btn">Partager PDF</button>
-                    <button type="button" id="bloc-fuel-export-print-btn">PDF / Imprimer</button>
+                    <div class="export-hint">Aperçu imprimable. Utiliser “PDF / Imprimer” puis “Partager / Enregistrer en PDF” sur iPad.</div>
+                    <button type="button" id="bloc-fuel-export-print-btn" class="print-primary">PDF / Imprimer</button>
                     <button type="button" id="bloc-fuel-export-close-btn" class="secondary">Fermer</button>
                 </div>
                 <iframe id="bloc-fuel-export-frame" title="Aperçu BLOC/FUEL"></iframe>
@@ -11089,28 +11089,14 @@ function initializeCalculator() {
                 alert(`Impression impossible : ${error.message || error}`);
             }
         });
-        overlay.querySelector('#bloc-fuel-export-share-btn')?.addEventListener('click', async () => {
-            try {
-                const shared = await shareBlocFuelPdfFile();
-                if (!shared) {
-                    alert('Partage direct de fichier PDF non disponible sur ce navigateur. Utilisez PDF / Imprimer.');
-                }
-            } catch (error) {
-                if (error && error.name === 'AbortError') return;
-                alert(`Partage PDF impossible : ${error.message || error}`);
-            }
-        });
     }
 
     async function exportBlocFuelPdf() {
         try {
-            try {
-                const shared = await shareBlocFuelPdfFile();
-                if (shared) return;
-            } catch (shareError) {
-                if (shareError && shareError.name === 'AbortError') return;
-                console.warn('Partage PDF BLOC/FUEL indisponible, bascule aperçu:', shareError);
-            }
+            /*
+             * v13.12 — retour au rendu imprimable HTML, plus propre que le PDF
+             * généré en texte pur. L'export s'ouvre dans une modale fermable.
+             */
             openBlocFuelExportPreview();
         } catch (error) {
             console.error('Export BLOC/FUEL impossible:', error);
