@@ -472,7 +472,7 @@ const TRAFFIC_API_PROVIDERS = [
     { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point' }
 ];
 const TRAFFIC_RADIUS_NM = 50;
-const TRAFFIC_REFRESH_INTERVAL_MS = 30000;
+const TRAFFIC_REFRESH_INTERVAL_MS = 15000;
 const TRAFFIC_MAX_AIRCRAFT = 80;
 const TRAFFIC_MAX_SEEN_SECONDS = 90;
 let trafficLayer = null;
@@ -487,7 +487,8 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     radiusNm: TRAFFIC_RADIUS_NM,
     maxAircraft: TRAFFIC_MAX_AIRCRAFT,
     minAltitudeFt: 0,
-    maxAltitudeFt: null
+    maxAltitudeFt: null,
+    showAltitudeLabel: false
 });
 let trafficSettings = loadTrafficSettings();
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
@@ -3152,7 +3153,9 @@ function sanitizeTrafficSettings(candidate = {}) {
         maxAltitudeFt = minAltitudeFt;
     }
 
-    return { radiusNm, maxAircraft, minAltitudeFt, maxAltitudeFt };
+    const showAltitudeLabel = candidate.showAltitudeLabel === true || candidate.showAltitudeLabel === 'true' || candidate.showAltitudeLabel === '1' || candidate.showAltitudeLabel === 'on';
+
+    return { radiusNm, maxAircraft, minAltitudeFt, maxAltitudeFt, showAltitudeLabel };
 }
 
 function loadTrafficSettings() {
@@ -3176,7 +3179,8 @@ function saveTrafficSettings(settings) {
 function getTrafficSettingsSummary() {
     const settings = sanitizeTrafficSettings(trafficSettings);
     const altitudeMaxLabel = settings.maxAltitudeFt === null ? 'sans maxi' : `${settings.maxAltitudeFt} ft`;
-    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel}`;
+    const altitudeLabel = settings.showAltitudeLabel ? 'étiquette altitude ON' : 'étiquette altitude OFF';
+    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel} · ${altitudeLabel}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -3229,9 +3233,17 @@ function ensureTrafficSettingsModal() {
                         <em>ft</em>
                     </div>
                 </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
+                    <span>Étiquette altitude</span>
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-altitude-label-input" type="checkbox">
+                        <em>Afficher l'altitude à côté des avions</em>
+                    </div>
+                </label>
             </div>
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. Ces filtres ne changent pas la nature indicative/non certifiée de l'ADS-B.</div>
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. Rafraîchissement ADS-B toutes les 15 secondes. Ces filtres ne changent pas la nature indicative/non certifiée de l'ADS-B.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -3254,6 +3266,7 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-max-aircraft-input').value = String(defaults.maxAircraft);
         modal.querySelector('#traffic-min-altitude-input').value = String(defaults.minAltitudeFt);
         modal.querySelector('#traffic-max-altitude-input').value = '';
+        modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
     };
 
     modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
@@ -3269,12 +3282,14 @@ function ensureTrafficSettingsModal() {
         const maxAircraftInput = modal.querySelector('#traffic-max-aircraft-input');
         const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
+        const altitudeLabelInput = modal.querySelector('#traffic-altitude-label-input');
 
         saveTrafficSettings({
             radiusNm: radiusInput.value,
             maxAircraft: maxAircraftInput.value,
             minAltitudeFt: minAltitudeInput.value,
-            maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value
+            maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value,
+            showAltitudeLabel: !!altitudeLabelInput.checked
         });
 
         refreshTrafficButtonState(lastTrafficDisplayedCount);
@@ -3297,6 +3312,7 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-max-aircraft-input').value = String(current.maxAircraft);
     modal.querySelector('#traffic-min-altitude-input').value = String(current.minAltitudeFt);
     modal.querySelector('#traffic-max-altitude-input').value = current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt);
+    modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
 
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
@@ -3475,12 +3491,16 @@ function formatTrafficAge(seconds) {
 
 function buildTrafficMarkerIcon(aircraft) {
     const track = Number.isFinite(aircraft.track) ? aircraft.track : 0;
+    const settings = sanitizeTrafficSettings(trafficSettings);
+    const altitudeHtml = settings.showAltitudeLabel && aircraft.altitude && aircraft.altitude !== '--'
+        ? `<span class="traffic-aircraft-altitude-label">${escapeHtml(aircraft.altitude)}</span>`
+        : '';
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, -14]
+        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-arrow" style="transform: rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
+        iconSize: [82, 44],
+        iconAnchor: [41, 22],
+        popupAnchor: [0, -22]
     });
 }
 
@@ -3537,26 +3557,13 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
 }
 
 function updateTrafficStatus({ visible = showTrafficLayer, state = 'idle', count = null, pointLabel = '', message = '', now = Date.now() } = {}) {
+    /* v13.03 : plus de fenêtre/bandeau d'alerte ADS-B sur la carte.
+       L'état est porté uniquement par le bouton TRAFIC : rouge = erreur, bleu = chargement, vert = OK. */
     const status = document.getElementById('traffic-status-display');
     if (!status) return;
-
-    if (!visible || state === 'ok' || state === 'idle' || state === 'loading') {
-        status.style.display = 'none';
-        status.textContent = '';
-        status.className = 'traffic-status-display';
-        return;
-    }
-
-    status.style.display = 'block';
-    status.className = `traffic-status-display traffic-status-${state}`;
-
-    if (state === 'error') {
-        status.textContent = message || 'Trafic ADS-B indisponible';
-    } else {
-        const time = new Date(now).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        const where = pointLabel ? ` autour ${pointLabel}` : '';
-        status.textContent = `Trafic ADS-B indicatif : ${count ?? 0} avion(s)${where} · MAJ ${time}`;
-    }
+    status.style.display = 'none';
+    status.textContent = '';
+    status.className = 'traffic-status-display';
 }
 
 function refreshTrafficButtonState(count = null) {
