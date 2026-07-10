@@ -10883,9 +10883,9 @@ function initializeCalculator() {
     .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 20px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: hidden; }
     .header-grid span .kg-inline { justify-content: flex-start !important; max-width: 100%; min-width: 0; }
     .header-grid span .kg-unit { font-size: .50em !important; }
-    .header-card-fuel-depart .fuel-depart-export-value { font-size: 18px !important; letter-spacing: -0.045em; overflow: visible !important; }
-    .header-card-fuel-depart .kg-inline { gap: 2px !important; transform: scaleX(.92); transform-origin: left center; }
-    .header-card-fuel-depart .kg-unit { font-size: .46em !important; margin-left: 1px !important; }
+    .header-card-fuel-depart .fuel-depart-export-value { font-size: 20px !important; letter-spacing: -0.02em; overflow: visible !important; }
+    .header-card-fuel-depart .kg-inline { gap: 5px !important; transform: none !important; transform-origin: left center; }
+    .header-card-fuel-depart .kg-unit { font-size: 1em !important; margin-left: 0 !important; }
     .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
     .kg-number { display: inline-block; line-height: 1 !important; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
@@ -10915,7 +10915,7 @@ function initializeCalculator() {
             <h1>${safe(exportTitle)}</h1>
             <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.17')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.18')}</div>
     </div>
     ${flightSections}
     <script>
@@ -11024,7 +11024,7 @@ function initializeCalculator() {
         let cumulativeExportHdv = 0;
 
         addLine(exportTitle);
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.17'}`);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.18'}`);
         addLine(`Total vols exportes : ${flightsForExport.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
