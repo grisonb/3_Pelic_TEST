@@ -10758,6 +10758,18 @@ function initializeCalculator() {
         return `NPF-Q400 ${timestamp}.${extension}`;
     }
 
+    function getBlocFuelExportPrintDocumentTitle(date = new Date()) {
+        /*
+         * iPadOS refuse les / et : comme nom de fichier. Le titre interne du
+         * document garde le format demandé, mais le nom PDF proposé utilise une
+         * variante compatible fichiers : NPF-Q400 10-07-26 15h10.
+         */
+        const timestamp = getBlocFuelExportTimestamp(date)
+            .replace(/\//g, '-')
+            .replace(/:/g, 'h');
+        return `NPF-Q400 ${timestamp}`;
+    }
+
     function getBlocFuelFlightsForExport() {
         return dailyFlights
             .map((flight, originalIndex) => ({ flight, originalIndex }))
@@ -10772,6 +10784,7 @@ function initializeCalculator() {
         const exportGeneratedAt = options.exportGeneratedAt instanceof Date ? options.exportGeneratedAt : new Date();
         const exportDate = getBlocFuelExportTimestamp(exportGeneratedAt);
         const exportTitle = getBlocFuelExportTitle(exportGeneratedAt);
+        const exportPrintDocumentTitle = getBlocFuelExportPrintDocumentTitle(exportGeneratedAt);
         const exportHtmlFileName = getBlocFuelExportSafeFileName('html', exportGeneratedAt);
         const includeControls = !!options.includeControls;
         const safe = (value) => escapeHtml(value || '');
@@ -10848,7 +10861,7 @@ function initializeCalculator() {
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>${safe(exportTitle)}</title>
+<title>${safe(exportPrintDocumentTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
     @page { size: A4 landscape; margin: 10mm; }
@@ -10864,14 +10877,14 @@ function initializeCalculator() {
     .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     h2 { margin: 0; font-size: 21px; color: #0f172a; }
     .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; white-space: nowrap; }
-    .header-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 84px; overflow: hidden; display: grid; grid-template-rows: 30px 1fr; align-items: stretch; }
+    .header-grid { display: grid; grid-template-columns: 1fr 1.12fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 84px; overflow: visible; display: grid; grid-template-rows: 30px 1fr; align-items: stretch; }
     .header-grid b { display: flex; align-items: flex-start; min-height: 30px; margin: 0; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
-    .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 20px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: hidden; }
-    .header-grid span .kg-inline { justify-content: flex-start !important; max-width: 100%; min-width: 0; }
-    .header-grid span .kg-unit { font-size: .50em !important; }
-    .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
-    .kg-number { display: inline-block; line-height: 1 !important; }
+    .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 19px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: visible; letter-spacing: -0.02em; }
+    .header-grid span .kg-inline { justify-content: flex-start !important; max-width: none; min-width: 0; flex: 0 0 auto; }
+    .header-grid span .kg-unit { font-size: .55em !important; margin-left: 2px; }
+    .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 2px; white-space: nowrap; line-height: 1 !important; flex-wrap: nowrap; }
+    .kg-number { display: inline-block; line-height: 1 !important; flex: 0 0 auto; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
     table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
     th, td { border: 1px solid #d7dee8; padding: 7px 5px; text-align: center; font-size: 13px; line-height: 1.12; vertical-align: middle; overflow: hidden; }
@@ -10899,7 +10912,7 @@ function initializeCalculator() {
             <h1>${safe(exportTitle)}</h1>
             <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.15')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.16')}</div>
     </div>
     ${flightSections}
     <script>
@@ -10921,11 +10934,11 @@ function initializeCalculator() {
             const html = '<!doctype html>\n' + clone.outerHTML;
             const file = new File([html], '${safe(exportHtmlFileName)}', { type: 'text/html' });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ title: '${safe(exportTitle)}', text: 'Export BLOC/FUEL NPF-Q400', files: [file] });
+                await navigator.share({ title: '${safe(exportPrintDocumentTitle)}', text: 'Export BLOC/FUEL NPF-Q400', files: [file] });
                 return;
             }
             if (navigator.share) {
-                await navigator.share({ title: '${safe(exportTitle)}', text: 'Export BLOC/FUEL NPF-Q400' });
+                await navigator.share({ title: '${safe(exportPrintDocumentTitle)}', text: 'Export BLOC/FUEL NPF-Q400' });
                 return;
             }
             alert('Partage natif non disponible sur ce navigateur. Utilisez PDF / Imprimer.');
@@ -11008,7 +11021,7 @@ function initializeCalculator() {
         let cumulativeExportHdv = 0;
 
         addLine(exportTitle);
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.15'}`);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.16'}`);
         addLine(`Total vols exportes : ${flightsForExport.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
@@ -11128,12 +11141,15 @@ function initializeCalculator() {
     }
 
     function openBlocFuelExportPreview() {
-        const html = buildBlocFuelExportHtml({ includeControls: false });
+        const exportGeneratedAt = new Date();
+        const exportPrintDocumentTitle = getBlocFuelExportPrintDocumentTitle(exportGeneratedAt);
+        const html = buildBlocFuelExportHtml({ includeControls: false, exportGeneratedAt });
         let overlay = document.getElementById('bloc-fuel-export-overlay');
         if (overlay) overlay.remove();
 
         overlay = document.createElement('div');
         overlay.id = 'bloc-fuel-export-overlay';
+        overlay.dataset.exportPrintTitle = exportPrintDocumentTitle;
         overlay.innerHTML = `
             <div class="bloc-fuel-export-panel" role="dialog" aria-modal="true" aria-label="Aperçu export BLOC/FUEL">
                 <div class="bloc-fuel-export-toolbar">
@@ -11142,12 +11158,19 @@ function initializeCalculator() {
                     <button type="button" id="bloc-fuel-export-print-btn" class="print-primary">PDF / Imprimer</button>
                     <button type="button" id="bloc-fuel-export-close-btn" class="secondary">Fermer</button>
                 </div>
-                <iframe id="bloc-fuel-export-frame" title="Aperçu BLOC/FUEL"></iframe>
+                <iframe id="bloc-fuel-export-frame" title="${escapeHtml(exportPrintDocumentTitle)}"></iframe>
             </div>`;
         document.body.appendChild(overlay);
 
         const frame = overlay.querySelector('#bloc-fuel-export-frame');
-        if (frame) frame.srcdoc = html;
+        if (frame) {
+            frame.srcdoc = html;
+            frame.addEventListener('load', () => {
+                try {
+                    frame.contentWindow.document.title = exportPrintDocumentTitle;
+                } catch (_) {}
+            }, { once: true });
+        }
 
         overlay.querySelector('#bloc-fuel-export-close-btn')?.addEventListener('click', () => overlay.remove());
         overlay.addEventListener('click', (event) => {
@@ -11156,9 +11179,16 @@ function initializeCalculator() {
         overlay.querySelector('#bloc-fuel-export-print-btn')?.addEventListener('click', () => {
             try {
                 const win = frame?.contentWindow;
+                const printTitle = overlay.dataset.exportPrintTitle || exportPrintDocumentTitle;
+                const previousAppTitle = document.title;
                 if (win) {
+                    try { document.title = printTitle; } catch (_) {}
+                    try { win.document.title = printTitle; } catch (_) {}
                     win.focus();
                     win.print();
+                    setTimeout(() => {
+                        try { document.title = previousAppTitle || 'NPF-Q400'; } catch (_) {}
+                    }, 8000);
                 }
             } catch (error) {
                 alert(`Impression impossible : ${error.message || error}`);
