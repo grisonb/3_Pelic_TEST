@@ -1,3 +1,20 @@
+NPF-Q400 — TEST v13.17_export_layout_filename_blob
+Date : 2026-07-10
+Base : TEST v13.16_export_nom_pdf_fuel_depart
+
+Corrections :
+- Export BLOC/FUEL : restauration de la mise en page générale des cellules d’en-tête comme avant v13.16.
+- Correction ciblée de la cellule FUEL DÉPART uniquement : 3400 kg reste visible sans repousser l’unité à droite.
+- Export BLOC/FUEL : l’aperçu est maintenant chargé via un document Blob horodaté, avec titre interne horodaté, avant impression.
+- Objectif : améliorer la reprise du nom horodaté par iPadOS lors de “PDF / Imprimer”.
+- Limite connue : si iPadOS force encore le nom “NPF-Q400” dans Fichiers, c’est le nom de l’app PWA imposé par le système et il faudra renommer manuellement le PDF après enregistrement.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.16_export_nom_pdf_fuel_depart
 Date : 2026-07-10
 Base : TEST v13.15_export_horodatage_filtre_vols
