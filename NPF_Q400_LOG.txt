@@ -1,3 +1,21 @@
+NPF-Q400 — TEST v13.13_export_bloc_fuel_layout_fix
+Date : 2026-07-10
+Base : TEST v13.12_export_print_styled_preview
+
+Corrections :
+- Export BLOC/FUEL : correction des problèmes de mise en page visibles dans l’aperçu.
+- Les unités kg ne débordent plus des cartes ou des cellules du tableau.
+- Fuel départ, Fuel Pélic et Masse Rlt sont formatés avec une unité compacte maîtrisée.
+- Cartes hautes de l’export agrandies et alignées pour éviter les chevauchements.
+- Tableau export passé en mise en page fixe avec largeurs de colonnes et polices réduites.
+- Aperçu imprimable conservé avec bouton Fermer et bouton PDF / Imprimer.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.12_export_print_styled_preview
 Date : 2026-07-10
 Base : TEST v13.11_export_pdf_partage_reel
