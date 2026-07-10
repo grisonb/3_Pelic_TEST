@@ -1,3 +1,37 @@
+NPF-Q400 — TEST v13.08_post_maj_retablie
+Date : 2026-07-10
+Base : TEST v13.07_maj_trafic_modal_vecteurs
+
+Corrections :
+- Fenêtre post-MAJ rétablie : le message « Une mise à jour vient d’être effectuée. Fermez et relancez l’application. » est conservé.
+- La logique de détection/activation automatique de mise à jour de v13.07 est conservée.
+- Clarification : la fenêtre post-MAJ sert d’indication après bascule de version ; elle n’est pas supprimée.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
+NPF-Q400 — TEST v13.07_maj_trafic_modal_vecteurs
+Date : 2026-07-10
+Base : TEST v13.06_trafic_zones_alt_relative_vector
+
+Corrections :
+- Mise à jour PWA renforcée : détection au chargement, pageshow et retour au premier plan.
+- Activation automatique du nouveau service worker dès installation, avec rechargement automatique unique.
+- Suppression de la fenêtre post-MAJ demandant de fermer/relancer la PWA, pour éviter la double relance.
+- Filtres trafic : quand « Tranche autour de mon altitude » est cochée, les champs Altitude mini/maxi sont grisés et désactivés.
+- Filtres trafic : la ligne « Tranche autour de mon altitude » est déplacée sous Alt mini/maxi, avec libellé et saisie de tranche sur la même ligne.
+- Filtrage ADS-B : quand la tranche autour de mon altitude est active, les filtres absolus mini/maxi ne s'appliquent plus.
+- Vecteurs trafic agrandis et corrigés : pointillés plus longs, départ centré sur l'avion, orientation cohérente avec la route ADS-B.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.06_trafic_zones_alt_relative_vector
 Date : 2026-07-10
 Base : TEST v13.05_pelic_label_click
