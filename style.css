@@ -7472,3 +7472,27 @@ body:not(.app-ready) #nearest-commune-display {
         font-size: 13px;
     }
 }
+
+
+/* ========================================================================== 
+   v13.12 TEST — export BLOC/FUEL : aperçu imprimable stylé, sans PDF texte
+   ========================================================================== */
+.bloc-fuel-export-toolbar .print-primary {
+    background: #005a9c !important;
+}
+
+.bloc-fuel-export-toolbar .export-hint {
+    flex-basis: 100%;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+@media (min-width: 761px) {
+    .bloc-fuel-export-toolbar .export-hint {
+        flex: 1 1 auto;
+        text-align: right;
+        padding-right: 6px;
+    }
+}
