@@ -1,3 +1,21 @@
+NPF-Q400 — TEST v13.03_trafic_bouton_altitude_refresh
+Date : 2026-07-10
+Base : TEST v13.02_trafic_modal_commune_decalee
+
+Corrections :
+- Suppression complète de la grande fenêtre/bandeau d'avertissement ADS-B sur la carte.
+- État ADS-B porté uniquement par le bouton TRAFIC : rouge si problème, bleu en chargement, vert/actif si trafic OK.
+- Ajout dans la fenêtre Filtres ADS-B d'une case à cocher « Étiquette altitude ».
+- Si « Étiquette altitude » est cochée, chaque avion affiché reçoit une étiquette avec son altitude ADS-B.
+- Rafraîchissement automatique du trafic ADS-B accéléré : 15 secondes au lieu de 30 secondes.
+- Note de la fenêtre filtres mise à jour avec la fréquence de rafraîchissement.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.02_trafic_modal_commune_decalee
 Date : 2026-07-10
 Base : TEST v13.01_commune_gauche_trafic_filtres
