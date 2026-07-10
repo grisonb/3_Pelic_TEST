@@ -7114,3 +7114,65 @@ body:not(.app-ready) #nearest-commune-display {
 .leaflet-tooltip.route-tooltip-clickable:active {
     transform: scale(0.98);
 }
+
+
+/* ==========================================================================
+   v13.06 TEST — priorités affichage commune + filtres trafic enrichis
+   ========================================================================== */
+#nearest-commune-display {
+    z-index: 980 !important;
+}
+
+.traffic-settings-modal {
+    z-index: 5000 !important;
+}
+
+.traffic-settings-nested-input-row {
+    margin-top: 8px !important;
+}
+
+.traffic-settings-nested-input-row > span {
+    font-weight: 950;
+    color: #0f172a;
+    min-width: 16px;
+    text-align: center;
+}
+
+.traffic-aircraft-symbol-wrap {
+    width: 96px !important;
+    height: 52px !important;
+}
+
+.traffic-aircraft-dotted-vector {
+    position: absolute;
+    left: 48px;
+    top: 25px;
+    width: 34px;
+    height: 0;
+    border-top: 3px dotted rgba(17, 24, 39, 0.88);
+    transform-origin: left center;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(255,255,255,.95));
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    left: 35px !important;
+    top: 14px !important;
+}
+
+.traffic-aircraft-altitude-label {
+    left: 62px !important;
+    top: 15px !important;
+}
+
+@media (max-width: 760px) {
+    .traffic-settings-card {
+        max-height: calc(100vh - 26px) !important;
+        padding: 16px !important;
+    }
+
+    .traffic-settings-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+}
