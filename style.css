@@ -7278,3 +7278,40 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* v13.08 TEST — fenêtre post-MAJ rétablie côté index.html ; styles existants conservés. */
+
+
+/* ==========================================================================
+   v13.09 TEST — export BLOC/FUEL PDF + centrage vecteur trafic
+   ========================================================================== */
+#export-bloc-fuel-pdf-btn {
+    background: #005a9c !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255,255,255,.5) !important;
+    font-weight: 950 !important;
+}
+
+#export-bloc-fuel-pdf-btn:active {
+    transform: translateY(1px);
+}
+
+.traffic-aircraft-vector-wrap {
+    left: 64px !important;
+    top: 64px !important;
+    transform-origin: center center !important;
+}
+
+.traffic-aircraft-dotted-vector {
+    left: -2px !important;
+    top: -92px !important;
+    height: 92px !important;
+    width: 0 !important;
+    border-left: 4px dotted rgba(17, 24, 39, 0.96) !important;
+    border-top: none !important;
+    transform: none !important;
+    transform-origin: center bottom !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    left: 52px !important;
+    top: 52px !important;
+}
