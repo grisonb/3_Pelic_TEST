@@ -7007,3 +7007,75 @@ body:not(.app-ready) #nearest-commune-display {
         width: 100%;
     }
 }
+
+
+/* ==========================================================================
+   v13.03 TEST — ADS-B sans bandeau, étiquette altitude et refresh 15 s
+   ========================================================================== */
+.traffic-status-display {
+    display: none !important;
+}
+
+.traffic-settings-checkbox-field {
+    justify-content: center;
+}
+
+.traffic-settings-check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 46px;
+}
+
+.traffic-settings-check-row input[type="checkbox"] {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    accent-color: var(--primary-color);
+}
+
+.traffic-settings-check-row em {
+    font-style: normal;
+    font-size: 14px;
+    font-weight: 900;
+    color: #475569;
+}
+
+.traffic-aircraft-symbol-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 82px;
+    height: 44px;
+    pointer-events: none;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    position: absolute;
+    left: 29px;
+    top: 10px;
+}
+
+.traffic-aircraft-altitude-label {
+    position: absolute;
+    left: 54px;
+    top: 11px;
+    padding: 2px 5px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(17, 24, 39, 0.35);
+    color: #111827;
+    font-size: 11px;
+    font-weight: 950;
+    line-height: 1.05;
+    white-space: nowrap;
+    box-shadow: 0 1px 5px rgba(0,0,0,.22);
+}
+
+@media (max-width: 760px) {
+    .traffic-aircraft-altitude-label {
+        font-size: 10px;
+        padding: 2px 4px;
+    }
+}
