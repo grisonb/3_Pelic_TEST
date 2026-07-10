@@ -10674,6 +10674,182 @@ function initializeCalculator() {
         persistFlights();
     }
 
+
+    function getBlocFuelExportRowCalculations(state, flightIndex = 0) {
+        const rows = [];
+        const globalLimit = parseTime(dailyFlights[0]?.state?.['limite-hdv']) ?? parseTime(state?.['limite-hdv']);
+        const hdvBeforeFlight = dailyFlights
+            .slice(0, Math.max(0, flightIndex))
+            .reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+        const limitForFlight = globalLimit !== null ? Math.max(0, globalLimit - hdvBeforeFlight) : null;
+
+        let previousBlocArrivee = parseTime(state?.['bloc-depart']);
+        let previousFuelPelic = parseNumeric(state?.['fuel-depart']);
+        let cumulativeTpsVol = 0;
+
+        compactCalculatorTableData(state?.calculator_table_data || []).forEach((rowData) => {
+            const blocArrivee = parseTime(rowData.time || '');
+            const fuelPelic = parseNumeric(rowData.fuel || '');
+            const isFirstFullRlt = rowData.rltFirstFull === '1' || rowData.rltMode === 'firstFull';
+
+            let dureeRotation = null;
+            let fuelRotation = null;
+            let tpsVol = null;
+            let tpsVolRestant = null;
+
+            if (!isFirstFullRlt) {
+                if (blocArrivee !== null && previousBlocArrivee !== null) {
+                    dureeRotation = blocArrivee - previousBlocArrivee;
+                }
+                if (fuelPelic !== null && previousFuelPelic !== null) {
+                    fuelRotation = previousFuelPelic - fuelPelic;
+                }
+                if (blocArrivee !== null) {
+                    if (dureeRotation !== null && dureeRotation > 0) cumulativeTpsVol += dureeRotation;
+                    tpsVol = cumulativeTpsVol;
+                    tpsVolRestant = limitForFlight !== null ? limitForFlight - cumulativeTpsVol : null;
+                }
+            }
+
+            rows.push({
+                blocArrivee: rowData.time || '',
+                fuelPelic: rowData.fuel || '',
+                oaci: rowData.oaci || '',
+                rlt: rowData.rltMass || '',
+                dureeRotation: isFirstFullRlt ? '' : (formatTime(dureeRotation) || '--'),
+                fuelRotation: isFirstFullRlt ? '' : (fuelRotation === null ? '--' : String(fuelRotation)),
+                tpsVol: isFirstFullRlt ? '' : (formatTime(tpsVol) || (blocArrivee !== null ? '00:00' : '--')),
+                tpsVolRestant: isFirstFullRlt ? '' : (formatTime(tpsVolRestant) || '--'),
+                isFirstFullRlt
+            });
+
+            if (blocArrivee !== null) previousBlocArrivee = blocArrivee;
+            if (fuelPelic !== null) previousFuelPelic = fuelPelic;
+        });
+
+        return rows;
+    }
+
+    function buildBlocFuelExportHtml() {
+        updateActiveFlightStateFromDom();
+        ensureFlightsLoadedFromStorage();
+        normalizeFlightNumbers();
+
+        const exportDate = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+        const safe = (value) => escapeHtml(value || '');
+        const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
+
+        const flightSections = dailyFlights.map((flight, index) => {
+            const state = flight.state || {};
+            const rows = getBlocFuelExportRowCalculations(state, index);
+            const rowsHtml = rows.length
+                ? rows.map(row => `
+                    <tr${row.isFirstFullRlt ? ' class="first-full-row"' : ''}>
+                        <td>${safe(row.blocArrivee)}</td>
+                        <td>${safe(row.fuelPelic)}</td>
+                        <td>${safe(row.oaci || '--')}</td>
+                        <td>${safe(row.rlt)}</td>
+                        <td>${safe(row.dureeRotation)}</td>
+                        <td>${safe(row.fuelRotation)}</td>
+                        <td>${safe(row.tpsVol)}</td>
+                        <td>${safe(row.tpsVolRestant)}</td>
+                    </tr>`).join('')
+                : '<tr><td colspan="8" class="empty-row">Aucune ligne BLOC arrivée saisie</td></tr>';
+
+            return `
+                <section class="flight-section">
+                    <div class="flight-title-row">
+                        <h2>Vol n°${flight.number || index + 1}${flight.closed ? ' — clôturé' : ''}</h2>
+                        <span>Tps de vol : ${safe(formatDurationForFlightSummary(getFlightDurationFromState(state)))}</span>
+                    </div>
+                    <div class="header-grid">
+                        <div><b>BLOC DÉPART</b><span>${safe(state['bloc-depart']) || '--:--'}</span></div>
+                        <div><b>FUEL Départ</b><span>${safe(state['fuel-depart']) || '-- kg'}</span></div>
+                        <div><b>Base</b><span>${safe(state['base-oaci-input']) || safe(selectedBaseOACI || DEFAULT_BASE_OACI)}</span></div>
+                        <div><b>TMD</b><span>${safe(state['tmd']) || '--:--'}</span></div>
+                        <div><b>LIMITE HDV</b><span>${safe(state['limite-hdv']) || '--:--'}</span></div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>BLOC Arrivée</th>
+                                <th>FUEL Pélic.</th>
+                                <th>OACI</th>
+                                <th>Masse Rlt</th>
+                                <th>Durée Rot.</th>
+                                <th>Fuel Rot.</th>
+                                <th>Tps de Vol</th>
+                                <th>Tps de Vol Restant</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </section>`;
+        }).join('');
+
+        return `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>NPF-Q400 — Export BLOC/FUEL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    @page { size: A4 landscape; margin: 10mm; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 0; padding: 18px; color: #111827; background: #fff; }
+    .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; border-bottom: 3px solid #005a9c; padding-bottom: 10px; }
+    h1 { margin: 0; font-size: 26px; color: #005a9c; }
+    .meta { text-align: right; font-size: 13px; color: #475569; font-weight: 700; }
+    .print-button { position: fixed; right: 18px; bottom: 18px; z-index: 10; border: 0; border-radius: 12px; background: #005a9c; color: #fff; padding: 12px 18px; font-size: 16px; font-weight: 900; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+    .flight-section { page-break-inside: avoid; margin: 0 0 18px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; }
+    .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    h2 { margin: 0; font-size: 21px; color: #0f172a; }
+    .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; }
+    .header-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
+    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 8px 10px; min-height: 52px; }
+    .header-grid b { display: block; font-size: 11px; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
+    .header-grid span { display: block; margin-top: 3px; font-size: 20px; font-weight: 950; color: #111827; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+    th, td { border: 1px solid #d7dee8; padding: 7px 8px; text-align: center; font-size: 14px; }
+    th { background: #005a9c; color: #fff; font-weight: 900; }
+    td { font-weight: 800; }
+    tr.first-full-row td { background: #fff7ed; }
+    .empty-row { color: #64748b; font-style: italic; padding: 16px; }
+    @media print { .print-button { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
+</style>
+</head>
+<body>
+    <button class="print-button" onclick="window.print()">Exporter / Imprimer en PDF</button>
+    <div class="topbar">
+        <div>
+            <h1>NPF-Q400 — Export BLOC/FUEL</h1>
+            <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
+        </div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.09')}</div>
+    </div>
+    ${flightSections}
+    <script>setTimeout(() => { try { window.print(); } catch (_) {} }, 450);<\/script>
+</body>
+</html>`;
+    }
+
+    function exportBlocFuelPdf() {
+        try {
+            const html = buildBlocFuelExportHtml();
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('Export PDF impossible : la fenêtre a été bloquée. Autorisez les fenêtres pop-up pour NPF-Q400.');
+                return;
+            }
+            printWindow.document.open();
+            printWindow.document.write(html);
+            printWindow.document.close();
+        } catch (error) {
+            console.error('Export BLOC/FUEL impossible:', error);
+            alert(`Export PDF impossible : ${error.message || error}`);
+        }
+    }
+
     function ensureFlightsLoadedFromStorage() {
         try {
             const savedFlights = JSON.parse(localStorage.getItem(MULTI_FLIGHT_STORAGE_KEY) || 'null');
@@ -12290,6 +12466,7 @@ function initializeCalculator() {
     const newFlightButton = document.getElementById('new-flight-btn');
     const closeFlightButton = document.getElementById('close-flight-btn');
     const deleteFlightButton = document.getElementById('delete-flight-btn');
+    const exportBlocFuelPdfButton = document.getElementById('export-bloc-fuel-pdf-btn');
 
     if (flightSelect) {
         flightSelect.addEventListener('change', () => {
@@ -12363,6 +12540,11 @@ function initializeCalculator() {
             persistFlights();
             loadActiveFlightState();
         });
+    }
+
+
+    if (exportBlocFuelPdfButton) {
+        exportBlocFuelPdfButton.addEventListener('click', exportBlocFuelPdf);
     }
 
     resetButton.addEventListener('click', () => {
