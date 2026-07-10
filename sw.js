@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-16-export-nom-pdf-fuel-depart';
+const SW_VERSION = 'sw-v13-17-export-layout-filename-blob';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
