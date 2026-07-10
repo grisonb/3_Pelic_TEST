@@ -6697,3 +6697,94 @@ body:not(.app-ready) #nearest-commune-display {
         font-size: 21px !important;
     }
 }
+
+
+/* ==========================================================================
+   v13.01 TEST — bandeau commune à gauche + état trafic par couleur
+   ========================================================================== */
+#nearest-commune-display {
+    left: 14px !important;
+    right: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 14px) !important;
+    min-width: 360px !important;
+    max-width: min(560px, calc(100vw - 150px)) !important;
+    min-height: 54px !important;
+    padding: 12px 18px !important;
+    border-radius: 20px !important;
+    font-size: 24px !important;
+}
+
+#nearest-commune-display b {
+    font-size: 28px !important;
+}
+
+.traffic-status-display {
+    left: 14px !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 82px) !important;
+    max-width: min(520px, calc(100vw - 28px)) !important;
+    padding: 10px 14px !important;
+    border-radius: 16px !important;
+    font-size: 14px !important;
+}
+
+#traffic-layer-button.traffic-state-idle {
+    box-shadow: var(--shadow);
+}
+
+#traffic-layer-button.traffic-state-ok {
+    background: linear-gradient(180deg, rgba(230, 251, 241, 0.98) 0%, rgba(196, 244, 214, 0.98) 100%) !important;
+    border-color: rgba(22, 163, 74, 0.55) !important;
+}
+
+#traffic-layer-button.traffic-state-ok .traffic-label,
+#traffic-layer-button.traffic-state-ok .traffic-icon {
+    color: #0f6b34 !important;
+}
+
+#traffic-layer-button.traffic-state-loading {
+    background: linear-gradient(180deg, rgba(232, 244, 255, 0.98) 0%, rgba(206, 227, 255, 0.98) 100%) !important;
+    border-color: rgba(37, 99, 235, 0.45) !important;
+}
+
+#traffic-layer-button.traffic-state-loading .traffic-label,
+#traffic-layer-button.traffic-state-loading .traffic-icon {
+    color: #0b5e93 !important;
+}
+
+#traffic-layer-button.traffic-state-error {
+    background: linear-gradient(180deg, rgba(255, 240, 240, 0.98) 0%, rgba(255, 220, 220, 0.98) 100%) !important;
+    border-color: rgba(220, 38, 38, 0.45) !important;
+}
+
+#traffic-layer-button.traffic-state-error .traffic-label,
+#traffic-layer-button.traffic-state-error .traffic-icon {
+    color: #b42318 !important;
+}
+
+@media (max-width: 760px) {
+    #nearest-commune-display {
+        left: 10px !important;
+        right: auto !important;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+        min-width: 0 !important;
+        max-width: calc(100vw - 108px) !important;
+        min-height: 42px !important;
+        padding: 9px 12px !important;
+        font-size: 18px !important;
+        white-space: nowrap !important;
+    }
+
+    #nearest-commune-display b {
+        font-size: 23px !important;
+    }
+
+    .traffic-status-display {
+        left: 10px !important;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 66px) !important;
+        max-width: calc(100vw - 20px) !important;
+        padding: 8px 10px !important;
+        font-size: 12px !important;
+    }
+}
