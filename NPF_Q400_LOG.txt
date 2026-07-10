@@ -1,3 +1,20 @@
+NPF-Q400 — TEST v13.15_export_horodatage_filtre_vols
+Date : 2026-07-10
+Base : TEST v13.14_ui_export_sans_trafic
+
+Corrections :
+- Export BLOC/FUEL : horodatage ajouté au titre du document exporté avec le format « NPF-Q400 JJ/MM/AA HH:MM ».
+- Export BLOC/FUEL : nom de fichier horodaté pour les exports/partages utilisant un vrai fichier.
+- Export BLOC/FUEL : seuls les vols ayant une heure de BLOC DÉPART renseignée sont exportés ; les vols suivants vides ne sont plus affichés.
+- Export BLOC/FUEL : à partir du 2e vol exporté, affichage du temps du vol et du temps total cumulé.
+- Export BLOC/FUEL : alignement renforcé des cartes d’en-tête, notamment FUEL DÉPART et son unité kg.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.14_ui_export_sans_trafic
 Date : 2026-07-10
 Base : TEST v13.13_export_bloc_fuel_layout_fix
