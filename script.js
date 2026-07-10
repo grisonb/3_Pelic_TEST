@@ -10739,6 +10739,17 @@ function initializeCalculator() {
         const exportDate = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
         const includeControls = !!options.includeControls;
         const safe = (value) => escapeHtml(value || '');
+        const stripKgForExport = (value) => String(value ?? '')
+            .replace(/kg/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        const kgExportHtml = (value, fallback = '--') => {
+            const raw = stripKgForExport(value);
+            const clean = raw || fallback;
+            if (!clean || clean === '--') return '<span class="kg-inline"><span class="kg-number">--</span></span>';
+            return `<span class="kg-inline"><span class="kg-number">${safe(clean)}</span><span class="kg-unit">kg</span></span>`;
+        };
+        const plainExportHtml = (value, fallback = '--') => safe(String(value ?? '').trim() || fallback);
         const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
 
         const flightSections = dailyFlights.map((flight, index) => {
@@ -10747,14 +10758,14 @@ function initializeCalculator() {
             const rowsHtml = rows.length
                 ? rows.map(row => `
                     <tr${row.isFirstFullRlt ? ' class="first-full-row"' : ''}>
-                        <td>${safe(row.blocArrivee)}</td>
-                        <td>${safe(row.fuelPelic)}</td>
-                        <td>${safe(row.oaci || '--')}</td>
-                        <td>${safe(row.rlt)}</td>
-                        <td>${safe(row.dureeRotation)}</td>
-                        <td>${safe(row.fuelRotation)}</td>
-                        <td>${safe(row.tpsVol)}</td>
-                        <td>${safe(row.tpsVolRestant)}</td>
+                        <td>${plainExportHtml(row.blocArrivee)}</td>
+                        <td class="kg-cell">${kgExportHtml(row.fuelPelic)}</td>
+                        <td>${plainExportHtml(row.oaci, '--')}</td>
+                        <td class="kg-cell">${kgExportHtml(row.rlt)}</td>
+                        <td>${plainExportHtml(row.dureeRotation)}</td>
+                        <td>${plainExportHtml(row.fuelRotation)}</td>
+                        <td>${plainExportHtml(row.tpsVol)}</td>
+                        <td>${plainExportHtml(row.tpsVolRestant)}</td>
                     </tr>`).join('')
                 : '<tr><td colspan="8" class="empty-row">Aucune ligne BLOC arrivée saisie</td></tr>';
 
@@ -10765,11 +10776,11 @@ function initializeCalculator() {
                         <span>Tps de vol : ${safe(formatDurationForFlightSummary(getFlightDurationFromState(state)))}</span>
                     </div>
                     <div class="header-grid">
-                        <div><b>BLOC DÉPART</b><span>${safe(state['bloc-depart']) || '--:--'}</span></div>
-                        <div><b>FUEL Départ</b><span>${safe(state['fuel-depart']) || '-- kg'}</span></div>
-                        <div><b>Base</b><span>${safe(state['base-oaci-input']) || safe(selectedBaseOACI || DEFAULT_BASE_OACI)}</span></div>
-                        <div><b>TMD</b><span>${safe(state['tmd']) || '--:--'}</span></div>
-                        <div><b>LIMITE HDV</b><span>${safe(state['limite-hdv']) || '--:--'}</span></div>
+                        <div><b>BLOC DÉPART</b><span>${plainExportHtml(state['bloc-depart'], '--:--')}</span></div>
+                        <div><b>FUEL DÉPART</b><span>${kgExportHtml(state['fuel-depart'])}</span></div>
+                        <div><b>BASE</b><span>${plainExportHtml(state['base-oaci-input'] || selectedBaseOACI || DEFAULT_BASE_OACI)}</span></div>
+                        <div><b>TMD</b><span>${plainExportHtml(state['tmd'], '--:--')}</span></div>
+                        <div><b>LIMITE HDV</b><span>${plainExportHtml(state['limite-hdv'], '--:--')}</span></div>
                     </div>
                     <table>
                         <thead>
@@ -10805,18 +10816,31 @@ function initializeCalculator() {
     .export-toolbar { position: fixed; right: 18px; bottom: 18px; z-index: 10; display: flex; gap: 8px; align-items: center; }
     .export-toolbar button { border: 0; border-radius: 12px; background: #005a9c; color: #fff; padding: 12px 16px; font-size: 15px; font-weight: 900; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
     .export-toolbar .close-export-btn { background: #334155; }
-    .flight-section { page-break-inside: avoid; margin: 0 0 18px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; }
-    .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .flight-section { page-break-inside: avoid; margin: 0 0 18px; padding: 14px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; overflow: hidden; }
+    .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     h2 { margin: 0; font-size: 21px; color: #0f172a; }
-    .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; }
-    .header-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 12px; }
-    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 8px 10px; min-height: 52px; }
-    .header-grid b { display: block; font-size: 11px; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
-    .header-grid span { display: block; margin-top: 3px; font-size: 20px; font-weight: 950; color: #111827; }
-    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
-    th, td { border: 1px solid #d7dee8; padding: 7px 8px; text-align: center; font-size: 14px; }
-    th { background: #005a9c; color: #fff; font-weight: 900; }
+    .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; white-space: nowrap; }
+    .header-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 74px; overflow: hidden; }
+    .header-grid b { display: block; min-height: 27px; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
+    .header-grid span { display: block; margin-top: 4px; font-size: 20px; line-height: 1.05; font-weight: 950; color: #111827; white-space: nowrap; }
+    .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
+    .kg-number { display: inline-block; line-height: 1 !important; }
+    .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
+    table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+    th, td { border: 1px solid #d7dee8; padding: 7px 5px; text-align: center; font-size: 13px; line-height: 1.12; vertical-align: middle; overflow: hidden; }
+    th { background: #005a9c; color: #fff; font-weight: 900; font-size: 12.5px; }
     td { font-weight: 800; }
+    th:nth-child(1), td:nth-child(1) { width: 14%; }
+    th:nth-child(2), td:nth-child(2) { width: 14%; }
+    th:nth-child(3), td:nth-child(3) { width: 10%; }
+    th:nth-child(4), td:nth-child(4) { width: 13%; }
+    th:nth-child(5), td:nth-child(5) { width: 12%; }
+    th:nth-child(6), td:nth-child(6) { width: 11%; }
+    th:nth-child(7), td:nth-child(7) { width: 12%; }
+    th:nth-child(8), td:nth-child(8) { width: 14%; }
+    td.kg-cell .kg-inline { font-size: 14px; }
+    td.kg-cell .kg-unit { font-size: .68em; }
     tr.first-full-row td { background: #fff7ed; }
     .empty-row { color: #64748b; font-style: italic; padding: 16px; }
     @media print { .export-toolbar { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
@@ -10829,7 +10853,7 @@ function initializeCalculator() {
             <h1>NPF-Q400 — Export BLOC/FUEL</h1>
             <div>Total vols : ${dailyFlights.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.12')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Version : ${safe(window.APP_VERSION || 'v13.13')}</div>
     </div>
     ${flightSections}
     <script>
@@ -10938,7 +10962,7 @@ function initializeCalculator() {
         const totalHdv = dailyFlights.reduce((total, flight) => total + getFlightDurationFromState(flight.state), 0);
 
         addLine('NPF-Q400 - Export BLOC/FUEL');
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.12'}`);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.13'}`);
         addLine(`Total vols : ${dailyFlights.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
@@ -11094,7 +11118,7 @@ function initializeCalculator() {
     async function exportBlocFuelPdf() {
         try {
             /*
-             * v13.12 — retour au rendu imprimable HTML, plus propre que le PDF
+             * v13.13 — retour au rendu imprimable HTML, plus propre que le PDF
              * généré en texte pur. L'export s'ouvre dans une modale fermable.
              */
             openBlocFuelExportPreview();
