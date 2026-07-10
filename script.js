@@ -10885,7 +10885,10 @@ function initializeCalculator() {
     .header-grid span .kg-unit { font-size: .50em !important; }
     .header-card-fuel-depart .fuel-depart-export-value { font-size: 20px !important; letter-spacing: -0.02em; overflow: visible !important; }
     .header-card-fuel-depart .kg-inline { gap: 5px !important; transform: none !important; transform-origin: left center; }
-    .header-card-fuel-depart .kg-unit { font-size: 1em !important; margin-left: 0 !important; }
+    .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-inline,
+    .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-number,
+    .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-unit { font-size: 1em !important; line-height: 1 !important; }
+    .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-unit { margin-left: 0 !important; }
     .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
     .kg-number { display: inline-block; line-height: 1 !important; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
