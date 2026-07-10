@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-14-ui-export-sans-trafic';
+const SW_VERSION = 'sw-v13-15-export-horodatage-filtre-vols';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
