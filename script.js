@@ -10929,18 +10929,19 @@ function initializeCalculator() {
     th, td { border: 1px solid #d7dee8; padding: 7px 5px; text-align: center; font-size: 13px; line-height: 1.12; vertical-align: middle; overflow: hidden; }
     th { background: #005a9c; color: #fff; font-weight: 900; font-size: 12.5px; }
     td { font-weight: 800; }
-    th:nth-child(1), td:nth-child(1) { width: 14%; }
-    th:nth-child(2), td:nth-child(2) { width: 14%; }
-    th:nth-child(3), td:nth-child(3) { width: 10%; }
-    th:nth-child(4), td:nth-child(4) { width: 13%; }
-    th:nth-child(5), td:nth-child(5) { width: 12%; }
-    th:nth-child(6), td:nth-child(6) { width: 11%; }
+    th:nth-child(1), td:nth-child(1) { width: 13%; }
+    th:nth-child(2), td:nth-child(2) { width: 13%; }
+    th:nth-child(3), td:nth-child(3) { width: 8%; }
+    th:nth-child(4), td:nth-child(4) { width: 21%; }
+    th:nth-child(5), td:nth-child(5) { width: 8%; }
+    th:nth-child(6), td:nth-child(6) { width: 9%; }
     th:nth-child(7), td:nth-child(7) { width: 12%; }
-    th:nth-child(8), td:nth-child(8) { width: 14%; }
+    th:nth-child(8), td:nth-child(8) { width: 16%; }
     td.kg-cell .kg-inline { font-size: 14px; }
     td.kg-cell .kg-unit { font-size: .68em; }
-    .rlt-export-cell { line-height: 1.08; }
-    .rlt-calc-line { margin-top: 2px; font-size: 9.5px; line-height: 1.05; font-weight: 800; color: #475569; white-space: normal; }
+    .rlt-export-cell { line-height: 1.06; padding-left: 4px; padding-right: 4px; }
+    .rlt-export-cell .kg-inline { font-size: 13px; }
+    .rlt-calc-line { margin-top: 2px; font-size: 9.2px; line-height: 1.05; font-weight: 800; color: #475569; white-space: nowrap; letter-spacing: -0.015em; }
     tr.first-full-row td { background: #fff7ed; }
     .empty-row { color: #64748b; font-style: italic; padding: 16px; }
     @media print { .export-toolbar { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
@@ -10953,7 +10954,7 @@ function initializeCalculator() {
             <h1>${safe(exportTitle)}</h1>
             <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.20')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.21')}</div>
     </div>
     ${flightSections}
     <script>
