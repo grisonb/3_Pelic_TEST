@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-24-grand-clavier-recherche-feu';
+const SW_VERSION = 'sw-v13-25-maj-double-relance-clavier-large';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
