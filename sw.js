@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-23-export-pdf-colonnes-homogenes';
+const SW_VERSION = 'sw-v13-24-grand-clavier-recherche-feu';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
