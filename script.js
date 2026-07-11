@@ -10939,22 +10939,22 @@ function initializeCalculator() {
     table.bloc-fuel-export-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
     .bloc-fuel-export-table .col-bloc-arrivee { width: 10%; }
     .bloc-fuel-export-table .col-fuel-pelic { width: 11%; }
-    .bloc-fuel-export-table .col-oaci { width: 7%; }
-    .bloc-fuel-export-table .col-masse-rlt { width: 30%; }
-    .bloc-fuel-export-table .col-duree-rot { width: 7.5%; }
-    .bloc-fuel-export-table .col-fuel-rot { width: 7.5%; }
+    .bloc-fuel-export-table .col-oaci { width: 8%; }
+    .bloc-fuel-export-table .col-masse-rlt { width: 27%; }
+    .bloc-fuel-export-table .col-duree-rot { width: 9%; }
+    .bloc-fuel-export-table .col-fuel-rot { width: 9%; }
     .bloc-fuel-export-table .col-tps-vol { width: 10%; }
-    .bloc-fuel-export-table .col-tps-restant { width: 17%; }
+    .bloc-fuel-export-table .col-tps-restant { width: 16%; }
     th, td { border: 1px solid #d7dee8; padding: 6px 4px; text-align: center; font-size: 12.5px; line-height: 1.12; vertical-align: middle; overflow: hidden; }
-    th { background: #005a9c; color: #fff; font-weight: 900; font-size: 12px; }
+    th { background: #005a9c; color: #fff; font-weight: 900; font-size: 12px; line-height: 1.08; }
     td { font-weight: 800; }
-    th:nth-child(5), td:nth-child(5) { font-size: 11.5px; }
-    td:nth-child(5) { font-size: 12px; white-space: nowrap; }
+    th:nth-child(5), th:nth-child(6) { font-size: 11.8px; }
+    td:nth-child(5), td:nth-child(6) { font-size: 12.5px; white-space: nowrap; }
     td.kg-cell .kg-inline { font-size: 14px; }
     td.kg-cell .kg-unit { font-size: .68em; }
     .rlt-export-cell { line-height: 1.06; padding-left: 3px; padding-right: 3px; white-space: nowrap; overflow: hidden; }
     .rlt-export-cell .kg-inline { font-size: 13px; }
-    .rlt-calc-line { display: block; margin-top: 2px; font-size: 8.7px; line-height: 1.05; font-weight: 800; color: #475569; white-space: nowrap; letter-spacing: -0.045em; overflow: visible; }
+    .rlt-calc-line { display: block; margin-top: 2px; font-size: 8.4px; line-height: 1.05; font-weight: 800; color: #475569; white-space: nowrap; letter-spacing: -0.055em; overflow: visible; }
     tr.first-full-row td { background: #fff7ed; }
     .empty-row { color: #64748b; font-style: italic; padding: 16px; }
 
@@ -10972,7 +10972,7 @@ function initializeCalculator() {
             <h1>${safe(exportTitle)}</h1>
             <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.22')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.23')}</div>
     </div>
     ${flightSections}
     <script>
