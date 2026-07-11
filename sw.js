@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-19-fuel-depart-kg-pleine-taille';
+const SW_VERSION = 'sw-v13-20-export-rlt-offline-horloge';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -214,6 +214,10 @@ async function swFetchWithTimeout(input, init = {}, timeoutMs = 3500) {
     }
 }
 
+function swDelay(ms, value = null) {
+    return new Promise(resolve => setTimeout(() => resolve(value), ms));
+}
+
 async function swFetchFallbackToCache(request, timeoutMs = 8000) {
     try {
         return await swFetchWithTimeout(request, {}, timeoutMs);
@@ -315,17 +319,33 @@ async function handleAppShellRequest(request) {
      * serveur ; le cache reste le secours hors ligne.
      */
     if (isCriticalAppShellRequest(request)) {
-        try {
-            const freshRequest = new Request(request, { cache: 'reload' });
-            const fresh = await swFetchWithTimeout(freshRequest, {}, 2800);
-            if (fresh && fresh.ok) {
-                const cacheKey = request.mode === 'navigate' ? './index.html' : request;
-                await cache.put(cacheKey, fresh.clone());
-                return fresh;
-            }
-        } catch (_) {}
+        const cacheKey = request.mode === 'navigate' ? './index.html' : request;
+        const fallbackCached = cached || (request.mode === 'navigate' ? await caches.match('./index.html', { ignoreSearch: true }) : null);
 
-        return cached || await caches.match('./index.html', { ignoreSearch: true }) || new Response('', { status: 504, statusText: 'Offline critical asset unavailable' });
+        const freshPromise = (async () => {
+            try {
+                const freshRequest = new Request(request, { cache: 'reload' });
+                const fresh = await swFetchWithTimeout(freshRequest, {}, 2200);
+                if (fresh && fresh.ok) {
+                    await cache.put(cacheKey, fresh.clone());
+                    return fresh;
+                }
+            } catch (_) {}
+            return null;
+        })();
+
+        /*
+         * v13.20 — réseau dégradé / perte 4G : ne pas laisser l'écran blanc
+         * pendant que Safari attend un réseau qui répond mal. Si un app-shell
+         * existe en cache, on le sert très vite et la mise à jour réseau continue
+         * en arrière-plan. En bon réseau, la réponse fraîche arrive avant le délai.
+         */
+        if (fallbackCached) {
+            const freshOrTimeout = await Promise.race([freshPromise, swDelay(900, null)]);
+            return freshOrTimeout || fallbackCached;
+        }
+
+        return await freshPromise || new Response('', { status: 504, statusText: 'Offline critical asset unavailable' });
     }
 
     if (cached) {
