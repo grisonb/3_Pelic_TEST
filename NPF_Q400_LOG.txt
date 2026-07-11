@@ -1,3 +1,20 @@
+NPF-Q400 — TEST v13.25_maj_double_relance_clavier_large
+Date : 2026-07-11
+Base : pérenne v2026.53 / TEST v13.24_grand_clavier_recherche_feu
+
+Corrections :
+- Message post-MAJ : l’alerte « Fermez et relancez l’application » est de nouveau conservée sur deux ouvertures après mise à jour, pour correspondre au comportement iPad/PWA encore observé.
+- Grand clavier recherche feu : suppression des suggestions internes à 2 lettres.
+- La recherche retrouve le fonctionnement historique : les résultats restent ceux de la liste standard de recherche commune/feu.
+- Grand clavier agrandi : moins de touches par ligne, touches plus hautes et plus larges.
+- Le clavier ne masque plus toute la zone haute : les résultats de recherche restent visibles et utilisables au-dessus du clavier.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.24_grand_clavier_recherche_feu
 Date : 2026-07-11
 Base : version pérenne v2026.53
