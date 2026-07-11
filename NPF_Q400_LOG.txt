@@ -1,3 +1,19 @@
+NPF-Q400 — TEST v13.21_export_rlt_colonne_elargie
+Date : 2026-07-11
+Base : TEST v13.20_export_rlt_offline_horloge
+
+Corrections :
+- Export BLOC/FUEL : colonne « Masse Rlt » élargie pour que le calcul complet litres × densité = kg reste sur une seule ligne.
+- Export BLOC/FUEL : colonne « Durée Rot. » resserrée pour récupérer de la largeur au profit de « Masse Rlt ».
+- Export BLOC/FUEL : ligne de calcul RLT passée en affichage sans retour à la ligne, avec police légèrement resserrée.
+- Cache-buster index/manifest actualisé en v13.21.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.20_export_rlt_offline_horloge
 Date : 2026-07-11
 Base : TEST v13.19_fuel_depart_kg_pleine_taille
