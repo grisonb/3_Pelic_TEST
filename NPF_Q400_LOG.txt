@@ -1,3 +1,20 @@
+NPF-Q400 — TEST v13.20_export_rlt_offline_horloge
+Date : 2026-07-11
+Base : TEST v13.19_fuel_depart_kg_pleine_taille
+
+Corrections :
+- Export BLOC/FUEL : ajout du calcul complet retardant par ligne dans la colonne Masse Rlt, au format volume en litres × densité = masse kg.
+- Export BLOC/FUEL : le PDF/aperçu conserve l’export de tous les vols valides et continue d’exclure les vols sans BLOC DÉPART.
+- Démarrage PWA en réseau dégradé : service worker modifié pour servir rapidement l’app-shell en cache si le réseau répond mal, afin d’éviter l’écran blanc quand la 4G/Wi-Fi commence à décrocher.
+- Horloge BLOC arrivée : si la cellule est vide, l’heure proposée par défaut reprend la cellule BLOC arrivée précédente ; à défaut seulement, elle reprend BLOC DÉPART.
+- Fenêtre post-MAJ : restauration de l’affichage immédiat au premier lancement d’une nouvelle version, sans supprimer la logique de détection/activation automatique.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.19_fuel_depart_kg_pleine_taille
 Date : 2026-07-10
 Base : TEST v13.18_fuel_depart_kg_meme_taille
