@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.19';
+        const APP_VERSION = 'v13.20';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -199,6 +199,8 @@
                         if (previousVersion) {
                             localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
                             localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                            // v13.20 — réafficher immédiatement la fenêtre post-MAJ au premier lancement de la nouvelle version.
+                            setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 0);
                         }
                         localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
                         sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
