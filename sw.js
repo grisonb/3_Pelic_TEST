@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-20-export-rlt-offline-horloge';
+const SW_VERSION = 'sw-v13-21-export-rlt-colonne-elargie';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
