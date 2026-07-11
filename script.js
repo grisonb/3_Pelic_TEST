@@ -2098,7 +2098,7 @@ function keepKeyboardAfterSearchClear() {
 
 
 // =========================================================================
-// v13.24 TEST — grand clavier en vol pour recherche feu/commune
+// v13.25 TEST — grand clavier en vol pour recherche feu/commune
 // =========================================================================
 let largeFireKeyboardModal = null;
 let largeFireKeyboardSuggestionsEl = null;
@@ -2106,6 +2106,7 @@ let largeFireKeyboardDisplayEl = null;
 let largeFireKeyboardSearchInput = null;
 let largeFireKeyboardOpen = false;
 let largeFireKeyboardJustOpenedAt = 0;
+const POST_UPDATE_NOTICE_REMAINING_KEY = 'npfPostUpdateRestartNoticeRemaining';
 
 function isLargeFireKeyboardTarget(input) {
     return !!input && input.id === 'search-input';
@@ -2121,9 +2122,10 @@ function createLargeFireKeyboardModalIfNeeded() {
     modal.setAttribute('aria-hidden', 'true');
 
     const keyRows = [
-        ['A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
-        ['Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M'],
-        ['W', 'X', 'C', 'V', 'B', 'N']
+        ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+        ['H', 'I', 'J', 'K', 'L', 'M', 'N'],
+        ['O', 'P', 'Q', 'R', 'S', 'T', 'U'],
+        ['V', 'W', 'X', 'Y', 'Z']
     ];
 
     const keysHtml = keyRows.map(row => `
@@ -2142,7 +2144,7 @@ function createLargeFireKeyboardModalIfNeeded() {
                 <button type="button" class="large-fire-keyboard-close" data-action="close" aria-label="Fermer">×</button>
             </div>
             <div id="large-fire-keyboard-display" class="large-fire-keyboard-display" aria-live="polite"></div>
-            <div id="large-fire-keyboard-suggestions" class="large-fire-keyboard-suggestions"></div>
+            <div class="large-fire-keyboard-results-note">Les résultats restent affichés dans la liste de recherche habituelle.</div>
             <div class="large-fire-keyboard-keys">
                 ${keysHtml}
                 <div class="large-fire-keyboard-row large-fire-keyboard-actions-row">
@@ -2150,9 +2152,7 @@ function createLargeFireKeyboardModalIfNeeded() {
                     <button type="button" class="large-fire-key large-fire-key-wide" data-action="backspace">⌫</button>
                     <button type="button" class="large-fire-key large-fire-key-wide danger" data-action="clear">Effacer</button>
                     <button type="button" class="large-fire-key large-fire-key-wide primary" data-action="search">Rechercher</button>
-                </div>
-                <div class="large-fire-keyboard-row large-fire-keyboard-actions-row">
-                    <button type="button" class="large-fire-key large-fire-key-full" data-action="close">Fermer le clavier</button>
+                    <button type="button" class="large-fire-key large-fire-key-wide dark" data-action="close">Fermer</button>
                 </div>
             </div>
         </div>
@@ -2186,7 +2186,8 @@ function createLargeFireKeyboardModalIfNeeded() {
         } else if (action === 'clear') {
             clearLargeFireKeyboardText();
         } else if (action === 'search') {
-            updateLargeFireKeyboardSuggestions({ forceOpenResults: true });
+            const input = largeFireKeyboardSearchInput || document.getElementById('search-input');
+            if (input) input.dispatchEvent(new Event('input', { bubbles: true }));
         } else if (action === 'close') {
             closeLargeFireKeyboard({ refocus: false });
         }
@@ -2208,7 +2209,6 @@ function openLargeFireKeyboard(searchInput = null) {
     modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('large-fire-keyboard-open');
     updateLargeFireKeyboardDisplay();
-    updateLargeFireKeyboardSuggestions();
 }
 
 function closeLargeFireKeyboard(options = {}) {
@@ -2232,7 +2232,6 @@ function setLargeFireKeyboardInputValue(value) {
     if (clearSearchBtn) clearSearchBtn.style.display = input.value.length > 0 ? 'block' : 'none';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     updateLargeFireKeyboardDisplay();
-    updateLargeFireKeyboardSuggestions();
 }
 
 function updateLargeFireKeyboardDisplay() {
@@ -2304,50 +2303,9 @@ function findLargeFireKeyboardResults(rawSearch) {
 }
 
 function updateLargeFireKeyboardSuggestions(options = {}) {
-    if (!largeFireKeyboardSuggestionsEl) return;
-    const input = largeFireKeyboardSearchInput || document.getElementById('search-input');
-    const value = input ? input.value || '' : '';
-    const results = findLargeFireKeyboardResults(value);
-
-    largeFireKeyboardSuggestionsEl.innerHTML = '';
-
-    if (!value.trim()) {
-        const hint = document.createElement('div');
-        hint.className = 'large-fire-keyboard-hint';
-        hint.textContent = 'Saisis au moins 2 lettres. Les résultats apparaîtront ici en gros boutons.';
-        largeFireKeyboardSuggestionsEl.appendChild(hint);
-        return;
-    }
-
-    if (results.length === 0) {
-        const hint = document.createElement('div');
-        hint.className = 'large-fire-keyboard-hint';
-        hint.textContent = 'Aucun résultat immédiat.';
-        largeFireKeyboardSuggestionsEl.appendChild(hint);
-        return;
-    }
-
-    results.forEach((commune) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'large-fire-keyboard-suggestion';
-        const depCode = commune.dep_code || '';
-        button.textContent = `${commune.nom_standard} (${depCode})`;
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            currentCommune = commune;
-            localStorage.setItem('currentCommune', JSON.stringify(commune));
-            closeLargeFireKeyboard({ refocus: false });
-            displayCommuneDetails(commune);
-        });
-        largeFireKeyboardSuggestionsEl.appendChild(button);
-    });
-
-    if (options.forceOpenResults) {
-        const resultsList = document.getElementById('results-list');
-        if (resultsList) resultsList.style.display = results.length ? 'block' : 'none';
-    }
+    // v13.25 — supprimé : on garde le fonctionnement de recherche historique
+    // dans #results-list, déclenché par l'événement input normal.
+    return;
 }
 
 function setupLargeFireKeyboardForSearch(searchInput) {
@@ -2996,14 +2954,21 @@ function showPostUpdateRestartNoticeModal() {
     document.body.appendChild(modal);
 
     /*
-     * v12.82 — fenêtre post-MAJ persistante : pas de bouton OK, pas de
-     * fermeture par clic extérieur. Elle reste affichée jusqu'à fermeture / 
-     * relance de l'app. On efface le marqueur dès l'affichage pour ne pas
-     * la revoir au lancement suivant.
+     * v13.25 — fenêtre post-MAJ persistante : pas de bouton OK.
+     * Sur iPad/PWA la bascule service worker peut encore nécessiter deux
+     * relances ; le message reste donc prévu pour deux ouvertures.
      */
     try {
-        localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-        localStorage.removeItem('npfPostUpdateRestartNoticePending');
+        const remainingRaw = Number(localStorage.getItem(POST_UPDATE_NOTICE_REMAINING_KEY) || '1');
+        const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
+        if (remaining > 1) {
+            localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(remaining - 1));
+            localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+        } else {
+            localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
+            localStorage.removeItem('npfPostUpdateRestartNoticePending');
+            localStorage.removeItem(POST_UPDATE_NOTICE_REMAINING_KEY);
+        }
     } catch (_) {}
 }
 
