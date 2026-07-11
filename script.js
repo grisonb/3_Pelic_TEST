@@ -10683,6 +10683,38 @@ function initializeCalculator() {
     }
 
 
+    function buildRltExportCalculationLabel(rowData = {}) {
+        const parseExportNumber = (value) => {
+            if (value === null || value === undefined) return null;
+            const normalized = String(value).replace(/[^0-9,.-]/g, '').replace(',', '.');
+            const num = Number(normalized);
+            return Number.isFinite(num) ? num : null;
+        };
+        const formatExportNumber = (value, decimals = 0) => {
+            const num = parseExportNumber(value);
+            if (num === null) return '';
+            return decimals > 0 ? num.toFixed(decimals) : String(Math.round(num));
+        };
+
+        const candidates = [
+            { volume: rowData.rltBottomVolume, density: rowData.rltBottomDensity, mass: rowData.rltBottomMass || rowData.rltMass },
+            { volume: rowData.rltVolume, density: rowData.rltDensity, mass: rowData.rltMass },
+            { volume: rowData.rltTopVolume, density: rowData.rltTopDensity, mass: rowData.rltTopMass || rowData.rltMass }
+        ];
+
+        for (const candidate of candidates) {
+            const volume = parseExportNumber(candidate.volume);
+            const density = parseExportNumber(candidate.density);
+            const mass = parseExportNumber(candidate.mass);
+            if (volume !== null && density !== null) {
+                const computedMass = mass !== null ? mass : volume * density;
+                return `${formatExportNumber(volume)} L × ${formatExportNumber(density, 3)} = ${formatExportNumber(computedMass)} kg`;
+            }
+        }
+
+        return '';
+    }
+
     function getBlocFuelExportRowCalculations(state, flightIndex = 0) {
         const rows = [];
         const globalLimit = parseTime(dailyFlights[0]?.state?.['limite-hdv']) ?? parseTime(state?.['limite-hdv']);
@@ -10724,6 +10756,7 @@ function initializeCalculator() {
                 fuelPelic: rowData.fuel || '',
                 oaci: rowData.oaci || '',
                 rlt: rowData.rltMass || '',
+                rltCalculation: buildRltExportCalculationLabel(rowData),
                 dureeRotation: isFirstFullRlt ? '' : (formatTime(dureeRotation) || '--'),
                 fuelRotation: isFirstFullRlt ? '' : (fuelRotation === null ? '--' : String(fuelRotation)),
                 tpsVol: isFirstFullRlt ? '' : (formatTime(tpsVol) || (blocArrivee !== null ? '00:00' : '--')),
@@ -10818,7 +10851,7 @@ function initializeCalculator() {
                         <td>${plainExportHtml(row.blocArrivee)}</td>
                         <td class="kg-cell">${kgExportHtml(row.fuelPelic)}</td>
                         <td>${plainExportHtml(row.oaci, '--')}</td>
-                        <td class="kg-cell">${kgExportHtml(row.rlt)}</td>
+                        <td class="kg-cell rlt-export-cell">${kgExportHtml(row.rlt)}${row.rltCalculation ? `<div class="rlt-calc-line">${safe(row.rltCalculation)}</div>` : ''}</td>
                         <td>${plainExportHtml(row.dureeRotation)}</td>
                         <td>${plainExportHtml(row.fuelRotation)}</td>
                         <td>${plainExportHtml(row.tpsVol)}</td>
@@ -10906,6 +10939,8 @@ function initializeCalculator() {
     th:nth-child(8), td:nth-child(8) { width: 14%; }
     td.kg-cell .kg-inline { font-size: 14px; }
     td.kg-cell .kg-unit { font-size: .68em; }
+    .rlt-export-cell { line-height: 1.08; }
+    .rlt-calc-line { margin-top: 2px; font-size: 9.5px; line-height: 1.05; font-weight: 800; color: #475569; white-space: normal; }
     tr.first-full-row td { background: #fff7ed; }
     .empty-row { color: #64748b; font-style: italic; padding: 16px; }
     @media print { .export-toolbar { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
@@ -10918,7 +10953,7 @@ function initializeCalculator() {
             <h1>${safe(exportTitle)}</h1>
             <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.18')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.20')}</div>
     </div>
     ${flightSections}
     <script>
@@ -11027,7 +11062,7 @@ function initializeCalculator() {
         let cumulativeExportHdv = 0;
 
         addLine(exportTitle);
-        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.18'}`);
+        addLine(`Export : ${exportDate}    Version : ${window.APP_VERSION || 'v13.20'}`);
         addLine(`Total vols exportes : ${flightsForExport.length}    Total HDV : ${formatDurationForFlightSummary(totalHdv)}`);
         addSeparator();
 
@@ -11061,6 +11096,7 @@ function initializeCalculator() {
                     fitPdfCell(row.tpsVol || '--', 7),
                     fitPdfCell(row.tpsVolRestant || '--', 7)
                 ].join(' | '));
+                if (row.rltCalculation) addLine(`          Calcul RLT : ${row.rltCalculation}`);
             });
         });
 
@@ -11398,6 +11434,26 @@ function initializeCalculator() {
         updateActiveFlightStateFromDom();
     }
 
+    function getPreviousBlocFuelArrivalTimeForWrapper(wrapper) {
+        try {
+            const row = wrapper?.closest?.('tr');
+            const table = row?.closest?.('#bloc-fuel');
+            if (!row || !table) return '';
+
+            const rows = Array.from(table.querySelectorAll('tbody tr'));
+            const rowIndex = rows.indexOf(row);
+            for (let i = rowIndex - 1; i >= 0; i -= 1) {
+                const previousValue = rows[i].querySelector('.time-input-wrapper .display-input')?.value || '';
+                if (parseTime(previousValue) !== null) return previousValue;
+            }
+
+            const blocDepartValue = document.getElementById('bloc-depart')?.querySelector('.display-input')?.value || '';
+            return parseTime(blocDepartValue) !== null ? blocDepartValue : '';
+        } catch (_) {
+            return '';
+        }
+    }
+
     function initializeTimeInput(wrapper, initialValue = '') {
         if (!wrapper) return;
         const displayInput = wrapper.querySelector('.display-input');
@@ -11557,6 +11613,24 @@ function initializeCalculator() {
         });
 
         if (engineInput) {
+            const prepareTimePickerDefault = () => {
+                try {
+                    const isBlocFuelArrival = !!wrapper.closest('tr')?.closest('#bloc-fuel');
+                    if (isBlocFuelArrival && !displayInput.value) {
+                        const previousTime = getPreviousBlocFuelArrivalTimeForWrapper(wrapper);
+                        if (previousTime) engineInput.value = previousTime;
+                        return;
+                    }
+                    if (!engineInput.value && !displayInput.value) {
+                        engineInput.value = getAutoTimeValue();
+                    }
+                } catch (_) {}
+            };
+
+            ['pointerdown', 'touchstart', 'mousedown', 'focus'].forEach((eventName) => {
+                engineInput.addEventListener(eventName, prepareTimePickerDefault, { passive: true });
+            });
+
             engineInput.addEventListener('change', () => {
                 if (engineInput.value) {
                     setTimeValue(engineInput.value);
