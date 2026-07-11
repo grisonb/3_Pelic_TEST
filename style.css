@@ -7567,7 +7567,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ============================================================================
-   v13.24 TEST — grand clavier recherche feu / commune
+   v13.25 TEST — grand clavier recherche feu / commune
    ============================================================================ */
 .large-fire-keyboard-modal {
     position: fixed;
@@ -7785,4 +7785,135 @@ body.large-fire-keyboard-open #ui-overlay {
     .large-fire-key { min-height: 56px; font-size: 24px; }
     .large-fire-key-wide,
     .large-fire-key-full { grid-column: auto; font-size: 18px; }
+}
+
+
+/* ==========================================================================
+   v13.25 TEST — grand clavier plus gros, sans suggestions propres
+   ========================================================================== */
+.large-fire-keyboard-modal {
+    background: transparent !important;
+    pointer-events: none !important;
+    align-items: flex-end !important;
+    padding: 10px 14px calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+}
+
+.large-fire-keyboard-card {
+    pointer-events: auto !important;
+    width: min(1260px, calc(100vw - 28px)) !important;
+    max-height: min(62vh, 620px) !important;
+    padding: 14px !important;
+    border-radius: 22px !important;
+}
+
+.large-fire-keyboard-header {
+    margin-bottom: 8px !important;
+}
+
+.large-fire-keyboard-title {
+    font-size: 24px !important;
+}
+
+.large-fire-keyboard-subtitle {
+    display: none !important;
+}
+
+.large-fire-keyboard-display {
+    min-height: 62px !important;
+    margin-bottom: 8px !important;
+    font-size: 36px !important;
+    padding: 10px 14px !important;
+}
+
+.large-fire-keyboard-results-note {
+    margin: 0 0 10px 0;
+    padding: 8px 12px;
+    border-radius: 14px;
+    background: rgba(235, 246, 255, 0.96);
+    border: 1px solid rgba(0, 90, 156, 0.20);
+    color: var(--primary-color);
+    font-size: 18px;
+    font-weight: 850;
+    text-align: center;
+}
+
+.large-fire-keyboard-suggestions {
+    display: none !important;
+}
+
+.large-fire-keyboard-keys {
+    gap: 12px !important;
+}
+
+.large-fire-keyboard-row,
+.large-fire-keyboard-row:nth-child(3) {
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding: 0 !important;
+}
+
+.large-fire-keyboard-row:nth-child(4) {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    padding: 0 12% !important;
+}
+
+.large-fire-keyboard-actions-row {
+    grid-template-columns: 1.35fr 1fr 1.12fr 1.25fr 1fr !important;
+    padding: 0 !important;
+}
+
+.large-fire-key {
+    min-height: 86px !important;
+    border-radius: 20px !important;
+    font-size: 42px !important;
+    border-width: 2px !important;
+}
+
+.large-fire-key-wide {
+    font-size: 28px !important;
+}
+
+.large-fire-key.dark {
+    background: #344054 !important;
+    color: #ffffff !important;
+    border-color: #344054 !important;
+}
+
+@media (max-width: 760px) {
+    .large-fire-keyboard-card {
+        max-height: min(70vh, 600px) !important;
+        padding: 10px !important;
+    }
+
+    .large-fire-keyboard-display {
+        min-height: 54px !important;
+        font-size: 30px !important;
+    }
+
+    .large-fire-keyboard-results-note {
+        font-size: 14px !important;
+        padding: 6px 8px !important;
+    }
+
+    .large-fire-keyboard-row,
+    .large-fire-keyboard-row:nth-child(3) {
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        padding: 0 !important;
+    }
+
+    .large-fire-keyboard-row:nth-child(4),
+    .large-fire-keyboard-actions-row {
+        grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        padding: 0 !important;
+    }
+
+    .large-fire-key {
+        min-height: 70px !important;
+        font-size: 34px !important;
+    }
+
+    .large-fire-key-wide {
+        font-size: 18px !important;
+    }
 }
