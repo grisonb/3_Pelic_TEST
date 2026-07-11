@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.24">
-    <link rel="manifest" href="manifest.json?appv=v13.24">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.24">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.24">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.24">
+    <link rel="stylesheet" href="style.css?appv=v13.25">
+    <link rel="manifest" href="manifest.json?appv=v13.25">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.25">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.25">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.25">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,12 +56,23 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.24';
+        const APP_VERSION = 'v13.25';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
         const shouldDisableServiceWorker = false;
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
+
+        // v13.25 — la mise à jour iPad/PWA peut encore nécessiter deux relances.
+        // On conserve donc volontairement l'alerte post-MAJ sur deux ouvertures.
+        const POST_UPDATE_NOTICE_REMAINING_KEY = 'npfPostUpdateRestartNoticeRemaining';
+        function markPostUpdateRestartNotice(version = APP_VERSION, remaining = 2) {
+            try {
+                localStorage.setItem('npfPostUpdateRestartNoticeVersion', version);
+                localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(Math.max(1, remaining)));
+            } catch (_) {}
+        }
 
         /*
          * v13.00 TEST — HUD commune survolée auto-réparant + trafic ADS-B v3/source de secours, basé sur v12.99.
@@ -76,8 +87,7 @@
                     const reloadKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:${APP_VERSION}`;
                     if (sessionStorage.getItem(reloadKey) === '1') return;
                     sessionStorage.setItem(reloadKey, '1');
-                    localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
-                    localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                    markPostUpdateRestartNotice(APP_VERSION, 2);
                 } catch (_) {}
 
                 window.location.reload();
@@ -142,8 +152,7 @@
             refreshUrl.searchParams.set('appv', APP_VERSION);
             refreshUrl.searchParams.set('ts', Date.now().toString());
             try {
-                localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
-                    localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                markPostUpdateRestartNotice(APP_VERSION, 2);
             } catch (_) {}
             window.location.replace(refreshUrl.toString());
         };
@@ -167,8 +176,7 @@
                     worker.addEventListener('statechange', () => {
                         if (worker.state === 'installed') {
                             try {
-                                localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
-                                localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                                markPostUpdateRestartNotice(APP_VERSION, 2);
                             } catch (_) {}
                             worker.postMessage({ type: 'SKIP_WAITING' });
                         }
@@ -197,8 +205,7 @@
                     const previousVersion = localStorage.getItem(APP_VERSION_STORAGE_KEY);
                     if (previousVersion !== APP_VERSION) {
                         if (previousVersion) {
-                            localStorage.setItem('npfPostUpdateRestartNoticeVersion', APP_VERSION);
-                            localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                            markPostUpdateRestartNotice(APP_VERSION, 2);
                             // v13.20 — réafficher immédiatement la fenêtre post-MAJ au premier lancement de la nouvelle version.
                             setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 0);
                         }
@@ -244,14 +251,21 @@
                 document.body.appendChild(modal);
 
                 /*
-                 * v13.08 : la fenêtre post-MAJ est rétablie.
-                 * Elle sert d'indication volontaire après bascule de version.
-                 * Le marqueur est effacé dès l'affichage pour ne pas la revoir
-                 * au lancement suivant.
+                 * v13.25 : sur iPad/PWA la bascule service worker peut encore
+                 * nécessiter deux relances. Le message reste donc prévu pour
+                 * deux ouvertures, puis le marqueur est nettoyé.
                  */
                 try {
-                    localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-                    localStorage.removeItem('npfPostUpdateRestartNoticePending');
+                    const remainingRaw = Number(localStorage.getItem(POST_UPDATE_NOTICE_REMAINING_KEY) || '1');
+                    const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
+                    if (remaining > 1) {
+                        localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(remaining - 1));
+                        localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                    } else {
+                        localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
+                        localStorage.removeItem('npfPostUpdateRestartNoticePending');
+                        localStorage.removeItem(POST_UPDATE_NOTICE_REMAINING_KEY);
+                    }
                 } catch (_) {}
             } catch (_) {}
         }
@@ -386,7 +400,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.24"></script>
+    <script src="script.js?appv=v13.25"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
