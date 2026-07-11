@@ -1,3 +1,22 @@
+NPF-Q400 — TEST v13.23_export_pdf_colonnes_homogenes
+Date : 2026-07-11
+Base : TEST v13.22_export_pdf_layout_propre
+
+Corrections :
+- Export BLOC/FUEL : rééquilibrage des colonnes du tableau PDF.
+- Colonne OACI légèrement élargie.
+- Colonne Masse Rlt légèrement réduite.
+- Colonnes Durée Rot. et Fuel Rot. légèrement élargies.
+- Colonne Tps de Vol Restant légèrement réduite.
+- Rendu des colonnes Durée Rot. / Fuel Rot. homogénéisé.
+- Cache-buster index/manifest/script actualisé en v13.23.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.22_export_pdf_layout_propre
 Date : 2026-07-11
 Base : TEST v13.21_export_rlt_colonne_elargie
