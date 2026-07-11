@@ -1,3 +1,22 @@
+NPF-Q400 — TEST v13.22_export_pdf_layout_propre
+Date : 2026-07-11
+Base : TEST v13.21_export_rlt_colonne_elargie
+
+Corrections :
+- Export BLOC/FUEL : réduction forte des marges latérales pour donner plus de largeur au tableau.
+- Export BLOC/FUEL : reprise complète de la mise en page tableau pour obtenir un rendu plus propre.
+- Colonne Masse Rlt élargie à 30 % du tableau avec colgroup dédié.
+- Colonne Durée Rot. resserrée mais nettoyée pour éviter l’effet colonne tassée.
+- Ligne de calcul retardant forcée sur une seule ligne avec "kg" visible à la fin.
+- Carte FUEL DÉPART revue : largeur relative augmentée, valeur "3400 kg" affichée sans masquage.
+- Les autres fonctions de v13.21 sont conservées.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.21_export_rlt_colonne_elargie
 Date : 2026-07-11
 Base : TEST v13.20_export_rlt_offline_horloge
