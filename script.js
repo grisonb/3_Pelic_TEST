@@ -10872,7 +10872,17 @@ function initializeCalculator() {
                         <div><b>TMD</b><span>${plainExportHtml(state['tmd'], '--:--')}</span></div>
                         <div><b>LIMITE HDV</b><span>${plainExportHtml(state['limite-hdv'], '--:--')}</span></div>
                     </div>
-                    <table>
+                    <table class="bloc-fuel-export-table">
+                        <colgroup>
+                            <col class="col-bloc-arrivee">
+                            <col class="col-fuel-pelic">
+                            <col class="col-oaci">
+                            <col class="col-masse-rlt">
+                            <col class="col-duree-rot">
+                            <col class="col-fuel-rot">
+                            <col class="col-tps-vol">
+                            <col class="col-tps-restant">
+                        </colgroup>
                         <thead>
                             <tr>
                                 <th>BLOC Arrivée</th>
@@ -10897,27 +10907,28 @@ function initializeCalculator() {
 <title>${safe(exportPrintDocumentTitle)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 5mm; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 0; padding: 18px; color: #111827; background: #fff; }
-    .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 16px; border-bottom: 3px solid #005a9c; padding-bottom: 10px; }
-    h1 { margin: 0; font-size: 26px; color: #005a9c; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; margin: 0; padding: 8px 10px; color: #111827; background: #fff; }
+    .topbar { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 10px; border-bottom: 3px solid #005a9c; padding-bottom: 8px; }
+    h1 { margin: 0; font-size: 24px; color: #005a9c; }
     .meta { text-align: right; font-size: 13px; color: #475569; font-weight: 700; }
     .export-toolbar { position: fixed; right: 18px; bottom: 18px; z-index: 10; display: flex; gap: 8px; align-items: center; }
     .export-toolbar button { border: 0; border-radius: 12px; background: #005a9c; color: #fff; padding: 12px 16px; font-size: 15px; font-weight: 900; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
     .export-toolbar .close-export-btn { background: #334155; }
-    .flight-section { page-break-inside: avoid; margin: 0 0 18px; padding: 14px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; overflow: hidden; }
-    .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    h2 { margin: 0; font-size: 21px; color: #0f172a; }
+    .flight-section { page-break-inside: avoid; margin: 0 0 12px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; overflow: hidden; }
+    .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+    h2 { margin: 0; font-size: 20px; color: #0f172a; }
     .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; white-space: nowrap; }
-    .header-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 9px 10px; min-height: 84px; overflow: hidden; display: grid; grid-template-rows: 30px 1fr; align-items: stretch; }
-    .header-grid b { display: flex; align-items: flex-start; min-height: 30px; margin: 0; font-size: 11px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
-    .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 20px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: hidden; }
+    .header-grid { display: grid; grid-template-columns: .95fr 1.25fr .95fr .95fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 8px 9px; min-height: 76px; overflow: hidden; display: grid; grid-template-rows: 28px 1fr; align-items: stretch; }
+    .header-grid b { display: flex; align-items: flex-start; min-height: 28px; margin: 0; font-size: 10.5px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
+    .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 19px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: visible; }
     .header-grid span .kg-inline { justify-content: flex-start !important; max-width: 100%; min-width: 0; }
     .header-grid span .kg-unit { font-size: .50em !important; }
-    .header-card-fuel-depart .fuel-depart-export-value { font-size: 20px !important; letter-spacing: -0.02em; overflow: visible !important; }
-    .header-card-fuel-depart .kg-inline { gap: 5px !important; transform: none !important; transform-origin: left center; }
+    .header-card-fuel-depart { overflow: visible !important; }
+    .header-card-fuel-depart .fuel-depart-export-value { font-size: 19px !important; letter-spacing: -0.04em; overflow: visible !important; white-space: nowrap !important; }
+    .header-card-fuel-depart .kg-inline { gap: 5px !important; transform: none !important; transform-origin: left center; flex-shrink: 0; }
     .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-inline,
     .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-number,
     .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-unit { font-size: 1em !important; line-height: 1 !important; }
@@ -10925,25 +10936,32 @@ function initializeCalculator() {
     .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
     .kg-number { display: inline-block; line-height: 1 !important; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
-    table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
-    th, td { border: 1px solid #d7dee8; padding: 7px 5px; text-align: center; font-size: 13px; line-height: 1.12; vertical-align: middle; overflow: hidden; }
-    th { background: #005a9c; color: #fff; font-weight: 900; font-size: 12.5px; }
+    table.bloc-fuel-export-table { width: 100%; table-layout: fixed; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+    .bloc-fuel-export-table .col-bloc-arrivee { width: 10%; }
+    .bloc-fuel-export-table .col-fuel-pelic { width: 11%; }
+    .bloc-fuel-export-table .col-oaci { width: 7%; }
+    .bloc-fuel-export-table .col-masse-rlt { width: 30%; }
+    .bloc-fuel-export-table .col-duree-rot { width: 7.5%; }
+    .bloc-fuel-export-table .col-fuel-rot { width: 7.5%; }
+    .bloc-fuel-export-table .col-tps-vol { width: 10%; }
+    .bloc-fuel-export-table .col-tps-restant { width: 17%; }
+    th, td { border: 1px solid #d7dee8; padding: 6px 4px; text-align: center; font-size: 12.5px; line-height: 1.12; vertical-align: middle; overflow: hidden; }
+    th { background: #005a9c; color: #fff; font-weight: 900; font-size: 12px; }
     td { font-weight: 800; }
-    th:nth-child(1), td:nth-child(1) { width: 13%; }
-    th:nth-child(2), td:nth-child(2) { width: 13%; }
-    th:nth-child(3), td:nth-child(3) { width: 8%; }
-    th:nth-child(4), td:nth-child(4) { width: 21%; }
-    th:nth-child(5), td:nth-child(5) { width: 8%; }
-    th:nth-child(6), td:nth-child(6) { width: 9%; }
-    th:nth-child(7), td:nth-child(7) { width: 12%; }
-    th:nth-child(8), td:nth-child(8) { width: 16%; }
+    th:nth-child(5), td:nth-child(5) { font-size: 11.5px; }
+    td:nth-child(5) { font-size: 12px; white-space: nowrap; }
     td.kg-cell .kg-inline { font-size: 14px; }
     td.kg-cell .kg-unit { font-size: .68em; }
-    .rlt-export-cell { line-height: 1.06; padding-left: 4px; padding-right: 4px; }
+    .rlt-export-cell { line-height: 1.06; padding-left: 3px; padding-right: 3px; white-space: nowrap; overflow: hidden; }
     .rlt-export-cell .kg-inline { font-size: 13px; }
-    .rlt-calc-line { margin-top: 2px; font-size: 9.2px; line-height: 1.05; font-weight: 800; color: #475569; white-space: nowrap; letter-spacing: -0.015em; }
+    .rlt-calc-line { display: block; margin-top: 2px; font-size: 8.7px; line-height: 1.05; font-weight: 800; color: #475569; white-space: nowrap; letter-spacing: -0.045em; overflow: visible; }
     tr.first-full-row td { background: #fff7ed; }
     .empty-row { color: #64748b; font-style: italic; padding: 16px; }
+
+    .header-card-fuel-depart .kg-number,
+    .header-card-fuel-depart .kg-unit { font-size: 1em !important; line-height: 1 !important; }
+    .header-card-fuel-depart .kg-unit { color: #111827 !important; font-weight: 950 !important; }
+    .rlt-export-cell .kg-number { font-size: 13px; }
     @media print { .export-toolbar { display: none; } body { padding: 0; } .flight-section { background: #fff; } }
 </style>
 </head>
@@ -10954,7 +10972,7 @@ function initializeCalculator() {
             <h1>${safe(exportTitle)}</h1>
             <div>Total vols exportés : ${flightsForExport.length} · Total HDV : ${safe(formatDurationForFlightSummary(totalHdv))}</div>
         </div>
-        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.21')}</div>
+        <div class="meta">Export : ${safe(exportDate)}<br>Vols exportés : ${flightsForExport.length}<br>Version : ${safe(window.APP_VERSION || 'v13.22')}</div>
     </div>
     ${flightSections}
     <script>
