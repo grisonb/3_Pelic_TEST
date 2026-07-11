@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-21-export-rlt-colonne-elargie';
+const SW_VERSION = 'sw-v13-22-export-pdf-layout-propre';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
