@@ -1,27 +1,23 @@
-NPF-Q400 — TEST v13.30
-Base : TEST v13.29
+NPF-Q400 — TEST v13.31
+Base : TEST v13.30
 
-Modifications intégrées :
+Objet : fenêtre de recherche des feux — historique repliable
 
-1. Commune survolée — département par calque départements
-- Le nom de la commune reste déterminé par le calque communes.
-- Le département affiché est maintenant recherché au même point GPS dans le calque départements.
-- En cas de commune homonyme, le département ne dépend plus d'une recherche par nom dans la base communes.
-- Le code INSEE reste utilisé en secours/contrôle si le calque départements n'est pas encore chargé.
-- Le calque départements est préchargé en arrière-plan, sans obligation d'afficher le calque sur la carte.
+Modifications :
+- Lorsque l’historique des feux est ouvert, la flèche de repli ▲ est maintenant placée à droite du bouton « Tout effacer ».
+- Lorsque l’historique est masqué, la flèche ▼ reste à droite de la ligne « Historique des feux ».
+- Le bouton « Tout effacer » conserve uniquement son rôle de suppression de l’historique.
+- Le clic sur le titre « Historique des feux » ou sur la flèche continue de replier/déplier l’historique.
+- L’état masqué/affiché reste mémorisé.
 
-2. Fenêtre de recherche des feux — historique repliable
-- Ajout d'un en-tête "Historique des feux" avec flèche.
-- Flèche vers le bas ▼ : historique masqué, clic pour afficher.
-- Flèche vers le haut ▲ : historique affiché, clic pour masquer.
-- L'état affiché/masqué est mémorisé localement.
-- L'historique reste conservé ; il est uniquement replié visuellement.
-
-3. Version / cache
-- Version application passée en v13.30.
-- Service worker renommé pour forcer le rafraîchissement des fichiers.
+Fichiers modifiés :
+- script.js
+- style.css
+- index.html : passage version TEST v13.31
+- manifest.json : cache-buster v13.31
+- sw.js : cache service worker v13.31
 
 Contrôles effectués :
-- Syntaxe script.js : OK.
-- Syntaxe sw.js : OK.
-- manifest.json : OK.
+- Syntaxe script.js : OK
+- Syntaxe sw.js : OK
+- manifest.json : OK
