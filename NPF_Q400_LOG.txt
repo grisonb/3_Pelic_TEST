@@ -1,3 +1,19 @@
+NPF-Q400 — TEST v13.28_suivi_gps_drag_zip_ign
+Date : 2026-07-12
+Base : TEST v13.27_message_maj_suivi_centrage_gps
+
+Corrections :
+- Suivi GPS : correction du premier déplacement manuel de la carte.
+- En mode suivi actif, un drag/touch utilisateur est maintenant toujours reconnu comme manuel, même s'il intervient juste après un recentrage programmatique.
+- Résultat attendu : après un déplacement de carte, le recentrage automatique attend bien 10 secondes dès le premier essai.
+- Ajout séparé fourni : script Python Windows pour scinder le dossier IGN France en plusieurs ZIP.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.27_message_maj_suivi_centrage_gps
 Date : 2026-07-12
 Base : TEST v13.26_secours_demarrage_sans_grand_clavier / pérenne v2026.53
