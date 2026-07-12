@@ -1,3 +1,23 @@
+NPF-Q400 — TEST v13.27_message_maj_suivi_centrage_gps
+Date : 2026-07-12
+Base : TEST v13.26_secours_demarrage_sans_grand_clavier / pérenne v2026.53
+
+Corrections :
+- Message post-MAJ réécrit : précise que l’alerte peut apparaître plusieurs fois et que c’est normal.
+- Message post-MAJ enrichi : en cas d’ouverture anormalement lente ou de blocage au démarrage, consigne de supprimer puis réinstaller la PWA depuis Safari.
+- Aucun bouton de relance automatique ajouté : iPadOS/PWA ne permet pas de fermer puis relancer réellement l’application.
+- Bouton « centrer la carte sur position » transformé en mode suivi GPS activable/désactivable.
+- En mode suivi actif, le bouton devient vert pastel.
+- En mode suivi actif, la carte suit la position GPS.
+- Si l’utilisateur déplace/zoome la carte manuellement, le suivi se suspend puis recentre automatiquement au bout de 10 secondes.
+- Un second clic sur le bouton désactive le suivi.
+
+Contrôles :
+- Syntaxe script.js OK.
+- Syntaxe sw.js OK.
+- manifest.json OK.
+
+--- Historique précédent ---
 NPF-Q400 — TEST v13.26_secours_demarrage_sans_grand_clavier
 Date : 2026-07-11
 Base : version pérenne v2026.53
