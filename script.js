@@ -1134,6 +1134,7 @@ function setFireHistoryCollapsed(collapsed) {
 }
 
 function displayFireHistory() {
+    // v13.31 — flèche de repli conservée à droite de « Tout effacer » quand l’historique est ouvert.
     const resultsList = document.getElementById('results-list');
     if (!resultsList) return;
 
@@ -1150,16 +1151,18 @@ function displayFireHistory() {
     const header = document.createElement('li');
     header.className = 'fire-history-header';
 
-    const toggleButton = document.createElement('button');
-    toggleButton.type = 'button';
-    toggleButton.className = 'fire-history-toggle';
-    toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    toggleButton.innerHTML = `<span>Historique des feux</span><span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
-    toggleButton.addEventListener('click', () => {
+    const toggleHistory = () => {
         setFireHistoryCollapsed(!collapsed);
         displayFireHistory();
-    });
-    header.appendChild(toggleButton);
+    };
+
+    const titleButton = document.createElement('button');
+    titleButton.type = 'button';
+    titleButton.className = 'fire-history-toggle fire-history-title-toggle';
+    titleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    titleButton.innerHTML = '<span>Historique des feux</span>';
+    titleButton.addEventListener('click', toggleHistory);
+    header.appendChild(titleButton);
 
     if (!collapsed) {
         const clearButton = document.createElement('button');
@@ -1172,6 +1175,15 @@ function displayFireHistory() {
         });
         header.appendChild(clearButton);
     }
+
+    const arrowButton = document.createElement('button');
+    arrowButton.type = 'button';
+    arrowButton.className = 'fire-history-arrow-button';
+    arrowButton.setAttribute('aria-label', collapsed ? 'Afficher l’historique des feux' : 'Masquer l’historique des feux');
+    arrowButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    arrowButton.innerHTML = `<span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
+    arrowButton.addEventListener('click', toggleHistory);
+    header.appendChild(arrowButton);
 
     resultsList.appendChild(header);
 
@@ -4880,7 +4892,7 @@ async function loadDepartmentsLayerData() {
     if (hasLoadedDepartments) return;
 
     const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
-    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v13-30';
+    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v13-31';
     let response = null;
 
     /*
