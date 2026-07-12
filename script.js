@@ -415,6 +415,13 @@ let communesByCodeInsee = new Map();
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null, accuracyCircle = null, headingLayer = null, lastPosition = null;
+let centerGpsFollowActive = false;
+let centerGpsFollowProgrammaticMove = false;
+let centerGpsFollowPauseTimer = null;
+let centerGpsFollowPausedUntil = 0;
+let centerGpsFollowStartedLiveGps = false;
+let centerGpsFollowHandlersInstalled = false;
+const CENTER_GPS_FOLLOW_RECENTER_DELAY_MS = 10000;
 let ownGpsVectorLayer = null, ownGpsVectorMarkers = [];
 let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
 let showLftwRoute = true;
@@ -2413,7 +2420,9 @@ function setupEventListeners() {
     });
 
     if (centerGpsButton) {
-        centerGpsButton.addEventListener('click', centerMapOnCurrentPosition);
+        refreshCenterGpsFollowButtonState();
+        installCenterGpsFollowHandlers();
+        centerGpsButton.addEventListener('click', toggleCenterGpsFollow);
     }
 
     liveGpsButton.addEventListener('click', toggleLiveGps);
@@ -2704,8 +2713,11 @@ function showPostUpdateRestartNoticeModal() {
     modal.className = 'update-reminder-modal post-update-restart-modal';
     modal.innerHTML = `
         <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
-            <h3 id="post-update-restart-title">Mise à jour</h3>
-            <p><strong>Une mise à jour vient d’être effectuée.</strong><br>Fermez et relancez l’application.</p>
+            <h3 id="post-update-restart-title">Mise à jour installée</h3>
+            <p>Une nouvelle version de NPF-Q400 vient d’être chargée.</p>
+            <p>Ferme complètement l’application puis relance-la pour finaliser la mise à jour.</p>
+            <p>Ce message peut apparaître plusieurs fois : c’est normal. Relance simplement l’application à chaque demande jusqu’à disparition du message.</p>
+            <p>Si à un moment l’application devient anormalement lente à s’ouvrir ou reste bloquée au démarrage, supprime-la de l’écran d’accueil puis réinstalle-la depuis Safari.</p>
         </div>
     `;
 
@@ -5546,15 +5558,157 @@ function setupGpsResumeHandlers() {
 }
 
 
+function getKnownGpsLatLngForCentering() {
+    if (userMarker && typeof userMarker.getLatLng === 'function') {
+        try {
+            const pos = userMarker.getLatLng();
+            if (pos && Number.isFinite(pos.lat) && Number.isFinite(pos.lng)) {
+                return { lat: pos.lat, lng: pos.lng };
+            }
+        } catch (_) {}
+    }
+
+    if (lastPosition) {
+        const lat = Number(lastPosition.lat ?? lastPosition.latitude);
+        const lng = Number(lastPosition.lng ?? lastPosition.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            return { lat, lng };
+        }
+    }
+
+    return null;
+}
+
+function refreshCenterGpsFollowButtonState() {
+    const button = document.getElementById('center-gps-button');
+    if (!button) return;
+    button.classList.toggle('center-follow-active', centerGpsFollowActive);
+    button.classList.toggle('active', centerGpsFollowActive);
+    button.setAttribute('aria-pressed', centerGpsFollowActive ? 'true' : 'false');
+    button.title = centerGpsFollowActive
+        ? 'Suivi position actif — cliquer pour désactiver'
+        : 'Centrer puis suivre ma position GPS';
+}
+
+function recenterMapOnKnownGpsPosition(reason = 'manual') {
+    if (!map) return false;
+    const pos = getKnownGpsLatLngForCentering();
+    if (!pos) return false;
+
+    centerGpsFollowProgrammaticMove = true;
+    try {
+        map.setView([pos.lat, pos.lng], Math.max(map.getZoom(), 11), {
+            animate: reason !== 'gps-update'
+        });
+    } finally {
+        setTimeout(() => {
+            centerGpsFollowProgrammaticMove = false;
+        }, 600);
+    }
+    return true;
+}
+
+function scheduleCenterGpsFollowRecentering() {
+    if (!centerGpsFollowActive) return;
+
+    centerGpsFollowPausedUntil = Date.now() + CENTER_GPS_FOLLOW_RECENTER_DELAY_MS;
+    if (centerGpsFollowPauseTimer) {
+        clearTimeout(centerGpsFollowPauseTimer);
+        centerGpsFollowPauseTimer = null;
+    }
+
+    centerGpsFollowPauseTimer = setTimeout(() => {
+        centerGpsFollowPauseTimer = null;
+        centerGpsFollowPausedUntil = 0;
+        if (centerGpsFollowActive) {
+            recenterMapOnKnownGpsPosition('manual-delay');
+        }
+    }, CENTER_GPS_FOLLOW_RECENTER_DELAY_MS);
+}
+
+function installCenterGpsFollowHandlers() {
+    if (!map || centerGpsFollowHandlersInstalled) return;
+    centerGpsFollowHandlersInstalled = true;
+
+    const onManualMapMove = () => {
+        if (!centerGpsFollowActive || centerGpsFollowProgrammaticMove) return;
+        scheduleCenterGpsFollowRecentering();
+    };
+
+    map.on('dragstart zoomstart', onManualMapMove);
+}
+
+function enableCenterGpsFollow() {
+    centerGpsFollowActive = true;
+    centerGpsFollowPausedUntil = 0;
+    if (centerGpsFollowPauseTimer) {
+        clearTimeout(centerGpsFollowPauseTimer);
+        centerGpsFollowPauseTimer = null;
+    }
+
+    refreshCenterGpsFollowButtonState();
+    installCenterGpsFollowHandlers();
+
+    const liveGpsWasActive = !!watchId || localStorage.getItem('liveGpsActive') === 'true';
+    centerGpsFollowStartedLiveGps = !liveGpsWasActive;
+
+    if (!liveGpsWasActive) {
+        restartLiveGpsWatch({ silent: false });
+    } else {
+        requestOneShotGps({ silent: true, highAccuracy: true, timeout: 30000, maximumAge: 600000 });
+    }
+
+    if (!recenterMapOnKnownGpsPosition('enable') && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                updateUserPosition(pos);
+                recenterMapOnKnownGpsPosition('enable-current');
+            },
+            () => {
+                if (!recenterMapOnKnownGpsPosition('enable-fallback')) {
+                    alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
+                    disableCenterGpsFollow({ keepLiveGps: true });
+                }
+            },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 600000 }
+        );
+    }
+}
+
+function disableCenterGpsFollow({ keepLiveGps = false } = {}) {
+    centerGpsFollowActive = false;
+    centerGpsFollowPausedUntil = 0;
+    if (centerGpsFollowPauseTimer) {
+        clearTimeout(centerGpsFollowPauseTimer);
+        centerGpsFollowPauseTimer = null;
+    }
+
+    if (!keepLiveGps && centerGpsFollowStartedLiveGps && watchId) {
+        try { navigator.geolocation.clearWatch(watchId); } catch (_) {}
+        watchId = null;
+        const liveGpsButton = document.getElementById('live-gps-button');
+        if (liveGpsButton) liveGpsButton.classList.remove('active');
+        localStorage.setItem('liveGpsActive', 'false');
+    }
+
+    centerGpsFollowStartedLiveGps = false;
+    refreshCenterGpsFollowButtonState();
+}
+
+function toggleCenterGpsFollow() {
+    if (centerGpsFollowActive) {
+        disableCenterGpsFollow();
+    } else {
+        enableCenterGpsFollow();
+    }
+}
+
 function centerMapOnCurrentPosition() {
+    // Conservé pour compatibilité avec d'éventuels appels existants : action ponctuelle sans activer le suivi.
     if (!map) return;
 
     if (!navigator.geolocation) {
-        if (userMarker && userMarker.getLatLng()) {
-            const pos = userMarker.getLatLng();
-            map.setView([pos.lat, pos.lng], Math.max(map.getZoom(), 11));
-            return;
-        }
+        if (recenterMapOnKnownGpsPosition('legacy')) return;
         alert("La géolocalisation n'est pas supportée par votre navigateur.");
         return;
     }
@@ -5562,19 +5716,12 @@ function centerMapOnCurrentPosition() {
     navigator.geolocation.getCurrentPosition(
         (pos) => {
             updateUserPosition(pos);
-            map.setView([pos.coords.latitude, pos.coords.longitude], Math.max(map.getZoom(), 11));
+            recenterMapOnKnownGpsPosition('legacy-current');
         },
         () => {
-            if (lastPosition && Number.isFinite(lastPosition.lat) && Number.isFinite(lastPosition.lng)) {
-                map.setView([lastPosition.lat, lastPosition.lng], Math.max(map.getZoom(), 11));
-                return;
+            if (!recenterMapOnKnownGpsPosition('legacy-fallback')) {
+                alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
             }
-            if (userMarker && userMarker.getLatLng()) {
-                const pos = userMarker.getLatLng();
-                map.setView([pos.lat, pos.lng], Math.max(map.getZoom(), 11));
-                return;
-            }
-            alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
         },
         { enableHighAccuracy: true, timeout: 30000, maximumAge: 600000 }
     );
@@ -5583,11 +5730,16 @@ function centerMapOnCurrentPosition() {
 function toggleLiveGps() {
     const liveGpsButton = document.getElementById('live-gps-button');
     if (watchId) {
+        if (centerGpsFollowActive) {
+            disableCenterGpsFollow({ keepLiveGps: true });
+        }
         navigator.geolocation.clearWatch(watchId);
         watchId = null;
         if (liveGpsButton) liveGpsButton.classList.remove('active');
         localStorage.setItem('liveGpsActive', 'false');
+        centerGpsFollowStartedLiveGps = false;
     } else {
+        centerGpsFollowStartedLiveGps = false;
         restartLiveGpsWatch({ silent: false });
     }
 }
@@ -6268,6 +6420,10 @@ function updateUserPosition(pos) {
 
     if (typeof updateDeroutementGpsStatus === 'function') {
         updateDeroutementGpsStatus(isSimulationPosition ? 'GPS simulation' : 'GPS actualisé');
+    }
+
+    if (centerGpsFollowActive && Date.now() >= centerGpsFollowPausedUntil) {
+        recenterMapOnKnownGpsPosition('gps-update');
     }
 
     // Synchronise les calculs (dont GPS->Feu) dès qu'une position GPS est reçue.
