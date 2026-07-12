@@ -7564,3 +7564,44 @@ body:not(.app-ready) #nearest-commune-display {
         min-width: 210px !important;
     }
 }
+
+
+/* ==========================================================================
+   v13.27 TEST — suivi automatique position GPS depuis le bouton centrage
+   ========================================================================== */
+#center-gps-button.center-follow-active {
+    background: rgba(210, 245, 222, 0.96) !important;
+    border-color: #72c98a !important;
+    box-shadow: 0 4px 14px rgba(40, 167, 69, 0.32) !important;
+}
+
+#center-gps-button.center-follow-active .center-gps-icon,
+#center-gps-button.center-follow-active .map-action-icon {
+    filter: saturate(1.18) contrast(1.05);
+}
+
+#center-gps-button.center-follow-active::after {
+    content: "SUIVI";
+    position: absolute;
+    left: 50%;
+    bottom: 5px;
+    transform: translateX(-50%);
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(34, 139, 54, 0.30);
+    color: #1b7f38;
+    font-size: 10px;
+    font-weight: 950;
+    letter-spacing: .03em;
+    line-height: 1.25;
+    pointer-events: none;
+}
+
+@media (max-width: 760px) {
+    #center-gps-button.center-follow-active::after {
+        bottom: 3px;
+        font-size: 8px;
+        padding: 0 4px;
+    }
+}
