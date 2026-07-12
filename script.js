@@ -427,6 +427,8 @@ let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
 let showLftwRoute = true;
 let departmentsLayerGroup = null;
 let departmentsLabelsLayer = null;
+let departmentsPolygonData = [];
+let departmentsLayerLoadPromise = null;
 let highVoltageLinesLayer = null;
 let highVoltageLinesRenderer = null;
 let areDepartmentsVisible = false;
@@ -505,6 +507,7 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
 });
 let trafficSettings = loadTrafficSettings();
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
+const FIRE_HISTORY_COLLAPSED_STORAGE_KEY = 'fireHistoryCollapsedV1';
 const FIRE_HISTORY_MAX_ITEMS = 20;
 const FORCE_DISPLAY_MODE = new URLSearchParams(window.location.search).get('force_display') === '1';
 const SHOW_DEPARTMENTS_LAYER_KEY = 'showDepartmentsLayer';
@@ -687,6 +690,51 @@ async function refreshOfflineTilesRendering() {
 }
 
 
+function normalizeDepartmentCode(value) {
+    if (value === undefined || value === null) return '';
+    const raw = String(value).trim().toUpperCase();
+    if (!raw) return '';
+
+    if (/^(2A|2B)$/.test(raw)) return raw;
+    if (/^2[AB]$/.test(raw)) return raw;
+    if (/^\d$/.test(raw)) return `0${raw}`;
+    if (/^\d{2,3}$/.test(raw)) return raw;
+
+    return raw;
+}
+
+function deriveDepartmentCodeFromInsee(codeInsee) {
+    if (codeInsee === undefined || codeInsee === null) return '';
+    const code = String(codeInsee).trim().toUpperCase();
+    if (!code) return '';
+
+    if (/^2[AB]\d{3}$/.test(code)) return code.slice(0, 2);
+    if (/^97[1-6]\d{2}$/.test(code)) return code.slice(0, 3);
+    if (/^98\d{3}$/.test(code)) return code.slice(0, 3);
+    if (/^\d{5}$/.test(code)) return code.slice(0, 2);
+
+    return '';
+}
+
+function getCommuneCodeInsee(commune = {}) {
+    const directCandidates = [
+        commune.code_insee,
+        commune.codeInsee,
+        commune.insee,
+        commune.insee_code,
+        commune.code_commune,
+        commune.codeCommune,
+        commune.code
+    ];
+
+    for (const candidate of directCandidates) {
+        const value = candidate === undefined || candidate === null ? '' : String(candidate).trim().toUpperCase();
+        if (value) return value;
+    }
+
+    return '';
+}
+
 function formatCommuneDepartment(commune) {
     if (!commune || typeof commune !== 'object') return '';
 
@@ -703,9 +751,12 @@ function formatCommuneDepartment(commune) {
     ];
 
     for (const candidate of directCandidates) {
-        const value = candidate === undefined || candidate === null ? '' : String(candidate).trim().toUpperCase();
+        const value = normalizeDepartmentCode(candidate);
         if (value) return value;
     }
+
+    const fromInsee = deriveDepartmentCodeFromInsee(getCommuneCodeInsee(commune));
+    if (fromInsee) return fromInsee;
 
     const postalCode = commune.code_postal || commune.postal_code || commune.postcode;
     if (postalCode !== undefined && postalCode !== null) {
@@ -719,15 +770,21 @@ function formatCommuneDepartment(commune) {
 function getCommuneFromDatabaseByNameAndDepartment(commune) {
     if (!commune || !Array.isArray(allCommunes) || !allCommunes.length) return null;
 
+    const targetCodeInsee = getCommuneCodeInsee(commune);
+    if (targetCodeInsee && communesByCodeInsee instanceof Map) {
+        const exactByCode = communesByCodeInsee.get(targetCodeInsee);
+        if (exactByCode) return exactByCode;
+    }
+
     const targetName = simplifyString(commune.nom_standard || commune.name || '');
     if (!targetName) return null;
 
-    const targetDep = commune.dep_code ? String(commune.dep_code).trim().toUpperCase() : '';
+    const targetDep = formatCommuneDepartment(commune);
     const sameName = allCommunes.filter(item => simplifyString(item.nom_standard || item.name || '') === targetName);
 
     if (!sameName.length) return null;
     if (targetDep) {
-        const sameDep = sameName.find(item => String(item.dep_code || '').trim().toUpperCase() === targetDep);
+        const sameDep = sameName.find(item => formatCommuneDepartment(item) === targetDep);
         if (sameDep) return sameDep;
     }
 
@@ -1062,6 +1119,20 @@ function clearFireHistory() {
     drawFireHistoryMarkers();
 }
 
+function isFireHistoryCollapsed() {
+    try {
+        return localStorage.getItem(FIRE_HISTORY_COLLAPSED_STORAGE_KEY) === 'true';
+    } catch (_) {
+        return false;
+    }
+}
+
+function setFireHistoryCollapsed(collapsed) {
+    try {
+        localStorage.setItem(FIRE_HISTORY_COLLAPSED_STORAGE_KEY, collapsed ? 'true' : 'false');
+    } catch (_) {}
+}
+
 function displayFireHistory() {
     const resultsList = document.getElementById('results-list');
     if (!resultsList) return;
@@ -1074,13 +1145,40 @@ function displayFireHistory() {
         return;
     }
 
+    const collapsed = isFireHistoryCollapsed();
+
     const header = document.createElement('li');
     header.className = 'fire-history-header';
-    header.innerHTML = `
-        <span>Derniers feux</span>
-        <button type="button" class="fire-history-clear-all" onclick="window.clearFireHistory()">🗑️ Tout effacer</button>
-    `;
+
+    const toggleButton = document.createElement('button');
+    toggleButton.type = 'button';
+    toggleButton.className = 'fire-history-toggle';
+    toggleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggleButton.innerHTML = `<span>Historique des feux</span><span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
+    toggleButton.addEventListener('click', () => {
+        setFireHistoryCollapsed(!collapsed);
+        displayFireHistory();
+    });
+    header.appendChild(toggleButton);
+
+    if (!collapsed) {
+        const clearButton = document.createElement('button');
+        clearButton.type = 'button';
+        clearButton.className = 'fire-history-clear-all';
+        clearButton.textContent = '🗑️ Tout effacer';
+        clearButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            window.clearFireHistory();
+        });
+        header.appendChild(clearButton);
+    }
+
     resultsList.appendChild(header);
+
+    if (collapsed) {
+        resultsList.style.display = 'block';
+        return;
+    }
 
     history.forEach((item, index) => {
         const li = document.createElement('li');
@@ -1120,6 +1218,11 @@ function displayFireHistory() {
 
     resultsList.style.display = 'block';
 }
+
+window.toggleFireHistoryCollapsed = function() {
+    setFireHistoryCollapsed(!isFireHistoryCollapsed());
+    displayFireHistory();
+};
 
 window.deleteFireHistoryItem = function(index) {
     const history = getFireHistory();
@@ -1426,6 +1529,18 @@ async function initializeApp() {
                 }
             });
     }, 500);
+    setTimeout(() => {
+        ensureDepartmentsLayerDataLoaded()
+            .then(() => {
+                if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+                    refreshNearestCommuneDisplayFromKnownGps();
+                }
+                repairManualFireCommuneLabelsFromPolygons();
+            })
+            .catch((error) => {
+                console.warn('Préchargement calque départements impossible:', error);
+            });
+    }, 650);
     primeGpsFromStoredPosition();
     setTimeout(() => {
         if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps();
@@ -4762,8 +4877,10 @@ function updateDepartmentsLayerAppearance() {
 }
 
 async function loadDepartmentsLayerData() {
+    if (hasLoadedDepartments) return;
+
     const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
-    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v12-38';
+    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v13-30';
     let response = null;
 
     /*
@@ -4798,6 +4915,15 @@ async function loadDepartmentsLayerData() {
     }
 
     const departmentsGeojson = await response.json();
+    departmentsPolygonData = buildDepartmentPolygonIndex(departmentsGeojson);
+
+    if (departmentsLayerGroup && typeof departmentsLayerGroup.clearLayers === 'function') {
+        departmentsLayerGroup.clearLayers();
+    }
+    if (departmentsLabelsLayer && typeof departmentsLabelsLayer.clearLayers === 'function') {
+        departmentsLabelsLayer.clearLayers();
+    }
+
     const geoJsonLayer = L.geoJSON(departmentsGeojson, {
         style: getDepartmentBoundaryStyle
     });
@@ -4820,12 +4946,25 @@ async function loadDepartmentsLayerData() {
     updateDepartmentsLayerAppearance();
 }
 
+function ensureDepartmentsLayerDataLoaded() {
+    if (hasLoadedDepartments) return Promise.resolve();
+    if (departmentsLayerLoadPromise) return departmentsLayerLoadPromise;
+
+    departmentsLayerLoadPromise = loadDepartmentsLayerData()
+        .catch((error) => {
+            departmentsLayerLoadPromise = null;
+            throw error;
+        });
+
+    return departmentsLayerLoadPromise;
+}
+
 async function toggleDepartmentsLayer(shouldShow) {
     const departmentsLayerButton = document.getElementById('departments-layer-button');
 
     if (shouldShow && !hasLoadedDepartments) {
         try {
-            await loadDepartmentsLayerData();
+            await ensureDepartmentsLayerDataLoaded();
         } catch (error) {
             console.error('Erreur de chargement du calque départements:', error);
             alert("Impossible de générer le calque des départements. Si l'appareil est hors ligne, il faut que le calque ait été préchargé au moins une fois après la mise à jour.");
@@ -5039,8 +5178,120 @@ function getCommuneNameFromProperties(properties = {}) {
     return simplifyCommuneDisplayName(rawName);
 }
 
+/*
+ * v13.29 — commune survolée : l'identification du département ne doit plus
+ * dépendre d'une recherche par nom. Les communes homonymes comme Mérignac
+ * existent dans plusieurs départements ; on utilise donc le code INSEE du
+ * polygone Etalab quand il est disponible.
+ */
+function getCommuneInseeCodeFromProperties(properties = {}) {
+    const directCandidates = [
+        properties.code,
+        properties.code_insee,
+        properties.codeInsee,
+        properties.insee,
+        properties.insee_code,
+        properties.code_commune,
+        properties.codeCommune
+    ];
+
+    for (const candidate of directCandidates) {
+        const value = candidate === undefined || candidate === null ? '' : String(candidate).trim().toUpperCase();
+        if (/^(?:\d{5}|2[AB]\d{3})$/.test(value)) return value;
+    }
+
+    return '';
+}
+
 function getCommuneDepCodeFromProperties(properties = {}) {
-    return properties.code_departement || properties.dep_code || properties.dep || properties.codeDepartement || '';
+    const directDep = properties.code_departement || properties.dep_code || properties.dep || properties.codeDepartement || '';
+    const normalizedDirectDep = normalizeDepartmentCode(directDep);
+    if (normalizedDirectDep) return normalizedDirectDep;
+
+    return deriveDepartmentCodeFromInsee(getCommuneInseeCodeFromProperties(properties));
+}
+
+/*
+ * v13.30 — commune survolée : le département affiché est calculé à partir
+ * du calque départements au même point GPS. Le nom vient du calque communes,
+ * le département vient du calque départements ; le code INSEE reste un secours.
+ */
+function getDepartmentCodeFromProperties(properties = {}) {
+    const directCandidates = [
+        properties.code,
+        properties.code_departement,
+        properties.dep_code,
+        properties.dep,
+        properties.codeDepartement,
+        properties.num_dep,
+        properties.numero
+    ];
+
+    for (const candidate of directCandidates) {
+        const value = normalizeDepartmentCode(candidate);
+        if (value) return value;
+    }
+
+    return '';
+}
+
+function getDepartmentNameFromProperties(properties = {}) {
+    return String(properties.nom || properties.nom_departement || properties.name || properties.libelle || properties.dep_nom || '').trim();
+}
+
+function buildDepartmentPolygonIndex(departmentsGeojson) {
+    const features = Array.isArray(departmentsGeojson?.features) ? departmentsGeojson.features : [];
+    const index = [];
+
+    features.forEach((feature) => {
+        const properties = feature.properties || {};
+        const depCode = getDepartmentCodeFromProperties(properties);
+        if (!depCode) return;
+
+        const rings = coordinatesToRings(feature.geometry);
+        const bounds = getGeometryBoundsFromRings(rings);
+        if (!bounds) return;
+
+        index.push({
+            depCode,
+            depName: getDepartmentNameFromProperties(properties),
+            rings,
+            bounds
+        });
+    });
+
+    return index;
+}
+
+function findDepartmentContainingPoint(lat, lon) {
+    if (!Array.isArray(departmentsPolygonData) || !departmentsPolygonData.length) return null;
+
+    const numericLat = Number(lat);
+    const numericLon = Number(lon);
+    if (!Number.isFinite(numericLat) || !Number.isFinite(numericLon)) return null;
+
+    for (const department of departmentsPolygonData) {
+        const bounds = department.bounds;
+        if (!bounds) continue;
+
+        if (
+            numericLat < bounds.minLat
+            || numericLat > bounds.maxLat
+            || numericLon < bounds.minLon
+            || numericLon > bounds.maxLon
+        ) {
+            continue;
+        }
+
+        if (isPointInPolygonRings(numericLat, numericLon, department.rings)) {
+            return {
+                dep_code: department.depCode,
+                dep_nom: department.depName || ''
+            };
+        }
+    }
+
+    return null;
 }
 
 function coordinatesToRings(geometry) {
@@ -5136,8 +5387,11 @@ function buildCommunePolygonIndex(communesGeojson) {
         const bounds = getGeometryBoundsFromRings(rings);
         if (!bounds) return;
 
+        const codeInsee = getCommuneInseeCodeFromProperties(properties);
+
         index.push({
             name,
+            codeInsee,
             depCode: getCommuneDepCodeFromProperties(properties),
             rings,
             bounds
@@ -5164,9 +5418,12 @@ function findCommuneContainingPoint(lat, lon) {
         }
 
         if (isPointInPolygonRings(lat, lon, commune.rings)) {
+            const departmentAtPoint = findDepartmentContainingPoint(lat, lon);
             return {
                 nom_standard: commune.name,
-                dep_code: commune.depCode || ''
+                dep_code: departmentAtPoint?.dep_code || commune.depCode || deriveDepartmentCodeFromInsee(commune.codeInsee) || '',
+                dep_nom: departmentAtPoint?.dep_nom || '',
+                code_insee: commune.codeInsee || ''
             };
         }
     }
@@ -5824,7 +6081,8 @@ function updateNearestCommuneDisplay(lat, lon) {
     const buildLabel = (commune, prefix = 'Commune') => {
         const displayCommune = enrichCommuneForDisplay(commune);
         if (!displayCommune) return '';
-        const depLabel = formatCommuneDepartment(displayCommune);
+        const departmentAtPoint = findDepartmentContainingPoint(lat, lon);
+        const depLabel = departmentAtPoint?.dep_code || formatCommuneDepartment(displayCommune);
         return `📍 ${prefix}: <b>${displayCommune.nom_standard || displayCommune.name || 'non déterminée'}${depLabel ? ` (${depLabel})` : ''}</b>`;
     };
 
@@ -5838,6 +6096,19 @@ function updateNearestCommuneDisplay(lat, lon) {
     const containedCommune = findCommuneContainingPoint(numericLat, numericLon);
     if (containedCommune) {
         showDisplay(buildLabel(containedCommune, 'Survolée'));
+
+        if (!hasLoadedDepartments) {
+            ensureDepartmentsLayerDataLoaded()
+                .then(() => {
+                    const display = document.getElementById('nearest-commune-display');
+                    if (!display) return;
+                    const refreshedCommune = findCommuneContainingPoint(numericLat, numericLon) || containedCommune;
+                    display.style.display = 'flex';
+                    display.className = 'nearest-commune-display';
+                    display.innerHTML = buildLabel(refreshedCommune, 'Survolée');
+                })
+                .catch((error) => console.warn('Chargement calque départements pour commune survolée impossible:', error));
+        }
         return;
     }
 
