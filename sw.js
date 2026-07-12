@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-31-historique-feux-fleche-apres-tout-effacer';
+const SW_VERSION = 'sw-v13-32-limite-hdv-maj-bloc-arrivee';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
