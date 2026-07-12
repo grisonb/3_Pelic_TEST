@@ -7644,3 +7644,31 @@ body:not(.app-ready) #nearest-commune-display {
 #results-list li.fire-history-header .fire-history-toggle:active {
     background: transparent;
 }
+
+
+/* v13.31 — Historique ouvert : flèche maintenue à droite de « Tout effacer » */
+.fire-history-title-toggle {
+    justify-content: flex-start !important;
+    min-width: 0;
+}
+
+.fire-history-arrow-button {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.fire-history-arrow-button:active .fire-history-arrow {
+    transform: scale(0.96);
+}
+
+#results-list li.fire-history-header .fire-history-arrow-button:hover,
+#results-list li.fire-history-header .fire-history-arrow-button:active {
+    background: transparent;
+}
