@@ -7605,3 +7605,42 @@ body:not(.app-ready) #nearest-commune-display {
         padding: 0 4px;
     }
 }
+
+
+/* v13.30 — Historique des feux repliable dans la recherche */
+.fire-history-toggle {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 34px;
+    border: none;
+    background: transparent;
+    color: #0b3d63;
+    font: inherit;
+    font-weight: 900;
+    text-align: left;
+    cursor: pointer;
+    padding: 0;
+}
+
+.fire-history-arrow {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 999px;
+    background: rgba(0, 86, 179, 0.10);
+    color: #0056b3;
+    font-size: 17px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+#results-list li.fire-history-header .fire-history-toggle:hover,
+#results-list li.fire-history-header .fire-history-toggle:active {
+    background: transparent;
+}
