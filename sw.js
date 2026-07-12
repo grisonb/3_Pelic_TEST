@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-25-maj-double-relance-clavier-large';
+const SW_VERSION = 'sw-v13-26-secours-demarrage-sans-grand-clavier';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
