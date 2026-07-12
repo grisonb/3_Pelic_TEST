@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.25">
-    <link rel="manifest" href="manifest.json?appv=v13.25">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.25">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.25">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.25">
+    <link rel="stylesheet" href="style.css?appv=v13.26">
+    <link rel="manifest" href="manifest.json?appv=v13.26">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.26">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.26">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.26">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,14 +56,14 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.25';
+        const APP_VERSION = 'v13.26';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
         const shouldDisableServiceWorker = false;
         window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
 
-        // v13.25 — la mise à jour iPad/PWA peut encore nécessiter deux relances.
+        // v13.26 — sur iPad/PWA la bascule de service worker peut nécessiter deux relances.
         // On conserve donc volontairement l'alerte post-MAJ sur deux ouvertures.
         const POST_UPDATE_NOTICE_REMAINING_KEY = 'npfPostUpdateRestartNoticeRemaining';
         function markPostUpdateRestartNotice(version = APP_VERSION, remaining = 2) {
@@ -73,6 +73,20 @@
                 localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(Math.max(1, remaining)));
             } catch (_) {}
         }
+
+        // Sécurité : ne jamais laisser l'écran de démarrage bloquer indéfiniment.
+        // Ne remplace pas l'initialisation normale ; sert uniquement en secours si Safari/PWA rate un évènement.
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                try {
+                    if (document.body && !document.body.classList.contains('app-ready')) {
+                        document.body.classList.add('app-ready');
+                        document.documentElement.classList.add('app-ready');
+                    }
+                } catch (_) {}
+            }, 12000);
+        }, { once: true });
+
 
         /*
          * v13.00 TEST — HUD commune survolée auto-réparant + trafic ADS-B v3/source de secours, basé sur v12.99.
@@ -251,9 +265,10 @@
                 document.body.appendChild(modal);
 
                 /*
-                 * v13.25 : sur iPad/PWA la bascule service worker peut encore
-                 * nécessiter deux relances. Le message reste donc prévu pour
-                 * deux ouvertures, puis le marqueur est nettoyé.
+                 * v13.08 : la fenêtre post-MAJ est rétablie.
+                 * Elle sert d'indication volontaire après bascule de version.
+                 * Le marqueur est effacé dès l'affichage pour ne pas la revoir
+                 * au lancement suivant.
                  */
                 try {
                     const remainingRaw = Number(localStorage.getItem(POST_UPDATE_NOTICE_REMAINING_KEY) || '1');
@@ -400,7 +415,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.25"></script>
+    <script src="script.js?appv=v13.26"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
