@@ -1,23 +1,31 @@
-NPF-Q400 — TEST v13.31
-Base : TEST v13.30
+NPF-Q400 — TEST v13.32
+Base : TEST v13.31
+Objet : LIMITE HDV mise à jour à chaque BLOC ARRIVÉE saisi
 
-Objet : fenêtre de recherche des feux — historique repliable
+MODIFICATIONS
 
-Modifications :
-- Lorsque l’historique des feux est ouvert, la flèche de repli ▲ est maintenant placée à droite du bouton « Tout effacer ».
-- Lorsque l’historique est masqué, la flèche ▼ reste à droite de la ligne « Historique des feux ».
-- Le bouton « Tout effacer » conserve uniquement son rôle de suppression de l’historique.
-- Le clic sur le titre « Historique des feux » ou sur la flèche continue de replier/déplier l’historique.
-- L’état masqué/affiché reste mémorisé.
+1. Onglet BLOC / FUEL
+- La valeur affichée dans le champ LIMITE HDV se met maintenant à jour dès qu’un BLOC ARRIVÉE est saisi.
+- Le champ affiche le restant journée disponible après prise en compte du temps de vol déjà saisi sur le vol actif.
+- Le calcul des lignes du tableau BLOC/FUEL conserve la logique correcte : la colonne Tps de Vol Restant continue à utiliser la limite disponible au début du vol actif, puis soustrait progressivement les rotations de la ligne.
+- Objectif : éviter une double soustraction du vol courant.
 
-Fichiers modifiés :
-- script.js
-- style.css
-- index.html : passage version TEST v13.31
-- manifest.json : cache-buster v13.31
-- sw.js : cache service worker v13.31
+2. Onglet PRÉVI NBR ROTATION
+- La LIMITE HDV affichée dans Prévi Nbr Rotation est synchronisée avec le restant journée actualisé.
+- Les prévisions de rotations utilisent donc automatiquement le nouveau restant HDV après chaque BLOC ARRIVÉE saisi dans BLOC/FUEL.
 
-Contrôles effectués :
-- Syntaxe script.js : OK
-- Syntaxe sw.js : OK
-- manifest.json : OK
+3. Protection du stockage multi-vols
+- La limite journée de référence reste conservée en mémoire.
+- L’affichage peut diminuer dynamiquement, mais la valeur de référence n’est pas écrasée à chaque sauvegarde.
+- Cela évite que la LIMITE HDV baisse définitivement à chaque changement de champ ou de vol.
+
+4. Version / cache
+- Passage APP_VERSION en v13.32.
+- Mise à jour du cache service worker en sw-v13-32-limite-hdv-maj-bloc-arrivee.
+- Mise à jour du cache départements en npf-q400-departments-v13-32.
+
+CONTRÔLES
+
+- Syntaxe script.js : OK.
+- Syntaxe sw.js : OK.
+- manifest.json : OK.
