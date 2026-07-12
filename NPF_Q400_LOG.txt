@@ -1,31 +1,13 @@
-NPF-Q400 — TEST v13.25_maj_double_relance_clavier_large
-Date : 2026-07-11
-Base : pérenne v2026.53 / TEST v13.24_grand_clavier_recherche_feu
-
-Corrections :
-- Message post-MAJ : l’alerte « Fermez et relancez l’application » est de nouveau conservée sur deux ouvertures après mise à jour, pour correspondre au comportement iPad/PWA encore observé.
-- Grand clavier recherche feu : suppression des suggestions internes à 2 lettres.
-- La recherche retrouve le fonctionnement historique : les résultats restent ceux de la liste standard de recherche commune/feu.
-- Grand clavier agrandi : moins de touches par ligne, touches plus hautes et plus larges.
-- Le clavier ne masque plus toute la zone haute : les résultats de recherche restent visibles et utilisables au-dessus du clavier.
-
-Contrôles :
-- Syntaxe script.js OK.
-- Syntaxe sw.js OK.
-- manifest.json OK.
-
---- Historique précédent ---
-NPF-Q400 — TEST v13.24_grand_clavier_recherche_feu
+NPF-Q400 — TEST v13.26_secours_demarrage_sans_grand_clavier
 Date : 2026-07-11
 Base : version pérenne v2026.53
 
-Corrections / ajouts TEST :
-- Ajout d’un grand clavier interne pour la recherche feu/commune.
-- Le clavier iOS est évité sur le champ de recherche commune afin d’avoir de grosses touches utilisables en vol.
-- Clavier alphabétique sans accents, avec grosses touches A-Z, Espace, Retour arrière, Effacer, Rechercher et Fermer.
-- Suggestions de communes affichées en gros boutons dès 2 lettres.
-- Sélection directe d’une commune depuis les suggestions du grand clavier.
-- Aucun changement sur le bouton existant “Feu sur commune survolée”.
+Corrections TEST :
+- Version de secours après blocage au lancement sur l’écran « Chargement NPF-Q400 — Patience, je réfléchis ».
+- Retour au comportement de recherche feu/commune standard : suppression du grand clavier interne TEST v13.24/v13.25.
+- Conservation du message post-MAJ prévu sur deux ouvertures, puisque l’iPad/PWA peut encore nécessiter deux relances après mise à jour.
+- Ajout d’un garde-fou : l’écran de démarrage ne doit plus rester affiché indéfiniment si Safari/PWA rate un événement de fin de chargement.
+- Le reste repart de la base pérenne validée v2026.53.
 
 Contrôles :
 - Syntaxe script.js OK.
