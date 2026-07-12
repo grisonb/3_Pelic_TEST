@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-28-suivi-gps-drag-zip-ign';
+const SW_VERSION = 'sw-v13-30-commune-survolee-calque-departements-historique';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
