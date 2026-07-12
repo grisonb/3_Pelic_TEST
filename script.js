@@ -5630,12 +5630,25 @@ function installCenterGpsFollowHandlers() {
     if (!map || centerGpsFollowHandlersInstalled) return;
     centerGpsFollowHandlersInstalled = true;
 
-    const onManualMapMove = () => {
-        if (!centerGpsFollowActive || centerGpsFollowProgrammaticMove) return;
+    const onManualMapMove = (event) => {
+        if (!centerGpsFollowActive) return;
+
+        /*
+         * v13.28 — correction suivi GPS : lors du premier déplacement manuel
+         * juste après l'activation, Leaflet peut encore être dans une séquence
+         * de recentrage programmatique. On ne doit ignorer que les mouvements
+         * réellement générés par le code, pas le drag/touch de l'utilisateur.
+         */
+        const isUserInteraction = !!(event && event.originalEvent);
+        if (centerGpsFollowProgrammaticMove && !isUserInteraction) return;
+
         scheduleCenterGpsFollowRecentering();
     };
 
     map.on('dragstart zoomstart', onManualMapMove);
+    map.on('movestart', (event) => {
+        if (event && event.originalEvent) onManualMapMove(event);
+    });
 }
 
 function enableCenterGpsFollow() {
