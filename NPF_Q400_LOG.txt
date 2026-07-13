@@ -1,27 +1,17 @@
-NPF-Q400 — MODIFICATIONS v13.36 TEST
-Base : v13.35 TEST
+NPF-Q400 — TEST v13.37
+Base : TEST v13.36
 
-1. Historique des feux — suppression sans fermeture de fenêtre
-- Après validation de la suppression d’un feu dans l’historique, la fenêtre de recherche reste ouverte.
-- Le clic/touch sur le X de suppression est isolé pour éviter un déclenchement parasite de la sélection du feu ou de l’ouverture/fermeture de la fenêtre.
-- Ajout d’un court garde-fou après une suppression pour éviter l’effet iPad : clic sur l’icône recherche qui ouvre puis referme immédiatement.
+Corrections :
+- Historique des feux : correction de la mise en page des lignes.
+- Suppression du pictogramme injecté par l'ancien style ::before qui créait une colonne fantôme et décalait les boutons.
+- Boutons ForeFlight / SDVFR conservés à distance du X, avec grille plus stable.
+- Bouton X de suppression rétabli sur iPad : suppression du preventDefault trop tôt sur touchstart/pointerdown, qui pouvait empêcher le clic.
+- Le X reste isolé des autres actions et demande toujours confirmation avant suppression.
+- Après suppression confirmée, la fenêtre de recherche reste ouverte.
 
-2. Historique des feux — sécurité visuelle
-- La colonne du X de suppression est isolée.
-- Les boutons ForeFlight / SDVFR restent décalés vers la gauche, avec un espace de sécurité avant le X.
-
-3. Valeurs par défaut Fuel
-- Dans PREVI. NBR ROTATIONS, FUEL Départ par défaut : 3500 kg.
-- Dans BLOC / FUEL, FUEL Départ par défaut : 3500 kg.
-- Les nouveaux vols reprennent 3500 kg comme valeur par défaut lorsque rien n’est encore sauvegardé.
-
-4. Carte IGN offline — fluidité
-- Optimisation du calque de tuiles offline pour un pack IGN lourd : tampon de tuiles réduit en mode offline.
-- Espacement léger des mises à jour de tuiles en déplacement pour réduire les lectures IndexedDB sur iPad.
-- Activation preferCanvas pour alléger le rendu des couches vectorielles.
-- Ajout d’options CSS légères pour stabiliser le rendu des tuiles.
-
-Contrôles effectués :
-- script.js : syntaxe OK.
-- sw.js : syntaxe OK.
-- manifest.json : JSON OK.
+Fichiers à remplacer :
+1. index.html
+2. manifest.json
+3. script.js
+4. style.css
+5. sw.js
