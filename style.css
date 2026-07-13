@@ -7672,3 +7672,196 @@ body:not(.app-ready) #nearest-commune-display {
 #results-list li.fire-history-header .fire-history-arrow-button:active {
     background: transparent;
 }
+
+/* ========================================================================== 
+   v13.34 TEST — Suivi GPS, historique et commune survolée longue
+   ========================================================================== */
+
+/* Historique ouvert : la flèche est replacée dans la zone du titre,
+   à distance de la colonne des boutons X de suppression. */
+#results-list li.fire-history-header {
+    gap: 12px !important;
+}
+
+#results-list li.fire-history-header .fire-history-title-toggle {
+    flex: 1 1 auto !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+    padding-right: 10px !important;
+}
+
+#results-list li.fire-history-header .fire-history-clear-all {
+    flex: 0 0 auto !important;
+    margin-left: auto !important;
+}
+
+#results-list li.fire-history-header .fire-history-arrow {
+    min-width: 34px !important;
+    min-height: 34px !important;
+    font-size: 18px !important;
+}
+
+/* Commune survolée : aucun ellipsis. Le nom complet et le département doivent
+   rester visibles, même si le nom de commune passe sur plusieurs lignes. */
+#nearest-commune-display {
+    height: auto !important;
+    min-height: 54px !important;
+    max-height: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    line-height: 1.14 !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+}
+
+#nearest-commune-display .nearest-commune-prefix,
+#nearest-commune-display .nearest-commune-name,
+#nearest-commune-display b {
+    display: inline !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 760px) {
+    #nearest-commune-display {
+        height: auto !important;
+        min-height: 42px !important;
+        max-height: none !important;
+        white-space: normal !important;
+        line-height: 1.12 !important;
+        padding: 8px 10px !important;
+    }
+
+    #nearest-commune-display b,
+    #nearest-commune-display .nearest-commune-name {
+        font-size: 20px !important;
+        line-height: 1.12 !important;
+    }
+}
+
+
+/* ========================================================================== 
+   v13.34 TEST — Bandeau feu : ETA GPS + durée rotation / exports dans historique
+   ========================================================================== */
+
+#commune-info-display {
+    height: auto !important;
+    min-height: 52px !important;
+    max-width: calc(100vw - 105px) !important;
+    flex-wrap: wrap !important;
+    row-gap: 5px !important;
+    column-gap: 10px !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+    overflow: visible !important;
+}
+
+#commune-info-display > .commune-name {
+    flex: 1 1 auto !important;
+    min-width: 180px !important;
+    max-width: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+    line-height: 1.1 !important;
+}
+
+#commune-info-display .gps-feu-route-info,
+#commune-info-display .gps-feu-rotation-info {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    margin-left: 2px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eef6ff;
+    border: 1px solid #b9d8f0;
+    color: var(--primary-color);
+    font-size: 18px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+#commune-info-display .gps-feu-rotation-info {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #b45309;
+}
+
+.fire-history-export-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 4px;
+}
+
+.fire-history-export-btn {
+    border: 1px solid rgba(0, 95, 170, 0.25);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #eef8ff 0%, #d8edff 100%);
+    color: #005a9c;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    padding: 7px 7px;
+    white-space: nowrap;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.fire-history-export-btn:active {
+    transform: translateY(1px);
+}
+
+.fire-history-export-btn:disabled,
+.fire-history-export-btn.busy {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+#results-list li.fire-history-item {
+    gap: 6px !important;
+}
+
+#results-list li.fire-history-item .fire-history-select {
+    min-width: 0;
+}
+
+@media (max-width: 760px) {
+    #commune-info-display {
+        max-width: calc(100vw - 82px) !important;
+        padding-left: 10px !important;
+        padding-right: 8px !important;
+        font-size: 16px !important;
+    }
+
+    #commune-info-display .gps-feu-route-info,
+    #commune-info-display .gps-feu-rotation-info {
+        font-size: 14px !important;
+        padding: 4px 7px !important;
+    }
+
+    .fire-history-export-actions {
+        gap: 4px;
+    }
+
+    .fire-history-export-btn {
+        font-size: 10px;
+        padding: 7px 6px;
+    }
+}
