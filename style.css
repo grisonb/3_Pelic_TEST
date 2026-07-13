@@ -8091,3 +8091,74 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
+
+/* ========================================================================== 
+   v13.39 TEST — Suppression historique : confirmation interne sans fermeture
+   ========================================================================== */
+.fire-history-delete-confirm-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 999999 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 18px !important;
+    background: rgba(0, 0, 0, 0.34) !important;
+    touch-action: manipulation !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}
+
+.fire-history-delete-confirm-box {
+    width: min(420px, 92vw) !important;
+    border-radius: 18px !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.36) !important;
+    padding: 18px !important;
+    border: 1px solid rgba(15, 23, 42, 0.18) !important;
+}
+
+.fire-history-delete-confirm-title {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    margin-bottom: 8px !important;
+}
+
+.fire-history-delete-confirm-text {
+    font-size: 15px !important;
+    line-height: 1.3 !important;
+    margin-bottom: 16px !important;
+    word-break: break-word !important;
+}
+
+.fire-history-delete-confirm-actions {
+    display: flex !important;
+    gap: 12px !important;
+    justify-content: flex-end !important;
+}
+
+.fire-history-delete-confirm-actions button {
+    border: none !important;
+    border-radius: 12px !important;
+    min-height: 46px !important;
+    padding: 0 18px !important;
+    font-weight: 800 !important;
+    font-size: 15px !important;
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+}
+
+.fire-history-delete-confirm-cancel {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+}
+
+.fire-history-delete-confirm-ok {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+}
+
+.fire-history-delete-confirm-actions button:active {
+    transform: translateY(1px) !important;
+}
