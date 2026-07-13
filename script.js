@@ -1135,111 +1135,6 @@ function setFireHistoryCollapsed(collapsed) {
     } catch (_) {}
 }
 
-
-function keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus = true, durationMs = 1800 } = {}) {
-    /*
-     * v13.39 — suppression historique : on ne fait plus clignoter la fenêtre
-     * avec plusieurs réouvertures programmées. On la force ouverte une fois et
-     * on neutralise temporairement le bouton d'ouverture/fermeture contre les
-     * événements tactiles résiduels iPad.
-     */
-    window.__fireHistorySuppressSearchToggleUntil = Date.now() + durationMs;
-
-    const uiOverlay = document.getElementById('ui-overlay');
-    const searchSection = document.getElementById('search-section');
-    const toggleButton = document.getElementById('toggle-search-button');
-    const communeDisplay = document.getElementById('commune-info-display');
-    const resultsList = document.getElementById('results-list');
-    const searchInput = document.getElementById('search-input');
-
-    if (uiOverlay) uiOverlay.style.display = 'block';
-    if (searchSection) searchSection.style.display = 'block';
-    if (toggleButton) toggleButton.classList.add('active');
-    if (communeDisplay) communeDisplay.style.display = 'none';
-
-    if (resultsList) {
-        const hasHistory = getFireHistory().length > 0;
-        resultsList.style.display = hasHistory ? 'block' : 'none';
-    }
-
-    if (keepFocus && searchInput) {
-        try {
-            searchInput.disabled = false;
-            searchInput.readOnly = false;
-            searchInput.focus({ preventScroll: true });
-            const end = searchInput.value ? searchInput.value.length : 0;
-            searchInput.setSelectionRange(end, end);
-        } catch (_) {
-            try { searchInput.focus(); } catch (__) {}
-        }
-    }
-}
-
-function closeFireHistoryDeleteConfirm() {
-    const existing = document.getElementById('fire-history-delete-confirm-modal');
-    if (existing) existing.remove();
-}
-
-function showFireHistoryDeleteConfirm(index, item) {
-    /*
-     * v13.39 — remplacement du confirm() natif iPad par une confirmation
-     * interne. Cela évite les doubles validations et les événements différés
-     * qui refermaient la fenêtre Recherche feu / Historique.
-     */
-    closeFireHistoryDeleteConfirm();
-    keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 3500 });
-
-    const fireName = item?.nom_standard || item?.name || 'ce feu';
-    const overlay = document.createElement('div');
-    overlay.id = 'fire-history-delete-confirm-modal';
-    overlay.className = 'fire-history-delete-confirm-modal';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.innerHTML = `
-        <div class="fire-history-delete-confirm-box" role="document">
-            <div class="fire-history-delete-confirm-title">Supprimer le feu ?</div>
-            <div class="fire-history-delete-confirm-text">${escapeHtml(fireName)}</div>
-            <div class="fire-history-delete-confirm-actions">
-                <button type="button" class="fire-history-delete-confirm-cancel">Annuler</button>
-                <button type="button" class="fire-history-delete-confirm-ok">Supprimer</button>
-            </div>
-        </div>
-    `;
-
-    const stopModalEvent = (event) => {
-        if (!event) return;
-        event.stopPropagation();
-        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-    };
-
-    overlay.addEventListener('click', stopModalEvent, true);
-    overlay.addEventListener('touchstart', stopModalEvent, { capture: true, passive: true });
-    overlay.addEventListener('pointerdown', stopModalEvent, true);
-
-    const cancelButton = overlay.querySelector('.fire-history-delete-confirm-cancel');
-    const confirmButton = overlay.querySelector('.fire-history-delete-confirm-ok');
-
-    cancelButton?.addEventListener('click', (event) => {
-        event.preventDefault();
-        stopModalEvent(event);
-        closeFireHistoryDeleteConfirm();
-        keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 1600 });
-    });
-
-    confirmButton?.addEventListener('click', (event) => {
-        event.preventDefault();
-        stopModalEvent(event);
-        closeFireHistoryDeleteConfirm();
-        window.deleteFireHistoryItem(index, { keepSearchOpen: true });
-        keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 2500 });
-    });
-
-    document.body.appendChild(overlay);
-    setTimeout(() => {
-        try { confirmButton?.focus({ preventScroll: true }); } catch (_) {}
-    }, 30);
-}
-
 function displayFireHistory() {
     // v13.31 — flèche de repli conservée à droite de « Tout effacer » quand l’historique est ouvert.
     const resultsList = document.getElementById('results-list');
@@ -1268,7 +1163,7 @@ function displayFireHistory() {
     titleButton.className = 'fire-history-toggle fire-history-title-toggle';
     titleButton.setAttribute('aria-label', collapsed ? 'Afficher l’historique des feux' : 'Masquer l’historique des feux');
     titleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    /* v13.35 — la flèche reste dans la zone du titre, loin de la colonne des X de suppression. */
+    /* v13.34 — la flèche reste dans la zone du titre, loin de la colonne des X de suppression. */
     titleButton.innerHTML = `<span>Historique des feux</span><span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
     titleButton.addEventListener('click', toggleHistory);
     header.appendChild(titleButton);
@@ -1332,37 +1227,10 @@ function displayFireHistory() {
             }
         });
 
-        const deleteHistoryButton = li.querySelector('.fire-history-delete');
-
-        const isolateHistoryDeleteTap = (event) => {
-            if (!event) return;
-            /*
-             * v13.39 — on isole le X de la ligne, mais la confirmation ne part
-             * que sur l'événement click. Cela évite les deux confirm() successifs
-             * provoqués par la chaîne touchend + click sur iPad.
-             */
+        li.querySelector('.fire-history-delete').addEventListener('click', (event) => {
             event.stopPropagation();
-        };
-        ['pointerdown', 'touchstart', 'mousedown'].forEach((eventName) => {
-            deleteHistoryButton?.addEventListener(eventName, isolateHistoryDeleteTap, { passive: true });
+            window.deleteFireHistoryItem(index);
         });
-
-        const handleHistoryDeleteClick = (event) => {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-                if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-            }
-
-            const now = Date.now();
-            const lastClick = Number(deleteHistoryButton?.dataset?.lastDeleteClick || '0');
-            if (lastClick && now - lastClick < 800) return;
-            if (deleteHistoryButton?.dataset) deleteHistoryButton.dataset.lastDeleteClick = String(now);
-
-            showFireHistoryDeleteConfirm(index, item);
-        };
-
-        deleteHistoryButton?.addEventListener('click', handleHistoryDeleteClick, { passive: false });
 
         resultsList.appendChild(li);
     });
@@ -1375,7 +1243,7 @@ window.toggleFireHistoryCollapsed = function() {
     displayFireHistory();
 };
 
-window.deleteFireHistoryItem = function(index, options = {}) {
+window.deleteFireHistoryItem = function(index) {
     const history = getFireHistory();
     if (!Number.isInteger(index) || index < 0 || index >= history.length) return;
 
@@ -1383,10 +1251,6 @@ window.deleteFireHistoryItem = function(index, options = {}) {
     localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(history));
     displayFireHistory();
     drawFireHistoryMarkers();
-
-    if (options && options.keepSearchOpen) {
-        keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 2600 });
-    }
 };
 
 window.deleteFireHistoryItemByCommune = deleteFireHistoryItemByCommune;
@@ -2085,7 +1949,6 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-        preferCanvas: true,
         zoomAnimation: true,
         fadeAnimation: false,
         markerZoomAnimation: true
@@ -2302,26 +2165,16 @@ function setupBaseTileLayer() {
     const tileHostPrefix = offlineTilesMode ? normalizeOfflineTileHostPrefix(activeTilePackName) : 'a';
     const tileLayerUrl = `https://${tileHostPrefix}.tile.openstreetmap.org/{z}/{x}/{y}.png`;
 
-    /*
-     * v13.36 — fluidité carte offline IGN volumineuse.
-     * keepBuffer=32 conservait trop de tuiles autour de la vue et provoquait
-     * beaucoup de lectures IndexedDB sur iPad. En offline, on limite le tampon
-     * et on espace légèrement les mises à jour pour privilégier le déplacement fluide.
-     */
-    const tileKeepBuffer = offlineTilesMode ? 6 : 24;
-    const tileUpdateInterval = offlineTilesMode ? 280 : 160;
-
     baseTileLayer = L.tileLayer(tileLayerUrl, {
         minNativeZoom: effectiveMinZoom,
         maxNativeZoom: effectiveMaxZoom,
         minZoom: effectiveMinZoom,
         maxZoom: effectiveMaxZoom,
         attribution: '© OpenStreetMap',
-        keepBuffer: tileKeepBuffer,
+        keepBuffer: 32,
         updateWhenZooming: false,
         updateWhenIdle: true,
-        updateInterval: tileUpdateInterval,
-        unloadInvisibleTiles: true,
+        updateInterval: 160,
         noWrap: true,
         errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
     }).addTo(map);
@@ -2714,16 +2567,7 @@ function setupEventListeners() {
     editCircuitsButton.addEventListener('click', toggleGaarDrawingMode);
     deleteCircuitsButton.addEventListener('click', () => { if (confirm("Voulez-vous vraiment supprimer tous les circuits GAAR ?")) { clearAllGaarCircuits(); } });
 
-    toggleSearchButton.addEventListener('click', (event) => {
-        if (event) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-
-        if (Date.now() < (window.__fireHistorySuppressSearchToggleUntil || 0)) {
-            return;
-        }
-
+    toggleSearchButton.addEventListener('click', () => {
         const uiOverlay = document.getElementById('ui-overlay');
         const communeDisplay = document.getElementById('commune-info-display');
         if (uiOverlay.style.display === 'none') {
@@ -6073,9 +5917,9 @@ function recenterMapOnKnownGpsPosition(reason = 'manual') {
     if (!pos) return false;
 
     /*
-     * v13.35 — mode Suivi : ne plus forcer un zoom minimum au clic.
-     * Le changement de zoom rechargeait les tuiles et pouvait donner l'impression
-     * que la carte disparaissait quelques secondes. On recentre à zoom constant.
+     * v13.40 — retour base v13.34 : le bouton Suivi ne doit plus provoquer
+     * de changement de zoom. Sur iPad/PWA, ce changement rechargeait les tuiles
+     * et pouvait faire disparaître la carte quelques secondes.
      */
     const currentZoom = Number.isFinite(map.getZoom()) ? map.getZoom() : 10;
     centerGpsFollowProgrammaticMove = true;
@@ -6132,7 +5976,7 @@ function installCenterGpsFollowHandlers() {
         centerGpsFollowLastUserGestureAt = Date.now();
 
         /*
-         * v13.35 — on arme la pause de 10 secondes dès le contact utilisateur
+         * v13.34 — on arme la pause de 10 secondes dès le contact utilisateur
          * sur la carte, avant les événements Leaflet. Sur iPad, le premier drag
          * pouvait sinon arriver pendant le fanion de recentrage programmatique
          * et être ignoré, ce qui provoquait un recentrage immédiat.
@@ -11217,9 +11061,9 @@ function initializeCalculator() {
             closed: false,
             state: {
                 'bloc-depart': '',
-                'fuel-depart': '3500 kg',
+                'fuel-depart': '3400 kg',
                 'previ-bloc-depart': '',
-                'previ-fuel-depart': '3500 kg',
+                'previ-fuel-depart': '3400 kg',
                 'tmd': '21:30',
                 'limite-hdv': '08:00',
                 calculator_table_data: []
@@ -12139,9 +11983,9 @@ function initializeCalculator() {
             dailyFlights = [createEmptyFlight(1)];
             dailyFlights[0].state = {
                 'bloc-depart': legacyState['bloc-depart'] || '',
-                'fuel-depart': legacyState['fuel-depart'] || '3500 kg',
+                'fuel-depart': legacyState['fuel-depart'] || '3400 kg',
                 'previ-bloc-depart': legacyState['previ-bloc-depart'] || legacyState['bloc-depart'] || '',
-                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3500 kg',
+                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3400 kg',
                 'tmd': legacyState['tmd'] || '21:30',
                 'limite-hdv': legacyState['limite-hdv'] || '08:00',
                 'deroutement-heure-wrapper': legacyState['deroutement-heure-wrapper'] || '',
@@ -12233,12 +12077,12 @@ function initializeCalculator() {
             tableBody.innerHTML = '';
 
             initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
-            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3500 kg');
+            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3400 kg');
             initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
 
             initializeTimeInput(document.getElementById('previ-bloc-depart'), state['previ-bloc-depart'] || state['bloc-depart'] || '');
-            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3500 kg');
+            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3400 kg');
             initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('previ-limite-hdv'), state['limite-hdv'] || '08:00');
 
@@ -13796,9 +13640,9 @@ function initializeCalculator() {
             if (activeFlight) {
                 newFlight.state['tmd'] = activeFlight.state?.['tmd'] || document.getElementById('tmd')?.querySelector('.display-input')?.value || '21:30';
                 newFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '08:00';
-                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3500 kg';
+                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
                 newFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || document.getElementById('previ-bloc-depart')?.querySelector('.display-input')?.value || '';
-                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3500 kg';
+                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
             }
             dailyFlights.push(newFlight);
             activeFlightId = newFlight.id;
@@ -13824,9 +13668,9 @@ function initializeCalculator() {
                     const nextFlight = createEmptyFlight(dailyFlights.length + 1);
                     nextFlight.state['tmd'] = activeFlight.state?.['tmd'] || '21:30';
                     nextFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || '08:00';
-                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3500 kg';
+                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3400 kg';
                     nextFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || '';
-                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3500 kg';
+                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3400 kg';
                     dailyFlights.push(nextFlight);
                     activeFlightId = nextFlight.id;
                     persistFlights();
