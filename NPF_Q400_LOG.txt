@@ -1,24 +1,25 @@
-NPF-Q400 — v13.35 TEST
-Base : v13.34 TEST
+NPF-Q400 — MODIFICATIONS v13.36 TEST
+Base : v13.35 TEST
 
-Corrections intégrées :
+1. Historique des feux — suppression sans fermeture de fenêtre
+- Après validation de la suppression d’un feu dans l’historique, la fenêtre de recherche reste ouverte.
+- Le clic/touch sur le X de suppression est isolé pour éviter un déclenchement parasite de la sélection du feu ou de l’ouverture/fermeture de la fenêtre.
+- Ajout d’un court garde-fou après une suppression pour éviter l’effet iPad : clic sur l’icône recherche qui ouvre puis referme immédiatement.
 
-1. Historique des feux
-- Les boutons ForeFlight et SDVFR de chaque ligne d'historique sont légèrement décalés vers la gauche.
-- Ajout d'un espace de sécurité entre ces boutons et le bouton rouge X.
-- Clic sur X : demande maintenant une confirmation avant suppression du feu de l'historique.
+2. Historique des feux — sécurité visuelle
+- La colonne du X de suppression est isolée.
+- Les boutons ForeFlight / SDVFR restent décalés vers la gauche, avec un espace de sécurité avant le X.
 
-2. Bandeau feu sur la carte
-- Le nom du feu, le CS, la route/distance/temps GPS et la durée de rotation sont forcés sur une seule ligne.
-- Le CS reste directement à côté du nom du feu.
-- Le libellé "Rotations" devient "Rot." pour gagner de la place.
-- Format attendu : Nom du feu — CS xx:xx — 278° / 184 Nm / 45 min — Rot. 45 min.
+3. Valeurs par défaut Fuel
+- Dans PREVI. NBR ROTATIONS, FUEL Départ par défaut : 3500 kg.
+- Dans BLOC / FUEL, FUEL Départ par défaut : 3500 kg.
+- Les nouveaux vols reprennent 3500 kg comme valeur par défaut lorsque rien n’est encore sauvegardé.
 
-3. Mode suivi GPS
-- Le clic sur le bouton de suivi ne force plus un changement de zoom.
-- Le recentrage se fait à zoom constant pour éviter le rechargement complet des tuiles et la disparition temporaire de la carte.
-- La pause de 10 secondes après déplacement manuel est renforcée dès le premier mouvement de carte.
-- Les mises à jour GPS ne recentrent plus la carte pendant la période de pause utilisateur.
+4. Carte IGN offline — fluidité
+- Optimisation du calque de tuiles offline pour un pack IGN lourd : tampon de tuiles réduit en mode offline.
+- Espacement léger des mises à jour de tuiles en déplacement pour réduire les lectures IndexedDB sur iPad.
+- Activation preferCanvas pour alléger le rendu des couches vectorielles.
+- Ajout d’options CSS légères pour stabiliser le rendu des tuiles.
 
 Contrôles effectués :
 - script.js : syntaxe OK.
