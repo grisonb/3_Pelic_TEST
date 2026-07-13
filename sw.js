@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-34-bandeau-feu-eta-exports-historique';
+const SW_VERSION = 'sw-v13-35-suivi-sans-rechargement-bandeau-feu-historique-securise';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
