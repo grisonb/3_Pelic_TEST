@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-37-historique-feux-x-retablis-layout';
+const SW_VERSION = 'sw-v13-38-historique-suppression-un-clic-fenetre-ouverte';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
