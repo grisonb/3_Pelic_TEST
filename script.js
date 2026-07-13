@@ -1135,6 +1135,49 @@ function setFireHistoryCollapsed(collapsed) {
     } catch (_) {}
 }
 
+
+function keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus = true } = {}) {
+    /*
+     * v13.36 — suppression dans l'historique : après confirmation, la fenêtre
+     * de recherche doit rester ouverte. On protège aussi le prochain clic court
+     * sur l'icône de recherche contre l'effet double ouverture/fermeture observé
+     * sur iPad après une boîte confirm().
+     */
+    window.__fireHistorySuppressSearchToggleUntil = Date.now() + 750;
+
+    const uiOverlay = document.getElementById('ui-overlay');
+    const searchSection = document.getElementById('search-section');
+    const toggleButton = document.getElementById('toggle-search-button');
+    const communeDisplay = document.getElementById('commune-info-display');
+    const resultsList = document.getElementById('results-list');
+    const searchInput = document.getElementById('search-input');
+
+    if (uiOverlay) uiOverlay.style.display = 'block';
+    if (searchSection) searchSection.style.display = 'block';
+    if (toggleButton) toggleButton.classList.add('active');
+    if (communeDisplay) communeDisplay.style.display = 'none';
+
+    if (resultsList) {
+        resultsList.style.display = getFireHistory().length ? 'block' : 'none';
+    }
+
+    if (keepFocus && searchInput) {
+        const refocus = () => {
+            try {
+                searchInput.disabled = false;
+                searchInput.readOnly = false;
+                searchInput.focus({ preventScroll: true });
+                const end = searchInput.value ? searchInput.value.length : 0;
+                searchInput.setSelectionRange(end, end);
+            } catch (_) {
+                try { searchInput.focus(); } catch (__) {}
+            }
+        };
+        setTimeout(refocus, 40);
+        setTimeout(refocus, 160);
+    }
+}
+
 function displayFireHistory() {
     // v13.31 — flèche de repli conservée à droite de « Tout effacer » quand l’historique est ouvert.
     const resultsList = document.getElementById('results-list');
@@ -1227,11 +1270,24 @@ function displayFireHistory() {
             }
         });
 
-        li.querySelector('.fire-history-delete').addEventListener('click', (event) => {
+        const deleteHistoryButton = li.querySelector('.fire-history-delete');
+        const protectHistoryDeleteTap = (event) => {
+            if (!event) return;
+            event.preventDefault();
             event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        };
+        ['pointerdown', 'touchstart', 'mousedown'].forEach((eventName) => {
+            deleteHistoryButton?.addEventListener(eventName, protectHistoryDeleteTap, { passive: false });
+        });
+        deleteHistoryButton?.addEventListener('click', (event) => {
+            protectHistoryDeleteTap(event);
             const fireName = item?.nom_standard || item?.name || 'ce feu';
-            if (!confirm(`Supprimer ${fireName} de l’historique des feux ?`)) return;
-            window.deleteFireHistoryItem(index);
+            if (!confirm(`Supprimer ${fireName} de l’historique des feux ?`)) {
+                keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false });
+                return;
+            }
+            window.deleteFireHistoryItem(index, { keepSearchOpen: true });
         });
 
         resultsList.appendChild(li);
@@ -1245,7 +1301,7 @@ window.toggleFireHistoryCollapsed = function() {
     displayFireHistory();
 };
 
-window.deleteFireHistoryItem = function(index) {
+window.deleteFireHistoryItem = function(index, options = {}) {
     const history = getFireHistory();
     if (!Number.isInteger(index) || index < 0 || index >= history.length) return;
 
@@ -1253,6 +1309,10 @@ window.deleteFireHistoryItem = function(index) {
     localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(history));
     displayFireHistory();
     drawFireHistoryMarkers();
+
+    if (options && options.keepSearchOpen) {
+        keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false });
+    }
 };
 
 window.deleteFireHistoryItemByCommune = deleteFireHistoryItemByCommune;
@@ -1951,6 +2011,7 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
+        preferCanvas: true,
         zoomAnimation: true,
         fadeAnimation: false,
         markerZoomAnimation: true
@@ -2167,16 +2228,26 @@ function setupBaseTileLayer() {
     const tileHostPrefix = offlineTilesMode ? normalizeOfflineTileHostPrefix(activeTilePackName) : 'a';
     const tileLayerUrl = `https://${tileHostPrefix}.tile.openstreetmap.org/{z}/{x}/{y}.png`;
 
+    /*
+     * v13.36 — fluidité carte offline IGN volumineuse.
+     * keepBuffer=32 conservait trop de tuiles autour de la vue et provoquait
+     * beaucoup de lectures IndexedDB sur iPad. En offline, on limite le tampon
+     * et on espace légèrement les mises à jour pour privilégier le déplacement fluide.
+     */
+    const tileKeepBuffer = offlineTilesMode ? 6 : 24;
+    const tileUpdateInterval = offlineTilesMode ? 280 : 160;
+
     baseTileLayer = L.tileLayer(tileLayerUrl, {
         minNativeZoom: effectiveMinZoom,
         maxNativeZoom: effectiveMaxZoom,
         minZoom: effectiveMinZoom,
         maxZoom: effectiveMaxZoom,
         attribution: '© OpenStreetMap',
-        keepBuffer: 32,
+        keepBuffer: tileKeepBuffer,
         updateWhenZooming: false,
         updateWhenIdle: true,
-        updateInterval: 160,
+        updateInterval: tileUpdateInterval,
+        unloadInvisibleTiles: true,
         noWrap: true,
         errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
     }).addTo(map);
@@ -2569,7 +2640,16 @@ function setupEventListeners() {
     editCircuitsButton.addEventListener('click', toggleGaarDrawingMode);
     deleteCircuitsButton.addEventListener('click', () => { if (confirm("Voulez-vous vraiment supprimer tous les circuits GAAR ?")) { clearAllGaarCircuits(); } });
 
-    toggleSearchButton.addEventListener('click', () => {
+    toggleSearchButton.addEventListener('click', (event) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        if (Date.now() < (window.__fireHistorySuppressSearchToggleUntil || 0)) {
+            return;
+        }
+
         const uiOverlay = document.getElementById('ui-overlay');
         const communeDisplay = document.getElementById('commune-info-display');
         if (uiOverlay.style.display === 'none') {
@@ -11063,9 +11143,9 @@ function initializeCalculator() {
             closed: false,
             state: {
                 'bloc-depart': '',
-                'fuel-depart': '3400 kg',
+                'fuel-depart': '3500 kg',
                 'previ-bloc-depart': '',
-                'previ-fuel-depart': '3400 kg',
+                'previ-fuel-depart': '3500 kg',
                 'tmd': '21:30',
                 'limite-hdv': '08:00',
                 calculator_table_data: []
@@ -11985,9 +12065,9 @@ function initializeCalculator() {
             dailyFlights = [createEmptyFlight(1)];
             dailyFlights[0].state = {
                 'bloc-depart': legacyState['bloc-depart'] || '',
-                'fuel-depart': legacyState['fuel-depart'] || '3400 kg',
+                'fuel-depart': legacyState['fuel-depart'] || '3500 kg',
                 'previ-bloc-depart': legacyState['previ-bloc-depart'] || legacyState['bloc-depart'] || '',
-                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3400 kg',
+                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3500 kg',
                 'tmd': legacyState['tmd'] || '21:30',
                 'limite-hdv': legacyState['limite-hdv'] || '08:00',
                 'deroutement-heure-wrapper': legacyState['deroutement-heure-wrapper'] || '',
@@ -12079,12 +12159,12 @@ function initializeCalculator() {
             tableBody.innerHTML = '';
 
             initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
-            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3400 kg');
+            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3500 kg');
             initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
 
             initializeTimeInput(document.getElementById('previ-bloc-depart'), state['previ-bloc-depart'] || state['bloc-depart'] || '');
-            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3400 kg');
+            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3500 kg');
             initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('previ-limite-hdv'), state['limite-hdv'] || '08:00');
 
@@ -13642,9 +13722,9 @@ function initializeCalculator() {
             if (activeFlight) {
                 newFlight.state['tmd'] = activeFlight.state?.['tmd'] || document.getElementById('tmd')?.querySelector('.display-input')?.value || '21:30';
                 newFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '08:00';
-                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
+                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3500 kg';
                 newFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || document.getElementById('previ-bloc-depart')?.querySelector('.display-input')?.value || '';
-                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
+                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3500 kg';
             }
             dailyFlights.push(newFlight);
             activeFlightId = newFlight.id;
@@ -13670,9 +13750,9 @@ function initializeCalculator() {
                     const nextFlight = createEmptyFlight(dailyFlights.length + 1);
                     nextFlight.state['tmd'] = activeFlight.state?.['tmd'] || '21:30';
                     nextFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || '08:00';
-                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3400 kg';
+                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3500 kg';
                     nextFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || '';
-                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3400 kg';
+                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3500 kg';
                     dailyFlights.push(nextFlight);
                     activeFlightId = nextFlight.id;
                     persistFlights();
