@@ -8010,3 +8010,84 @@ body:not(.app-ready) #nearest-commune-display {
         transform: translateX(-6px) !important;
     }
 }
+
+/* ========================================================================== 
+   v13.37 TEST — Historique des feux : mise en page stabilisée et X rétablis
+   ========================================================================== */
+
+/* Le pictogramme injecté par l'ancien ::before cassait la grille v13.36 :
+   il créait une colonne fantôme avant le nom, ce qui décalait les boutons et
+   pouvait rendre le X difficile à toucher. */
+#results-list li.fire-history-item::before {
+    content: none !important;
+    display: none !important;
+}
+
+#results-list li.fire-history-item {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto 52px !important;
+    column-gap: 12px !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    box-sizing: border-box !important;
+}
+
+#results-list li.fire-history-item .fire-history-select {
+    grid-column: 1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+#results-list li.fire-history-item .fire-history-export-actions {
+    grid-column: 2 !important;
+    justify-self: end !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 0 18px 0 0 !important;
+    transform: none !important;
+}
+
+#results-list li.fire-history-item .fire-history-delete {
+    grid-column: 3 !important;
+    justify-self: end !important;
+    align-self: center !important;
+    position: relative !important;
+    z-index: 3 !important;
+    pointer-events: auto !important;
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    line-height: 38px !important;
+    margin: 0 !important;
+    touch-action: manipulation !important;
+}
+
+@media (max-width: 760px) {
+    #results-list li.fire-history-item {
+        grid-template-columns: minmax(0, 1fr) auto 50px !important;
+        column-gap: 10px !important;
+        padding: 7px 10px !important;
+    }
+
+    #results-list li.fire-history-item .fire-history-export-actions {
+        gap: 5px !important;
+        margin-right: 16px !important;
+    }
+
+    #results-list li.fire-history-item .fire-history-export-btn {
+        font-size: 10px !important;
+        padding: 7px 6px !important;
+    }
+
+    #results-list li.fire-history-item .fire-history-delete {
+        width: 38px !important;
+        min-width: 38px !important;
+        height: 38px !important;
+        line-height: 38px !important;
+    }
+}
+
