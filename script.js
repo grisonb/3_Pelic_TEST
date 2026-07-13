@@ -1576,6 +1576,8 @@ async function initializeApp() {
     if (savedCommuneJSON) {
         currentCommune = JSON.parse(savedCommuneJSON);
         displayCommuneDetails(currentCommune, true);
+        setTimeout(() => fitMapToStartupFireContext({ reason: 'saved-fire-after-display' }), 350);
+        setTimeout(() => fitMapToStartupFireContext({ reason: 'saved-fire-after-gps' }), 1400);
     }
 
     setTimeout(() => {
@@ -5701,6 +5703,68 @@ function getStartupGpsCenterZoom() {
     );
 }
 
+
+function fitMapToStartupFireContext({ reason = 'startup-fire-context' } = {}) {
+    /*
+     * v13.41 — ouverture avec feu sélectionné : la carte doit afficher dans la
+     * même vue la position avion connue, le feu actif et les pélicandromes
+     * affichés/sélectionnés. On l'utilise uniquement comme cadrage de démarrage,
+     * sans activer le suivi GPS.
+     */
+    if (!map || !currentCommune) return false;
+
+    const fireLat = Number(currentCommune.latitude_mairie);
+    const fireLon = Number(currentCommune.longitude_mairie);
+    if (!Number.isFinite(fireLat) || !Number.isFinite(fireLon)) return false;
+
+    const points = [[fireLat, fireLon]];
+    const seen = new Set();
+    const addPoint = (lat, lon) => {
+        const numericLat = Number(lat);
+        const numericLon = Number(lon);
+        if (!Number.isFinite(numericLat) || !Number.isFinite(numericLon)) return;
+        const key = `${numericLat.toFixed(5)},${numericLon.toFixed(5)}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        points.push([numericLat, numericLon]);
+    };
+
+    const gpsPos = getKnownGpsLatLngForCentering();
+    if (gpsPos) addPoint(gpsPos.lat, gpsPos.lng);
+
+    try {
+        const countInput = document.getElementById('airport-count');
+        const count = Number.parseInt(countInput?.value || '0', 10);
+        const closest = Number.isFinite(count) && count > 0 ? getClosestAirports(fireLat, fireLon, count) : [];
+        closest.forEach(ap => addPoint(ap.lat, ap.lon));
+    } catch (_) {}
+
+    try {
+        const selectedPelic = selectedPelicanOACI ? getAirportByOaci(selectedPelicanOACI) : null;
+        if (selectedPelic) addPoint(selectedPelic.lat, selectedPelic.lon);
+    } catch (_) {}
+
+    if (!points.length) return false;
+
+    centerGpsFollowProgrammaticMove = true;
+    try {
+        if (points.length === 1) {
+            map.setView(points[0], Math.min(Math.max(getStartupGpsCenterZoom(), 9), 11), { animate: false });
+        } else {
+            map.fitBounds(L.latLngBounds(points).pad(0.25), {
+                animate: false,
+                padding: [34, 34],
+                maxZoom: 11
+            });
+        }
+    } finally {
+        setTimeout(() => {
+            centerGpsFollowProgrammaticMove = false;
+        }, 350);
+    }
+    return true;
+}
+
 function applyStartupGpsAutoCenter(lat, lng, { source = 'real', force = false } = {}) {
     /*
      * v12.54 — ouverture centrée GPS.
@@ -5724,6 +5788,10 @@ function applyStartupGpsAutoCenter(lat, lng, { source = 'real', force = false } 
         if (startupGpsAutoCenteredWithRealPosition) return false;
         if (startupGpsStoredCenterAppliedAt && !force) return false;
         startupGpsStoredCenterAppliedAt = Date.now();
+    }
+
+    if (currentCommune && fitMapToStartupFireContext({ reason: `startup-${source}` })) {
+        return true;
     }
 
     map.setView([numericLat, numericLng], getStartupGpsCenterZoom(), { animate: false });
@@ -11087,6 +11155,7 @@ function initializeCalculator() {
             || rowData.rltBottomVolume
             || rowData.rltBottomDensity
             || rowData.rltBottomMass
+            || rowData.rltRefracto
             || rowData.rltMode
             || rowData.rltFirstFull
             || rowData.rltFirstFullPending
@@ -11187,13 +11256,14 @@ function initializeCalculator() {
             const rltBottomVolume = rltWrapper?.dataset.bottomVolume || '';
             const rltBottomDensity = rltWrapper?.dataset.bottomDensity || '';
             const rltBottomMass = rltWrapper?.dataset.bottomMass || '';
+            const rltRefracto = rltWrapper?.dataset.refracto || '';
             const rltMode = rltWrapper?.dataset.rltMode || '';
             const rltFirstFull = rltWrapper?.dataset.rltFirstFull || '';
             const rltFirstFullPending = rltWrapper?.dataset.rltFirstFullPending || '';
             const rltFirstFullWanted = rltWrapper?.dataset.rltFirstFullWanted || '';
             const oaci = row.dataset.airportOaci || row.querySelector('.airport-oaci-cell')?.textContent?.replace('--', '').trim() || '';
-            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltMode || rltFirstFull || rltFirstFullPending || rltFirstFullWanted) {
-                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltMode, rltFirstFull, rltFirstFullPending, rltFirstFullWanted });
+            if (time || fuel || oaci || rltMass || rltVolume || rltDensity || rltTopMass || rltTopDensity || rltTopVolume || rltBottomVolume || rltBottomDensity || rltBottomMass || rltRefracto || rltMode || rltFirstFull || rltFirstFullPending || rltFirstFullWanted) {
+                tableData.push({ time, fuel, oaci, rltMass, rltVolume, rltDensity, rltTopMass, rltTopDensity, rltTopVolume, rltBottomVolume, rltBottomDensity, rltBottomMass, rltRefracto, rltMode, rltFirstFull, rltFirstFullPending, rltFirstFullWanted });
             }
         });
         state.calculator_table_data = compactCalculatorTableData(tableData);
@@ -12734,12 +12804,70 @@ function initializeCalculator() {
         return `${Math.round(value)} kg`;
     }
 
+    function parseRltRefractoInput(value) {
+        const normalized = String(value || '').trim().replace(',', '.').replace(/[^0-9.]/g, '');
+        if (!normalized) return null;
+        let number = Number(normalized);
+        if (!Number.isFinite(number)) return null;
+        /* Tolérance iPad : 145 peut représenter 14,5. */
+        if (number > 30 && number <= 300) number = number / 10;
+        return Number.isFinite(number) ? number : null;
+    }
+
+    function getRltDensityFromRefracto(value) {
+        const refracto = parseRltRefractoInput(value);
+        if (refracto === null) return null;
+        if (refracto >= 11.5 && refracto <= 13.9) return 1.04;
+        if (refracto >= 14 && refracto <= 17.4) return 1.08;
+        if (refracto >= 17.5 && refracto <= 20.4) return 1.10;
+        if (refracto >= 20.5 && refracto <= 23.9) return 1.12;
+        if (refracto >= 24 && refracto <= 26.9) return 1.14;
+        if (refracto >= 27 && refracto <= 30) return 1.16;
+        return null;
+    }
+
+    function formatRltDensityForInput(value) {
+        if (!Number.isFinite(value)) return '';
+        return value.toFixed(2).replace(/0$/, '').replace(/\.$/, '');
+    }
+
+    function normalizeRltRefractoInputValue(value) {
+        return String(value || '').replace(',', '.').replace(/[^0-9.]/g, '');
+    }
+
+    function updateRltRefractoDensityOutput({ applyToDensityInputs = false } = {}) {
+        const {
+            refractoInput,
+            refractoDensityOutput,
+            massToVolumeDensityInput,
+            densityInput
+        } = getRltMassModalElements();
+
+        if (!refractoInput) return null;
+        const density = getRltDensityFromRefracto(refractoInput.value);
+        const densityLabel = density !== null ? formatRltDensityForInput(density) : '';
+
+        if (refractoDensityOutput) {
+            refractoDensityOutput.value = densityLabel;
+            refractoDensityOutput.classList.toggle('rlt-calculated-field', !!densityLabel);
+        }
+
+        if (applyToDensityInputs && densityLabel) {
+            if (massToVolumeDensityInput) massToVolumeDensityInput.value = densityLabel;
+            if (densityInput) densityInput.value = densityLabel;
+        }
+
+        return density;
+    }
+
     function getRltMassModalElements() {
         return {
             modal: document.getElementById('rlt-mass-modal'),
             massToVolumeMassInput: document.getElementById('rlt-mass-to-volume-mass-input'),
             massToVolumeDensityInput: document.getElementById('rlt-mass-to-volume-density-input'),
             massToVolumeVolumeInput: document.getElementById('rlt-mass-to-volume-volume-input'),
+            refractoInput: document.getElementById('rlt-refracto-input'),
+            refractoDensityOutput: document.getElementById('rlt-refracto-density-output'),
             volumeInput: document.getElementById('rlt-volume-input'),
             densityInput: document.getElementById('rlt-density-input'),
             massInput: document.getElementById('rlt-mass-input'),
@@ -12759,6 +12887,8 @@ function initializeCalculator() {
                 elements.massToVolumeMassInput,
                 elements.massToVolumeDensityInput,
                 elements.massToVolumeVolumeInput,
+                elements.refractoInput,
+                elements.refractoDensityOutput,
                 elements.volumeInput,
                 elements.densityInput,
                 elements.massInput
@@ -12897,6 +13027,7 @@ function initializeCalculator() {
         activeRltMassWrapper.dataset.bottomVolume = bottomVolume !== null ? formatDecimalValue(bottomVolume, 0) : '';
         activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
         activeRltMassWrapper.dataset.bottomMass = bottomComputedMass !== null ? String(Math.round(bottomComputedMass)) : '';
+        activeRltMassWrapper.dataset.refracto = normalizeRltRefractoInputValue(getRltMassModalElements().refractoInput?.value || '');
         activeRltMassWrapper.dataset.volume = selectedVolume !== null ? formatDecimalValue(selectedVolume, 0) : '';
         activeRltMassWrapper.dataset.density = selectedDensity !== null ? formatDecimalValue(selectedDensity, 3) : '';
         activeRltMassWrapper.dataset.mass = String(Math.round(selectedMass));
@@ -12926,6 +13057,8 @@ function initializeCalculator() {
             massToVolumeMassInput,
             massToVolumeDensityInput,
             massToVolumeVolumeInput,
+            refractoInput,
+            refractoDensityOutput,
             volumeInput,
             densityInput,
             massInput,
@@ -12933,6 +13066,7 @@ function initializeCalculator() {
         } = getRltMassModalElements();
 
         ensureRltDensityDefaults();
+        updateRltRefractoDensityOutput({ applyToDensityInputs: false });
         markRltCalculatedField(null);
 
         const topMass = parseDecimalInput(massToVolumeMassInput?.value);
@@ -12987,6 +13121,8 @@ function initializeCalculator() {
             massToVolumeMassInput,
             massToVolumeDensityInput,
             massToVolumeVolumeInput,
+            refractoInput,
+            refractoDensityOutput,
             volumeInput,
             densityInput,
             massInput,
@@ -13018,7 +13154,7 @@ function initializeCalculator() {
             });
         }
 
-        [massToVolumeVolumeInput, massInput].filter(Boolean).forEach(input => {
+        [massToVolumeVolumeInput, refractoDensityOutput, massInput].filter(Boolean).forEach(input => {
             input.readOnly = true;
             input.setAttribute('readonly', 'readonly');
             input.setAttribute('aria-readonly', 'true');
@@ -13070,6 +13206,40 @@ function initializeCalculator() {
         bindInput(massToVolumeDensityInput, 'density', 'massToVolume');
         bindInput(volumeInput, 'volume', 'volumeToMass');
         bindInput(densityInput, 'density', 'volumeToMass');
+
+        if (refractoInput && refractoInput.dataset.rltRefractoBound !== '1') {
+            refractoInput.dataset.rltRefractoBound = '1';
+            refractoInput.addEventListener('focus', () => {
+                setTimeout(() => {
+                    try {
+                        const content = refractoInput.closest('.rlt-mass-modal-content');
+                        if (content && typeof content.scrollIntoView === 'function') {
+                            content.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+                        }
+                    } catch (_) {}
+                }, 160);
+            });
+            refractoInput.addEventListener('input', () => {
+                refractoInput.value = normalizeRltRefractoInputValue(refractoInput.value);
+                try { refractoInput.setSelectionRange(refractoInput.value.length, refractoInput.value.length); } catch (_) {}
+                const density = updateRltRefractoDensityOutput({ applyToDensityInputs: true });
+                if (density !== null) {
+                    activeRltMassLastEdited = 'density';
+                    activeRltMassCalculationMode = 'refractoToDensity';
+                }
+                syncRltMassModalFromInputs();
+            });
+            refractoInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    volumeInput?.focus?.({ preventScroll: false });
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeRltMassModal();
+                }
+            });
+        }
 
         if (firstFullBtn && firstFullBtn.dataset.rltFirstFullBound !== '1') {
             firstFullBtn.dataset.rltFirstFullBound = '1';
@@ -13149,6 +13319,7 @@ function initializeCalculator() {
             const topMass = parseDecimalInput(massToVolumeMassInput?.value);
             const topDensity = parseRltDensityInput(massToVolumeDensityInput?.value);
             const topVolume = parseDecimalInput(massToVolumeVolumeInput?.value);
+            const refractoValue = normalizeRltRefractoInputValue(refractoInput?.value || '');
             const bottomVolume = parseDecimalInput(volumeInput?.value);
             const bottomDensity = parseRltDensityInput(densityInput?.value);
             const bottomMass = parseDecimalInput(massInput?.value);
@@ -13205,6 +13376,7 @@ function initializeCalculator() {
             activeRltMassWrapper.dataset.bottomVolume = bottomVolume !== null ? formatDecimalValue(bottomVolume, 0) : '';
             activeRltMassWrapper.dataset.bottomDensity = bottomDensity !== null ? formatDecimalValue(bottomDensity, 3) : '';
             activeRltMassWrapper.dataset.bottomMass = bottomMass !== null ? String(Math.round(bottomMass)) : '';
+            activeRltMassWrapper.dataset.refracto = refractoValue;
             activeRltMassWrapper.dataset.rltMode = selectedMode;
             activeRltMassWrapper.dataset.rltFirstFull = selectedMode === 'firstFull' ? '1' : '';
             activeRltMassWrapper.dataset.rltFirstFullPending = selectedMode === 'firstFull' ? '1' : '';
@@ -13236,6 +13408,8 @@ function initializeCalculator() {
             if (massToVolumeMassInput) massToVolumeMassInput.value = '';
             if (massToVolumeDensityInput) massToVolumeDensityInput.value = '1.';
             if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = '';
+            if (refractoInput) refractoInput.value = '';
+            if (refractoDensityOutput) refractoDensityOutput.value = '';
             if (volumeInput) volumeInput.value = '';
             if (densityInput) densityInput.value = '1.';
             if (massInput) massInput.value = '';
@@ -13363,6 +13537,8 @@ function initializeCalculator() {
             massToVolumeMassInput,
             massToVolumeDensityInput,
             massToVolumeVolumeInput,
+            refractoInput,
+            refractoDensityOutput,
             volumeInput,
             densityInput,
             massInput
@@ -13384,6 +13560,7 @@ function initializeCalculator() {
         const storedBottomVolume = wrapper.dataset.bottomVolume || '';
         const storedBottomDensity = wrapper.dataset.bottomDensity || '';
         const storedBottomMass = wrapper.dataset.bottomMass || '';
+        const storedRefracto = wrapper.dataset.refracto || '';
         const storedMode = wrapper.dataset.rltMode || '';
         const storedFirstFull = wrapper.dataset.rltFirstFull || '';
 
@@ -13397,6 +13574,9 @@ function initializeCalculator() {
         if (massToVolumeMassInput) massToVolumeMassInput.value = hasDetailedRltData ? storedTopMass : '';
         if (massToVolumeDensityInput) massToVolumeDensityInput.value = hasDetailedRltData ? (storedTopDensity || '1.') : '1.';
         if (massToVolumeVolumeInput) massToVolumeVolumeInput.value = hasDetailedRltData ? storedTopVolume : '';
+        if (refractoInput) refractoInput.value = storedRefracto;
+        if (refractoDensityOutput) refractoDensityOutput.value = '';
+        updateRltRefractoDensityOutput({ applyToDensityInputs: false });
         if (volumeInput) volumeInput.value = hasDetailedRltData ? storedBottomVolume : storedVolume;
         if (densityInput) densityInput.value = hasDetailedRltData ? (storedBottomDensity || '1.') : (storedDensity || '1.');
         if (massInput) massInput.value = hasDetailedRltData ? storedBottomMass : storedMass;
@@ -13446,6 +13626,7 @@ function initializeCalculator() {
         wrapper.dataset.bottomVolume = data?.rltBottomVolume || '';
         wrapper.dataset.bottomDensity = data?.rltBottomDensity || '';
         wrapper.dataset.bottomMass = data?.rltBottomMass || '';
+        wrapper.dataset.refracto = data?.rltRefracto || '';
         wrapper.dataset.rltMode = data?.rltMode || '';
         wrapper.dataset.rltFirstFull = data?.rltFirstFull || '';
         wrapper.dataset.rltFirstFullPending = data?.rltFirstFullPending || data?.rltFirstFull || '';
@@ -13484,6 +13665,7 @@ function initializeCalculator() {
                 wrapper.dataset.bottomVolume = '';
                 wrapper.dataset.bottomDensity = '';
                 wrapper.dataset.bottomMass = '';
+                wrapper.dataset.refracto = '';
                 wrapper.dataset.rltMode = '';
                 wrapper.dataset.rltFirstFull = '';
                 wrapper.dataset.rltFirstFullPending = '';
