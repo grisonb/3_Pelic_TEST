@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-35-suivi-sans-rechargement-bandeau-feu-historique-securise';
+const SW_VERSION = 'sw-v13-36-historique-fuel3500-carte-offline-fluide';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
