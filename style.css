@@ -7674,7 +7674,7 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 /* ========================================================================== 
-   v13.35 TEST — Suivi GPS, historique et commune survolée longue
+   v13.34 TEST — Suivi GPS, historique et commune survolée longue
    ========================================================================== */
 
 /* Historique ouvert : la flèche est replacée dans la zone du titre,
@@ -7752,7 +7752,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.35 TEST — Bandeau feu : ETA GPS + durée rotation / exports dans historique
+   v13.34 TEST — Bandeau feu : ETA GPS + durée rotation / exports dans historique
    ========================================================================== */
 
 #commune-info-display {
@@ -7867,31 +7867,12 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 
+
 /* ========================================================================== 
-   v13.35 TEST — Historique sécurisé / bandeau feu sur une ligne / suivi GPS
+   v13.40 TEST — Retour v13.34 : bandeau feu sur une ligne / suivi GPS sans refresh
    ========================================================================== */
 
-/* Historique : éloigne ForeFlight/SDVFR de la colonne de suppression. */
-#results-list li.fire-history-item {
-    gap: 8px !important;
-    padding-right: 12px !important;
-}
-
-#results-list li.fire-history-item .fire-history-select {
-    min-width: 0 !important;
-}
-
-#results-list li.fire-history-item .fire-history-export-actions {
-    margin-left: 4px !important;
-    margin-right: 18px !important;
-    transform: translateX(-6px);
-}
-
-#results-list li.fire-history-item .fire-history-delete {
-    margin-left: 4px !important;
-}
-
-/* Bandeau du feu sélectionné : nom + CS + route/distance/temps + rotation sur une seule ligne. */
+/* Bandeau du feu sélectionné : nom + CS + route/distance/temps + Rot. sur une seule ligne. */
 #commune-info-display {
     flex-wrap: nowrap !important;
     align-items: center !important;
@@ -7952,213 +7933,4 @@ body:not(.app-ready) #nearest-commune-display {
         font-size: 12px !important;
         padding: 3px 5px !important;
     }
-
-    #results-list li.fire-history-item .fire-history-export-actions {
-        margin-right: 16px !important;
-        transform: translateX(-4px);
-    }
-}
-
-
-/* ========================================================================== 
-   v13.36 TEST — Historique sécurisé, fuel 3500 kg, fluidité carte offline
-   ========================================================================== */
-
-/* Historique : les boutons export restent visuellement groupés et la zone du X
-   est isolée pour limiter les suppressions accidentelles. */
-#results-list li.fire-history-item {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto 44px !important;
-    column-gap: 10px !important;
-    align-items: center !important;
-    padding-right: 10px !important;
-}
-
-#results-list li.fire-history-item .fire-history-export-actions {
-    margin-left: 0 !important;
-    margin-right: 10px !important;
-    transform: translateX(-8px) !important;
-}
-
-#results-list li.fire-history-item .fire-history-delete {
-    width: 36px !important;
-    min-width: 36px !important;
-    height: 36px !important;
-    margin-left: 0 !important;
-    justify-self: end !important;
-    touch-action: manipulation !important;
-}
-
-/* Cartes offline : réduit les effets de peinture lors du déplacement de grandes
-   zones de tuiles. */
-.leaflet-tile-pane {
-    will-change: transform;
-}
-
-.leaflet-tile {
-    backface-visibility: hidden;
-}
-
-@media (max-width: 760px) {
-    #results-list li.fire-history-item {
-        grid-template-columns: minmax(0, 1fr) auto 42px !important;
-        column-gap: 8px !important;
-    }
-
-    #results-list li.fire-history-item .fire-history-export-actions {
-        margin-right: 8px !important;
-        transform: translateX(-6px) !important;
-    }
-}
-
-/* ========================================================================== 
-   v13.37 TEST — Historique des feux : mise en page stabilisée et X rétablis
-   ========================================================================== */
-
-/* Le pictogramme injecté par l'ancien ::before cassait la grille v13.36 :
-   il créait une colonne fantôme avant le nom, ce qui décalait les boutons et
-   pouvait rendre le X difficile à toucher. */
-#results-list li.fire-history-item::before {
-    content: none !important;
-    display: none !important;
-}
-
-#results-list li.fire-history-item {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto 52px !important;
-    column-gap: 12px !important;
-    align-items: center !important;
-    padding: 8px 12px !important;
-    box-sizing: border-box !important;
-}
-
-#results-list li.fire-history-item .fire-history-select {
-    grid-column: 1 !important;
-    min-width: 0 !important;
-    width: 100% !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-}
-
-#results-list li.fire-history-item .fire-history-export-actions {
-    grid-column: 2 !important;
-    justify-self: end !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    margin: 0 18px 0 0 !important;
-    transform: none !important;
-}
-
-#results-list li.fire-history-item .fire-history-delete {
-    grid-column: 3 !important;
-    justify-self: end !important;
-    align-self: center !important;
-    position: relative !important;
-    z-index: 3 !important;
-    pointer-events: auto !important;
-    width: 38px !important;
-    min-width: 38px !important;
-    height: 38px !important;
-    line-height: 38px !important;
-    margin: 0 !important;
-    touch-action: manipulation !important;
-}
-
-@media (max-width: 760px) {
-    #results-list li.fire-history-item {
-        grid-template-columns: minmax(0, 1fr) auto 50px !important;
-        column-gap: 10px !important;
-        padding: 7px 10px !important;
-    }
-
-    #results-list li.fire-history-item .fire-history-export-actions {
-        gap: 5px !important;
-        margin-right: 16px !important;
-    }
-
-    #results-list li.fire-history-item .fire-history-export-btn {
-        font-size: 10px !important;
-        padding: 7px 6px !important;
-    }
-
-    #results-list li.fire-history-item .fire-history-delete {
-        width: 38px !important;
-        min-width: 38px !important;
-        height: 38px !important;
-        line-height: 38px !important;
-    }
-}
-
-
-/* ========================================================================== 
-   v13.39 TEST — Suppression historique : confirmation interne sans fermeture
-   ========================================================================== */
-.fire-history-delete-confirm-modal {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 999999 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 18px !important;
-    background: rgba(0, 0, 0, 0.34) !important;
-    touch-action: manipulation !important;
-    -webkit-user-select: none !important;
-    user-select: none !important;
-}
-
-.fire-history-delete-confirm-box {
-    width: min(420px, 92vw) !important;
-    border-radius: 18px !important;
-    background: #ffffff !important;
-    color: #111827 !important;
-    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.36) !important;
-    padding: 18px !important;
-    border: 1px solid rgba(15, 23, 42, 0.18) !important;
-}
-
-.fire-history-delete-confirm-title {
-    font-size: 18px !important;
-    font-weight: 800 !important;
-    margin-bottom: 8px !important;
-}
-
-.fire-history-delete-confirm-text {
-    font-size: 15px !important;
-    line-height: 1.3 !important;
-    margin-bottom: 16px !important;
-    word-break: break-word !important;
-}
-
-.fire-history-delete-confirm-actions {
-    display: flex !important;
-    gap: 12px !important;
-    justify-content: flex-end !important;
-}
-
-.fire-history-delete-confirm-actions button {
-    border: none !important;
-    border-radius: 12px !important;
-    min-height: 46px !important;
-    padding: 0 18px !important;
-    font-weight: 800 !important;
-    font-size: 15px !important;
-    cursor: pointer !important;
-    touch-action: manipulation !important;
-}
-
-.fire-history-delete-confirm-cancel {
-    background: #e5e7eb !important;
-    color: #111827 !important;
-}
-
-.fire-history-delete-confirm-ok {
-    background: #dc2626 !important;
-    color: #ffffff !important;
-}
-
-.fire-history-delete-confirm-actions button:active {
-    transform: translateY(1px) !important;
 }
