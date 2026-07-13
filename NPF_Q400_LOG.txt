@@ -1,31 +1,32 @@
-NPF-Q400 — TEST v13.40
-Base utilisée : TEST v13.34
+NPF-Q400 — MODIFICATIONS v13.41 TEST
+Base : v13.40 TEST
 
-Objectif : revenir à la base v13.34 et n'ajouter que les corrections demandées.
+1. Ouverture application avec feu déjà sélectionné
+- Au démarrage, si un feu est déjà sélectionné, la carte recadre automatiquement la vue pour afficher ensemble :
+  • la position GPS connue de l’avion ;
+  • le feu sélectionné ;
+  • les pélicandromes affichés/sélectionnés autour du feu ;
+  • le pélicandrome actif s’il est renseigné.
+- Le recadrage se fait sans activer le suivi GPS permanent.
+- Le recadrage est réappliqué après récupération GPS réelle pour éviter qu’un centrage GPS simple écrase la vue feu/position/pélicandromes.
 
-Modifications intégrées :
+2. Volume/Masse retardant — ajout Réfracto. = Densité
+- Ajout d’une ligne « Réfracto. = Densité » dans la fenêtre VOLUME/MASSE RETARDANT.
+- La valeur Réfracto. remplit automatiquement la densité selon la table suivante :
+  • 11.5 à 13.9  -> densité 1.04
+  • 14 à 17.4    -> densité 1.08
+  • 17.5 à 20.4  -> densité 1.10
+  • 20.5 à 23.9  -> densité 1.12
+  • 24 à 26.9    -> densité 1.14
+  • 27 à 30      -> densité 1.16
+- La densité calculée est appliquée aux deux champs Densité du tableau retardant.
+- La valeur Réfracto. est conservée avec la ligne BLOC/FUEL.
 
-1. Bandeau feu sur la carte
-- Le bandeau du feu sélectionné est forcé sur une seule ligne.
-- Ordre conservé : nom du feu + CS directement à côté + route / distance / temps + rotation.
-- Le libellé "Rotations" est raccourci en "Rot.".
-- Exemple attendu : FEU COMMUNE (13)  CS 20:42  278° / 184 Nm / 45 min  Rot. 45 min
+3. Historique des feux
+- Modification conservée pour cette version : les boutons ForeFlight et SDVFR sont légèrement décalés vers la gauche.
+- Objectif : les éloigner du bouton X de suppression.
+- Aucun changement volontaire sur le mécanisme de suppression de l’historique.
 
-2. Mode Suivi GPS
-- Le clic sur "Suivi" ne force plus de changement de zoom.
-- Le recentrage se fait à zoom constant.
-- Animation désactivée pour éviter le rechargement visible des tuiles et la disparition temporaire de la carte sur iPad/PWA.
-- Pause de recentrage renforcée lors d'un déplacement manuel de carte.
-
-Non repris volontairement :
-- modifications v13.35 et suivantes sur l'historique des feux ;
-- confirmation de suppression historique ;
-- changements de mise en page historique ;
-- modifications fuel 3500 kg ;
-- optimisations carte offline v13.36 ;
-- confirmation interne v13.39.
-
-Contrôles effectués :
-- syntaxe script.js : OK ;
-- syntaxe sw.js : OK ;
-- manifest.json : OK.
+4. Version / cache
+- Passage APP_VERSION en v13.41.
+- Mise à jour manifest et service worker pour forcer la prise en compte de la nouvelle version.
