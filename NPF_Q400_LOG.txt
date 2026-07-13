@@ -1,31 +1,31 @@
-NPF-Q400 — TEST v13.32
-Base : TEST v13.31
-Objet : LIMITE HDV mise à jour à chaque BLOC ARRIVÉE saisi
+NPF-Q400 — MODIFICATIONS v13.34 TEST
+Base : v13.33 TEST
 
-MODIFICATIONS
+1. Bandeau feu sélectionné sur carte
+- Retrait des boutons ForeFlight / SDVFR du bandeau du feu sélectionné.
+- Ajout du temps estimé vers le feu calculé avec la vitesse GPS sol de l’avion.
+- Affichage prévu : route magnétique / distance / temps, par exemple : 278° / 184 Nm / 45 min.
+- Si la vitesse GPS est indisponible ou non exploitable, le temps affiche -- min.
 
-1. Onglet BLOC / FUEL
-- La valeur affichée dans le champ LIMITE HDV se met maintenant à jour dès qu’un BLOC ARRIVÉE est saisi.
-- Le champ affiche le restant journée disponible après prise en compte du temps de vol déjà saisi sur le vol actif.
-- Le calcul des lignes du tableau BLOC/FUEL conserve la logique correcte : la colonne Tps de Vol Restant continue à utiliser la limite disponible au début du vol actif, puis soustrait progressivement les rotations de la ligne.
-- Objectif : éviter une double soustraction du vol courant.
+2. Durée rotation dans le bandeau feu
+- Ajout de l’information : Rotations XX min.
+- La valeur est reprise depuis l’onglet Suivi rotation, champ Durée rotation.
+- Fallback sur la durée Prévi rotation si la valeur Suivi n’est pas encore disponible.
 
-2. Onglet PRÉVI NBR ROTATION
-- La LIMITE HDV affichée dans Prévi Nbr Rotation est synchronisée avec le restant journée actualisé.
-- Les prévisions de rotations utilisent donc automatiquement le nouveau restant HDV après chaque BLOC ARRIVÉE saisi dans BLOC/FUEL.
+3. Historique des feux
+- Déplacement des exports ForeFlight et SDVFR sur chaque ligne de l’historique des feux.
+- Chaque feu de l’historique peut être exporté directement sans devoir l’afficher dans le bandeau carte.
+- Les boutons d’export sont distincts du bouton rouge de suppression pour limiter les suppressions accidentelles.
 
-3. Protection du stockage multi-vols
-- La limite journée de référence reste conservée en mémoire.
-- L’affichage peut diminuer dynamiquement, mais la valeur de référence n’est pas écrasée à chaque sauvegarde.
-- Cela évite que la LIMITE HDV baisse définitivement à chaque changement de champ ou de vol.
+4. GPS
+- La dernière position GPS mémorise maintenant aussi la vitesse sol calculée ou fournie par iPadOS.
+- Cette vitesse sert uniquement au calcul du temps vers le feu dans le bandeau carte.
 
-4. Version / cache
-- Passage APP_VERSION en v13.32.
-- Mise à jour du cache service worker en sw-v13-32-limite-hdv-maj-bloc-arrivee.
-- Mise à jour du cache départements en npf-q400-departments-v13-32.
+5. Cache / version
+- Version TEST : v13.34.
+- Cache service worker mis à jour pour forcer la récupération des nouveaux fichiers.
 
-CONTRÔLES
-
+Contrôles effectués
 - Syntaxe script.js : OK.
 - Syntaxe sw.js : OK.
 - manifest.json : OK.
