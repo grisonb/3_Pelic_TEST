@@ -7674,7 +7674,7 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 /* ========================================================================== 
-   v13.34 TEST — Suivi GPS, historique et commune survolée longue
+   v13.35 TEST — Suivi GPS, historique et commune survolée longue
    ========================================================================== */
 
 /* Historique ouvert : la flèche est replacée dans la zone du titre,
@@ -7752,7 +7752,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.34 TEST — Bandeau feu : ETA GPS + durée rotation / exports dans historique
+   v13.35 TEST — Bandeau feu : ETA GPS + durée rotation / exports dans historique
    ========================================================================== */
 
 #commune-info-display {
@@ -7863,5 +7863,98 @@ body:not(.app-ready) #nearest-commune-display {
     .fire-history-export-btn {
         font-size: 10px;
         padding: 7px 6px;
+    }
+}
+
+
+/* ========================================================================== 
+   v13.35 TEST — Historique sécurisé / bandeau feu sur une ligne / suivi GPS
+   ========================================================================== */
+
+/* Historique : éloigne ForeFlight/SDVFR de la colonne de suppression. */
+#results-list li.fire-history-item {
+    gap: 8px !important;
+    padding-right: 12px !important;
+}
+
+#results-list li.fire-history-item .fire-history-select {
+    min-width: 0 !important;
+}
+
+#results-list li.fire-history-item .fire-history-export-actions {
+    margin-left: 4px !important;
+    margin-right: 18px !important;
+    transform: translateX(-6px);
+}
+
+#results-list li.fire-history-item .fire-history-delete {
+    margin-left: 4px !important;
+}
+
+/* Bandeau du feu sélectionné : nom + CS + route/distance/temps + rotation sur une seule ligne. */
+#commune-info-display {
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    row-gap: 0 !important;
+    column-gap: 8px !important;
+    max-width: calc(100vw - 76px) !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+#commune-info-display > .commune-name {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    overflow-wrap: normal !important;
+    line-height: 1 !important;
+}
+
+#commune-info-display .sunset-info {
+    flex: 0 0 auto !important;
+    margin-left: 0 !important;
+    white-space: nowrap !important;
+    font-size: 15px !important;
+}
+
+#commune-info-display .gps-feu-route-info,
+#commune-info-display .gps-feu-rotation-info {
+    flex: 0 0 auto !important;
+    margin-left: 0 !important;
+    white-space: nowrap !important;
+    font-size: 16px !important;
+    padding: 4px 8px !important;
+}
+
+#commune-info-display .clear-commune-btn {
+    flex: 0 0 auto !important;
+    margin-left: 2px !important;
+}
+
+@media (max-width: 760px) {
+    #commune-info-display {
+        column-gap: 5px !important;
+        max-width: calc(100vw - 64px) !important;
+        font-size: 14px !important;
+        padding-left: 8px !important;
+        padding-right: 6px !important;
+    }
+
+    #commune-info-display .sunset-info {
+        font-size: 12px !important;
+    }
+
+    #commune-info-display .gps-feu-route-info,
+    #commune-info-display .gps-feu-rotation-info {
+        font-size: 12px !important;
+        padding: 3px 5px !important;
+    }
+
+    #results-list li.fire-history-item .fire-history-export-actions {
+        margin-right: 16px !important;
+        transform: translateX(-4px);
     }
 }
