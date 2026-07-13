@@ -1,31 +1,26 @@
-NPF-Q400 — MODIFICATIONS v13.34 TEST
-Base : v13.33 TEST
+NPF-Q400 — v13.35 TEST
+Base : v13.34 TEST
 
-1. Bandeau feu sélectionné sur carte
-- Retrait des boutons ForeFlight / SDVFR du bandeau du feu sélectionné.
-- Ajout du temps estimé vers le feu calculé avec la vitesse GPS sol de l’avion.
-- Affichage prévu : route magnétique / distance / temps, par exemple : 278° / 184 Nm / 45 min.
-- Si la vitesse GPS est indisponible ou non exploitable, le temps affiche -- min.
+Corrections intégrées :
 
-2. Durée rotation dans le bandeau feu
-- Ajout de l’information : Rotations XX min.
-- La valeur est reprise depuis l’onglet Suivi rotation, champ Durée rotation.
-- Fallback sur la durée Prévi rotation si la valeur Suivi n’est pas encore disponible.
+1. Historique des feux
+- Les boutons ForeFlight et SDVFR de chaque ligne d'historique sont légèrement décalés vers la gauche.
+- Ajout d'un espace de sécurité entre ces boutons et le bouton rouge X.
+- Clic sur X : demande maintenant une confirmation avant suppression du feu de l'historique.
 
-3. Historique des feux
-- Déplacement des exports ForeFlight et SDVFR sur chaque ligne de l’historique des feux.
-- Chaque feu de l’historique peut être exporté directement sans devoir l’afficher dans le bandeau carte.
-- Les boutons d’export sont distincts du bouton rouge de suppression pour limiter les suppressions accidentelles.
+2. Bandeau feu sur la carte
+- Le nom du feu, le CS, la route/distance/temps GPS et la durée de rotation sont forcés sur une seule ligne.
+- Le CS reste directement à côté du nom du feu.
+- Le libellé "Rotations" devient "Rot." pour gagner de la place.
+- Format attendu : Nom du feu — CS xx:xx — 278° / 184 Nm / 45 min — Rot. 45 min.
 
-4. GPS
-- La dernière position GPS mémorise maintenant aussi la vitesse sol calculée ou fournie par iPadOS.
-- Cette vitesse sert uniquement au calcul du temps vers le feu dans le bandeau carte.
+3. Mode suivi GPS
+- Le clic sur le bouton de suivi ne force plus un changement de zoom.
+- Le recentrage se fait à zoom constant pour éviter le rechargement complet des tuiles et la disparition temporaire de la carte.
+- La pause de 10 secondes après déplacement manuel est renforcée dès le premier mouvement de carte.
+- Les mises à jour GPS ne recentrent plus la carte pendant la période de pause utilisateur.
 
-5. Cache / version
-- Version TEST : v13.34.
-- Cache service worker mis à jour pour forcer la récupération des nouveaux fichiers.
-
-Contrôles effectués
-- Syntaxe script.js : OK.
-- Syntaxe sw.js : OK.
-- manifest.json : OK.
+Contrôles effectués :
+- script.js : syntaxe OK.
+- sw.js : syntaxe OK.
+- manifest.json : JSON OK.
