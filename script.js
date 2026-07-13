@@ -1163,7 +1163,7 @@ function displayFireHistory() {
     titleButton.className = 'fire-history-toggle fire-history-title-toggle';
     titleButton.setAttribute('aria-label', collapsed ? 'Afficher l’historique des feux' : 'Masquer l’historique des feux');
     titleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    /* v13.34 — la flèche reste dans la zone du titre, loin de la colonne des X de suppression. */
+    /* v13.35 — la flèche reste dans la zone du titre, loin de la colonne des X de suppression. */
     titleButton.innerHTML = `<span>Historique des feux</span><span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
     titleButton.addEventListener('click', toggleHistory);
     header.appendChild(titleButton);
@@ -1229,6 +1229,8 @@ function displayFireHistory() {
 
         li.querySelector('.fire-history-delete').addEventListener('click', (event) => {
             event.stopPropagation();
+            const fireName = item?.nom_standard || item?.name || 'ce feu';
+            if (!confirm(`Supprimer ${fireName} de l’historique des feux ?`)) return;
             window.deleteFireHistoryItem(index);
         });
 
@@ -2945,7 +2947,7 @@ function updateCommuneDisplay(commune) {
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
     const closeButtonHTML = `<span id="clear-commune-btn" class="clear-commune-btn" title="Effacer le feu">×</span>`;
-    const routeInfoHTML = `<div id="gps-feu-route-info" class="gps-feu-route-info" title="Route, distance et temps GPS vers le feu">---° / -- Nm / -- min</div><div id="gps-feu-rotation-info" class="gps-feu-rotation-info" title="Durée de rotation issue de l’onglet Suivi rotation">Rotations -- min</div>`;
+    const routeInfoHTML = `<div id="gps-feu-route-info" class="gps-feu-route-info" title="Route, distance et temps GPS vers le feu">---° / -- Nm / -- min</div><div id="gps-feu-rotation-info" class="gps-feu-rotation-info" title="Durée de rotation issue de l’onglet Suivi rotation">Rot. -- min</div>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
@@ -3046,8 +3048,8 @@ function updateCommuneMapRotationInfo() {
 
     const minutes = getSuiviRotationDurationMinutesForMap();
     rotationInfo.textContent = Number.isFinite(minutes) && minutes > 0
-        ? `Rotations ${Math.round(minutes)} min`
-        : 'Rotations -- min';
+        ? `Rot. ${Math.round(minutes)} min`
+        : 'Rot. -- min';
     rotationInfo.classList.toggle('gps-feu-route-info-empty', !(Number.isFinite(minutes) && minutes > 0));
 }
 
@@ -5916,15 +5918,22 @@ function recenterMapOnKnownGpsPosition(reason = 'manual') {
     const pos = getKnownGpsLatLngForCentering();
     if (!pos) return false;
 
+    /*
+     * v13.35 — mode Suivi : ne plus forcer un zoom minimum au clic.
+     * Le changement de zoom rechargeait les tuiles et pouvait donner l'impression
+     * que la carte disparaissait quelques secondes. On recentre à zoom constant.
+     */
+    const currentZoom = Number.isFinite(map.getZoom()) ? map.getZoom() : 10;
     centerGpsFollowProgrammaticMove = true;
     try {
-        map.setView([pos.lat, pos.lng], Math.max(map.getZoom(), 11), {
-            animate: reason !== 'gps-update'
+        map.setView([pos.lat, pos.lng], currentZoom, {
+            animate: false,
+            noMoveStart: true
         });
     } finally {
         setTimeout(() => {
             centerGpsFollowProgrammaticMove = false;
-        }, 600);
+        }, 350);
     }
     return true;
 }
@@ -5969,7 +5978,7 @@ function installCenterGpsFollowHandlers() {
         centerGpsFollowLastUserGestureAt = Date.now();
 
         /*
-         * v13.34 — on arme la pause de 10 secondes dès le contact utilisateur
+         * v13.35 — on arme la pause de 10 secondes dès le contact utilisateur
          * sur la carte, avant les événements Leaflet. Sur iPad, le premier drag
          * pouvait sinon arriver pendant le fanion de recentrage programmatique
          * et être ignoré, ce qui provoquait un recentrage immédiat.
@@ -6004,6 +6013,13 @@ function installCenterGpsFollowHandlers() {
         });
     }
 
+    const forcePauseForMapGesture = () => {
+        if (!centerGpsFollowActive) return;
+        centerGpsFollowLastUserGestureAt = Date.now();
+        centerGpsFollowPausedUntil = Date.now() + CENTER_GPS_FOLLOW_RECENTER_DELAY_MS;
+        scheduleCenterGpsFollowRecentering();
+    };
+
     const onManualMapMove = (event) => {
         if (!centerGpsFollowActive) return;
 
@@ -6019,9 +6035,13 @@ function installCenterGpsFollowHandlers() {
         scheduleCenterGpsFollowRecentering();
     };
 
-    map.on('dragstart zoomstart drag moveend dragend zoomend', onManualMapMove);
+    map.on('dragstart zoomstart', forcePauseForMapGesture);
+    map.on('drag moveend dragend zoomend', onManualMapMove);
     map.on('movestart', (event) => {
-        if (event && event.originalEvent) onManualMapMove(event);
+        if (event && event.originalEvent) {
+            forcePauseForMapGesture();
+            onManualMapMove(event);
+        }
     });
 }
 function enableCenterGpsFollow() {
@@ -6840,8 +6860,12 @@ function updateUserPosition(pos) {
         updateDeroutementGpsStatus(isSimulationPosition ? 'GPS simulation' : 'GPS actualisé');
     }
 
-    if (centerGpsFollowActive && !centerGpsFollowUserGestureActive && Date.now() >= centerGpsFollowPausedUntil) {
-        recenterMapOnKnownGpsPosition('gps-update');
+    if (centerGpsFollowActive) {
+        const nowForFollow = Date.now();
+        const recentManualMapGesture = (nowForFollow - centerGpsFollowLastUserGestureAt) < CENTER_GPS_FOLLOW_RECENTER_DELAY_MS;
+        if (!centerGpsFollowUserGestureActive && !recentManualMapGesture && nowForFollow >= centerGpsFollowPausedUntil) {
+            recenterMapOnKnownGpsPosition('gps-update');
+        }
     }
 
     // Synchronise les calculs (dont GPS->Feu) dès qu'une position GPS est reçue.
