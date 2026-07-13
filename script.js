@@ -1138,7 +1138,7 @@ function setFireHistoryCollapsed(collapsed) {
 
 function keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus = true } = {}) {
     /*
-     * v13.36 — suppression dans l'historique : après confirmation, la fenêtre
+     * v13.37 — suppression dans l'historique : après confirmation, la fenêtre
      * de recherche doit rester ouverte. On protège aussi le prochain clic court
      * sur l'icône de recherche contre l'effet double ouverture/fermeture observé
      * sur iPad après une boîte confirm().
@@ -1271,24 +1271,40 @@ function displayFireHistory() {
         });
 
         const deleteHistoryButton = li.querySelector('.fire-history-delete');
-        const protectHistoryDeleteTap = (event) => {
+        const isolateHistoryDeleteTap = (event) => {
             if (!event) return;
-            event.preventDefault();
+            /* v13.37 — on isole le X sans preventDefault sur touchstart/pointerdown.
+               Sur iPad, preventDefault trop tôt pouvait supprimer le click du bouton. */
             event.stopPropagation();
             if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
         };
         ['pointerdown', 'touchstart', 'mousedown'].forEach((eventName) => {
-            deleteHistoryButton?.addEventListener(eventName, protectHistoryDeleteTap, { passive: false });
+            deleteHistoryButton?.addEventListener(eventName, isolateHistoryDeleteTap, { passive: true });
         });
-        deleteHistoryButton?.addEventListener('click', (event) => {
-            protectHistoryDeleteTap(event);
+
+        const handleHistoryDelete = (event) => {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+            }
+
+            const now = Date.now();
+            const lastTap = Number(deleteHistoryButton?.dataset?.lastDeleteTap || '0');
+            if (lastTap && now - lastTap < 650) return;
+            if (deleteHistoryButton?.dataset) deleteHistoryButton.dataset.lastDeleteTap = String(now);
+
             const fireName = item?.nom_standard || item?.name || 'ce feu';
             if (!confirm(`Supprimer ${fireName} de l’historique des feux ?`)) {
                 keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false });
                 return;
             }
             window.deleteFireHistoryItem(index, { keepSearchOpen: true });
-        });
+        };
+
+        deleteHistoryButton?.addEventListener('pointerup', handleHistoryDelete, { passive: false });
+        deleteHistoryButton?.addEventListener('touchend', handleHistoryDelete, { passive: false });
+        deleteHistoryButton?.addEventListener('click', handleHistoryDelete, { passive: false });
 
         resultsList.appendChild(li);
     });
