@@ -1,31 +1,31 @@
-NPF-Q400 — TEST v13.39
-Base : TEST v13.38
-Objet : suppression historique feu — confirmation interne sans fermeture parasite
+NPF-Q400 — TEST v13.40
+Base utilisée : TEST v13.34
 
-MODIFICATIONS
+Objectif : revenir à la base v13.34 et n'ajouter que les corrections demandées.
 
-1. Historique des feux — suppression par X
-- Remplacement de la confirmation native iPad/browser `confirm()` par une confirmation interne à l’application.
-- Objectif : éviter les doubles validations et les événements tactiles différés iPad qui ouvraient/refermaient la fenêtre Recherche feu / Historique.
-- Le clic sur X ouvre maintenant une petite fenêtre interne :
-  - Annuler
-  - Supprimer
+Modifications intégrées :
 
-2. Fenêtre Recherche feu / Historique
-- Après suppression confirmée, la fenêtre reste ouverte.
-- Suppression des réouvertures programmées multiples qui faisaient clignoter la fenêtre.
-- Ajout d’un verrou temporaire contre les clics/touches résiduels sur le bouton d’ouverture/fermeture.
+1. Bandeau feu sur la carte
+- Le bandeau du feu sélectionné est forcé sur une seule ligne.
+- Ordre conservé : nom du feu + CS directement à côté + route / distance / temps + rotation.
+- Le libellé "Rotations" est raccourci en "Rot.".
+- Exemple attendu : FEU COMMUNE (13)  CS 20:42  278° / 184 Nm / 45 min  Rot. 45 min
 
-3. Sécurité tactile
-- Isolation conservée du bouton X pour éviter les suppressions accidentelles.
-- Les boutons ForeFlight / SDVFR et la mise en page historique restent inchangés par rapport à v13.38.
+2. Mode Suivi GPS
+- Le clic sur "Suivi" ne force plus de changement de zoom.
+- Le recentrage se fait à zoom constant.
+- Animation désactivée pour éviter le rechargement visible des tuiles et la disparition temporaire de la carte sur iPad/PWA.
+- Pause de recentrage renforcée lors d'un déplacement manuel de carte.
 
-4. Version / cache
-- APP_VERSION : v13.39
-- manifest start_url : v13.39
-- service worker : sw-v13-39-historique-suppression-confirmation-interne
+Non repris volontairement :
+- modifications v13.35 et suivantes sur l'historique des feux ;
+- confirmation de suppression historique ;
+- changements de mise en page historique ;
+- modifications fuel 3500 kg ;
+- optimisations carte offline v13.36 ;
+- confirmation interne v13.39.
 
-CONTRÔLES
-- Syntaxe script.js : OK
-- Syntaxe sw.js : OK
-- manifest.json : OK
+Contrôles effectués :
+- syntaxe script.js : OK ;
+- syntaxe sw.js : OK ;
+- manifest.json : OK.
