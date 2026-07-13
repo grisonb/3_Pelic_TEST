@@ -421,6 +421,8 @@ let centerGpsFollowPauseTimer = null;
 let centerGpsFollowPausedUntil = 0;
 let centerGpsFollowStartedLiveGps = false;
 let centerGpsFollowHandlersInstalled = false;
+let centerGpsFollowUserGestureActive = false;
+let centerGpsFollowLastUserGestureAt = 0;
 const CENTER_GPS_FOLLOW_RECENTER_DELAY_MS = 10000;
 let ownGpsVectorLayer = null, ownGpsVectorMarkers = [];
 let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
@@ -1159,8 +1161,10 @@ function displayFireHistory() {
     const titleButton = document.createElement('button');
     titleButton.type = 'button';
     titleButton.className = 'fire-history-toggle fire-history-title-toggle';
+    titleButton.setAttribute('aria-label', collapsed ? 'Afficher l’historique des feux' : 'Masquer l’historique des feux');
     titleButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    titleButton.innerHTML = '<span>Historique des feux</span>';
+    /* v13.34 — la flèche reste dans la zone du titre, loin de la colonne des X de suppression. */
+    titleButton.innerHTML = `<span>Historique des feux</span><span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
     titleButton.addEventListener('click', toggleHistory);
     header.appendChild(titleButton);
 
@@ -1175,15 +1179,6 @@ function displayFireHistory() {
         });
         header.appendChild(clearButton);
     }
-
-    const arrowButton = document.createElement('button');
-    arrowButton.type = 'button';
-    arrowButton.className = 'fire-history-arrow-button';
-    arrowButton.setAttribute('aria-label', collapsed ? 'Afficher l’historique des feux' : 'Masquer l’historique des feux');
-    arrowButton.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    arrowButton.innerHTML = `<span class="fire-history-arrow">${collapsed ? '▼' : '▲'}</span>`;
-    arrowButton.addEventListener('click', toggleHistory);
-    header.appendChild(arrowButton);
 
     resultsList.appendChild(header);
 
@@ -1200,8 +1195,20 @@ function displayFireHistory() {
 
         li.innerHTML = `
             <button type="button" class="fire-history-select" title="Reprendre ce feu">${name}</button>
+            <div class="fire-history-export-actions" aria-label="Exports du feu">
+                <button type="button" class="fire-history-export-btn fire-history-export-kml" title="Exporter ce feu vers ForeFlight">ForeFlight</button>
+                <button type="button" class="fire-history-export-btn fire-history-export-sdvfr" title="Exporter ce feu vers SDVFR Next">SDVFR</button>
+            </div>
             <button type="button" class="fire-history-delete" title="Supprimer ce feu">✕</button>
         `;
+
+        li.querySelector('.fire-history-export-kml')?.addEventListener('click', (event) => {
+            exportCurrentFireKml(event, item, event.currentTarget);
+        });
+
+        li.querySelector('.fire-history-export-sdvfr')?.addEventListener('click', (event) => {
+            exportCurrentFireSdvfrCsv(event, item, event.currentTarget);
+        });
 
         li.querySelector('.fire-history-select').addEventListener('click', () => {
             currentCommune = item;
@@ -2937,31 +2944,23 @@ function updateCommuneDisplay(commune) {
     const depLabel = formatCommuneDepartment(displayCommune);
     const depCode = depLabel ? ` (${depLabel})` : '';
     const communeNameHTML = `<span class="commune-name">${displayCommune.nom_standard || commune.nom_standard}${depCode}</span>`;
-    const exportButtonsHTML = `<span class="fire-export-buttons"><button id="export-kml-btn" class="export-kml-btn" type="button" title="Télécharger le fichier KML pour ForeFlight">ForeFlight</button><button id="export-sdvfr-csv-btn" class="export-sdvfr-csv-btn" type="button" title="Télécharger le fichier CSV pour SDVFR Next">SDVFR</button></span>`;
     const closeButtonHTML = `<span id="clear-commune-btn" class="clear-commune-btn" title="Effacer le feu">×</span>`;
+    const routeInfoHTML = `<div id="gps-feu-route-info" class="gps-feu-route-info" title="Route, distance et temps GPS vers le feu">---° / -- Nm / -- min</div><div id="gps-feu-rotation-info" class="gps-feu-rotation-info" title="Durée de rotation issue de l’onglet Suivi rotation">Rotations -- min</div>`;
     let sunsetHTML = '';
     if (typeof SunCalc !== 'undefined') {
         try {
             const now = new Date();
             const times = SunCalc.getTimes(now, commune.latitude_mairie, commune.longitude_mairie);
             const sunsetString = times.sunset.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-            sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>`;
+            sunsetHTML = `<div class="sunset-info">🌅&nbsp;CS&nbsp;<b>${sunsetString}</b></div>${routeInfoHTML}`;
         } catch (e) {
-            sunsetHTML = '<div class="sunset-info"></div><div id="gps-feu-route-info" class="gps-feu-route-info" title="Route et distance GPS vers le feu">---° / -- Nm</div>';
+            sunsetHTML = `<div class="sunset-info"></div>${routeInfoHTML}`;
         }
+    } else {
+        sunsetHTML = routeInfoHTML;
     }
-    communeDisplay.innerHTML = communeNameHTML + sunsetHTML + exportButtonsHTML + closeButtonHTML;
+    communeDisplay.innerHTML = communeNameHTML + sunsetHTML + closeButtonHTML;
     updateCommuneGpsRouteDisplay();
-
-    const exportKmlBtn = document.getElementById('export-kml-btn');
-    if (exportKmlBtn) {
-        exportKmlBtn.addEventListener('click', (event) => exportCurrentFireKml(event));
-    }
-
-    const exportSdvfrCsvBtn = document.getElementById('export-sdvfr-csv-btn');
-    if (exportSdvfrCsvBtn) {
-        exportSdvfrCsvBtn.addEventListener('click', (event) => exportCurrentFireSdvfrCsv(event));
-    }
 
     // On attache l'événement de clic au nouveau bouton
     const clearCommuneBtn = document.getElementById('clear-commune-btn');
@@ -3009,13 +3008,60 @@ function updateCommuneDisplay(commune) {
     }
 }
 
+function getCurrentGpsGroundSpeedKt() {
+    const speedMps = Number(lastPosition?.speedMps);
+    if (!Number.isFinite(speedMps) || speedMps <= 0) return null;
+    return speedMps * 1.9438444924406;
+}
+
+function formatGpsEtaMinutes(distanceNm) {
+    const speedKt = getCurrentGpsGroundSpeedKt();
+    if (!Number.isFinite(distanceNm) || distanceNm <= 0 || !Number.isFinite(speedKt) || speedKt < 30) {
+        return '-- min';
+    }
+    const minutes = Math.max(1, Math.round((distanceNm * 60) / speedKt));
+    return `${minutes} min`;
+}
+
+function getSuiviRotationDurationMinutesForMap() {
+    const suiviInput = document.querySelector('#suivi-duree-rotation-wrapper .display-input');
+    const suiviMinutes = parseTime(suiviInput?.value || '');
+    if (Number.isFinite(suiviMinutes) && suiviMinutes > 0) return suiviMinutes;
+
+    const previText = document.getElementById('duree-rotation')?.textContent || '';
+    const previMinutes = parseTime(previText);
+    if (Number.isFinite(previMinutes) && previMinutes > 0) return previMinutes;
+
+    if (Number.isFinite(CALCULATOR_DATA?.distPelicFeu) && CALCULATOR_DATA.distPelicFeu > 0) {
+        const computed = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu));
+        if (Number.isFinite(computed) && computed > 20) return computed;
+    }
+
+    return null;
+}
+
+function updateCommuneMapRotationInfo() {
+    const rotationInfo = document.getElementById('gps-feu-rotation-info');
+    if (!rotationInfo) return;
+
+    const minutes = getSuiviRotationDurationMinutesForMap();
+    rotationInfo.textContent = Number.isFinite(minutes) && minutes > 0
+        ? `Rotations ${Math.round(minutes)} min`
+        : 'Rotations -- min';
+    rotationInfo.classList.toggle('gps-feu-route-info-empty', !(Number.isFinite(minutes) && minutes > 0));
+}
+
 function updateCommuneGpsRouteDisplay() {
     const routeInfo = document.getElementById('gps-feu-route-info');
-    if (!routeInfo) return;
+    const rotationInfo = document.getElementById('gps-feu-rotation-info');
+    if (!routeInfo && !rotationInfo) return;
 
     if (!currentCommune || !userMarker || !userMarker.getLatLng) {
-        routeInfo.textContent = '---° / -- Nm';
-        routeInfo.classList.add('gps-feu-route-info-empty');
+        if (routeInfo) {
+            routeInfo.textContent = '---° / -- Nm / -- min';
+            routeInfo.classList.add('gps-feu-route-info-empty');
+        }
+        updateCommuneMapRotationInfo();
         return;
     }
 
@@ -3024,8 +3070,11 @@ function updateCommuneGpsRouteDisplay() {
     const userLatLng = userMarker.getLatLng();
 
     if (!Number.isFinite(targetLat) || !Number.isFinite(targetLon) || !userLatLng) {
-        routeInfo.textContent = '---° / -- Nm';
-        routeInfo.classList.add('gps-feu-route-info-empty');
+        if (routeInfo) {
+            routeInfo.textContent = '---° / -- Nm / -- min';
+            routeInfo.classList.add('gps-feu-route-info-empty');
+        }
+        updateCommuneMapRotationInfo();
         return;
     }
 
@@ -3033,8 +3082,11 @@ function updateCommuneGpsRouteDisplay() {
     const trueBearingToTarget = calculateBearing(userLatLng.lat, userLatLng.lng, targetLat, targetLon);
     const magneticBearing = (trueBearingToTarget - MAGNETIC_DECLINATION + 360) % 360;
 
-    routeInfo.textContent = `${formatRouteDegrees(magneticBearing)} / ${Math.round(distance)} Nm`;
-    routeInfo.classList.remove('gps-feu-route-info-empty');
+    if (routeInfo) {
+        routeInfo.textContent = `${formatRouteDegrees(magneticBearing)} / ${Math.round(distance)} Nm / ${formatGpsEtaMinutes(distance)}`;
+        routeInfo.classList.remove('gps-feu-route-info-empty');
+    }
+    updateCommuneMapRotationInfo();
 }
 
 
@@ -4892,7 +4944,7 @@ async function loadDepartmentsLayerData() {
     if (hasLoadedDepartments) return;
 
     const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
-    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v13-32';
+    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v2026-54';
     let response = null;
 
     /*
@@ -5899,27 +5951,79 @@ function installCenterGpsFollowHandlers() {
     if (!map || centerGpsFollowHandlersInstalled) return;
     centerGpsFollowHandlersInstalled = true;
 
+    const shouldIgnoreCenterFollowDomEvent = (event) => {
+        try {
+            const target = event && event.target;
+            if (!target || typeof target.closest !== 'function') return false;
+            return !!target.closest('.leaflet-control, .leaflet-popup, .leaflet-tooltip, button, input, textarea, select, a, #results-list, #commune-info-display, #nearest-commune-display');
+        } catch (_) {
+            return false;
+        }
+    };
+
+    const markUserMapGesture = (event, { active = true } = {}) => {
+        if (!centerGpsFollowActive) return;
+        if (event && shouldIgnoreCenterFollowDomEvent(event)) return;
+
+        centerGpsFollowUserGestureActive = active;
+        centerGpsFollowLastUserGestureAt = Date.now();
+
+        /*
+         * v13.34 — on arme la pause de 10 secondes dès le contact utilisateur
+         * sur la carte, avant les événements Leaflet. Sur iPad, le premier drag
+         * pouvait sinon arriver pendant le fanion de recentrage programmatique
+         * et être ignoré, ce qui provoquait un recentrage immédiat.
+         */
+        scheduleCenterGpsFollowRecentering();
+    };
+
+    const endUserMapGesture = (event) => {
+        if (!centerGpsFollowActive) {
+            centerGpsFollowUserGestureActive = false;
+            return;
+        }
+        if (event && shouldIgnoreCenterFollowDomEvent(event)) return;
+        markUserMapGesture(event, { active: false });
+        centerGpsFollowUserGestureActive = false;
+    };
+
+    const container = typeof map.getContainer === 'function' ? map.getContainer() : null;
+    if (container) {
+        ['pointerdown', 'touchstart', 'mousedown', 'wheel'].forEach((eventName) => {
+            container.addEventListener(eventName, (event) => markUserMapGesture(event, { active: true }), { passive: true, capture: true });
+        });
+
+        ['pointermove', 'touchmove'].forEach((eventName) => {
+            container.addEventListener(eventName, (event) => {
+                if (centerGpsFollowUserGestureActive) markUserMapGesture(event, { active: true });
+            }, { passive: true, capture: true });
+        });
+
+        ['pointerup', 'pointercancel', 'touchend', 'touchcancel', 'mouseup'].forEach((eventName) => {
+            container.addEventListener(eventName, endUserMapGesture, { passive: true, capture: true });
+        });
+    }
+
     const onManualMapMove = (event) => {
         if (!centerGpsFollowActive) return;
 
-        /*
-         * v13.28 — correction suivi GPS : lors du premier déplacement manuel
-         * juste après l'activation, Leaflet peut encore être dans une séquence
-         * de recentrage programmatique. On ne doit ignorer que les mouvements
-         * réellement générés par le code, pas le drag/touch de l'utilisateur.
-         */
-        const isUserInteraction = !!(event && event.originalEvent);
+        const recentDomUserGesture = Date.now() - centerGpsFollowLastUserGestureAt < 1500;
+        const isUserInteraction = !!(
+            (event && event.originalEvent)
+            || centerGpsFollowUserGestureActive
+            || recentDomUserGesture
+        );
+
         if (centerGpsFollowProgrammaticMove && !isUserInteraction) return;
 
         scheduleCenterGpsFollowRecentering();
     };
 
-    map.on('dragstart zoomstart', onManualMapMove);
+    map.on('dragstart zoomstart drag moveend dragend zoomend', onManualMapMove);
     map.on('movestart', (event) => {
         if (event && event.originalEvent) onManualMapMove(event);
     });
 }
-
 function enableCenterGpsFollow() {
     centerGpsFollowActive = true;
     centerGpsFollowPausedUntil = 0;
@@ -5960,6 +6064,8 @@ function enableCenterGpsFollow() {
 function disableCenterGpsFollow({ keepLiveGps = false } = {}) {
     centerGpsFollowActive = false;
     centerGpsFollowPausedUntil = 0;
+    centerGpsFollowUserGestureActive = false;
+    centerGpsFollowLastUserGestureAt = 0;
     if (centerGpsFollowPauseTimer) {
         clearTimeout(centerGpsFollowPauseTimer);
         centerGpsFollowPauseTimer = null;
@@ -6095,7 +6201,7 @@ function updateNearestCommuneDisplay(lat, lon) {
         if (!displayCommune) return '';
         const departmentAtPoint = findDepartmentContainingPoint(lat, lon);
         const depLabel = departmentAtPoint?.dep_code || formatCommuneDepartment(displayCommune);
-        return `📍 ${prefix}: <b>${displayCommune.nom_standard || displayCommune.name || 'non déterminée'}${depLabel ? ` (${depLabel})` : ''}</b>`;
+        return `<span class="nearest-commune-prefix">📍 ${prefix}:</span> <b class="nearest-commune-name">${displayCommune.nom_standard || displayCommune.name || 'non déterminée'}${depLabel ? ` (${depLabel})` : ''}</b>`;
     };
 
     const numericLat = Number(lat);
@@ -6292,7 +6398,7 @@ function escapeXml(value) {
 let exportKmlInProgress = false;
 let exportKmlLastActionTime = 0;
 
-async function exportCurrentFireKml(event = null) {
+async function exportCurrentFireKml(event = null, communeOverride = null, buttonOverride = null) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -6306,20 +6412,21 @@ async function exportCurrentFireKml(event = null) {
     exportKmlInProgress = true;
     exportKmlLastActionTime = now;
 
-    const exportButton = document.getElementById('export-kml-btn');
+    const targetCommune = normalizeHistoryCommune(communeOverride) || currentCommune;
+    const exportButton = buttonOverride || document.getElementById('export-kml-btn');
     if (exportButton) {
         exportButton.disabled = true;
         exportButton.classList.add('busy');
     }
 
     try {
-        if (!currentCommune) {
+        if (!targetCommune) {
             alert('Aucun feu sélectionné.');
             return;
         }
 
-        const lat = Number(currentCommune.latitude_mairie);
-        const lon = Number(currentCommune.longitude_mairie);
+        const lat = Number(targetCommune.latitude_mairie);
+        const lon = Number(targetCommune.longitude_mairie);
 
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
             alert('Coordonnées du feu indisponibles.');
@@ -6332,7 +6439,7 @@ async function exportCurrentFireKml(event = null) {
          * et fournir un vrai fichier .kml à ouvrir/importer ensuite depuis Fichiers.
          * Coordonnées KML : longitude,latitude,altitude.
          */
-        const rawName = currentCommune.nom_standard || 'POINT_Q400';
+        const rawName = targetCommune.nom_standard || 'POINT_Q400';
         const safeName = rawName
             .toUpperCase()
             .normalize('NFD')
@@ -6403,7 +6510,7 @@ function buildSdvfrPointName(value) {
 let exportSdvfrCsvInProgress = false;
 let exportSdvfrCsvLastActionTime = 0;
 
-async function exportCurrentFireSdvfrCsv(event = null) {
+async function exportCurrentFireSdvfrCsv(event = null, communeOverride = null, buttonOverride = null) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -6417,20 +6524,21 @@ async function exportCurrentFireSdvfrCsv(event = null) {
     exportSdvfrCsvInProgress = true;
     exportSdvfrCsvLastActionTime = now;
 
-    const exportButton = document.getElementById('export-sdvfr-csv-btn');
+    const targetCommune = normalizeHistoryCommune(communeOverride) || currentCommune;
+    const exportButton = buttonOverride || document.getElementById('export-sdvfr-csv-btn');
     if (exportButton) {
         exportButton.disabled = true;
         exportButton.classList.add('busy');
     }
 
     try {
-        if (!currentCommune) {
+        if (!targetCommune) {
             alert('Aucun feu sélectionné.');
             return;
         }
 
-        const lat = Number(currentCommune.latitude_mairie);
-        const lon = Number(currentCommune.longitude_mairie);
+        const lat = Number(targetCommune.latitude_mairie);
+        const lon = Number(targetCommune.longitude_mairie);
 
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
             alert('Coordonnées du feu indisponibles.');
@@ -6443,8 +6551,8 @@ async function exportCurrentFireSdvfrCsv(event = null) {
          * name;description;type;latitude;longitude;shape;color
          * BELCODENE;Belcodene;FEU;43.427222;5.589444;diamond;yellow
          */
-        const pointName = buildSdvfrPointName(currentCommune.nom_standard || 'POINT_Q400');
-        const description = formatSdvfrCsvValue(currentCommune.nom_standard || pointName);
+        const pointName = buildSdvfrPointName(targetCommune.nom_standard || 'POINT_Q400');
+        const description = formatSdvfrCsvValue(targetCommune.nom_standard || pointName);
         const csv = [
             'name;description;type;latitude;longitude;shape;color',
             `${formatSdvfrCsvValue(pointName)};${description};FEU;${lat.toFixed(6)};${lon.toFixed(6)};diamond;yellow`
@@ -6677,13 +6785,27 @@ function updateUserPosition(pos) {
 
     if (isSimulationPosition) {
         clearOwnGpsVector();
-        lastPosition = { lat: latitude, lng: longitude, timestamp: gpsTimestampMs, simulation: true };
-    } else {
-        updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
         lastPosition = {
             lat: latitude,
             lng: longitude,
+            latitude,
+            longitude,
             timestamp: gpsTimestampMs,
+            speedMps: null,
+            speedKt: null,
+            simulation: true
+        };
+    } else {
+        updateOwnGpsVector(latitude, longitude, motionHeading, motionSpeed);
+        const storedSpeedMps = Number.isFinite(motionSpeed) ? motionSpeed : null;
+        lastPosition = {
+            lat: latitude,
+            lng: longitude,
+            latitude,
+            longitude,
+            timestamp: gpsTimestampMs,
+            speedMps: storedSpeedMps,
+            speedKt: storedSpeedMps !== null ? storedSpeedMps * 1.9438444924406 : null,
             altitudeFt: Number.isFinite(Number(pos.coords.altitude)) ? Math.round(Number(pos.coords.altitude) * 3.28084) : null,
             altitudeTimeMs: Number.isFinite(Number(pos.coords.altitude)) ? gpsTimestampMs : null
         };
@@ -6718,7 +6840,7 @@ function updateUserPosition(pos) {
         updateDeroutementGpsStatus(isSimulationPosition ? 'GPS simulation' : 'GPS actualisé');
     }
 
-    if (centerGpsFollowActive && Date.now() >= centerGpsFollowPausedUntil) {
+    if (centerGpsFollowActive && !centerGpsFollowUserGestureActive && Date.now() >= centerGpsFollowPausedUntil) {
         recenterMapOnKnownGpsPosition('gps-update');
     }
 
@@ -11016,7 +11138,7 @@ function initializeCalculator() {
                 let value = wrapper.querySelector('.display-input')?.value || '';
 
                 /*
-                 * v13.32 — LIMITE HDV dynamique :
+                 * v2026.54 — LIMITE HDV dynamique :
                  * le champ affiché peut montrer le restant après les BLOC ARRIVÉE
                  * saisis. En stockage, on conserve la limite journée de référence
                  * pour éviter qu'elle baisse à chaque sauvegarde.
@@ -11127,7 +11249,7 @@ function initializeCalculator() {
 
     function getGlobalLimitHdvMinutes() {
         /*
-         * v13.32 — Limite HDV journée :
+         * v2026.54 — Limite HDV journée :
          * la valeur stockée reste la limite journée de référence, même si le
          * champ affiché montre le restant après les BLOC ARRIVÉE déjà saisis.
          */
@@ -11164,7 +11286,7 @@ function initializeCalculator() {
 
     function updateDisplayedLimitHdvForActiveFlight() {
         /*
-         * v13.32 — affichage dynamique : dès qu'un BLOC ARRIVÉE est saisi,
+         * v2026.54 — affichage dynamique : dès qu'un BLOC ARRIVÉE est saisi,
          * LIMITE HDV affiche le restant journée disponible.
          * Les calculs du tableau BLOC/FUEL utilisent toujours la limite au
          * début du vol actif afin de ne pas soustraire deux fois le vol courant.
@@ -13578,6 +13700,7 @@ function initializeCalculator() {
         recalculateBlocFuel();
         updatePreviTab();
         updateSuiviTab();
+        updateCommuneGpsRouteDisplay();
         updateDeroutementTab();
         if (typeof updateFlightDurationSummary === 'function') updateFlightDurationSummary();
     };
