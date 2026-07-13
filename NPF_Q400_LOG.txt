@@ -1,22 +1,31 @@
-NPF-Q400 — v13.38 TEST — Historique feux : suppression en un seul OK et fenêtre maintenue ouverte
+NPF-Q400 — TEST v13.39
+Base : TEST v13.38
+Objet : suppression historique feu — confirmation interne sans fermeture parasite
 
-Base : v13.37 TEST
+MODIFICATIONS
 
-Corrections :
-- Historique des feux : la suppression par le bouton X ne déclenche plus plusieurs confirmations sur iPad.
-- La confirmation de suppression n’est plus branchée sur touchend/pointerup + click, mais uniquement sur le click final du bouton.
-- Après validation de suppression, la fenêtre Recherche feu / Historique reste ouverte.
-- Ajout d’un verrou temporaire plus long autour de la confirmation pour éviter que la fenêtre s’ouvre puis se referme immédiatement après la boîte iPadOS.
-- Conservation de la confirmation avant suppression.
+1. Historique des feux — suppression par X
+- Remplacement de la confirmation native iPad/browser `confirm()` par une confirmation interne à l’application.
+- Objectif : éviter les doubles validations et les événements tactiles différés iPad qui ouvraient/refermaient la fenêtre Recherche feu / Historique.
+- Le clic sur X ouvre maintenant une petite fenêtre interne :
+  - Annuler
+  - Supprimer
 
-Fichiers à remplacer :
-1. index.html
-2. manifest.json
-3. script.js
-4. style.css
-5. sw.js
+2. Fenêtre Recherche feu / Historique
+- Après suppression confirmée, la fenêtre reste ouverte.
+- Suppression des réouvertures programmées multiples qui faisaient clignoter la fenêtre.
+- Ajout d’un verrou temporaire contre les clics/touches résiduels sur le bouton d’ouverture/fermeture.
 
-Contrôles effectués :
-- script.js : syntaxe JavaScript OK
-- sw.js : syntaxe JavaScript OK
-- manifest.json : JSON OK
+3. Sécurité tactile
+- Isolation conservée du bouton X pour éviter les suppressions accidentelles.
+- Les boutons ForeFlight / SDVFR et la mise en page historique restent inchangés par rapport à v13.38.
+
+4. Version / cache
+- APP_VERSION : v13.39
+- manifest start_url : v13.39
+- service worker : sw-v13-39-historique-suppression-confirmation-interne
+
+CONTRÔLES
+- Syntaxe script.js : OK
+- Syntaxe sw.js : OK
+- manifest.json : OK
