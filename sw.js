@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-39-historique-suppression-confirmation-interne';
+const SW_VERSION = 'sw-v13-40-retour-v13-34-bandeau-feu-suivi-sans-refresh';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
