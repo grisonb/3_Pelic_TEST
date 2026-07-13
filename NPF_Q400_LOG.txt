@@ -1,32 +1,15 @@
-NPF-Q400 — MODIFICATIONS v13.41 TEST
-Base : v13.40 TEST
+NPF-Q400 — MODIFICATIONS v13.42 TEST
 
-1. Ouverture application avec feu déjà sélectionné
-- Au démarrage, si un feu est déjà sélectionné, la carte recadre automatiquement la vue pour afficher ensemble :
-  • la position GPS connue de l’avion ;
-  • le feu sélectionné ;
-  • les pélicandromes affichés/sélectionnés autour du feu ;
-  • le pélicandrome actif s’il est renseigné.
-- Le recadrage se fait sans activer le suivi GPS permanent.
-- Le recadrage est réappliqué après récupération GPS réelle pour éviter qu’un centrage GPS simple écrase la vue feu/position/pélicandromes.
+Base : v13.41 TEST
 
-2. Volume/Masse retardant — ajout Réfracto. = Densité
-- Ajout d’une ligne « Réfracto. = Densité » dans la fenêtre VOLUME/MASSE RETARDANT.
-- La valeur Réfracto. remplit automatiquement la densité selon la table suivante :
-  • 11.5 à 13.9  -> densité 1.04
-  • 14 à 17.4    -> densité 1.08
-  • 17.5 à 20.4  -> densité 1.10
-  • 20.5 à 23.9  -> densité 1.12
-  • 24 à 26.9    -> densité 1.14
-  • 27 à 30      -> densité 1.16
-- La densité calculée est appliquée aux deux champs Densité du tableau retardant.
-- La valeur Réfracto. est conservée avec la ligne BLOC/FUEL.
+Correction intégrée :
+- fenêtre Volume/Masse retardant : ligne Réfracto. = Densité rendue beaucoup plus compacte ;
+- libellés Réfracto. et Densité placés sur la même hauteur que les champs ;
+- hauteur des champs de cette ligne réduite uniquement sur la ligne Réfracto. ;
+- marge basse de cette ligne réduite pour éviter que le clavier iPad masque les boutons ;
+- les lignes Masse ÷ Densité = Volume et Volume × Densité = Masse restent inchangées.
 
-3. Historique des feux
-- Modification conservée pour cette version : les boutons ForeFlight et SDVFR sont légèrement décalés vers la gauche.
-- Objectif : les éloigner du bouton X de suppression.
-- Aucun changement volontaire sur le mécanisme de suppression de l’historique.
-
-4. Version / cache
-- Passage APP_VERSION en v13.41.
-- Mise à jour manifest et service worker pour forcer la prise en compte de la nouvelle version.
+Contrôles effectués :
+- syntaxe script.js OK ;
+- syntaxe sw.js OK ;
+- manifest.json OK.
