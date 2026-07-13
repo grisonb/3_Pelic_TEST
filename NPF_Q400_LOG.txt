@@ -1,13 +1,13 @@
-NPF-Q400 — TEST v13.37
-Base : TEST v13.36
+NPF-Q400 — v13.38 TEST — Historique feux : suppression en un seul OK et fenêtre maintenue ouverte
+
+Base : v13.37 TEST
 
 Corrections :
-- Historique des feux : correction de la mise en page des lignes.
-- Suppression du pictogramme injecté par l'ancien style ::before qui créait une colonne fantôme et décalait les boutons.
-- Boutons ForeFlight / SDVFR conservés à distance du X, avec grille plus stable.
-- Bouton X de suppression rétabli sur iPad : suppression du preventDefault trop tôt sur touchstart/pointerdown, qui pouvait empêcher le clic.
-- Le X reste isolé des autres actions et demande toujours confirmation avant suppression.
-- Après suppression confirmée, la fenêtre de recherche reste ouverte.
+- Historique des feux : la suppression par le bouton X ne déclenche plus plusieurs confirmations sur iPad.
+- La confirmation de suppression n’est plus branchée sur touchend/pointerup + click, mais uniquement sur le click final du bouton.
+- Après validation de suppression, la fenêtre Recherche feu / Historique reste ouverte.
+- Ajout d’un verrou temporaire plus long autour de la confirmation pour éviter que la fenêtre s’ouvre puis se referme immédiatement après la boîte iPadOS.
+- Conservation de la confirmation avant suppression.
 
 Fichiers à remplacer :
 1. index.html
@@ -15,3 +15,8 @@ Fichiers à remplacer :
 3. script.js
 4. style.css
 5. sw.js
+
+Contrôles effectués :
+- script.js : syntaxe JavaScript OK
+- sw.js : syntaxe JavaScript OK
+- manifest.json : JSON OK
