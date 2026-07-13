@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-36-historique-fuel3500-carte-offline-fluide';
+const SW_VERSION = 'sw-v13-37-historique-feux-x-retablis-layout';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
