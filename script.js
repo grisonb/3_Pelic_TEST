@@ -1136,33 +1136,34 @@ function setFireHistoryCollapsed(collapsed) {
 }
 
 
-function keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus = true } = {}) {
+function keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus = true, durationMs = 2200 } = {}) {
     /*
-     * v13.37 — suppression dans l'historique : après confirmation, la fenêtre
-     * de recherche doit rester ouverte. On protège aussi le prochain clic court
-     * sur l'icône de recherche contre l'effet double ouverture/fermeture observé
-     * sur iPad après une boîte confirm().
+     * v13.38 — suppression historique sur iPad : la boîte confirm() peut
+     * générer des événements différés après validation. On garde la fenêtre
+     * de recherche ouverte explicitement et on neutralise temporairement le
+     * bouton d'ouverture/fermeture pour éviter une fermeture parasite.
      */
-    window.__fireHistorySuppressSearchToggleUntil = Date.now() + 750;
+    window.__fireHistorySuppressSearchToggleUntil = Date.now() + durationMs;
 
-    const uiOverlay = document.getElementById('ui-overlay');
-    const searchSection = document.getElementById('search-section');
-    const toggleButton = document.getElementById('toggle-search-button');
-    const communeDisplay = document.getElementById('commune-info-display');
-    const resultsList = document.getElementById('results-list');
-    const searchInput = document.getElementById('search-input');
+    const reopenSearchWindow = () => {
+        const uiOverlay = document.getElementById('ui-overlay');
+        const searchSection = document.getElementById('search-section');
+        const toggleButton = document.getElementById('toggle-search-button');
+        const communeDisplay = document.getElementById('commune-info-display');
+        const resultsList = document.getElementById('results-list');
+        const searchInput = document.getElementById('search-input');
 
-    if (uiOverlay) uiOverlay.style.display = 'block';
-    if (searchSection) searchSection.style.display = 'block';
-    if (toggleButton) toggleButton.classList.add('active');
-    if (communeDisplay) communeDisplay.style.display = 'none';
+        if (uiOverlay) uiOverlay.style.display = 'block';
+        if (searchSection) searchSection.style.display = 'block';
+        if (toggleButton) toggleButton.classList.add('active');
+        if (communeDisplay) communeDisplay.style.display = 'none';
 
-    if (resultsList) {
-        resultsList.style.display = getFireHistory().length ? 'block' : 'none';
-    }
+        if (resultsList) {
+            const hasHistory = getFireHistory().length > 0;
+            resultsList.style.display = hasHistory ? 'block' : 'none';
+        }
 
-    if (keepFocus && searchInput) {
-        const refocus = () => {
+        if (keepFocus && searchInput) {
             try {
                 searchInput.disabled = false;
                 searchInput.readOnly = false;
@@ -1172,10 +1173,13 @@ function keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus = true } = {})
             } catch (_) {
                 try { searchInput.focus(); } catch (__) {}
             }
-        };
-        setTimeout(refocus, 40);
-        setTimeout(refocus, 160);
-    }
+        }
+    };
+
+    reopenSearchWindow();
+    setTimeout(reopenSearchWindow, 80);
+    setTimeout(reopenSearchWindow, 260);
+    setTimeout(reopenSearchWindow, 700);
 }
 
 function displayFireHistory() {
@@ -1271,18 +1275,21 @@ function displayFireHistory() {
         });
 
         const deleteHistoryButton = li.querySelector('.fire-history-delete');
+
         const isolateHistoryDeleteTap = (event) => {
             if (!event) return;
-            /* v13.37 — on isole le X sans preventDefault sur touchstart/pointerdown.
-               Sur iPad, preventDefault trop tôt pouvait supprimer le click du bouton. */
+            /*
+             * v13.38 — on isole le X de la ligne, mais la confirmation ne part
+             * que sur l'événement click. Cela évite les deux confirm() successifs
+             * provoqués par la chaîne touchend + click sur iPad.
+             */
             event.stopPropagation();
-            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
         };
         ['pointerdown', 'touchstart', 'mousedown'].forEach((eventName) => {
             deleteHistoryButton?.addEventListener(eventName, isolateHistoryDeleteTap, { passive: true });
         });
 
-        const handleHistoryDelete = (event) => {
+        const handleHistoryDeleteClick = (event) => {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1290,21 +1297,21 @@ function displayFireHistory() {
             }
 
             const now = Date.now();
-            const lastTap = Number(deleteHistoryButton?.dataset?.lastDeleteTap || '0');
-            if (lastTap && now - lastTap < 650) return;
-            if (deleteHistoryButton?.dataset) deleteHistoryButton.dataset.lastDeleteTap = String(now);
+            const lastClick = Number(deleteHistoryButton?.dataset?.lastDeleteClick || '0');
+            if (lastClick && now - lastClick < 1200) return;
+            if (deleteHistoryButton?.dataset) deleteHistoryButton.dataset.lastDeleteClick = String(now);
+
+            keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 2600 });
 
             const fireName = item?.nom_standard || item?.name || 'ce feu';
-            if (!confirm(`Supprimer ${fireName} de l’historique des feux ?`)) {
-                keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false });
-                return;
-            }
+            const confirmed = confirm(`Supprimer ${fireName} de l’historique des feux ?`);
+            keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 2600 });
+
+            if (!confirmed) return;
             window.deleteFireHistoryItem(index, { keepSearchOpen: true });
         };
 
-        deleteHistoryButton?.addEventListener('pointerup', handleHistoryDelete, { passive: false });
-        deleteHistoryButton?.addEventListener('touchend', handleHistoryDelete, { passive: false });
-        deleteHistoryButton?.addEventListener('click', handleHistoryDelete, { passive: false });
+        deleteHistoryButton?.addEventListener('click', handleHistoryDeleteClick, { passive: false });
 
         resultsList.appendChild(li);
     });
@@ -1327,7 +1334,7 @@ window.deleteFireHistoryItem = function(index, options = {}) {
     drawFireHistoryMarkers();
 
     if (options && options.keepSearchOpen) {
-        keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false });
+        keepFireSearchWindowOpenAfterHistoryMutation({ keepFocus: false, durationMs: 2600 });
     }
 };
 
