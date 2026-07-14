@@ -1,5 +1,5 @@
 /*
- * NPF-Q400 v13.46 TEST — rendu Leaflet local des PMTiles France Sud.
+ * NPF-Q400 v13.47 TEST — rendu Leaflet local des PMTiles France Sud.
  * Aucun CDN. Lecture PMTiles depuis IndexedDB via NPFPMTilesLocal + rendu Canvas MVT simplifié.
  */
 (function () {
@@ -412,6 +412,62 @@
         return 5;
     }
 
+    function getNamedText(feature) {
+        return propText(feature && feature.properties, [
+            'name:fr', 'name_fr', 'name', 'label', 'ref', 'short_name'
+        ]);
+    }
+
+    function getLayerFamily(layerName, kind) {
+        const k = `${layerName || ''} ${kind || ''}`.toLowerCase();
+        if (/building|housenumber|address|poi|shop|restaurant|tourism|amenity/.test(k)) return 'ignored';
+        if (/water|ocean|sea|river|lake|reservoir|wetland|stream|canal/.test(k)) return 'water';
+        if (/road|transport|highway|motorway|trunk|primary|secondary|tertiary|street|minor|service|track|path/.test(k)) return 'road';
+        if (/boundary|admin/.test(k)) return 'boundary';
+        if (/forest|wood|park|grass|scrub|farmland|meadow|landuse|landcover|natural|earth|land/.test(k)) return 'land';
+        if (/place|label|locality|city|town|village|hamlet|neighbourhood|municipality/.test(k)) return 'place';
+        return 'generic';
+    }
+
+    function getPathAnchor(paths, extent, tileSize) {
+        let sx = 0;
+        let sy = 0;
+        let n = 0;
+        for (const path of paths || []) {
+            for (const pt of path || []) {
+                sx += pt[0];
+                sy += pt[1];
+                n += 1;
+            }
+        }
+        if (!n) return null;
+        return { x: sx / n * tileSize / extent, y: sy / n * tileSize / extent };
+    }
+
+    function fallbackFillStyle(layerName, kind) {
+        const family = getLayerFamily(layerName, kind);
+        if (family === 'ignored') return null;
+        if (family === 'water') return { color: '#a9d9ee', alpha: 0.85 };
+        if (family === 'land') return { color: '#dfead7', alpha: 0.55 };
+        if (family === 'generic') return { color: '#eee8d8', alpha: 0.25 };
+        return null;
+    }
+
+    function fallbackLineStyle(layerName, kind, zoom) {
+        const family = getLayerFamily(layerName, kind);
+        if (family === 'ignored') return null;
+        if (family === 'boundary') return { color: '#b8a68a', width: zoom >= 9 ? 0.9 : 0.45, dash: [4, 3], alpha: 0.75 };
+        if (family === 'water') return { color: '#7bbbd5', width: zoom >= 12 ? 1.2 : 0.7, alpha: 0.95 };
+        if (family === 'road') {
+            if (/motorway|trunk/.test(kind)) return { color: '#d08b43', width: zoom >= 10 ? 2.3 : 1.5, alpha: 1 };
+            if (/primary|secondary/.test(kind)) return { color: '#d3a45f', width: zoom >= 10 ? 1.8 : 1.1, alpha: 1 };
+            if (/tertiary|minor|street|residential/.test(kind)) return { color: '#cfc5ae', width: zoom >= 13 ? 1.05 : 0.55, alpha: 0.9 };
+            return { color: '#d6d0c4', width: zoom >= 13 ? 0.8 : 0.35, alpha: 0.7 };
+        }
+        if (family === 'generic') return { color: '#d8d0c1', width: zoom >= 12 ? 0.55 : 0.25, alpha: 0.45 };
+        return null;
+    }
+
     function renderTileToCanvas(layers, canvas, coords) {
         const ctx = canvas.getContext('2d');
         const tileSize = canvas.width;
@@ -419,82 +475,110 @@
         ctx.fillStyle = '#f7f3e9';
         ctx.fillRect(0, 0, tileSize, tileSize);
 
+        let featureCount = 0;
+        let drawnCount = 0;
         const labels = [];
 
+        // 1) Surfaces. En v13.47, on applique un style générique de secours si
+        // les noms de couches de la carte générée ne correspondent pas aux noms
+        // attendus (cas observé : carreaux vides malgré une tuile MVT lue).
         for (const layer of layers) {
             const layerName = String(layer.name || '').toLowerCase();
-            if (/poi|shop|housenumber|address|transit|aerodrome_label/.test(layerName)) continue;
-            for (const feature of layer.features) {
-                const kind = getKind(feature);
+            for (const feature of layer.features || []) {
+                featureCount += 1;
                 if (feature.type !== 3) continue;
-                const fill = styleForFill(layerName, kind);
+                const kind = getKind(feature);
+                const fill = styleForFill(layerName, kind) || fallbackFillStyle(layerName, kind);
                 if (!fill) continue;
                 const paths = decodeGeometry(feature);
+                if (!paths.length) continue;
                 pathToCanvas(ctx, paths, layer.extent, tileSize);
-                ctx.fillStyle = fill;
-                ctx.globalAlpha = /building/.test(layerName) ? 0.12 : 0.72;
+                ctx.fillStyle = typeof fill === 'string' ? fill : fill.color;
+                ctx.globalAlpha = typeof fill === 'string' ? 0.72 : fill.alpha;
                 ctx.fill('evenodd');
                 ctx.globalAlpha = 1;
+                drawnCount += 1;
             }
         }
 
+        // 2) Lignes : routes, cours d'eau, limites + style générique discret.
         for (const layer of layers) {
             const layerName = String(layer.name || '').toLowerCase();
-            for (const feature of layer.features) {
-                const kind = getKind(feature);
+            for (const feature of layer.features || []) {
                 if (feature.type !== 2) continue;
-                const st = styleForLine(layerName, kind, coords.z);
+                const kind = getKind(feature);
+                const st = styleForLine(layerName, kind, coords.z) || fallbackLineStyle(layerName, kind, coords.z);
                 if (!st) continue;
                 const paths = decodeGeometry(feature);
+                if (!paths.length) continue;
                 pathToCanvas(ctx, paths, layer.extent, tileSize);
                 ctx.strokeStyle = st.color;
-                ctx.lineWidth = Math.max(0.35, st.width);
+                ctx.lineWidth = Math.max(0.25, st.width);
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                if (st.dash) ctx.setLineDash(st.dash); else ctx.setLineDash([]);
-                ctx.globalAlpha = /boundary/.test(layerName) ? 0.75 : 1;
+                ctx.setLineDash(st.dash || []);
+                ctx.globalAlpha = st.alpha == null ? (/boundary/.test(layerName) ? 0.75 : 1) : st.alpha;
                 ctx.stroke();
                 ctx.globalAlpha = 1;
+                drawnCount += 1;
             }
         }
         ctx.setLineDash([]);
 
+        // 3) Labels : on ne se limite plus aux couches place/label. Si une entité
+        // possède un nom exploitable, on peut l'utiliser comme secours, en filtrant
+        // POI/commerces/bâtiments pour conserver une carte aviation sobre.
         for (const layer of layers) {
             const layerName = String(layer.name || '').toLowerCase();
-            if (!/place|label/.test(layerName)) continue;
-            for (const feature of layer.features) {
-                if (feature.type !== 1) continue;
-                const name = propText(feature.properties, ['name:fr', 'name_fr', 'name', 'label']);
+            if (/poi|shop|restaurant|tourism|amenity|building|housenumber|address/.test(layerName)) continue;
+            for (const feature of layer.features || []) {
+                const name = getNamedText(feature);
                 if (!name) continue;
                 const kind = getKind(feature);
-                const rank = rankPlace(kind);
+                const family = getLayerFamily(layerName, kind);
+                if (family === 'ignored') continue;
+                if (feature.type === 2 && coords.z < 12) continue;
+                if (feature.type === 3 && coords.z < 11 && !/city|town|village|hamlet|place|locality/.test(`${layerName} ${kind}`)) continue;
+                const paths = decodeGeometry(feature);
+                const anchor = getPathAnchor(paths, layer.extent, tileSize);
+                if (!anchor) continue;
+                const rank = rankPlace(kind || layerName);
                 if (coords.z < 8 && rank > 1) continue;
                 if (coords.z < 10 && rank > 2) continue;
-                if (coords.z < 12 && rank > 3) continue;
-                const paths = decodeGeometry(feature);
-                const p = paths[0] && paths[0][0];
-                if (!p) continue;
-                labels.push({ name, kind, rank, x: p[0] * tileSize / layer.extent, y: p[1] * tileSize / layer.extent });
+                if (coords.z < 12 && rank > 3 && family !== 'place') continue;
+                labels.push({ name, kind, rank, x: anchor.x, y: anchor.y, family });
             }
         }
 
-        labels.sort((a, b) => a.rank - b.rank);
+        labels.sort((a, b) => a.rank - b.rank || (a.name.length - b.name.length));
         const placed = [];
-        for (const l of labels) {
+        for (const l of labels.slice(0, 48)) {
             const size = l.rank <= 1 ? 13 : l.rank === 2 ? 12 : l.rank === 3 ? 11 : 10;
             ctx.font = `${l.rank <= 2 ? '600' : '500'} ${size}px system-ui, -apple-system, BlinkMacSystemFont, sans-serif`;
             const w = ctx.measureText(l.name).width;
-            const h = size + 3;
+            const h = size + 4;
             const box = { x1: l.x - w / 2 - 3, y1: l.y - h / 2, x2: l.x + w / 2 + 3, y2: l.y + h / 2 };
+            if (box.x2 < 0 || box.x1 > tileSize || box.y2 < 0 || box.y1 > tileSize) continue;
             if (placed.some(b => !(box.x2 < b.x1 || box.x1 > b.x2 || box.y2 < b.y1 || box.y1 > b.y2))) continue;
             placed.push(box);
             ctx.lineWidth = 3;
-            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.92)';
             ctx.fillStyle = l.rank <= 2 ? '#33302b' : '#4d4942';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.strokeText(l.name, l.x, l.y);
             ctx.fillText(l.name, l.x, l.y);
+            drawnCount += 1;
+        }
+
+        // Diagnostic discret : utile en TEST si la tuile est bien lue mais que la
+        // structure MVT ne contient rien de dessinable avec ce style.
+        if (layers.length && !drawnCount) {
+            ctx.fillStyle = 'rgba(116,107,92,0.65)';
+            ctx.font = '10px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`MVT lu: ${layers.length} couche(s), ${featureCount} objet(s)`, 6, 6);
         }
     }
 
