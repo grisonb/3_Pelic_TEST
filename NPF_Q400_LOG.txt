@@ -1,31 +1,35 @@
-NPF-Q400 — TEST v13.49
-Base : TEST v13.48
+NPF-Q400 — TEST v13.50
 
-Objet : correction PMTiles France Sud — tuiles absentes à bas zoom.
+Base utilisée
+- Reprise de la dernière base TEST validée avant les essais PMTiles : v13.43 / v2026.55.
 
-Constat terrain :
-- affichage dans les carreaux : "PMTiles: tuile absente z10/527/374 zoome vers ?-14" ;
-- cela indique que la tuile Leaflet demandée au zoom 10 n’existe pas directement dans le PMTiles ;
-- le fichier France Sud semble surtout disposer de tuiles exploitables au zoom natif 14.
+Objet de la version
+- Retour au fonctionnement offline raster ZIP validé.
+- Suppression de la branche TEST PMTiles v13.44 à v13.49 pour éviter les carrés vides et l'absence de fond de carte.
+- Aucun fichier npf-pmtiles-idb.js ou npf-pmtiles-leaflet.js n'est nécessaire pour cette version.
 
-Corrections v13.49 :
-- correction du repli de zoom PMTiles dans npf-pmtiles-leaflet.js ;
-- le repli n’est plus limité à +3 niveaux ;
-- cas traité explicitement : z10 → z14 ;
-- plafond contrôlé à 256 sous-tuiles pour éviter une explosion mémoire ;
-- message de diagnostic remplacé par une indication du zoom natif max ;
-- aucune modification du stockage IndexedDB PMTiles ;
-- aucune modification du système offline raster ZIP existant.
+Conservé
+- Import des packs de tuiles raster ZIP existants.
+- Base IndexedDB existante OfflineTilesDB_v12_21 inchangée.
+- Choix Online / offline raster existant.
+- Toutes les fonctions validées avant PMTiles, notamment :
+  - recherche feu/commune avec vidage de la barre après validation ;
+  - carte, GPS, suivi GPS, feux, pélicandromes, routes, circuits, communes, lignes HT, points d'eau, dessins, GAAR ;
+  - BLOC/FUEL, Prévi NBR rotations, Suivi rotation ;
+  - Volume/Masse retardant avec Réfracto. / Densité ;
+  - affichage et calculs issus de v13.43 / v2026.55.
 
-Fichiers PMTiles :
-- npf-pmtiles-idb.js est fourni à nouveau par cohérence de version ;
-- npf-pmtiles-leaflet.js contient la correction principale ;
-- ZIP fourni avec les bons noms finaux pour GitHub.
+Non inclus dans cette version
+- Pas de PMTiles.
+- Pas de source vectorielle France Sud.
+- Pas d'import local PMTiles.
+- Pas de nouveaux fichiers JavaScript PMTiles.
 
-Contrôles effectués :
-- node --check script.js : OK ;
-- node --check sw.js : OK ;
-- node --check npf-pmtiles-idb.js : OK ;
-- node --check npf-pmtiles-leaflet.js : OK ;
-- manifest.json valide ;
-- ZIP contrôlé avec les bons noms : npf-pmtiles-idb.js et npf-pmtiles-leaflet.js.
+Objectif suivant envisagé
+- Transformer le dossier NPF / France Sud en plusieurs ZIP raster compatibles avec le système offline actuel, idéalement 300 Mo maximum par ZIP.
+
+Contrôles effectués
+- node --check script.js : OK.
+- node --check sw.js : OK.
+- manifest.json : valide.
+- Vérification : aucun module ni fichier PMTiles requis par index/script/style/sw.
