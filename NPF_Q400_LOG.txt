@@ -1,41 +1,22 @@
-NPF-Q400 — Version TEST v13.45
+NPF-Q400 — TEST v13.46
 
-Base : v13.44 TEST, issue de v13.43 / v2026.55.
+Base : TEST v13.45 PMTiles import local.
 
-Objet : remplacement du téléchargement PMTiles par un import local manuel depuis l’iPad.
+Correction principale :
+- suppression du carreau de secours qui affichait seulement "France Sud PMTiles z/x/y" ;
+- remplacement par un premier rendu vectoriel local Canvas des tuiles MVT contenues dans le fichier PMTiles ;
+- lecture du fichier PMTiles assemblé virtuellement depuis les blocs IndexedDB, sans créer de second fichier complet ;
+- décodage local de l’en-tête PMTiles v3, des répertoires, des tuiles MVT et des géométries ;
+- décompression gzip locale via DecompressionStream quand les tuiles PMTiles sont compressées ;
+- style aéronautique sobre : fond clair, eau, zones naturelles/urbaines, routes principales/secondaires, limites et noms de lieux ;
+- aucun CDN ajouté ;
+- aucun changement de la logique raster ZIP existante ;
+- aucun bloc PMTiles ajouté au Cache Storage du service worker.
 
-Modifications principales :
-- Suppression de l’URL serveur centralisée PMTILES_FRANCE_SUD_BASE_URL.
-- Ajout d’un bouton “Importer la carte locale”.
-- Ajout d’un sélecteur de fichiers multiple pour sélectionner en une seule fois :
-  - manifest.json
-  - NPF-France-Sud-z14.pmtiles.part001 à part007
-- Le manifeste est lu localement depuis le fichier sélectionné.
-- Chaque bloc est lu depuis le fichier local correspondant, un par un.
-- Contrôle conservé :
-  - validité du manifest.json ;
-  - espace disponible via navigator.storage.estimate() ;
-  - demande de stockage persistant via navigator.storage.persist() ;
-  - taille de chaque bloc ;
-  - SHA-256 de chaque bloc via crypto.subtle.digest('SHA-256', ...) ;
-  - stockage séparé en IndexedDB NPF_PMTiles_DB ;
-  - reprise en conservant les blocs déjà validés.
-- Le bouton “Reprendre l’import” rouvre le sélecteur de fichiers : il faut resélectionner manifest.json + les 7 blocs, mais les blocs déjà validés ne sont pas réimportés.
-- Aucune dépendance à un serveur pour installer la carte.
-- Aucune URL CDN ajoutée.
-- Les blocs PMTiles restent en IndexedDB, jamais dans localStorage ni dans le Cache Storage du service worker.
-- La base raster OfflineTilesDB_v12_21 n’est pas modifiée.
-- La logique des packs ZIP raster existants reste inchangée.
+Fichiers nouveaux/à remplacer :
+- npf-pmtiles-leaflet.js : remplacé par le rendu vectoriel local ;
+- npf-pmtiles-idb.js : inchangé fonctionnellement, à conserver dans le dépôt ;
+- index.html, manifest.json, script.js, style.css, sw.js : versionnés v13.46.
 
-Service worker :
-- Passage du cache applicatif à sw-v13-45-pmtiles-import-local-test.
-- Les modules npf-pmtiles-idb.js et npf-pmtiles-leaflet.js restent dans le cache applicatif.
-- Aucun bloc PMTiles de 190 Mo n’est ajouté au cache applicatif.
-
-Contrôles effectués :
-- node --check script.js : OK
-- node --check sw.js : OK
-- node --check npf-pmtiles-idb.js : OK
-- node --check npf-pmtiles-leaflet.js : OK
-- manifest.json : JSON valide
-- Aucune URL CDN nécessaire au fonctionnement PMTiles local.
+Remarque test :
+- si une tuile affiche maintenant un message rouge PMTiles indisponible, cela pointera une cause technique réelle : bloc manquant, archive PMTiles incompatible, compression non supportée par Safari, ou import incomplet.
