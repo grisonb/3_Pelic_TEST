@@ -1,35 +1,35 @@
-NPF-Q400 — TEST v13.50
+NPF-Q400 — TEST v13.51 — Vue 3D terrain online Cesium
 
-Base utilisée
-- Reprise de la dernière base TEST validée avant les essais PMTiles : v13.43 / v2026.55.
+Base utilisée : TEST v13.50 retour ZIP raster sans PMTiles.
 
-Objet de la version
-- Retour au fonctionnement offline raster ZIP validé.
-- Suppression de la branche TEST PMTiles v13.44 à v13.49 pour éviter les carrés vides et l'absence de fond de carte.
-- Aucun fichier npf-pmtiles-idb.js ou npf-pmtiles-leaflet.js n'est nécessaire pour cette version.
+Modifications :
+1. Ajout d’un bouton “3D terrain” dans la colonne des boutons de carte.
+2. Ajout d’une page dédiée `vue-3d.html` basée sur CesiumJS.
+3. Ouverture de la vue 3D centrée automatiquement sur :
+   - le feu sélectionné si présent ;
+   - sinon la position GPS connue ;
+   - sinon le centre courant de la carte ;
+   - sinon Marseille par défaut.
+4. Transmission à la page 3D des coordonnées du feu, de la position GPS et du nom affiché.
+5. Affichage dans Cesium :
+   - marqueur de cible ;
+   - marqueur feu si présent ;
+   - marqueur GPS si présent ;
+   - ligne GPS → feu si les deux positions existent.
+6. Vue 3D online séparée de la carte Leaflet principale pour éviter de casser la carte 2D stable.
+7. Ajout d’un champ local pour enregistrer un token Cesium ion sur l’appareil.
+8. Mise à jour du service worker en v13.51 avec `vue-3d.html` dans l’app-shell.
+9. Aucun retour PMTiles dans la PWA. La logique raster ZIP reste inchangée.
 
-Conservé
-- Import des packs de tuiles raster ZIP existants.
-- Base IndexedDB existante OfflineTilesDB_v12_21 inchangée.
-- Choix Online / offline raster existant.
-- Toutes les fonctions validées avant PMTiles, notamment :
-  - recherche feu/commune avec vidage de la barre après validation ;
-  - carte, GPS, suivi GPS, feux, pélicandromes, routes, circuits, communes, lignes HT, points d'eau, dessins, GAAR ;
-  - BLOC/FUEL, Prévi NBR rotations, Suivi rotation ;
-  - Volume/Masse retardant avec Réfracto. / Densité ;
-  - affichage et calculs issus de v13.43 / v2026.55.
+Attention :
+- La vue 3D est online et dépend de CesiumJS + terrain Cesium ion.
+- Pour un usage normal, un token Cesium ion personnel est recommandé.
+- La carte 2D NPF-Q400 reste inchangée et reste le module principal.
 
-Non inclus dans cette version
-- Pas de PMTiles.
-- Pas de source vectorielle France Sud.
-- Pas d'import local PMTiles.
-- Pas de nouveaux fichiers JavaScript PMTiles.
-
-Objectif suivant envisagé
-- Transformer le dossier NPF / France Sud en plusieurs ZIP raster compatibles avec le système offline actuel, idéalement 300 Mo maximum par ZIP.
-
-Contrôles effectués
-- node --check script.js : OK.
-- node --check sw.js : OK.
-- manifest.json : valide.
-- Vérification : aucun module ni fichier PMTiles requis par index/script/style/sw.
+Fichiers à publier :
+- index.html
+- vue-3d.html
+- manifest.json
+- script.js
+- style.css
+- sw.js
