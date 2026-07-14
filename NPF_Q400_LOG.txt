@@ -1,35 +1,23 @@
-NPF-Q400 — TEST v13.51 — Vue 3D terrain online Cesium
+NPF-Q400 — TEST v13.52 — Vue 3D Cesium : bouton corrigé et mode offline
 
-Base utilisée : TEST v13.50 retour ZIP raster sans PMTiles.
+Base : TEST v13.51.
 
 Modifications :
-1. Ajout d’un bouton “3D terrain” dans la colonne des boutons de carte.
-2. Ajout d’une page dédiée `vue-3d.html` basée sur CesiumJS.
-3. Ouverture de la vue 3D centrée automatiquement sur :
-   - le feu sélectionné si présent ;
-   - sinon la position GPS connue ;
-   - sinon le centre courant de la carte ;
-   - sinon Marseille par défaut.
-4. Transmission à la page 3D des coordonnées du feu, de la position GPS et du nom affiché.
-5. Affichage dans Cesium :
-   - marqueur de cible ;
-   - marqueur feu si présent ;
-   - marqueur GPS si présent ;
-   - ligne GPS → feu si les deux positions existent.
-6. Vue 3D online séparée de la carte Leaflet principale pour éviter de casser la carte 2D stable.
-7. Ajout d’un champ local pour enregistrer un token Cesium ion sur l’appareil.
-8. Mise à jour du service worker en v13.51 avec `vue-3d.html` dans l’app-shell.
-9. Aucun retour PMTiles dans la PWA. La logique raster ZIP reste inchangée.
+1. Correction de l’action du bouton 3D : ouverture en navigation directe vers vue-3d.html, plus fiable en PWA iPad que window.open(_blank).
+2. Déplacement du bouton 3D dans la colonne gauche, immédiatement sous le bouton Lignes HT.
+3. Masquage automatique du bouton 3D lorsque le mode carte OFFLINE est actif.
+4. Réaffichage automatique du bouton 3D lors du retour au mode ONLINE.
+5. Correction service worker : navigation vers vue-3d.html servie comme page 3D, pas comme index.html.
+6. Conservation de la page Cesium vue-3d.html et de la logique de centrage sur feu/GPS/centre carte.
 
-Attention :
-- La vue 3D est online et dépend de CesiumJS + terrain Cesium ion.
-- Pour un usage normal, un token Cesium ion personnel est recommandé.
-- La carte 2D NPF-Q400 reste inchangée et reste le module principal.
-
-Fichiers à publier :
+Fichiers modifiés :
 - index.html
-- vue-3d.html
-- manifest.json
 - script.js
 - style.css
+- manifest.json
 - sw.js
+
+Contrôles :
+- node --check script.js : OK
+- node --check sw.js : OK
+- manifest.json : OK
