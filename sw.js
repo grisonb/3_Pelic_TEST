@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-49-pmtiles-repli-zoom-natif-test';
+const SW_VERSION = 'sw-v13-50-retour-zip-raster';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -20,8 +20,6 @@ const APP_SHELL_URLS = [
     './leaflet.min.js',
     './suncalc.js',
     './jszip.min.js',
-    './npf-pmtiles-idb.js',
-    './npf-pmtiles-leaflet.js',
     './communes.json',
     './communes_aliases.json',
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
@@ -46,8 +44,6 @@ const CORE_APP_SHELL_URLS = [
     './leaflet.min.js',
     './suncalc.js',
     './jszip.min.js',
-    './npf-pmtiles-idb.js',
-    './npf-pmtiles-leaflet.js',
     './communes.json',
     './communes_aliases.json'
 ];
