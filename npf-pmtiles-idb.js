@@ -1,5 +1,5 @@
 /*
- * NPF-Q400 v13.48 TEST — stockage IndexedDB des blocs PMTiles.
+ * NPF-Q400 v13.49 TEST — stockage IndexedDB des blocs PMTiles.
  * Objectif : conserver les blocs dans IndexedDB, séparément de OfflineTilesDB_v12_21.
  * Aucun bloc PMTiles n'est stocké dans localStorage ni dans le Cache Storage du service worker.
  */
