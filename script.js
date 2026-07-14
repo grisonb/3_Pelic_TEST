@@ -4167,9 +4167,14 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     updateCommuneDisplay(commune);
 
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
-    document.getElementById('search-input').value = name;
-    document.getElementById('results-list').style.display = 'none';
-    document.getElementById('clear-search').style.display = 'block';
+    // v13.43 — après validation d'un feu, la barre de recherche est vidée.
+    // Le feu reste sélectionné via currentCommune + bandeau carte ; seul le texte de recherche est nettoyé.
+    const fireSearchInput = document.getElementById('search-input');
+    const fireResultsList = document.getElementById('results-list');
+    const fireClearSearchButton = document.getElementById('clear-search');
+    if (fireSearchInput) fireSearchInput.value = '';
+    if (fireResultsList) fireResultsList.style.display = 'none';
+    if (fireClearSearchButton) fireClearSearchButton.style.display = 'none';
 
     const allPoints = [[lat, lon]];
     const fireLabel = buildFireDisplayName(commune);
