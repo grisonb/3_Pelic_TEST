@@ -8085,3 +8085,78 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
+
+/* v13.51 — bouton Vue 3D terrain online Cesium */
+#cesium-3d-button {
+    width: 90px;
+    height: 90px;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    border: 2px solid var(--border-color);
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(224,236,250,0.92));
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    color: #0b2f6b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+    padding: 0;
+    line-height: 1;
+    position: relative;
+}
+
+#cesium-3d-button::after {
+    content: "terrain";
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: rgba(11,47,107,0.82);
+}
+
+#cesium-3d-button .cesium-3d-label {
+    transform: translateY(-5px);
+    display: inline-block;
+}
+
+#cesium-3d-button:hover {
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(211,228,247,1));
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+    #cesium-3d-button {
+        width: var(--right-tools-size, 56px) !important;
+        height: var(--right-tools-size, 56px) !important;
+        min-width: var(--right-tools-size, 56px) !important;
+        min-height: var(--right-tools-size, 56px) !important;
+        max-width: var(--right-tools-size, 56px) !important;
+        max-height: var(--right-tools-size, 56px) !important;
+        border-radius: 15px !important;
+        font-size: 19px !important;
+        border-width: 1px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.16) !important;
+    }
+
+    #cesium-3d-button::after {
+        content: "3D";
+        left: auto;
+        right: 4px;
+        bottom: 3px;
+        font-size: 8px;
+        opacity: 0.72;
+    }
+
+    #cesium-3d-button .cesium-3d-label {
+        transform: translateY(0);
+    }
+}
+
