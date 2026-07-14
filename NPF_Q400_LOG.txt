@@ -1,22 +1,28 @@
-NPF-Q400 — TEST v13.46
+NPF-Q400 — TEST v13.47
+Base : TEST v13.46 PMTiles France Sud
 
-Base : TEST v13.45 PMTiles import local.
+Objectif : corriger les carreaux PMTiles vides observés après le remplacement du carreau diagnostic.
 
-Correction principale :
-- suppression du carreau de secours qui affichait seulement "France Sud PMTiles z/x/y" ;
-- remplacement par un premier rendu vectoriel local Canvas des tuiles MVT contenues dans le fichier PMTiles ;
-- lecture du fichier PMTiles assemblé virtuellement depuis les blocs IndexedDB, sans créer de second fichier complet ;
-- décodage local de l’en-tête PMTiles v3, des répertoires, des tuiles MVT et des géométries ;
-- décompression gzip locale via DecompressionStream quand les tuiles PMTiles sont compressées ;
-- style aéronautique sobre : fond clair, eau, zones naturelles/urbaines, routes principales/secondaires, limites et noms de lieux ;
-- aucun CDN ajouté ;
-- aucun changement de la logique raster ZIP existante ;
-- aucun bloc PMTiles ajouté au Cache Storage du service worker.
+Modifications :
+- npf-pmtiles-leaflet.js : ajout d’un rendu vectoriel de secours plus générique.
+- Les géométries MVT ne dépendent plus uniquement des noms de couches attendus.
+- Ajout d’un style générique discret pour les surfaces, lignes et libellés lorsque les couches de la carte générée portent des noms différents.
+- Les couches inutiles restent filtrées autant que possible : commerces, restaurants, POI touristiques, adresses, bâtiments.
+- Ajout d’un diagnostic discret si une tuile MVT est lue mais qu’aucun objet n’est dessinable par le style.
+- Conservation de l’import local PMTiles en IndexedDB.
+- Conservation du fonctionnement des cartes raster ZIP existantes.
+- Version applicative passée à v13.47.
+- Service worker passé à sw-v13-47-pmtiles-rendu-vectoriel-generique-test.
 
-Fichiers nouveaux/à remplacer :
-- npf-pmtiles-leaflet.js : remplacé par le rendu vectoriel local ;
-- npf-pmtiles-idb.js : inchangé fonctionnellement, à conserver dans le dépôt ;
-- index.html, manifest.json, script.js, style.css, sw.js : versionnés v13.46.
+Fichiers JS PMTiles :
+- npf-pmtiles-idb.js inchangé fonctionnellement, versionné v13.47.
+- npf-pmtiles-leaflet.js modifié pour le rendu générique.
 
-Remarque test :
-- si une tuile affiche maintenant un message rouge PMTiles indisponible, cela pointera une cause technique réelle : bloc manquant, archive PMTiles incompatible, compression non supportée par Safari, ou import incomplet.
+Contrôles effectués :
+- node --check script.js : OK
+- node --check sw.js : OK
+- node --check npf-pmtiles-idb.js : OK
+- node --check npf-pmtiles-leaflet.js : OK
+- manifest.json valide : OK
+- Aucun CDN ajouté pour PMTiles.
+- Les blocs PMTiles restent stockés en IndexedDB et non dans le service worker.
