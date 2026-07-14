@@ -462,6 +462,14 @@ const DEFAULT_OFFLINE_ONLINE_FALLBACK = true;
 const OFFLINE_TILES_MAX_ZOOM_KEY = 'offlineTilesMaxZoom';
 const OFFLINE_TILES_MIN_ZOOM_KEY = 'offlineTilesMinZoom';
 const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
+const MAP_SOURCE_VECTOR_FRANCE_SUD = 'pmtiles-france-sud';
+const PMTILES_FRANCE_SUD_MAP_NAME = 'france-sud';
+const PMTILES_FRANCE_SUD_LABEL = 'France Sud';
+const PMTILES_FRANCE_SUD_MAX_ZOOM = 14;
+const PMTILES_FRANCE_SUD_MANIFEST_FILE = 'manifest.json';
+const PMTILES_FRANCE_SUD_EXPECTED_PART_PREFIX = 'NPF-France-Sud-z14.pmtiles.part';
+const PMTILES_FRANCE_SUD_EXPECTED_FILE_COUNT = 8; // manifest.json + 7 blocs
+
 const COMMUNES_CACHE_KEY = 'communesDataCacheV1';
 const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV2';
 const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
@@ -521,6 +529,8 @@ const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
 const OFFLINE_HARD_MAX_NATIVE_ZOOM = 13;
 const GLOBAL_MAX_ZOOM = 18;
 const GLOBAL_MIN_ZOOM = 0;
+let pmtilesFranceSudLayer = null;
+let pmtilesFranceSudDownloadController = null;
 let baseTileMaxNativeZoom = ONLINE_MAX_NATIVE_ZOOM;
 let baseTileMinNativeZoom = GLOBAL_MIN_ZOOM;
 let offlineTilesMode = DEFAULT_OFFLINE_TILES_ENABLED;
@@ -686,7 +696,7 @@ async function clearTileCaches() {
 
 async function refreshOfflineTilesRendering() {
     notifyServiceWorkerActivePacks(activeOfflinePacks);
-    if (map && baseTileLayer) {
+    if (map) {
         setupBaseTileLayer();
     }
 }
@@ -1448,7 +1458,7 @@ async function initializeApp() {
         activeOfflinePacks = JSON.parse(localStorage.getItem(OFFLINE_ACTIVE_PACKS_KEY) || '[]');
         if (!Array.isArray(activeOfflinePacks)) activeOfflinePacks = [];
         const savedMapSourceMode = localStorage.getItem(MAP_SOURCE_MODE_KEY);
-        mapSourceMode = savedMapSourceMode === 'offline' ? 'offline' : DEFAULT_MAP_SOURCE_MODE;
+        mapSourceMode = savedMapSourceMode === 'offline' ? 'offline' : savedMapSourceMode === MAP_SOURCE_VECTOR_FRANCE_SUD ? MAP_SOURCE_VECTOR_FRANCE_SUD : DEFAULT_MAP_SOURCE_MODE;
         offlineOnlineFallbackMode = localStorage.getItem(OFFLINE_ONLINE_FALLBACK_KEY) === null
             ? DEFAULT_OFFLINE_ONLINE_FALLBACK
             : localStorage.getItem(OFFLINE_ONLINE_FALLBACK_KEY) === 'true';
@@ -2128,6 +2138,34 @@ function setupBaseTileLayer() {
     if (!map) return;
     if (baseTileLayer) {
         map.removeLayer(baseTileLayer);
+        baseTileLayer = null;
+    }
+    if (pmtilesFranceSudLayer) {
+        try { map.removeLayer(pmtilesFranceSudLayer); } catch (_) {}
+        pmtilesFranceSudLayer = null;
+    }
+
+    if (mapSourceMode === MAP_SOURCE_VECTOR_FRANCE_SUD) {
+        const effectiveMinZoom = GLOBAL_MIN_ZOOM;
+        const effectiveMaxZoom = PMTILES_FRANCE_SUD_MAX_ZOOM;
+        map.options.minZoom = effectiveMinZoom;
+        map.options.maxZoom = effectiveMaxZoom;
+        map.setMinZoom(effectiveMinZoom);
+        map.setMaxZoom(effectiveMaxZoom);
+        if (map.getZoom() > effectiveMaxZoom) {
+            map.setView(map.getCenter(), effectiveMaxZoom, { animate: false });
+        }
+        if (window.NPFLeafletPMTiles && typeof window.NPFLeafletPMTiles.createFranceSudLayer === 'function') {
+            pmtilesFranceSudLayer = window.NPFLeafletPMTiles.createFranceSudLayer({
+                mapName: PMTILES_FRANCE_SUD_MAP_NAME,
+                maxZoom: PMTILES_FRANCE_SUD_MAX_ZOOM
+            });
+            pmtilesFranceSudLayer.addTo(map);
+        } else {
+            console.error('Module PMTiles Leaflet absent.');
+        }
+        applyMapNoBackgroundStyle();
+        return;
     }
 
     /*
@@ -2270,6 +2308,13 @@ function setupEventListeners() {
     const airportPdfImporterInput = document.getElementById('airport-pdf-importer-input');
     const mapSourceOnlineBtn = document.getElementById('map-source-online-btn');
     const mapSourceOfflineBtn = document.getElementById('map-source-offline-btn');
+    const mapSourceVectorBtn = document.getElementById('map-source-vector-btn');
+    const pmtilesFranceSudDownloadBtn = document.getElementById('pmtiles-france-sud-download-btn');
+    const pmtilesFranceSudFileInput = document.getElementById('pmtiles-france-sud-file-input');
+    const pmtilesFranceSudResumeBtn = document.getElementById('pmtiles-france-sud-resume-btn');
+    const pmtilesFranceSudActivateBtn = document.getElementById('pmtiles-france-sud-activate-btn');
+    const pmtilesFranceSudDeleteBtn = document.getElementById('pmtiles-france-sud-delete-btn');
+    const pmtilesFranceSudCancelBtn = document.getElementById('pmtiles-france-sud-cancel-btn');
     const purgeInactivePacksBtn = document.getElementById('purge-inactive-packs-btn');
     const refreshOfflineTilesBtn = document.getElementById('refresh-offline-tiles-btn');
     const simulationModeButton = document.getElementById('simulation-mode-button');
@@ -2615,7 +2660,7 @@ function setupEventListeners() {
     closeCalculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'none'; });
     calculatorModal.addEventListener('click', (e) => { if (e.target === calculatorModal) { calculatorModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && calculatorModal.style.display === 'flex') { calculatorModal.style.display = 'none'; } });
-    offlineMapsButton.addEventListener('click', () => { offlineMapModal.style.display = 'flex'; displayInstalledMaps(); displayInstalledAirportPdfs(); refreshSimulationModeButtonState(); });
+    offlineMapsButton.addEventListener('click', () => { offlineMapModal.style.display = 'flex'; displayInstalledMaps(); displayInstalledAirportPdfs(); refreshSimulationModeButtonState(); refreshFranceSudPmtilesUi(); });
     closeOfflineMapButton.addEventListener('click', () => { offlineMapModal.style.display = 'none'; });
     offlineMapModal.addEventListener('click', (e) => { if (e.target === offlineMapModal) { offlineMapModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && offlineMapModal.style.display === 'flex') { offlineMapModal.style.display = 'none'; } });
@@ -2670,6 +2715,50 @@ function setupEventListeners() {
                 alert(`Impossible d'activer le mode offline: ${error.message || error}`);
             }
         });
+    }
+
+
+    if (mapSourceVectorBtn) {
+        mapSourceVectorBtn.addEventListener('click', async () => {
+            try {
+                const installed = await isFranceSudPmtilesInstalled();
+                if (!installed.ok) {
+                    alert(installed.message || 'Carte France Sud non entièrement installée. Importe manifest.json + les 7 blocs, ou reprends l’import local.');
+                    await refreshFranceSudPmtilesUi();
+                    return;
+                }
+                await setMapSourceMode(MAP_SOURCE_VECTOR_FRANCE_SUD);
+            } catch (error) {
+                console.error('Erreur activation carte vectorielle France Sud:', error);
+                alert(`Impossible d'activer la carte vectorielle France Sud: ${error.message || error}`);
+            }
+        });
+    }
+
+    if (pmtilesFranceSudDownloadBtn && pmtilesFranceSudFileInput) {
+        pmtilesFranceSudDownloadBtn.addEventListener('click', () => pmtilesFranceSudFileInput.click());
+    }
+    if (pmtilesFranceSudResumeBtn && pmtilesFranceSudFileInput) {
+        pmtilesFranceSudResumeBtn.addEventListener('click', () => pmtilesFranceSudFileInput.click());
+    }
+    if (pmtilesFranceSudFileInput) {
+        pmtilesFranceSudFileInput.addEventListener('change', async (event) => {
+            const files = Array.from(event.target.files || []);
+            await importFranceSudPmtilesFiles(files, { resume: true });
+            event.target.value = '';
+        });
+    }
+    if (pmtilesFranceSudActivateBtn) {
+        pmtilesFranceSudActivateBtn.addEventListener('click', async () => {
+            try { await setMapSourceMode(MAP_SOURCE_VECTOR_FRANCE_SUD); }
+            catch (error) { alert(error.message || String(error)); }
+        });
+    }
+    if (pmtilesFranceSudDeleteBtn) {
+        pmtilesFranceSudDeleteBtn.addEventListener('click', deleteFranceSudPmtiles);
+    }
+    if (pmtilesFranceSudCancelBtn) {
+        pmtilesFranceSudCancelBtn.addEventListener('click', cancelFranceSudPmtilesDownload);
     }
 
     if (purgeInactivePacksBtn) {
@@ -4167,7 +4256,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     updateCommuneDisplay(commune);
 
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
-    // v13.43 — après validation d'un feu, la barre de recherche est vidée.
+    // v13.45 — après validation d'un feu, la barre de recherche est vidée.
     // Le feu reste sélectionné via currentCommune + bandeau carte ; seul le texte de recherche est nettoyé.
     const fireSearchInput = document.getElementById('search-input');
     const fireResultsList = document.getElementById('results-list');
@@ -7328,22 +7417,407 @@ function setOfflineOnlineFallbackMode(enabled) {
     notifyServiceWorkerOfflineOnlineFallback(offlineOnlineFallbackMode);
 }
 
+
+function getFranceSudPmtilesElements() {
+    return {
+        status: document.getElementById('pmtiles-france-sud-status'),
+        progressPanel: document.getElementById('pmtiles-france-sud-progress'),
+        progressText: document.getElementById('pmtiles-france-sud-progress-text'),
+        progressBar: document.getElementById('pmtiles-france-sud-progress-bar'),
+        progressDetails: document.getElementById('pmtiles-france-sud-progress-details'),
+        fileInput: document.getElementById('pmtiles-france-sud-file-input'),
+        downloadBtn: document.getElementById('pmtiles-france-sud-download-btn'),
+        resumeBtn: document.getElementById('pmtiles-france-sud-resume-btn'),
+        activateBtn: document.getElementById('pmtiles-france-sud-activate-btn'),
+        deleteBtn: document.getElementById('pmtiles-france-sud-delete-btn'),
+        cancelBtn: document.getElementById('pmtiles-france-sud-cancel-btn')
+    };
+}
+
+function normalizePmtilesUrl(baseUrl, fileName) {
+    const base = String(baseUrl || '').trim();
+    const name = String(fileName || '').replace(/^\/+/, '');
+    return `${base.endsWith('/') ? base : `${base}/`}${name}`;
+}
+
+function formatBytesFr(bytes) {
+    const value = Number(bytes) || 0;
+    if (value >= 1024 * 1024 * 1024) return `${(value / (1024 * 1024 * 1024)).toFixed(2).replace('.', ',')} Go`;
+    if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1).replace('.', ',')} Mo`;
+    if (value >= 1024) return `${(value / 1024).toFixed(0)} ko`;
+    return `${value} o`;
+}
+
+function normalizePmtilesManifest(rawManifest) {
+    const raw = rawManifest && typeof rawManifest === 'object' ? rawManifest : {};
+    const partList = raw.parts || raw.blocks || raw.files || raw.chunks || [];
+    const originalFileName = raw.fileName || raw.filename || raw.originalFileName || raw.pmtilesFile || raw.pmtiles || raw.name || 'NPF-France-Sud-z14.pmtiles';
+    const totalSize = Number(raw.totalSize || raw.total_size || raw.size || raw.bytes || raw.totalBytes || 0);
+    const totalSha256 = String(raw.sha256 || raw.totalSha256 || raw.total_sha256 || raw.sha256_total || '').trim().toLowerCase();
+    const mapVersion = String(raw.version || raw.mapVersion || raw.date || totalSha256 || originalFileName).trim();
+    const parts = partList.map((part, index) => {
+        const number = Number(part.number || part.index || part.part || part.block || index + 1);
+        const filename = String(part.fileName || part.filename || part.name || part.path || `NPF-France-Sud-z14.pmtiles.part${String(number).padStart(3, '0')}`);
+        return {
+            id: `${PMTILES_FRANCE_SUD_MAP_NAME}:${number}`,
+            mapName: PMTILES_FRANCE_SUD_MAP_NAME,
+            number,
+            filename,
+            size: Number(part.size || part.bytes || part.length || 0),
+            sha256: String(part.sha256 || part.hash || '').trim().toLowerCase(),
+            offset: 0,
+            validated: false
+        };
+    }).sort((a, b) => a.number - b.number);
+    if (!parts.length) throw new Error('Manifest PMTiles invalide : aucun bloc listé.');
+    let offset = 0;
+    for (const part of parts) {
+        if (!part.filename) throw new Error(`Manifest PMTiles invalide : nom de bloc absent pour le bloc ${part.number}.`);
+        if (!Number.isFinite(part.size) || part.size <= 0) throw new Error(`Manifest PMTiles invalide : taille absente pour ${part.filename}.`);
+        if (!part.sha256 || !/^[a-f0-9]{64}$/i.test(part.sha256)) throw new Error(`Manifest PMTiles invalide : SHA-256 absent ou incorrect pour ${part.filename}.`);
+        part.offset = offset;
+        offset += part.size;
+    }
+    const normalizedTotalSize = totalSize > 0 ? totalSize : offset;
+    if (Math.abs(normalizedTotalSize - offset) > 1024 * 1024) {
+        throw new Error('Manifest PMTiles invalide : la somme des blocs ne correspond pas à la taille totale.');
+    }
+    return {
+        mapName: PMTILES_FRANCE_SUD_MAP_NAME,
+        label: PMTILES_FRANCE_SUD_LABEL,
+        originalFileName,
+        totalSize: normalizedTotalSize,
+        totalSha256,
+        partCount: parts.length,
+        version: mapVersion,
+        maxZoom: PMTILES_FRANCE_SUD_MAX_ZOOM,
+        parts,
+        downloadedAt: null,
+        validated: false
+    };
+}
+
+function normalizePmtilesSelectedFiles(files) {
+    const list = Array.from(files || []).filter(Boolean);
+    const byName = new Map();
+    for (const file of list) {
+        byName.set(String(file.name || '').trim(), file);
+    }
+    return { list, byName };
+}
+
+async function loadFranceSudManifestFromFiles(files) {
+    const { list, byName } = normalizePmtilesSelectedFiles(files);
+    if (!list.length) {
+        throw new Error('Aucun fichier sélectionné. Sélectionne manifest.json et les 7 blocs .part001 à .part007.');
+    }
+    const manifestFile = byName.get(PMTILES_FRANCE_SUD_MANIFEST_FILE) || list.find(file => String(file.name || '').toLowerCase() === PMTILES_FRANCE_SUD_MANIFEST_FILE);
+    if (!manifestFile) {
+        throw new Error('manifest.json absent. Sélectionne manifest.json avec les 7 blocs PMTiles.');
+    }
+    let rawManifest;
+    try {
+        rawManifest = JSON.parse(await manifestFile.text());
+    } catch (error) {
+        throw new Error(`manifest.json illisible ou invalide : ${error.message || error}`);
+    }
+    const manifest = normalizePmtilesManifest(rawManifest);
+    const missing = manifest.parts.filter(part => !byName.has(part.filename)).map(part => part.filename);
+    return { manifest, byName, missing, selectedCount: list.length };
+}
+
+function getFranceSudPartFile(byName, part) {
+    const exact = byName.get(part.filename);
+    if (exact) return exact;
+    const expectedSuffix = String(part.number).padStart(3, '0');
+    for (const [name, file] of byName.entries()) {
+        if (name.endsWith(`part${expectedSuffix}`) || name.endsWith(`.part${expectedSuffix}`)) return file;
+    }
+    return null;
+}
+
+async function isFranceSudPmtilesInstalled() {
+    if (!window.NPFPMTilesLocal) return { ok: false, message: 'Module IndexedDB PMTiles absent.' };
+    try {
+        const metadata = await window.NPFPMTilesLocal.getMetadata(PMTILES_FRANCE_SUD_MAP_NAME);
+        if (!metadata || !metadata.manifest) return { ok: false, message: 'Carte France Sud non installée.' };
+        const manifest = metadata.manifest;
+        const parts = Array.isArray(manifest.parts) ? manifest.parts : [];
+        if (!metadata.installed || !parts.length) return { ok: false, message: 'Import France Sud incomplet.' };
+        for (const part of parts) {
+            const stored = await window.NPFPMTilesLocal.getPart(PMTILES_FRANCE_SUD_MAP_NAME, part.number);
+            if (!stored || stored.validated !== true || Number(stored.size) !== Number(part.size) || String(stored.sha256 || '').toLowerCase() !== String(part.sha256 || '').toLowerCase()) {
+                return { ok: false, message: `Bloc ${part.number}/${parts.length} manquant ou invalide.` };
+            }
+        }
+        return { ok: true, manifest, message: 'Carte France Sud installée.' };
+    } catch (error) {
+        return { ok: false, message: error.message || String(error) };
+    }
+}
+
+async function refreshFranceSudPmtilesUi() {
+    const el = getFranceSudPmtilesElements();
+    if (!el.status) return;
+    const installed = await isFranceSudPmtilesInstalled();
+    const metadata = window.NPFPMTilesLocal ? await window.NPFPMTilesLocal.getMetadata(PMTILES_FRANCE_SUD_MAP_NAME).catch(() => null) : null;
+    const manifest = installed.manifest || (metadata && metadata.manifest) || null;
+    const validParts = metadata && Number.isFinite(metadata.validParts) ? metadata.validParts : 0;
+    const totalParts = manifest && Array.isArray(manifest.parts) ? manifest.parts.length : 7;
+    const downloadedBytes = metadata && Number.isFinite(metadata.downloadedBytes) ? metadata.downloadedBytes : 0;
+    const totalBytes = manifest && Number.isFinite(manifest.totalSize) ? manifest.totalSize : 1198500000;
+    if (installed.ok) {
+        el.status.textContent = `Carte France Sud installée — ${formatBytesFr(totalBytes)}`;
+    } else if (validParts > 0) {
+        el.status.textContent = `Import interrompu : ${validParts}/${totalParts} blocs validés — ${formatBytesFr(downloadedBytes)} / ${formatBytesFr(totalBytes)}`;
+    } else {
+        el.status.textContent = 'Carte France Sud non installée';
+    }
+    if (el.downloadBtn) el.downloadBtn.style.display = installed.ok ? 'none' : validParts > 0 ? 'none' : 'inline-flex';
+    if (el.resumeBtn) el.resumeBtn.style.display = installed.ok ? 'none' : validParts > 0 ? 'inline-flex' : 'none';
+    if (el.activateBtn) el.activateBtn.style.display = installed.ok ? 'inline-flex' : 'none';
+    if (el.deleteBtn) el.deleteBtn.style.display = (installed.ok || validParts > 0) ? 'inline-flex' : 'none';
+    if (el.progressPanel && !pmtilesFranceSudDownloadController) el.progressPanel.style.display = 'none';
+}
+
+function setFranceSudProgress({ text = '', percent = 0, details = '', downloading = true } = {}) {
+    const el = getFranceSudPmtilesElements();
+    if (el.progressPanel) el.progressPanel.style.display = downloading ? 'block' : 'none';
+    if (el.progressText) el.progressText.textContent = text;
+    if (el.progressBar) el.progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    if (el.progressDetails) el.progressDetails.textContent = details;
+    if (el.downloadBtn) el.downloadBtn.disabled = downloading;
+    if (el.resumeBtn) el.resumeBtn.disabled = downloading;
+    if (el.activateBtn) el.activateBtn.disabled = downloading;
+    if (el.deleteBtn) el.deleteBtn.disabled = downloading;
+}
+
+async function ensureEnoughStorageForPmtiles(manifest) {
+    if (!navigator.storage || typeof navigator.storage.estimate !== 'function') return;
+    const estimate = await navigator.storage.estimate();
+    const quota = Number(estimate.quota || 0);
+    const usage = Number(estimate.usage || 0);
+    const free = quota > usage ? quota - usage : 0;
+    const already = window.NPFPMTilesLocal ? await window.NPFPMTilesLocal.getDownloadedBytes(PMTILES_FRANCE_SUD_MAP_NAME).catch(() => 0) : 0;
+    const required = Math.max(0, Number(manifest.totalSize || 0) - Number(already || 0));
+    const safety = 180 * 1024 * 1024;
+    if (quota && free < required + safety) {
+        throw new Error(`Espace local insuffisant. Disponible estimé : ${formatBytesFr(free)}. Requis : ${formatBytesFr(required + safety)}.`);
+    }
+    if (navigator.storage && typeof navigator.storage.persist === 'function') {
+        try { await navigator.storage.persist(); } catch (_) {}
+    }
+}
+
+async function readLocalFileArrayBuffer(file, { signal, onProgress } = {}) {
+    if (signal && signal.aborted) throw new DOMException('Import annulé', 'AbortError');
+    const buffer = await file.arrayBuffer();
+    if (signal && signal.aborted) throw new DOMException('Import annulé', 'AbortError');
+    if (onProgress) onProgress(buffer.byteLength, file.size || buffer.byteLength);
+    return buffer;
+}
+
+function calculatePmtilesImportProgress(manifest, validParts, currentPartBytes = 0, currentPart = null) {
+    let baseBytes = 0;
+    for (const part of manifest.parts || []) {
+        if (Number(part.number) < Number(currentPart && currentPart.number || 0)) {
+            baseBytes += Number(part.size || 0);
+        }
+    }
+    return Math.min(Number(manifest.totalSize || 0), baseBytes + Number(currentPartBytes || 0));
+}
+
+async function importFranceSudPmtilesFiles(files, { resume = true } = {}) {
+    if (!window.NPFPMTilesLocal) {
+        alert('Module PMTiles IndexedDB absent.');
+        return;
+    }
+    if (pmtilesFranceSudDownloadController) return;
+    const controller = new AbortController();
+    pmtilesFranceSudDownloadController = controller;
+    const signal = controller.signal;
+    try {
+        setFranceSudProgress({ text: 'Lecture du manifeste local...', percent: 0, details: '', downloading: true });
+        const { manifest, byName, missing, selectedCount } = await loadFranceSudManifestFromFiles(files);
+        if (selectedCount < PMTILES_FRANCE_SUD_EXPECTED_FILE_COUNT) {
+            console.warn(`[PMTiles] ${selectedCount} fichier(s) sélectionné(s), ${PMTILES_FRANCE_SUD_EXPECTED_FILE_COUNT} attendus.`);
+        }
+        await ensureEnoughStorageForPmtiles(manifest);
+
+        let validParts = 0;
+        let downloadedBytes = 0;
+        for (const part of manifest.parts) {
+            const existing = await window.NPFPMTilesLocal.getPart(PMTILES_FRANCE_SUD_MAP_NAME, part.number);
+            const isExistingValid = resume && existing && existing.validated === true && Number(existing.size) === Number(part.size) && String(existing.sha256 || '').toLowerCase() === part.sha256;
+            if (isExistingValid) {
+                validParts += 1;
+                downloadedBytes += Number(part.size || 0);
+            }
+        }
+
+        await window.NPFPMTilesLocal.putMetadata(PMTILES_FRANCE_SUD_MAP_NAME, {
+            mapName: PMTILES_FRANCE_SUD_MAP_NAME,
+            manifest,
+            installed: false,
+            validParts,
+            downloadedBytes,
+            updatedAt: Date.now(),
+            importMode: 'local-files'
+        });
+
+        for (const part of manifest.parts) {
+            if (signal.aborted) throw new DOMException('Import annulé', 'AbortError');
+            const existing = await window.NPFPMTilesLocal.getPart(PMTILES_FRANCE_SUD_MAP_NAME, part.number);
+            const isExistingValid = resume && existing && existing.validated === true && Number(existing.size) === Number(part.size) && String(existing.sha256 || '').toLowerCase() === part.sha256;
+            if (isExistingValid) continue;
+
+            const file = getFranceSudPartFile(byName, part);
+            if (!file) {
+                const missingMessage = missing.length ? `Fichier local absent : ${part.filename}.` : `Bloc ${part.number} introuvable.`;
+                throw new Error(`${missingMessage} Sélectionne manifest.json et les 7 blocs .part001 à .part007 pour reprendre l'import.`);
+            }
+
+            const partLabel = `Import du bloc ${part.number}/${manifest.partCount}`;
+            setFranceSudProgress({
+                text: partLabel,
+                percent: Math.floor((downloadedBytes / manifest.totalSize) * 100),
+                details: `${formatBytesFr(downloadedBytes)} / ${formatBytesFr(manifest.totalSize)} — ${validParts}/${manifest.partCount} blocs validés`,
+                downloading: true
+            });
+
+            const buffer = await readLocalFileArrayBuffer(file, {
+                signal,
+                onProgress: (received) => {
+                    const totalNow = downloadedBytes + received;
+                    setFranceSudProgress({
+                        text: partLabel,
+                        percent: Math.floor((totalNow / manifest.totalSize) * 100),
+                        details: `Progression totale : ${Math.floor((totalNow / manifest.totalSize) * 100)} % — ${formatBytesFr(totalNow)} / ${formatBytesFr(manifest.totalSize)} — ${validParts}/${manifest.partCount} blocs validés`,
+                        downloading: true
+                    });
+                }
+            });
+
+            if (buffer.byteLength !== part.size) {
+                throw new Error(`Bloc ${part.number} incomplet : ${formatBytesFr(buffer.byteLength)} lu au lieu de ${formatBytesFr(part.size)}.`);
+            }
+            const sha256 = await window.NPFPMTilesLocal.sha256Hex(buffer);
+            if (sha256 !== part.sha256) {
+                throw new Error(`Bloc ${part.number} invalide : SHA-256 différent.`);
+            }
+            await window.NPFPMTilesLocal.putPart(PMTILES_FRANCE_SUD_MAP_NAME, {
+                ...part,
+                size: buffer.byteLength,
+                sha256,
+                validated: true,
+                validatedAt: Date.now(),
+                data: new Blob([buffer], { type: 'application/octet-stream' })
+            });
+            downloadedBytes = await window.NPFPMTilesLocal.getDownloadedBytes(PMTILES_FRANCE_SUD_MAP_NAME);
+            validParts += 1;
+            await window.NPFPMTilesLocal.putMetadata(PMTILES_FRANCE_SUD_MAP_NAME, {
+                mapName: PMTILES_FRANCE_SUD_MAP_NAME,
+                manifest,
+                installed: false,
+                validParts,
+                downloadedBytes,
+                updatedAt: Date.now(),
+                importMode: 'local-files'
+            });
+        }
+
+        await window.NPFPMTilesLocal.putMetadata(PMTILES_FRANCE_SUD_MAP_NAME, {
+            mapName: PMTILES_FRANCE_SUD_MAP_NAME,
+            manifest: { ...manifest, downloadedAt: Date.now(), validated: true },
+            installed: true,
+            validParts: manifest.partCount,
+            downloadedBytes: manifest.totalSize,
+            updatedAt: Date.now(),
+            importMode: 'local-files'
+        });
+        setFranceSudProgress({ text: 'Carte France Sud installée', percent: 100, details: `${manifest.partCount}/${manifest.partCount} blocs validés — ${formatBytesFr(manifest.totalSize)}`, downloading: false });
+        alert('Carte France Sud installée. Elle peut maintenant être activée.');
+    } catch (error) {
+        const aborted = error && error.name === 'AbortError';
+        setFranceSudProgress({
+            text: aborted ? 'Import annulé.' : 'Erreur import carte France Sud.',
+            percent: 0,
+            details: aborted ? 'Les blocs déjà validés sont conservés. Utilise Reprendre l’import et sélectionne de nouveau les 8 fichiers.' : `${error.message || error}. Les blocs déjà validés sont conservés.`,
+            downloading: false
+        });
+        if (!aborted) alert(`Erreur carte France Sud : ${error.message || error}`);
+    } finally {
+        pmtilesFranceSudDownloadController = null;
+        await refreshFranceSudPmtilesUi();
+    }
+}
+
+function downloadFranceSudPmtiles() {
+    const el = getFranceSudPmtilesElements();
+    if (el.fileInput) el.fileInput.click();
+}
+
+function cancelFranceSudPmtilesDownload() {
+    if (pmtilesFranceSudDownloadController) {
+        try { pmtilesFranceSudDownloadController.abort(); } catch (_) {}
+    }
+}
+
+async function deleteFranceSudPmtiles() {
+    if (!window.NPFPMTilesLocal) return;
+    const metadata = await window.NPFPMTilesLocal.getMetadata(PMTILES_FRANCE_SUD_MAP_NAME).catch(() => null);
+    const bytes = metadata && Number.isFinite(metadata.downloadedBytes) ? metadata.downloadedBytes : await window.NPFPMTilesLocal.getDownloadedBytes(PMTILES_FRANCE_SUD_MAP_NAME).catch(() => 0);
+    if (!confirm(`Supprimer la carte vectorielle France Sud ?\n\nEspace libéré estimé : ${formatBytesFr(bytes)}.\n\nLes cartes raster ZIP et les autres données NPF-Q400 ne seront pas touchées.`)) return;
+    if (mapSourceMode === MAP_SOURCE_VECTOR_FRANCE_SUD) {
+        mapSourceMode = 'online';
+        localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
+        await setOfflineTilesEnabled(false).catch(() => {});
+        if (map) setupBaseTileLayer();
+    }
+    await window.NPFPMTilesLocal.deleteMap(PMTILES_FRANCE_SUD_MAP_NAME);
+    alert(`Carte France Sud supprimée. Espace libéré estimé : ${formatBytesFr(bytes)}.`);
+    updateMapSourceButtons();
+    updateOfflineStatus();
+    await refreshFranceSudPmtilesUi();
+}
+
+window.refreshFranceSudPmtilesUi = refreshFranceSudPmtilesUi;
+window.downloadFranceSudPmtiles = downloadFranceSudPmtiles;
+window.importFranceSudPmtilesFiles = importFranceSudPmtilesFiles;
+window.deleteFranceSudPmtiles = deleteFranceSudPmtiles;
+
 function updateMapSourceButtons() {
     const onlineBtn = document.getElementById('map-source-online-btn');
     const offlineBtn = document.getElementById('map-source-offline-btn');
+    const vectorBtn = document.getElementById('map-source-vector-btn');
     if (!onlineBtn || !offlineBtn) return;
-    onlineBtn.classList.toggle('active', mapSourceMode !== 'offline');
-    offlineBtn.classList.toggle('active', mapSourceMode === 'offline');
+    const isRaster = mapSourceMode === 'offline';
+    const isVector = mapSourceMode === MAP_SOURCE_VECTOR_FRANCE_SUD;
+    onlineBtn.classList.toggle('active', !isRaster && !isVector);
+    offlineBtn.classList.toggle('active', isRaster);
+    if (vectorBtn) vectorBtn.classList.toggle('active', isVector);
     onlineBtn.disabled = isMapSourceSwitching;
     offlineBtn.disabled = isMapSourceSwitching;
-    onlineBtn.setAttribute('aria-pressed', String(mapSourceMode !== 'offline'));
-    offlineBtn.setAttribute('aria-pressed', String(mapSourceMode === 'offline'));
+    if (vectorBtn) vectorBtn.disabled = isMapSourceSwitching;
+    onlineBtn.setAttribute('aria-pressed', String(!isRaster && !isVector));
+    offlineBtn.setAttribute('aria-pressed', String(isRaster));
+    if (vectorBtn) vectorBtn.setAttribute('aria-pressed', String(isVector));
 }
 
 async function setMapSourceMode(mode) {
     if (isMapSourceSwitching) return;
     const previousMode = mapSourceMode;
-    const nextMode = mode === 'offline' ? 'offline' : 'online';
+    const nextMode = mode === 'offline'
+        ? 'offline'
+        : mode === MAP_SOURCE_VECTOR_FRANCE_SUD
+            ? MAP_SOURCE_VECTOR_FRANCE_SUD
+            : 'online';
+    if (nextMode === MAP_SOURCE_VECTOR_FRANCE_SUD) {
+        const installed = await isFranceSudPmtilesInstalled();
+        if (!installed.ok) {
+            throw new Error(installed.message || 'Carte France Sud non entièrement installée.');
+        }
+    }
     if (previousMode === nextMode) {
         updateMapSourceButtons();
         updateOfflineStatus();
@@ -7358,34 +7832,41 @@ async function setMapSourceMode(mode) {
         await setOfflineTilesEnabled(mapSourceMode === 'offline');
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
-        try {
-            await withTimeout(
-                updateBaseTileNativeZoomFromAvailability({ forceScan: true }),
-                5000,
-                'Analyse des tuiles trop longue.'
-            );
-        } catch (zoomError) {
-            console.warn('Analyse zoom offline interrompue:', zoomError);
+        if (mapSourceMode === 'offline') {
+            try {
+                await withTimeout(
+                    updateBaseTileNativeZoomFromAvailability({ forceScan: true }),
+                    5000,
+                    'Analyse des tuiles trop longue.'
+                );
+            } catch (zoomError) {
+                console.warn('Analyse zoom offline interrompue:', zoomError);
+            }
+        } else {
+            baseTileMinNativeZoom = GLOBAL_MIN_ZOOM;
+            baseTileMaxNativeZoom = mapSourceMode === MAP_SOURCE_VECTOR_FRANCE_SUD ? PMTILES_FRANCE_SUD_MAX_ZOOM : ONLINE_MAX_NATIVE_ZOOM;
         }
-        if (map && baseTileLayer) setupBaseTileLayer();
+        if (map) setupBaseTileLayer();
     } catch (error) {
         mapSourceMode = previousMode;
         localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
         try {
             await setOfflineTilesEnabled(mapSourceMode === 'offline');
         } catch (_) {}
+        if (map) setupBaseTileLayer();
         throw error;
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
         updateOfflineStatus();
+        refreshFranceSudPmtilesUi();
     }
 }
 
 function updateOfflineStatus() {
     const status = document.getElementById('offline-status');
     if (!status) return;
-    status.textContent = mapSourceMode === 'offline' ? 'Mode OFFLINE' : 'Mode ONLINE';
+    status.textContent = mapSourceMode === MAP_SOURCE_VECTOR_FRANCE_SUD ? 'Mode OFFLINE VECTORIEL FRANCE SUD' : mapSourceMode === 'offline' ? 'Mode OFFLINE RASTER' : 'Mode ONLINE';
 }
 
 async function initializeOfflineTilePreference() {
