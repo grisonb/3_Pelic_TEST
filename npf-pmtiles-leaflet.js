@@ -1,5 +1,5 @@
 /*
- * NPF-Q400 v13.48 TEST — rendu Leaflet local des PMTiles France Sud avec repli sur zoom natif.
+ * NPF-Q400 v13.49 TEST — rendu Leaflet local des PMTiles France Sud avec repli jusqu’au zoom natif z14.
  * Aucun CDN. Lecture PMTiles depuis IndexedDB via NPFPMTilesLocal + rendu Canvas MVT simplifié.
  */
 (function () {
@@ -586,12 +586,20 @@
         const header = await archive.getHeader();
         const tileSize = canvas.width;
         const ctx = canvas.getContext('2d');
-        const maxFallbackZoom = Math.min(Number(header.maxZoom || coords.z), coords.z + 3);
+
+        // v13.49 : le fichier France Sud généré peut ne contenir réellement que le
+        // zoom natif 14. En v13.48, le repli était limité à +3 niveaux : une tuile
+        // Leaflet z10 ne descendait donc qu'à z13 et restait vide. On autorise
+        // désormais le repli jusqu'au maxZoom du PMTiles, avec un plafond contrôlé
+        // de 256 sous-tuiles. Cas visé : z10/527/374 -> z14.
+        const nativeMaxZoom = Number.isFinite(Number(header.maxZoom)) ? Number(header.maxZoom) : coords.z;
+        const maxFallbackZoom = Math.max(coords.z, nativeMaxZoom);
+        const maxChildTiles = 256;
 
         for (let targetZ = coords.z + 1; targetZ <= maxFallbackZoom; targetZ++) {
             const factor = 1 << (targetZ - coords.z);
             const childTotal = factor * factor;
-            if (childTotal > 64) continue;
+            if (childTotal > maxChildTiles) break;
 
             let drawn = false;
             ctx.clearRect(0, 0, tileSize, tileSize);
@@ -702,7 +710,7 @@
                     const ok = await renderTileWithNativeZoomFallback(this._archive, canvas, coords);
                     if (!ok) {
                         const header = await this._archive.getHeader();
-                        renderMessage(canvas, `PMTiles: tuile absente\nz${coords.z}/${coords.x}/${coords.y}\nzoome vers ${header.minZoom || '?'}-${header.maxZoom || '?'}`, false);
+                        renderMessage(canvas, `PMTiles: tuile absente\nz${coords.z}/${coords.x}/${coords.y}\nzoom natif max ${header.maxZoom || '?'}`, false);
                     }
                 } else {
                     const layers = parseVectorTile(data);
