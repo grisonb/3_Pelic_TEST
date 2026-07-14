@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.49">
-    <link rel="manifest" href="manifest.json?appv=v13.49">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.49">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.49">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.49">
+    <link rel="stylesheet" href="style.css?appv=v13.50">
+    <link rel="manifest" href="manifest.json?appv=v13.50">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.50">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.50">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.50">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.49';
+        const APP_VERSION = 'v13.50';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -418,9 +418,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="npf-pmtiles-idb.js?appv=v13.49"></script>
-    <script src="npf-pmtiles-leaflet.js?appv=v13.49"></script>
-    <script src="script.js?appv=v13.49"></script>
+    <script src="script.js?appv=v13.50"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -666,38 +664,9 @@
                         <span>Type de carte :</span>
                         <div class="map-source-buttons">
                             <button type="button" id="map-source-online-btn" class="map-source-btn map-source-btn-online active">Online</button>
-                            <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">Offline raster</button>
-                            <button type="button" id="map-source-vector-btn" class="map-source-btn map-source-btn-vector">Offline vectorielle France Sud</button>
+                            <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">Offline</button>
                         </div>
                     </div>
-
-                    <section id="pmtiles-france-sud-section" class="pmtiles-map-section">
-                        <h3>Carte vectorielle France Sud</h3>
-                        <p class="pmtiles-map-description">
-                            Moitié sud de la France + Corse<br>
-                            Zoom maximum : 14<br>
-                            Taille : environ 1,20 Go<br>Import local depuis l’app Fichiers
-                        </p>
-                        <p id="pmtiles-france-sud-status" class="pmtiles-map-status">Carte France Sud non installée</p>
-                        <p class="pmtiles-map-import-hint">
-                            Sélectionne en une seule fois <strong>manifest.json</strong> et les 7 fichiers <strong>.part001 à .part007</strong>.
-                        </p>
-                        <div id="pmtiles-france-sud-actions" class="pmtiles-map-actions">
-                            <button type="button" id="pmtiles-france-sud-download-btn" class="import-button pmtiles-download-btn">Importer la carte locale</button>
-                            <input type="file" id="pmtiles-france-sud-file-input" accept=".json,.pmtiles,.part001,.part002,.part003,.part004,.part005,.part006,.part007,application/json,application/octet-stream" multiple style="display:none;">
-                            <button type="button" id="pmtiles-france-sud-resume-btn" class="neutral-inline-btn" style="display:none;">Reprendre l’import</button>
-                            <button type="button" id="pmtiles-france-sud-activate-btn" class="neutral-inline-btn" style="display:none;">Activer</button>
-                            <button type="button" id="pmtiles-france-sud-delete-btn" class="danger-inline-btn" style="display:none;">Supprimer</button>
-                        </div>
-                        <div id="pmtiles-france-sud-progress" class="pmtiles-progress-panel" style="display:none;">
-                            <p id="pmtiles-france-sud-progress-text">Import local en attente...</p>
-                            <div class="progress-bar-container pmtiles-progress-bar-container">
-                                <div id="pmtiles-france-sud-progress-bar" class="progress-bar"></div>
-                            </div>
-                            <p id="pmtiles-france-sud-progress-details" class="pmtiles-progress-details"></p>
-                            <button type="button" id="pmtiles-france-sud-cancel-btn" class="danger-inline-btn">Annuler</button>
-                        </div>
-                    </section>
                     <details class="offline-maintenance-section">
                         <summary>Maintenance / dépannage</summary>
                         <button type="button" id="refresh-offline-tiles-btn" class="neutral-inline-btn">Rafraîchir l'affichage des cartes</button>
