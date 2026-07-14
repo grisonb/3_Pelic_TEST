@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-45-pmtiles-import-local-test';
+const SW_VERSION = 'sw-v13-46-pmtiles-rendu-vectoriel-reel-test';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
