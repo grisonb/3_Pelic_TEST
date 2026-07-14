@@ -1,20 +1,41 @@
-NPF-Q400 — TEST v13.43
-Base : TEST v13.42
+NPF-Q400 — Version TEST v13.45
 
-Modification intégrée :
-- Recherche feu / commune : après validation d’un feu depuis la recherche, la barre de recherche est automatiquement vidée.
-- Le feu sélectionné reste actif sur la carte et dans le bandeau feu.
-- L’historique des feux n’est pas effacé.
-- Le bouton de nettoyage de recherche est masqué quand la barre est vidée.
+Base : v13.44 TEST, issue de v13.43 / v2026.55.
 
-Fichiers modifiés :
-- index.html : version v13.43 et cache-busting mis à jour.
-- manifest.json : start_url v13.43.
-- script.js : vidage automatique de la barre de recherche après validation d’un feu.
-- style.css : version livrée avec v13.43, sans modification fonctionnelle.
-- sw.js : version service worker v13.43.
+Objet : remplacement du téléchargement PMTiles par un import local manuel depuis l’iPad.
+
+Modifications principales :
+- Suppression de l’URL serveur centralisée PMTILES_FRANCE_SUD_BASE_URL.
+- Ajout d’un bouton “Importer la carte locale”.
+- Ajout d’un sélecteur de fichiers multiple pour sélectionner en une seule fois :
+  - manifest.json
+  - NPF-France-Sud-z14.pmtiles.part001 à part007
+- Le manifeste est lu localement depuis le fichier sélectionné.
+- Chaque bloc est lu depuis le fichier local correspondant, un par un.
+- Contrôle conservé :
+  - validité du manifest.json ;
+  - espace disponible via navigator.storage.estimate() ;
+  - demande de stockage persistant via navigator.storage.persist() ;
+  - taille de chaque bloc ;
+  - SHA-256 de chaque bloc via crypto.subtle.digest('SHA-256', ...) ;
+  - stockage séparé en IndexedDB NPF_PMTiles_DB ;
+  - reprise en conservant les blocs déjà validés.
+- Le bouton “Reprendre l’import” rouvre le sélecteur de fichiers : il faut resélectionner manifest.json + les 7 blocs, mais les blocs déjà validés ne sont pas réimportés.
+- Aucune dépendance à un serveur pour installer la carte.
+- Aucune URL CDN ajoutée.
+- Les blocs PMTiles restent en IndexedDB, jamais dans localStorage ni dans le Cache Storage du service worker.
+- La base raster OfflineTilesDB_v12_21 n’est pas modifiée.
+- La logique des packs ZIP raster existants reste inchangée.
+
+Service worker :
+- Passage du cache applicatif à sw-v13-45-pmtiles-import-local-test.
+- Les modules npf-pmtiles-idb.js et npf-pmtiles-leaflet.js restent dans le cache applicatif.
+- Aucun bloc PMTiles de 190 Mo n’est ajouté au cache applicatif.
 
 Contrôles effectués :
-- node --check script.js : OK.
-- node --check sw.js : OK.
-- manifest.json : JSON valide.
+- node --check script.js : OK
+- node --check sw.js : OK
+- node --check npf-pmtiles-idb.js : OK
+- node --check npf-pmtiles-leaflet.js : OK
+- manifest.json : JSON valide
+- Aucune URL CDN nécessaire au fonctionnement PMTiles local.
