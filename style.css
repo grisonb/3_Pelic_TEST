@@ -8021,7 +8021,7 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
-/* v13.48 — Volume/Masse retardant : ligne Réfracto. compacte pour dégager le clavier iPad.
+/* v13.49 — Volume/Masse retardant : ligne Réfracto. compacte pour dégager le clavier iPad.
    Objectif : gagner de la hauteur uniquement sur la ligne Réfracto. = Densité,
    sans réduire les deux lignes de calcul Masse/Volume ni les boutons. */
 .rlt-refracto-row {
@@ -8086,7 +8086,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 
-/* v13.48 TEST — Carte PMTiles France Sud */
+/* v13.49 TEST — Carte PMTiles France Sud */
 .pmtiles-map-section {
     margin: 14px 0;
     padding: 14px;
@@ -8169,7 +8169,7 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 
-/* v13.48 TEST — rendu Canvas PMTiles France Sud */
+/* v13.49 TEST — rendu Canvas PMTiles France Sud */
 .npf-pmtiles-vector-tile {
     background: #f7f3e9;
     image-rendering: auto;
