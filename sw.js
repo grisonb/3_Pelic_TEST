@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-50-retour-zip-raster';
+const SW_VERSION = 'sw-v13-51-cesium-3d-online';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -13,6 +13,7 @@ const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
 const APP_SHELL_URLS = [
     './',
     './index.html',
+    './vue-3d.html',
     './style.css',
     './script.js',
     './manifest.json',
@@ -37,6 +38,7 @@ const APP_SHELL_URLS = [
 const CORE_APP_SHELL_URLS = [
     './',
     './index.html',
+    './vue-3d.html',
     './style.css',
     './script.js',
     './manifest.json',
