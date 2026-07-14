@@ -1,5 +1,5 @@
 /*
- * NPF-Q400 v13.47 TEST — rendu Leaflet local des PMTiles France Sud.
+ * NPF-Q400 v13.48 TEST — rendu Leaflet local des PMTiles France Sud avec repli sur zoom natif.
  * Aucun CDN. Lecture PMTiles depuis IndexedDB via NPFPMTilesLocal + rendu Canvas MVT simplifié.
  */
 (function () {
@@ -582,6 +582,61 @@
         }
     }
 
+    async function renderTileWithNativeZoomFallback(archive, canvas, coords) {
+        const header = await archive.getHeader();
+        const tileSize = canvas.width;
+        const ctx = canvas.getContext('2d');
+        const maxFallbackZoom = Math.min(Number(header.maxZoom || coords.z), coords.z + 3);
+
+        for (let targetZ = coords.z + 1; targetZ <= maxFallbackZoom; targetZ++) {
+            const factor = 1 << (targetZ - coords.z);
+            const childTotal = factor * factor;
+            if (childTotal > 64) continue;
+
+            let drawn = false;
+            ctx.clearRect(0, 0, tileSize, tileSize);
+            ctx.fillStyle = '#f7f3e9';
+            ctx.fillRect(0, 0, tileSize, tileSize);
+
+            for (let cy = 0; cy < factor; cy++) {
+                for (let cx = 0; cx < factor; cx++) {
+                    const childX = coords.x * factor + cx;
+                    const childY = coords.y * factor + cy;
+                    let data = null;
+                    try {
+                        data = await archive.getTile(targetZ, childX, childY);
+                    } catch (error) {
+                        console.warn('[PMTiles France Sud] enfant indisponible:', { z: targetZ, x: childX, y: childY, error });
+                        continue;
+                    }
+                    if (!data) continue;
+                    const layers = parseVectorTile(data);
+                    if (!layers || !layers.length) continue;
+                    const childCanvas = document.createElement('canvas');
+                    childCanvas.width = tileSize;
+                    childCanvas.height = tileSize;
+                    renderTileToCanvas(layers, childCanvas, { z: targetZ, x: childX, y: childY });
+                    const dx = cx * tileSize / factor;
+                    const dy = cy * tileSize / factor;
+                    const dw = tileSize / factor;
+                    const dh = tileSize / factor;
+                    ctx.drawImage(childCanvas, dx, dy, dw, dh);
+                    drawn = true;
+                }
+            }
+
+            if (drawn) {
+                ctx.fillStyle = 'rgba(116,107,92,0.55)';
+                ctx.font = '9px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(`PMTiles z${targetZ} replié`, 6, tileSize - 6);
+                return true;
+            }
+        }
+        return false;
+    }
+
     function renderMessage(canvas, message, error) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -628,7 +683,8 @@
                 if (!metadata || !metadata.installed) throw new Error('Carte PMTiles France Sud non installée.');
                 const source = window.NPFPMTilesLocal.createVirtualSource(this._mapName);
                 this._archive = new LocalPMTilesArchive(source);
-                await this._archive.getHeader();
+                const header = await this._archive.getHeader();
+                console.info('[PMTiles France Sud] header:', header);
                 this._ready = true;
                 return metadata;
             })();
@@ -643,7 +699,11 @@
             this._ensureReady().then(async () => {
                 const data = await this._archive.getTile(coords.z, coords.x, coords.y);
                 if (!data) {
-                    renderMessage(canvas, '', false);
+                    const ok = await renderTileWithNativeZoomFallback(this._archive, canvas, coords);
+                    if (!ok) {
+                        const header = await this._archive.getHeader();
+                        renderMessage(canvas, `PMTiles: tuile absente\nz${coords.z}/${coords.x}/${coords.y}\nzoome vers ${header.minZoom || '?'}-${header.maxZoom || '?'}`, false);
+                    }
                 } else {
                     const layers = parseVectorTile(data);
                     renderTileToCanvas(layers, canvas, coords);
