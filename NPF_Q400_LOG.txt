@@ -1,15 +1,20 @@
-NPF-Q400 — MODIFICATIONS v13.42 TEST
+NPF-Q400 — TEST v13.43
+Base : TEST v13.42
 
-Base : v13.41 TEST
+Modification intégrée :
+- Recherche feu / commune : après validation d’un feu depuis la recherche, la barre de recherche est automatiquement vidée.
+- Le feu sélectionné reste actif sur la carte et dans le bandeau feu.
+- L’historique des feux n’est pas effacé.
+- Le bouton de nettoyage de recherche est masqué quand la barre est vidée.
 
-Correction intégrée :
-- fenêtre Volume/Masse retardant : ligne Réfracto. = Densité rendue beaucoup plus compacte ;
-- libellés Réfracto. et Densité placés sur la même hauteur que les champs ;
-- hauteur des champs de cette ligne réduite uniquement sur la ligne Réfracto. ;
-- marge basse de cette ligne réduite pour éviter que le clavier iPad masque les boutons ;
-- les lignes Masse ÷ Densité = Volume et Volume × Densité = Masse restent inchangées.
+Fichiers modifiés :
+- index.html : version v13.43 et cache-busting mis à jour.
+- manifest.json : start_url v13.43.
+- script.js : vidage automatique de la barre de recherche après validation d’un feu.
+- style.css : version livrée avec v13.43, sans modification fonctionnelle.
+- sw.js : version service worker v13.43.
 
 Contrôles effectués :
-- syntaxe script.js OK ;
-- syntaxe sw.js OK ;
-- manifest.json OK.
+- node --check script.js : OK.
+- node --check sw.js : OK.
+- manifest.json : JSON valide.
