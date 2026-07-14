@@ -1,28 +1,26 @@
-NPF-Q400 — TEST v13.47
-Base : TEST v13.46 PMTiles France Sud
+NPF-Q400 — TEST v13.48
+Base : TEST v13.47
 
-Objectif : corriger les carreaux PMTiles vides observés après le remplacement du carreau diagnostic.
+Objet : correction carte vectorielle France Sud PMTiles sans fond de carte.
 
 Modifications :
-- npf-pmtiles-leaflet.js : ajout d’un rendu vectoriel de secours plus générique.
-- Les géométries MVT ne dépendent plus uniquement des noms de couches attendus.
-- Ajout d’un style générique discret pour les surfaces, lignes et libellés lorsque les couches de la carte générée portent des noms différents.
-- Les couches inutiles restent filtrées autant que possible : commerces, restaurants, POI touristiques, adresses, bâtiments.
-- Ajout d’un diagnostic discret si une tuile MVT est lue mais qu’aucun objet n’est dessinable par le style.
-- Conservation de l’import local PMTiles en IndexedDB.
-- Conservation du fonctionnement des cartes raster ZIP existantes.
-- Version applicative passée à v13.47.
-- Service worker passé à sw-v13-47-pmtiles-rendu-vectoriel-generique-test.
+- Conservation du système d'import local PMTiles par manifest.json + 7 blocs.
+- Correction du rendu lorsque la tuile demandée au zoom courant n'existe pas dans le fichier PMTiles.
+- Ajout d'un repli automatique vers les tuiles natives disponibles à un zoom supérieur, jusqu'à 3 niveaux au-dessus, avec mosaïque locale Canvas.
+- Cas visé : carte générée surtout ou uniquement au zoom 14, alors que Leaflet demande par exemple z11/1054/748.
+- Si aucune tuile native exploitable n'est trouvée, affichage d'un message de diagnostic clair au lieu d'un carré vide silencieux.
+- Ajout d'un log console du header PMTiles pour contrôler minZoom/maxZoom/tileType/compressions en TEST.
+- Aucun CDN ajouté.
+- Les blocs PMTiles restent en IndexedDB et ne sont pas ajoutés au Cache Storage du service worker.
+- Le système raster ZIP existant reste séparé et inchangé.
 
-Fichiers JS PMTiles :
-- npf-pmtiles-idb.js inchangé fonctionnellement, versionné v13.47.
-- npf-pmtiles-leaflet.js modifié pour le rendu générique.
+Fichiers PMTiles JS modifiés :
+- npf-pmtiles-idb.js : entête versionné v13.48.
+- npf-pmtiles-leaflet.js : ajout du repli zoom natif et diagnostics.
 
 Contrôles effectués :
 - node --check script.js : OK
 - node --check sw.js : OK
 - node --check npf-pmtiles-idb.js : OK
 - node --check npf-pmtiles-leaflet.js : OK
-- manifest.json valide : OK
-- Aucun CDN ajouté pour PMTiles.
-- Les blocs PMTiles restent stockés en IndexedDB et non dans le service worker.
+- manifest.json : JSON valide
