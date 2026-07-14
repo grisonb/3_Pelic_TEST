@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-48-pmtiles-repli-zoom-natif-test';
+const SW_VERSION = 'sw-v13-49-pmtiles-repli-zoom-natif-test';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
