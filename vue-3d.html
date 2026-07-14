@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>NPF-Q400 — Vue 3D terrain</title>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        html, body, #cesiumContainer {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #07111f;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        .npf-3d-toolbar {
+            position: absolute;
+            top: calc(env(safe-area-inset-top, 0px) + 10px);
+            left: calc(env(safe-area-inset-left, 0px) + 10px);
+            right: calc(env(safe-area-inset-right, 0px) + 10px);
+            z-index: 20;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            pointer-events: none;
+        }
+        .npf-3d-toolbar button,
+        .npf-3d-toolbar input {
+            pointer-events: auto;
+            border: 1px solid rgba(255,255,255,0.35);
+            border-radius: 10px;
+            background: rgba(8,24,42,0.88);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            min-height: 38px;
+        }
+        .npf-3d-toolbar button {
+            padding: 7px 10px;
+            font-size: 14px;
+            font-weight: 750;
+            cursor: pointer;
+        }
+        .npf-3d-toolbar input {
+            width: min(460px, calc(100vw - 24px));
+            padding: 7px 10px;
+            font-size: 13px;
+        }
+        .npf-3d-status {
+            position: absolute;
+            left: calc(env(safe-area-inset-left, 0px) + 10px);
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+            z-index: 20;
+            max-width: min(720px, calc(100vw - 20px));
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(8,24,42,0.88);
+            color: #fff;
+            font-size: 13px;
+            line-height: 1.35;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+        }
+        .npf-3d-status strong { color: #ffd166; }
+        .npf-3d-hidden { display: none !important; }
+        .cesium-viewer-bottom { display: none; }
+        @media (max-width: 720px) {
+            .npf-3d-toolbar {
+                gap: 6px;
+            }
+            .npf-3d-toolbar button {
+                min-height: 34px;
+                padding: 6px 8px;
+                font-size: 12px;
+            }
+            .npf-3d-toolbar input {
+                flex: 1 1 100%;
+                font-size: 12px;
+                min-height: 34px;
+            }
+            .npf-3d-status {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="cesiumContainer"></div>
+    <div class="npf-3d-toolbar">
+        <button id="backBtn" type="button">← Carte 2D</button>
+        <button id="targetBtn" type="button">🎯 Cible</button>
+        <button id="topBtn" type="button">Vue dessus</button>
+        <button id="obliqueBtn" type="button">Vue oblique</button>
+        <input id="tokenInput" type="password" autocomplete="off" placeholder="Token Cesium ion facultatif pour test, recommandé pour usage normal">
+        <button id="saveTokenBtn" type="button">Enregistrer token</button>
+    </div>
+    <div id="statusBox" class="npf-3d-status">Chargement de la vue 3D...</div>
+
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.127/Build/Cesium/Cesium.js"></script>
+    <script>
+        const CESIUM_TOKEN_STORAGE_KEY = 'npfCesiumIonTokenV1';
+        const params = new URLSearchParams(window.location.search);
+        const statusBox = document.getElementById('statusBox');
+        const tokenInput = document.getElementById('tokenInput');
+
+        function readNumberParam(name, fallback) {
+            const value = Number(params.get(name));
+            return Number.isFinite(value) ? value : fallback;
+        }
+
+        const target = {
+            lat: readNumberParam('lat', 43.2965),
+            lon: readNumberParam('lon', 5.3698),
+            name: params.get('name') || 'Vue 3D NPF-Q400',
+            source: params.get('source') || 'map'
+        };
+
+        const fire = {
+            lat: readNumberParam('fireLat', NaN),
+            lon: readNumberParam('fireLon', NaN),
+            name: params.get('fireName') || target.name || 'Feu sélectionné'
+        };
+
+        const gps = {
+            lat: readNumberParam('gpsLat', NaN),
+            lon: readNumberParam('gpsLon', NaN)
+        };
+
+        const savedToken = localStorage.getItem(CESIUM_TOKEN_STORAGE_KEY) || '';
+        tokenInput.value = savedToken;
+        if (savedToken && window.Cesium && Cesium.Ion) {
+            Cesium.Ion.defaultAccessToken = savedToken;
+        }
+
+        function setStatus(html, isWarning = false) {
+            statusBox.innerHTML = html;
+            statusBox.style.background = isWarning ? 'rgba(92,61,0,0.92)' : 'rgba(8,24,42,0.88)';
+        }
+
+        function isFinitePoint(point) {
+            return point && Number.isFinite(point.lat) && Number.isFinite(point.lon);
+        }
+
+        function targetCartesian(height = 0) {
+            return Cesium.Cartesian3.fromDegrees(target.lon, target.lat, height);
+        }
+
+        function flyOblique(viewer, duration = 1.3) {
+            const altitude = 7200;
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(target.lon, target.lat, altitude),
+                orientation: {
+                    heading: Cesium.Math.toRadians(18),
+                    pitch: Cesium.Math.toRadians(-48),
+                    roll: 0
+                },
+                duration
+            });
+        }
+
+        function flyTop(viewer, duration = 1.1) {
+            viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(target.lon, target.lat, 9500),
+                orientation: {
+                    heading: Cesium.Math.toRadians(0),
+                    pitch: Cesium.Math.toRadians(-90),
+                    roll: 0
+                },
+                duration
+            });
+        }
+
+        function addPoint(viewer, point, label, color) {
+            if (!isFinitePoint(point)) return null;
+            return viewer.entities.add({
+                name: label,
+                position: Cesium.Cartesian3.fromDegrees(point.lon, point.lat, 60),
+                point: {
+                    pixelSize: 14,
+                    color,
+                    outlineColor: Cesium.Color.WHITE,
+                    outlineWidth: 3,
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                },
+                label: {
+                    text: label,
+                    font: 'bold 17px system-ui, sans-serif',
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 4,
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    pixelOffset: new Cesium.Cartesian2(0, -28),
+                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY
+                }
+            });
+        }
+
+        function addRoute(viewer) {
+            if (!isFinitePoint(fire) || !isFinitePoint(gps)) return;
+            viewer.entities.add({
+                name: 'GPS → Feu',
+                polyline: {
+                    positions: Cesium.Cartesian3.fromDegreesArray([gps.lon, gps.lat, fire.lon, fire.lat]),
+                    width: 4,
+                    material: Cesium.Color.CYAN.withAlpha(0.9),
+                    clampToGround: true
+                }
+            });
+        }
+
+        async function createTerrainProvider() {
+            if (Cesium.createWorldTerrainAsync) {
+                return Cesium.createWorldTerrainAsync({
+                    requestWaterMask: true,
+                    requestVertexNormals: true
+                });
+            }
+            if (Cesium.createWorldTerrain) {
+                return Cesium.createWorldTerrain({
+                    requestWaterMask: true,
+                    requestVertexNormals: true
+                });
+            }
+            return undefined;
+        }
+
+        async function boot() {
+            if (!window.Cesium) {
+                setStatus('<strong>Erreur :</strong> CesiumJS n’a pas été chargé. Vérifie la connexion Internet.', true);
+                return;
+            }
+
+            if (!savedToken) {
+                setStatus('<strong>Vue 3D online.</strong> Aucun token Cesium ion enregistré : le mode de test peut fonctionner avec le token d’évaluation, mais un token personnel est recommandé pour un usage normal.', true);
+            }
+
+            let terrainProvider = null;
+            try {
+                terrainProvider = await createTerrainProvider();
+            } catch (error) {
+                console.warn('Terrain Cesium indisponible:', error);
+                setStatus('<strong>Terrain 3D non chargé.</strong> Token Cesium ion absent/invalide ou accès réseau indisponible. La vue s’ouvre avec globe simple.', true);
+            }
+
+            const viewerOptions = {
+                animation: false,
+                timeline: false,
+                fullscreenButton: false,
+                homeButton: false,
+                sceneModePicker: false,
+                navigationHelpButton: false,
+                baseLayerPicker: true,
+                geocoder: true,
+                infoBox: true,
+                selectionIndicator: true,
+                shadows: false,
+                shouldAnimate: false
+            };
+            if (terrainProvider) viewerOptions.terrainProvider = terrainProvider;
+
+            const viewer = new Cesium.Viewer('cesiumContainer', viewerOptions);
+            window.npfCesiumViewer = viewer;
+
+            viewer.scene.globe.depthTestAgainstTerrain = false;
+            viewer.scene.globe.enableLighting = false;
+            viewer.scene.screenSpaceCameraController.enableCollisionDetection = false;
+
+            const targetEntity = addPoint(viewer, target, target.name, Cesium.Color.ORANGERED);
+            if (isFinitePoint(fire)) addPoint(viewer, fire, fire.name || 'Feu', Cesium.Color.RED);
+            if (isFinitePoint(gps)) addPoint(viewer, gps, 'Position GPS', Cesium.Color.CYAN);
+            addRoute(viewer);
+
+            if (targetEntity) viewer.selectedEntity = targetEntity;
+            flyOblique(viewer, 0.7);
+
+            const terrainText = terrainProvider ? 'terrain 3D actif' : 'globe simple, terrain non disponible';
+            setStatus(`<strong>${target.name}</strong> — ${target.lat.toFixed(5)}, ${target.lon.toFixed(5)} — ${terrainText}. Souris/tactile : tourner, incliner, zoomer.`);
+
+            document.getElementById('targetBtn').addEventListener('click', () => flyOblique(viewer));
+            document.getElementById('topBtn').addEventListener('click', () => flyTop(viewer));
+            document.getElementById('obliqueBtn').addEventListener('click', () => flyOblique(viewer));
+        }
+
+        document.getElementById('backBtn').addEventListener('click', () => {
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = './index.html';
+            }
+        });
+
+        document.getElementById('saveTokenBtn').addEventListener('click', () => {
+            const token = tokenInput.value.trim();
+            if (token) {
+                localStorage.setItem(CESIUM_TOKEN_STORAGE_KEY, token);
+                alert('Token Cesium ion enregistré localement sur cet appareil. Recharge la vue 3D pour l’utiliser.');
+            } else {
+                localStorage.removeItem(CESIUM_TOKEN_STORAGE_KEY);
+                alert('Token supprimé localement.');
+            }
+        });
+
+        boot();
+    </script>
+</body>
+</html>
