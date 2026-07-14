@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-42-refracto-compact-clavier-ipad';
+const SW_VERSION = 'sw-v13-43-recherche-feu-videe-validation';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
