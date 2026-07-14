@@ -1,26 +1,31 @@
-NPF-Q400 — TEST v13.48
-Base : TEST v13.47
+NPF-Q400 — TEST v13.49
+Base : TEST v13.48
 
-Objet : correction carte vectorielle France Sud PMTiles sans fond de carte.
+Objet : correction PMTiles France Sud — tuiles absentes à bas zoom.
 
-Modifications :
-- Conservation du système d'import local PMTiles par manifest.json + 7 blocs.
-- Correction du rendu lorsque la tuile demandée au zoom courant n'existe pas dans le fichier PMTiles.
-- Ajout d'un repli automatique vers les tuiles natives disponibles à un zoom supérieur, jusqu'à 3 niveaux au-dessus, avec mosaïque locale Canvas.
-- Cas visé : carte générée surtout ou uniquement au zoom 14, alors que Leaflet demande par exemple z11/1054/748.
-- Si aucune tuile native exploitable n'est trouvée, affichage d'un message de diagnostic clair au lieu d'un carré vide silencieux.
-- Ajout d'un log console du header PMTiles pour contrôler minZoom/maxZoom/tileType/compressions en TEST.
-- Aucun CDN ajouté.
-- Les blocs PMTiles restent en IndexedDB et ne sont pas ajoutés au Cache Storage du service worker.
-- Le système raster ZIP existant reste séparé et inchangé.
+Constat terrain :
+- affichage dans les carreaux : "PMTiles: tuile absente z10/527/374 zoome vers ?-14" ;
+- cela indique que la tuile Leaflet demandée au zoom 10 n’existe pas directement dans le PMTiles ;
+- le fichier France Sud semble surtout disposer de tuiles exploitables au zoom natif 14.
 
-Fichiers PMTiles JS modifiés :
-- npf-pmtiles-idb.js : entête versionné v13.48.
-- npf-pmtiles-leaflet.js : ajout du repli zoom natif et diagnostics.
+Corrections v13.49 :
+- correction du repli de zoom PMTiles dans npf-pmtiles-leaflet.js ;
+- le repli n’est plus limité à +3 niveaux ;
+- cas traité explicitement : z10 → z14 ;
+- plafond contrôlé à 256 sous-tuiles pour éviter une explosion mémoire ;
+- message de diagnostic remplacé par une indication du zoom natif max ;
+- aucune modification du stockage IndexedDB PMTiles ;
+- aucune modification du système offline raster ZIP existant.
+
+Fichiers PMTiles :
+- npf-pmtiles-idb.js est fourni à nouveau par cohérence de version ;
+- npf-pmtiles-leaflet.js contient la correction principale ;
+- ZIP fourni avec les bons noms finaux pour GitHub.
 
 Contrôles effectués :
-- node --check script.js : OK
-- node --check sw.js : OK
-- node --check npf-pmtiles-idb.js : OK
-- node --check npf-pmtiles-leaflet.js : OK
-- manifest.json : JSON valide
+- node --check script.js : OK ;
+- node --check sw.js : OK ;
+- node --check npf-pmtiles-idb.js : OK ;
+- node --check npf-pmtiles-leaflet.js : OK ;
+- manifest.json valide ;
+- ZIP contrôlé avec les bons noms : npf-pmtiles-idb.js et npf-pmtiles-leaflet.js.
