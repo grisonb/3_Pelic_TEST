@@ -8021,8 +8021,7 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
-/* v13.50 — Volume/Masse retardant : ligne Réfracto. compacte pour dégager le clavier iPad.
-   Retour au système offline raster ZIP validé, sans styles PMTiles.
+/* v13.54 — Volume/Masse retardant : ligne Réfracto. compacte pour dégager le clavier iPad.
    Objectif : gagner de la hauteur uniquement sur la ligne Réfracto. = Densité,
    sans réduire les deux lignes de calcul Masse/Volume ni les boutons. */
 .rlt-refracto-row {
@@ -8085,58 +8084,3 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
-
-/* v13.52 — bouton Vue 3D terrain online dans colonne gauche, sous HT */
-.cesium-3d-map-button {
-    font-size: 30px;
-    font-weight: 950;
-    letter-spacing: 0.5px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(233,241,250,0.94));
-    color: #0b2f6b;
-    border-color: var(--border-color);
-    flex-direction: column;
-    gap: 2px;
-}
-
-.cesium-3d-map-button .cesium-3d-label {
-    display: block;
-    line-height: 1;
-    transform: none;
-}
-
-.cesium-3d-map-button .cesium-3d-sub-label {
-    display: block;
-    font-size: 10px;
-    line-height: 1;
-    font-weight: 850;
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    color: rgba(11,47,107,0.78);
-}
-
-.cesium-3d-map-button:hover {
-    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(218,232,247,1));
-}
-
-.cesium-3d-map-button.is-hidden-offline,
-#cesium-3d-button[hidden] {
-    display: none !important;
-}
-
-@media (max-width: 760px) {
-    .cesium-3d-map-button {
-        font-size: 19px !important;
-        gap: 0 !important;
-    }
-
-    .cesium-3d-map-button .cesium-3d-sub-label {
-        font-size: 7px !important;
-        letter-spacing: 0 !important;
-    }
-}
-
-@media (max-width: 430px) {
-    .cesium-3d-map-button {
-        font-size: 20px !important;
-    }
-}
