@@ -574,7 +574,7 @@ const waterPoints = [{"id":"AIGUEBLETTE","name":"Aigueblette","countryCode":"FR"
 
 
 const otherAirports = [
-    { oaci: "LFBC", name: "Cazaux", lat: 44.534, lon: -1.155 }, { oaci: "LFBH", name: "La Rochelle-Île de Ré", lat: 46.179, lon: -1.195 }, { oaci: "LFBF", name: "Toulouse-Francazal", lat: 43.546, lon: 1.365 }, { oaci: "LFBG", name: "Cognac-Châteaubernard", lat: 45.660, lon: -0.354 }, { oaci: "LFBI", name: "Poitiers-Biard", lat: 46.587, lon: 0.309 }, { oaci: "LFBK", name: "Saint-Brieuc-Armor", lat: 48.538, lon: -2.852 }, { oaci: "LFBO", name: "Toulouse-Blagnac", lat: 43.635, lon: 1.363 }, { oaci: "LFBS", name: "Chambéry-Savoie", lat: 45.640, lon: 5.881 }, { oaci: "LFBT", name: "Tarbes-Lourdes-Pyrénées", lat: 43.185, lon: -0.003 }, { oaci: "LFBU", name: "Angoulême-Cognac", lat: 45.729, lon: 0.220 }, { oaci: "LFBV", name: "Brive-Souillac", lat: 45.040, lon: 1.484 }, { oaci: "LFCU", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFLA", name: "Auxerre-Branches", lat: 47.848, lon: 3.497 }, { oaci: "LFLC", name: "Clermont-Ferrand-Auvergne", lat: 45.786, lon: 3.169 }, { oaci: "LFLD", name: "Bourges", lat: 47.059, lon: 2.370 }, { oaci: "LFLL", name: "Lyon-Saint Exupéry", lat: 45.725, lon: 5.081 }, { oaci: "LFLN", name: "Saint-Yan", lat: 46.409, lon: 4.013 }, { oaci: "LFLS", name: "Grenoble-Isère", lat: 45.363, lon: 5.331 }, { oaci: "LFLV", name: "Vichy-Charmeil", lat: 46.167, lon: 3.403 }, { oaci: "LFLW", name: "Aurillac", lat: 44.887, lon: 2.418 }, { oaci: "LFLY", name: "Lyon-Bron", lat: 45.729, lon: 4.945 }, { oaci: "LFLZ", name: "Le Puy-Loudes", lat: 45.079, lon: 3.762 }, { oaci: "LFMC", name: "Le Luc-Le Cannet", lat: 43.385, lon: 6.368 }, { oaci: "LFMI", name: "Istres-Le Tubé", lat: 43.524, lon: 4.944 }, { oaci: "LFMN", name: "Nice-Côte d'Azur", lat: 43.665, lon: 7.215 }, { oaci: "LFMQ", name: "Le Castellet", lat: 43.253, lon: 5.786 }, { oaci: "LFMV", name: "Avignon-Provence", lat: 43.906, lon: 4.902 }, { oaci: "LFMY", name: "Salon-de-Provence", lat: 43.606, lon: 5.110 }, { oaci: "LFOA", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFOB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFOC", name: "Châteaudun", lat: 48.058, lon: 1.378 }, { oaci: "LFOE", name: "Évreux-Fauville", lat: 49.028, lon: 1.218 }, { oaci: "LFOK", name: "Châlons-Vatry", lat: 48.776, lon: 4.185 }, { oaci: "LFOJ", name: "Orléans-Bricy", lat: 47.989, lon: 1.758 }, { oaci: "LFOP", name: "Rouen-Vallée de Seine", lat: 49.385, lon: 1.182 }, { oaci: "LFOQ", name: "Blois-Le Breuil", lat: 47.678, lon: 1.217 }, { oaci: "LFOR", name: "Chartres-Métropole", lat: 48.455, lon: 1.530 }, { oaci: "LFOT", name: "Tours-Val de Loire", lat: 47.432, lon: 0.722 }, { oaci: "LFOU", name: "Cholet-Le Pontreau", lat: 47.081, lon: -0.871 }, { oaci: "LFOV", name: "Laval-Entrammes", lat: 48.033, lon: -0.749 }, { oaci: "LFPB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFPC", name: "Creil", lat: 49.253, lon: 2.520 }, { oaci: "LFPG", name: "Paris-Charles-de-Gaulle", lat: 49.009, lon: 2.547 }, { oaci: "LFPO", name: "Paris-Orly", lat: 48.723, lon: 2.379 }, { oaci: "LFPV", name: "Villacoublay-Vélizy", lat: 48.773, lon: 2.203 }, { oaci: "LFRB", name: "Brest-Bretagne", lat: 48.447, lon: -4.418 }, { oaci: "LFRC", name: "Cherbourg-Manche", lat: 49.650, lon: -1.478 }, { oaci: "LFRD", name: "Dinard-Pleurtuit-Saint-Malo", lat: 48.587, lon: -2.080 }, { oaci: "LFRE", name: "La Baule-Escoublac", lat: 47.289, lon: -2.348 }, { oaci: "LFRF", name: "Granville-Mont-Saint-Michel", lat: 48.887, lon: -1.564 }, { oaci: "LFRG", name: "Deauville-Normandie", lat: 49.365, lon: 0.154 }, { oaci: "LFRH", name: "Lorient-Bretagne-Sud", lat: 47.760, lon: -3.440 }, { oaci: "LFRI", name: "La Roche-sur-Yon-Les Ajoncs", lat: 46.702, lon: -1.381 }, { oaci: "LFRJ", name: "Landivisiau", lat: 48.527, lon: -4.156 }, { oaci: "LFRK", name: "Caen-Carpiquet", lat: 49.173, lon: -0.450 }, { oaci: "LFRL", name: "Lanvéoc-Poulmic", lat: 48.278, lon: -4.437 }, { oaci: "LFRM", name: "Le Mans-Arnage", lat: 47.949, lon: 0.203 }, { oaci: "LFRN", name: "Rennes-Saint-Jacques", lat: 48.070, lon: -1.732 }, { oaci: "LFRO", name: "Lannion-Côte de Granit Rose", lat: 48.755, lon: -3.472 }, { oaci: "LFRQ", name: "Quimper-Pluguffan", lat: 47.975, lon: -4.167 }, { oaci: "LFRS", name: "Nantes-Atlantique", lat: 47.153, lon: -1.607 }, { oaci: "LFRT", name: "Saint-Nazaire-Montoir", lat: 47.312, lon: -2.152 }, { oaci: "LFRU", name: "Morlaix-Ploujean", lat: 48.604, lon: -3.818 }, { oaci: "LFSD", name: "Dijon-Longvic", lat: 47.268, lon: 5.088 }, { oaci: "LFSF", name: "Metz-Nancy-Lorraine", lat: 48.981, lon: 6.251 }, { oaci: "LFSH", name: "Haguenau", lat: 48.790, lon: 7.820 }, { oaci: "LFSK", name: "Colmar-Houssen", lat: 48.110, lon: 7.359 }, { oaci: "LFSO", name: "Nancy-Ochey", lat: 48.577, lon: 5.955 }, { oaci: "LFSQ", name: "Luxeuil-Saint-Sauveur", lat: 47.779, lon: 6.353 }, { oaci: "LFSR", name: "Reims-Prunay", lat: 49.207, lon: 4.148 }, { oaci: "LFST", name: "Strasbourg-Entzheim", lat: 48.542, lon: 7.628 }, { oaci: "LFSX", name: "Montbéliard-Courcelles", lat: 47.487, lon: 6.852 }, { oaci: "LFYR", name: "Romorantin-Pruniers", lat: 47.352, lon: 1.670 }, { oaci: "LFYD", name: "Dinard", lat: 48.587, lon: -2.080 }, { oaci: "LFXI", name: "Reims-Champagne", lat: 49.308, lon: 4.045 }, { oaci: "LFYL", name: "Lille-Lesquin", lat: 50.563, lon: 3.086 }, { oaci: "LFXM", name: "Melun-Villaroche", lat: 48.608, lon: 2.671 }, { oaci: "LFXO", name: "Beauvais-Tillé", lat: 49.454, lon: 2.112 }, { oaci: "LFXQ", name: "Saint-Omer-Wizernes", lat: 50.725, lon: 2.220 }, { oaci: "LFKS", name: "Solenzara", lat: 41.924, lon: 9.405 },
+    { oaci: "LFBC", name: "Cazaux", lat: 44.534, lon: -1.155 }, { oaci: "LFBH", name: "La Rochelle-Île de Ré", lat: 46.179, lon: -1.195 }, { oaci: "LFBF", name: "Toulouse-Francazal", lat: 43.546, lon: 1.365 }, { oaci: "LFBG", name: "Cognac-Châteaubernard", lat: 45.660, lon: -0.354 }, { oaci: "LFBI", name: "Poitiers-Biard", lat: 46.587, lon: 0.309 }, { oaci: "LFBK", name: "Saint-Brieuc-Armor", lat: 48.538, lon: -2.852 }, { oaci: "LFBO", name: "Toulouse-Blagnac", lat: 43.635, lon: 1.363 }, { oaci: "LFBS", name: "Chambéry-Savoie", lat: 45.640, lon: 5.881 }, { oaci: "LFBT", name: "Tarbes-Lourdes-Pyrénées", lat: 43.185, lon: -0.003 }, { oaci: "LFBU", name: "Angoulême-Cognac", lat: 45.729, lon: 0.220 }, { oaci: "LFBV", name: "Brive-Souillac", lat: 45.040, lon: 1.484 }, { oaci: "LFCU", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFLA", name: "Auxerre-Branches", lat: 47.848, lon: 3.497 }, { oaci: "LFLC", name: "Clermont-Ferrand-Auvergne", lat: 45.786, lon: 3.169 }, { oaci: "LFLD", name: "Bourges", lat: 47.059, lon: 2.370 }, { oaci: "LFLL", name: "Lyon-Saint Exupéry", lat: 45.725, lon: 5.081 }, { oaci: "LFLN", name: "Saint-Yan", lat: 46.409, lon: 4.013 }, { oaci: "LFLS", name: "Grenoble-Isère", lat: 45.363, lon: 5.331 }, { oaci: "LFLV", name: "Vichy-Charmeil", lat: 46.167, lon: 3.403 }, { oaci: "LFLW", name: "Aurillac", lat: 44.887, lon: 2.418 }, { oaci: "LFLY", name: "Lyon-Bron", lat: 45.729, lon: 4.945 }, { oaci: "LFLZ", name: "Le Puy-Loudes", lat: 45.079, lon: 3.762 }, { oaci: "LFMC", name: "Le Luc-Le Cannet", lat: 43.385, lon: 6.368 }, { oaci: "LFMI", name: "Istres-Le Tubé", lat: 43.524, lon: 4.944 }, { oaci: "LFMN", name: "Nice-Côte d'Azur", lat: 43.665, lon: 7.215 }, { oaci: "LFMQ", name: "Le Castellet", lat: 43.253, lon: 5.786 }, { oaci: "LFMV", name: "Avignon-Provence", lat: 43.906, lon: 4.902 }, { oaci: "LFMY", name: "Salon-de-Provence", lat: 43.606, lon: 5.110 }, { oaci: "LFOA", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFOC", name: "Châteaudun", lat: 48.058, lon: 1.378 }, { oaci: "LFOE", name: "Évreux-Fauville", lat: 49.028, lon: 1.218 }, { oaci: "LFOK", name: "Châlons-Vatry", lat: 48.776, lon: 4.185 }, { oaci: "LFOJ", name: "Orléans-Bricy", lat: 47.989, lon: 1.758 }, { oaci: "LFOP", name: "Rouen-Vallée de Seine", lat: 49.385, lon: 1.182 }, { oaci: "LFOQ", name: "Blois-Le Breuil", lat: 47.678, lon: 1.217 }, { oaci: "LFOR", name: "Chartres-Métropole", lat: 48.455, lon: 1.530 }, { oaci: "LFOT", name: "Tours-Val de Loire", lat: 47.432, lon: 0.722 }, { oaci: "LFOU", name: "Cholet-Le Pontreau", lat: 47.081, lon: -0.871 }, { oaci: "LFOV", name: "Laval-Entrammes", lat: 48.033, lon: -0.749 }, { oaci: "LFPB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFPC", name: "Creil", lat: 49.253, lon: 2.520 }, { oaci: "LFPG", name: "Paris-Charles-de-Gaulle", lat: 49.009, lon: 2.547 }, { oaci: "LFPO", name: "Paris-Orly", lat: 48.723, lon: 2.379 }, { oaci: "LFPV", name: "Villacoublay-Vélizy", lat: 48.773, lon: 2.203 }, { oaci: "LFRB", name: "Brest-Bretagne", lat: 48.447, lon: -4.418 }, { oaci: "LFRC", name: "Cherbourg-Manche", lat: 49.650, lon: -1.478 }, { oaci: "LFRD", name: "Dinard-Pleurtuit-Saint-Malo", lat: 48.587, lon: -2.080 }, { oaci: "LFRE", name: "La Baule-Escoublac", lat: 47.289, lon: -2.348 }, { oaci: "LFRF", name: "Granville-Mont-Saint-Michel", lat: 48.887, lon: -1.564 }, { oaci: "LFRG", name: "Deauville-Normandie", lat: 49.365, lon: 0.154 }, { oaci: "LFRH", name: "Lorient-Bretagne-Sud", lat: 47.760, lon: -3.440 }, { oaci: "LFRI", name: "La Roche-sur-Yon-Les Ajoncs", lat: 46.702, lon: -1.381 }, { oaci: "LFRJ", name: "Landivisiau", lat: 48.527, lon: -4.156 }, { oaci: "LFRK", name: "Caen-Carpiquet", lat: 49.173, lon: -0.450 }, { oaci: "LFRL", name: "Lanvéoc-Poulmic", lat: 48.278, lon: -4.437 }, { oaci: "LFRM", name: "Le Mans-Arnage", lat: 47.949, lon: 0.203 }, { oaci: "LFRN", name: "Rennes-Saint-Jacques", lat: 48.070, lon: -1.732 }, { oaci: "LFRO", name: "Lannion-Côte de Granit Rose", lat: 48.755, lon: -3.472 }, { oaci: "LFRQ", name: "Quimper-Pluguffan", lat: 47.975, lon: -4.167 }, { oaci: "LFRS", name: "Nantes-Atlantique", lat: 47.153, lon: -1.607 }, { oaci: "LFRT", name: "Saint-Nazaire-Montoir", lat: 47.312, lon: -2.152 }, { oaci: "LFRU", name: "Morlaix-Ploujean", lat: 48.604, lon: -3.818 }, { oaci: "LFSD", name: "Dijon-Longvic", lat: 47.268, lon: 5.088 }, { oaci: "LFSF", name: "Metz-Nancy-Lorraine", lat: 48.981, lon: 6.251 }, { oaci: "LFSH", name: "Haguenau", lat: 48.790, lon: 7.820 }, { oaci: "LFSK", name: "Colmar-Houssen", lat: 48.110, lon: 7.359 }, { oaci: "LFSO", name: "Nancy-Ochey", lat: 48.577, lon: 5.955 }, { oaci: "LFSQ", name: "Luxeuil-Saint-Sauveur", lat: 47.779, lon: 6.353 }, { oaci: "LFQA", name: "Reims-Prunay", lat: 49.207, lon: 4.148 }, { oaci: "LFST", name: "Strasbourg-Entzheim", lat: 48.542, lon: 7.628 }, { oaci: "LFSX", name: "Montbéliard-Courcelles", lat: 47.487, lon: 6.852 }, { oaci: "LFYR", name: "Romorantin-Pruniers", lat: 47.352, lon: 1.670 }, { oaci: "LFYD", name: "Dinard", lat: 48.587, lon: -2.080 }, { oaci: "LFSR", name: "Reims-Champagne", lat: 49.308, lon: 4.045 }, { oaci: "LFPM", name: "Melun-Villaroche", lat: 48.604, lon: 2.676 }, { oaci: "LFOB", name: "Beauvais-Tillé", lat: 49.454, lon: 2.112 }, { oaci: "LFQN", name: "Saint-Omer-Wizernes", lat: 50.727, lon: 2.233 }, { oaci: "LFKS", name: "Solenzara", lat: 41.924, lon: 9.405 },
 
     // Terrains ajoutés depuis le PDF "piste revêtue > 1500 m"
     { oaci: "LFBA", name: "Agen-La Garenne", lat: 44.1747, lon: 0.5906 },
@@ -2239,120 +2239,12 @@ function keepKeyboardAfterSearchClear() {
     }, 80);
 }
 
-
-
-function getCesium3DTargetContext() {
-    const params = new URLSearchParams();
-    let lat = null;
-    let lon = null;
-    let label = 'Vue 3D NPF-Q400';
-    let source = 'map';
-
-    if (currentCommune) {
-        const fireLat = Number(currentCommune.latitude_mairie);
-        const fireLon = Number(currentCommune.longitude_mairie);
-        if (Number.isFinite(fireLat) && Number.isFinite(fireLon)) {
-            lat = fireLat;
-            lon = fireLon;
-            source = 'fire';
-            try {
-                label = buildFireDisplayName(currentCommune) || currentCommune.nom_standard || 'Feu sélectionné';
-            } catch (_) {
-                label = currentCommune.nom_standard || 'Feu sélectionné';
-            }
-            params.set('fireLat', String(fireLat));
-            params.set('fireLon', String(fireLon));
-            params.set('fireName', label);
-        }
-    }
-
-    let gpsLatLng = null;
-    try {
-        if (userMarker && typeof userMarker.getLatLng === 'function') {
-            gpsLatLng = userMarker.getLatLng();
-        }
-    } catch (_) {
-        gpsLatLng = null;
-    }
-
-    if (!gpsLatLng && lastPosition) {
-        const lastLat = Number(lastPosition.lat ?? lastPosition.latitude);
-        const lastLng = Number(lastPosition.lng ?? lastPosition.longitude);
-        if (Number.isFinite(lastLat) && Number.isFinite(lastLng)) {
-            gpsLatLng = { lat: lastLat, lng: lastLng };
-        }
-    }
-
-    if (gpsLatLng && Number.isFinite(Number(gpsLatLng.lat)) && Number.isFinite(Number(gpsLatLng.lng))) {
-        params.set('gpsLat', String(Number(gpsLatLng.lat)));
-        params.set('gpsLon', String(Number(gpsLatLng.lng)));
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-            lat = Number(gpsLatLng.lat);
-            lon = Number(gpsLatLng.lng);
-            label = 'Position GPS';
-            source = 'gps';
-        }
-    }
-
-    if ((!Number.isFinite(lat) || !Number.isFinite(lon)) && map && typeof map.getCenter === 'function') {
-        const center = map.getCenter();
-        if (center && Number.isFinite(Number(center.lat)) && Number.isFinite(Number(center.lng))) {
-            lat = Number(center.lat);
-            lon = Number(center.lng);
-            label = 'Centre carte';
-            source = 'map';
-        }
-    }
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        lat = 43.2965;
-        lon = 5.3698;
-        label = 'Marseille';
-        source = 'default';
-    }
-
-    params.set('lat', String(lat));
-    params.set('lon', String(lon));
-    params.set('name', label);
-    params.set('source', source);
-
-    if (map && typeof map.getZoom === 'function') {
-        const zoom = Number(map.getZoom());
-        if (Number.isFinite(zoom)) params.set('zoom2d', String(zoom));
-    }
-
-    return params;
-}
-
-function updateCesium3DButtonVisibility() {
-    const button = document.getElementById('cesium-3d-button');
-    if (!button) return;
-    const hidden = mapSourceMode === 'offline';
-    button.classList.toggle('is-hidden-offline', hidden);
-    button.hidden = hidden;
-    button.setAttribute('aria-hidden', String(hidden));
-    button.tabIndex = hidden ? -1 : 0;
-}
-
-function openCesium3DView(event) {
-    if (event && typeof event.preventDefault === 'function') event.preventDefault();
-    if (mapSourceMode === 'offline') return;
-    const params = getCesium3DTargetContext();
-    const url = `vue-3d.html?${params.toString()}`;
-    /*
-     * v13.52 — iPad/PWA : ouvrir en navigation directe.
-     * window.open(_blank) peut être silencieusement bloqué selon le contexte PWA.
-     */
-    window.location.href = url;
-}
-
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
     const airportCountInput = document.getElementById('airport-count');
     const gpsFeuButton = document.getElementById('gps-feu-button');
     const centerGpsButton = document.getElementById('center-gps-button');
-    const cesium3dButton = document.getElementById('cesium-3d-button');
     const liveGpsButton = document.getElementById('live-gps-button');
     const lftwRouteButton = document.getElementById('lftw-route-button');
     const gaarModeButton = document.getElementById('gaar-mode-button');
@@ -2667,12 +2559,6 @@ function setupEventListeners() {
         refreshCenterGpsFollowButtonState();
         installCenterGpsFollowHandlers();
         centerGpsButton.addEventListener('click', toggleCenterGpsFollow);
-    }
-
-    if (cesium3dButton) {
-        cesium3dButton.addEventListener('click', openCesium3DView);
-        cesium3dButton.addEventListener('touchend', openCesium3DView, { passive: false });
-        updateCesium3DButtonVisibility();
     }
 
     liveGpsButton.addEventListener('click', toggleLiveGps);
@@ -4281,7 +4167,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     updateCommuneDisplay(commune);
 
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
-    // v13.50 — retour au fond offline raster ZIP validé, sans module PMTiles ; conservation vidage recherche feu.
+    // v13.54 — après validation d'un feu, la barre de recherche est vidée.
     // Le feu reste sélectionné via currentCommune + bandeau carte ; seul le texte de recherche est nettoyé.
     const fireSearchInput = document.getElementById('search-input');
     const fireResultsList = document.getElementById('results-list');
@@ -5065,7 +4951,7 @@ async function loadDepartmentsLayerData() {
     if (hasLoadedDepartments) return;
 
     const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
-    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v2026-54';
+    const DEPARTMENTS_CACHE_NAME = 'npf-q400-departments-v13-54';
     let response = null;
 
     /*
@@ -7452,7 +7338,6 @@ function updateMapSourceButtons() {
     offlineBtn.disabled = isMapSourceSwitching;
     onlineBtn.setAttribute('aria-pressed', String(mapSourceMode !== 'offline'));
     offlineBtn.setAttribute('aria-pressed', String(mapSourceMode === 'offline'));
-    updateCesium3DButtonVisibility();
 }
 
 async function setMapSourceMode(mode) {
@@ -11249,9 +11134,9 @@ function initializeCalculator() {
             closed: false,
             state: {
                 'bloc-depart': '',
-                'fuel-depart': '3400 kg',
+                'fuel-depart': '3500 kg',
                 'previ-bloc-depart': '',
-                'previ-fuel-depart': '3400 kg',
+                'previ-fuel-depart': '3500 kg',
                 'tmd': '21:30',
                 'limite-hdv': '08:00',
                 calculator_table_data: []
@@ -11498,15 +11383,15 @@ function initializeCalculator() {
 
     function updateDisplayedLimitHdvForActiveFlight() {
         /*
-         * v2026.54 — affichage dynamique : dès qu'un BLOC ARRIVÉE est saisi,
-         * LIMITE HDV affiche le restant journée disponible.
-         * Les calculs du tableau BLOC/FUEL utilisent toujours la limite au
-         * début du vol actif afin de ne pas soustraire deux fois le vol courant.
+         * v13.54 — LIMITE HDV figée par vol :
+         * - vol n°1 : affiche la limite journée saisie par l'utilisateur ;
+         * - vols n°2 et suivants : affiche le restant disponible après les vols précédents ;
+         * - la durée du vol actif n'est pas retranchée de son propre champ LIMITE HDV.
          */
         const globalLabel = getStoredGlobalLimitHdvLabel();
         setStoredGlobalLimitHdvLabel(globalLabel, { persistFirstFlight: false });
 
-        const effectiveLimit = getEffectiveLimitHdvForActiveFlight({ includeCurrentFlight: true });
+        const effectiveLimit = getEffectiveLimitHdvForActiveFlight({ includeCurrentFlight: false });
         const effectiveLabel = formatTime(effectiveLimit) || '00:00';
 
         const mainWrapper = document.getElementById('limite-hdv');
@@ -12173,9 +12058,9 @@ function initializeCalculator() {
             dailyFlights = [createEmptyFlight(1)];
             dailyFlights[0].state = {
                 'bloc-depart': legacyState['bloc-depart'] || '',
-                'fuel-depart': legacyState['fuel-depart'] || '3400 kg',
+                'fuel-depart': legacyState['fuel-depart'] || '3500 kg',
                 'previ-bloc-depart': legacyState['previ-bloc-depart'] || legacyState['bloc-depart'] || '',
-                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3400 kg',
+                'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3500 kg',
                 'tmd': legacyState['tmd'] || '21:30',
                 'limite-hdv': legacyState['limite-hdv'] || '08:00',
                 'deroutement-heure-wrapper': legacyState['deroutement-heure-wrapper'] || '',
@@ -12267,12 +12152,12 @@ function initializeCalculator() {
             tableBody.innerHTML = '';
 
             initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
-            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3400 kg');
+            initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3500 kg');
             initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
 
             initializeTimeInput(document.getElementById('previ-bloc-depart'), state['previ-bloc-depart'] || state['bloc-depart'] || '');
-            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3400 kg');
+            initializeNumericInput(document.getElementById('previ-fuel-depart'), state['previ-fuel-depart'] || state['fuel-depart'] || '3500 kg');
             initializeTimeInput(document.getElementById('previ-tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('previ-limite-hdv'), state['limite-hdv'] || '08:00');
 
@@ -12361,7 +12246,12 @@ function initializeCalculator() {
         };
 
         const recalculateAndSave = () => {
-            if (wrapperRole === 'limite-hdv') {
+            if (wrapperRole === 'limite-hdv' && getActiveFlightIndex() <= 0) {
+                /*
+                 * v13.54 — LIMITE HDV journée figée par le vol n°1 :
+                 * seul le premier vol peut modifier la limite de référence.
+                 * Les vols suivants affichent le restant issu des vols précédents.
+                 */
                 setStoredGlobalLimitHdvLabel(displayInput.value);
             }
 
@@ -13942,9 +13832,9 @@ function initializeCalculator() {
             if (activeFlight) {
                 newFlight.state['tmd'] = activeFlight.state?.['tmd'] || document.getElementById('tmd')?.querySelector('.display-input')?.value || '21:30';
                 newFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || document.getElementById('limite-hdv')?.querySelector('.display-input')?.value || '08:00';
-                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
+                newFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || document.getElementById('fuel-depart')?.querySelector('.display-input')?.value || '3500 kg';
                 newFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || document.getElementById('previ-bloc-depart')?.querySelector('.display-input')?.value || '';
-                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3400 kg';
+                newFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || document.getElementById('previ-fuel-depart')?.querySelector('.display-input')?.value || '3500 kg';
             }
             dailyFlights.push(newFlight);
             activeFlightId = newFlight.id;
@@ -13970,9 +13860,9 @@ function initializeCalculator() {
                     const nextFlight = createEmptyFlight(dailyFlights.length + 1);
                     nextFlight.state['tmd'] = activeFlight.state?.['tmd'] || '21:30';
                     nextFlight.state['limite-hdv'] = activeFlight.state?.['limite-hdv'] || '08:00';
-                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3400 kg';
+                    nextFlight.state['fuel-depart'] = activeFlight.state?.['fuel-depart'] || '3500 kg';
                     nextFlight.state['previ-bloc-depart'] = activeFlight.state?.['previ-bloc-depart'] || '';
-                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3400 kg';
+                    nextFlight.state['previ-fuel-depart'] = activeFlight.state?.['previ-fuel-depart'] || '3500 kg';
                     dailyFlights.push(nextFlight);
                     activeFlightId = nextFlight.id;
                     persistFlights();
