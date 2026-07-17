@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.52">
-    <link rel="manifest" href="manifest.json?appv=v13.52">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.52">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.52">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.52">
+    <link rel="stylesheet" href="style.css?appv=v13.54">
+    <link rel="manifest" href="manifest.json?appv=v13.54">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.54">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.54">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.54">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.52';
+        const APP_VERSION = 'v13.54';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -324,10 +324,6 @@
             </span>
             <span class="powerline-label">HT</span>
         </button>
-        <button id="cesium-3d-button" class="left-map-action-button cesium-3d-map-button" type="button" title="Ouvrir la vue 3D terrain online" aria-label="Vue 3D terrain online">
-            <span class="cesium-3d-label">3D</span>
-            <span class="cesium-3d-sub-label">terrain</span>
-        </button>
         <button id="traffic-layer-button" class="left-map-action-button traffic-map-button" title="Afficher/Masquer le trafic ADS-B indicatif — appui long: filtres" aria-label="Afficher/Masquer le trafic ADS-B indicatif">
             <span class="traffic-icon" aria-hidden="true">✈</span>
             <span id="traffic-button-count" class="traffic-button-count">0</span>
@@ -422,7 +418,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.52"></script>
+    <script src="script.js?appv=v13.54"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
