@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-52-cesium-3d-online-button-ht';
+const SW_VERSION = 'sw-v13-54-blocfuel-hdv-fuel-oaci';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -13,7 +13,6 @@ const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
 const APP_SHELL_URLS = [
     './',
     './index.html',
-    './vue-3d.html',
     './style.css',
     './script.js',
     './manifest.json',
@@ -38,7 +37,6 @@ const APP_SHELL_URLS = [
 const CORE_APP_SHELL_URLS = [
     './',
     './index.html',
-    './vue-3d.html',
     './style.css',
     './script.js',
     './manifest.json',
@@ -281,7 +279,6 @@ function isAppShellRequest(request) {
         return [
             '',
             'index.html',
-            'vue-3d.html',
             'style.css',
             'script.js',
             'manifest.json',
@@ -303,26 +300,14 @@ function isCriticalAppShellRequest(request) {
         if (request.mode === 'navigate') return true;
         const parsed = new URL(request.url);
         const filename = parsed.pathname.split('/').pop() || '';
-        return ['index.html', 'vue-3d.html', 'script.js', 'style.css', 'manifest.json'].includes(filename);
+        return ['index.html', 'script.js', 'style.css', 'manifest.json'].includes(filename);
     } catch (_) {
         return false;
     }
 }
 
-function getAppShellCacheKeyForRequest(request) {
-    if (request.mode !== 'navigate') return request;
-    try {
-        const parsed = new URL(request.url);
-        const filename = parsed.pathname.split('/').pop() || 'index.html';
-        return filename === 'vue-3d.html' ? './vue-3d.html' : './index.html';
-    } catch (_) {
-        return './index.html';
-    }
-}
-
 async function handleAppShellRequest(request) {
-    const cacheKey = getAppShellCacheKeyForRequest(request);
-    const cached = await caches.match(cacheKey, { ignoreSearch: true }) || await caches.match(request, { ignoreSearch: true });
+    const cached = await caches.match(request, { ignoreSearch: true });
     const cache = await caches.open(APP_SHELL_CACHE);
 
     /*
@@ -334,7 +319,8 @@ async function handleAppShellRequest(request) {
      * serveur ; le cache reste le secours hors ligne.
      */
     if (isCriticalAppShellRequest(request)) {
-        const fallbackCached = cached || (request.mode === 'navigate' ? await caches.match(cacheKey, { ignoreSearch: true }) : null);
+        const cacheKey = request.mode === 'navigate' ? './index.html' : request;
+        const fallbackCached = cached || (request.mode === 'navigate' ? await caches.match('./index.html', { ignoreSearch: true }) : null);
 
         const freshPromise = (async () => {
             try {
