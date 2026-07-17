@@ -1,21 +1,32 @@
-NPF-Q400 — TEST v13.52 — Vue 3D Cesium : bouton corrigé et mode offline
+NPF-Q400 — TEST v13.54 — Bloc/Fuel HDV figée, fuel 3500 kg, OACI corrigés
 
-Base : TEST v13.51.
+Base : TEST v13.53 sans 3D.
 
-Modifications :
-1. Correction de l’action du bouton 3D : ouverture en navigation directe vers vue-3d.html, plus fiable en PWA iPad que window.open(_blank).
-2. Déplacement du bouton 3D dans la colonne gauche, immédiatement sous le bouton Lignes HT.
-3. Masquage automatique du bouton 3D lorsque le mode carte OFFLINE est actif.
-4. Réaffichage automatique du bouton 3D lors du retour au mode ONLINE.
-5. Correction service worker : navigation vers vue-3d.html servie comme page 3D, pas comme index.html.
-6. Conservation de la page Cesium vue-3d.html et de la logique de centrage sur feu/GPS/centre carte.
+Modifications Bloc/Fuel :
+1. LIMITE HDV figée par vol :
+   - vol n°1 : la LIMITE HDV reste la valeur saisie par l'utilisateur ;
+   - vols n°2 et suivants : la LIMITE HDV affichée dépend des heures restantes après les vols précédents ;
+   - le vol actif ne fait plus baisser son propre champ LIMITE HDV pendant la saisie des BLOC ARRIVÉE.
+2. La limite HDV globale ne peut être modifiée que depuis le vol n°1.
+3. FUEL DÉPART par défaut passé à 3500 kg.
+4. FUEL DÉPART Prévi par défaut passé à 3500 kg.
 
-Fichiers modifiés :
-- index.html
-- script.js
-- style.css
-- manifest.json
-- sw.js
+Corrections OACI intégrées :
+- Melun-Villaroche : LFPM au lieu de LFXM.
+- Beauvais-Tillé : LFOB au lieu de LFXO ; suppression du doublon erroné LFOB Paris-Le Bourget.
+- Saint-Omer-Wizernes : LFQN au lieu de LFXQ.
+- Reims-Prunay : LFQA.
+- Reims-Champagne : LFSR.
+- Lille-Lesquin : suppression du doublon LFYL ; entrée LFQQ conservée.
+
+Carte :
+- aucune modification du moteur carte dans cette version ;
+- la question de couverture/zoom Nord-Sud est à traiter séparément côté génération ZIP/gabarit.
+
+3D :
+- aucune carte 3D ;
+- aucune référence Cesium ;
+- aucune référence vue-3d.html.
 
 Contrôles :
 - node --check script.js : OK
