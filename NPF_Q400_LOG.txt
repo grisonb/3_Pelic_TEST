@@ -1,29 +1,20 @@
-NPF-Q400 — TEST v13.59
+NPF-Q400 — TEST v13.60
 
 Base utilisée
-- Reprise de la TEST v13.58, conservée comme référence de fluidité carte.
+- Reprise de TEST v13.59, elle-même basée sur v13.58 validée comme référence fluidité.
 
-Corrections incluses
-1. Pélicandromes ajoutés manuellement
-- Un terrain transformé en PÉLIC, par exemple Melun, est maintenant traité comme un vrai pélicandrome pour les calculs.
-- Correction des BINGO / Prévi / Suivi : le calcul n'utilise plus seulement la liste des pélicandromes par défaut.
-- Lorsqu'un terrain est ajouté en PÉLIC, il devient aussi le pélicandrome sélectionné.
+Corrections demandées
+- Circuits GAAR : les étiquettes des points sont visibles uniquement lorsque le mode Modification / Création de circuit est actif.
+- Hors mode modification, les noms ne sont plus affichés en permanence ; ils restent disponibles au clic sur le point.
+- Lorsqu'on modifie le nom d'un point GAAR, la fenêtre de recherche feu se ferme automatiquement pour libérer l'écran.
+- La fermeture de la recherche feu ne désactive pas le mode GAAR ni le mode modification/création de circuit.
+- Recherche du nom du point GAAR : comportement rapproché de la recherche feu ; un appui sur un résultat valide directement le nom du point.
+- Popup point GAAR prioritaire et plus exploitable sur iPad avec clavier ouvert.
 
-2. Circuits GAAR
-- Suppression des étiquettes permanentes des points du triangle.
-- Le nom du point s'affiche uniquement au clic sur le point.
-- L'intérieur du triangle GAAR est transparent : seul le contour reste visible.
-
-3. Popup point GAAR
-- Fenêtre agrandie.
-- Champ de nom plus grand et plus tactile.
-- Recherche de commune intégrée avec le même moteur que la recherche feu : approximations, département, alias.
-- Sélection d'une commune depuis la liste, puis validation OK.
-
-Conservé depuis v13.58
-- Fluidité carte offline validée.
-- Réduction des pages blanches/fonds bleus pendant zoom/dézoom.
-- Plafond OACI renforcé.
+Conservé
+- Fluidité validée de v13.58.
+- Corrections v13.59 sur les pélicandromes ajoutés manuellement pris en compte dans BINGO / Prévi / Suivi.
+- Intérieur des triangles GAAR transparent.
 
 Contrôles effectués
 - node --check script.js : OK.
