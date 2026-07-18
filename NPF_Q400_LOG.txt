@@ -1,25 +1,21 @@
-NPF-Q400 — TEST v13.56
+NPF-Q400 — TEST v13.57
 
 Base utilisée
-- TEST v13.55 fluidité carte iPad.
+- Reprise de la TEST v13.56 démarrage offline iPad, qui conserve les corrections de fluidité validées.
 
 Objet de la version
-- Corriger les lenteurs au démarrage à froid et lors des changements de carte offline.
-- Éviter que la PWA lance simultanément carte offline, scan IndexedDB, communes, départements, lignes HT et trafic.
+- Conserver le niveau de fluidité obtenu en v13.56.
+- Réduire l'affichage bleu transitoire lors des zoom in / zoom out.
+- Empêcher la carte OACI offline de zoomer au-delà de son niveau natif disponible.
 
-Modifications principales
-- Suppression du scan complet IndexedDB au démarrage et lors du passage online/offline.
-- Changement de carte offline sans rechargement complet de la PWA : la fenêtre de sélection se ferme rapidement, le calque carte est reconstruit en place.
-- Séquençage du démarrage : couches annexes différées après les premières tuiles offline.
-- Lignes HT : plus d'erreur définitive immédiate au démarrage ; retry automatique silencieux si le fichier GeoJSON n'est pas prêt au premier essai.
-- Conservation de la correction v13.55 : keepBuffer réduit, animations Leaflet désactivées, réveils carte progressifs.
-
-À tester
-1. Ouvrir l'application après fermeture prolongée.
-2. Ne rien toucher pendant 20 à 30 secondes et vérifier si la carte apparaît seule.
-3. Changer NPF ↔ OACI depuis Gestion des cartes.
-4. Vérifier que la fenêtre ne reste plus bloquée longtemps.
-5. Vérifier que les lignes HT finissent par apparaître sans alerte bloquante.
+Modifications
+- Buffer de tuiles offline légèrement augmenté : keepBuffer 2 -> 4.
+  Objectif : garder un peu plus de tuiles autour de l'écran pendant les zooms, sans revenir au keepBuffer 32 qui saturait l'iPad.
+- Fond de carte de chargement remplacé par un fond neutre #eef2f5.
+  Objectif : si une tuile manque brièvement, l'écran ne devient plus bleu.
+- Ajout d'un plafond dédié pour les packs OACI : zoom natif maximum 11.
+  Objectif : éviter les demandes de tuiles OACI inexistantes en zoom in.
+- Conservation du séquençage de démarrage, du changement de carte offline sans reload complet et du retry Lignes HT introduits en v13.56.
 
 Contrôles effectués
 - node --check script.js : OK.
