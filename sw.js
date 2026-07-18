@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-58-oaci-zoom-blanche-npf';
+const SW_VERSION = 'sw-v13-59-gaar-pelic-bingo';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
