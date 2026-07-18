@@ -7321,6 +7321,61 @@ function drawLftwRoute() {
 
 function toggleGaarVisibility() { isGaarMode = !isGaarMode; updateGaarButtonState(); if (isGaarMode) { redrawGaarCircuits(); } else { gaarLayer.clearLayers(); if (isDrawingMode) { toggleGaarDrawingMode(); } } }
 function updateGaarButtonState() { const gaarButton = document.getElementById('gaar-mode-button'); const gaarControls = document.getElementById('gaar-controls'); gaarButton.classList.toggle('active', isGaarMode); gaarControls.style.display = isGaarMode ? 'flex' : 'none'; }
+
+function setGaarEditingBannerVisible(active) {
+    try {
+        let banner = document.getElementById('gaar-editing-banner');
+        if (active) {
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'gaar-editing-banner';
+                banner.className = 'gaar-editing-banner';
+                banner.innerHTML = 'Mode création/modification circuit GAAR activé<span class="gaar-editing-banner-subtitle">Touchez un point pour modifier ou supprimer — touchez la carte pour ajouter un point</span>';
+                document.body.appendChild(banner);
+            }
+        } else if (banner && banner.parentNode) {
+            banner.parentNode.removeChild(banner);
+        }
+        if (document.body) {
+            document.body.classList.toggle('gaar-editing-active-ui', !!active);
+        }
+    } catch (_) {}
+}
+
+function suppressNextGaarMapClick(durationMs = 650) {
+    try {
+        window.__gaarSuppressMapClickUntil = Date.now() + durationMs;
+    } catch (_) {}
+}
+
+function shouldIgnoreGaarMapClick(e) {
+    try {
+        if (Date.now() < (window.__gaarSuppressMapClickUntil || 0)) return true;
+        const original = e && e.originalEvent;
+        const target = original && original.target;
+        if (target && typeof target.closest === 'function') {
+            if (target.closest('.leaflet-interactive, .leaflet-marker-icon, .leaflet-tooltip, .leaflet-popup, .leaflet-control, .gaar-point-search-overlay, .gaar-editing-banner')) {
+                return true;
+            }
+        }
+    } catch (_) {}
+    return false;
+}
+
+function stopGaarUiEvent(event, options = {}) {
+    try { suppressNextGaarMapClick(options.durationMs || 800); } catch (_) {}
+    try { if (event && typeof event.stopPropagation === 'function') event.stopPropagation(); } catch (_) {}
+    if (options.preventDefault !== false) {
+        try { if (event && typeof event.preventDefault === 'function') event.preventDefault(); } catch (_) {}
+    }
+    try {
+        const original = event && event.originalEvent;
+        if (original && typeof original.stopPropagation === 'function') original.stopPropagation();
+        if (options.preventDefault !== false && original && typeof original.preventDefault === 'function') original.preventDefault();
+        if (typeof L !== 'undefined' && L.DomEvent && original) L.DomEvent.stop(original);
+    } catch (_) {}
+}
+
 function updateGaarDrawingButtonState() {
     const editButton = document.getElementById('edit-circuits-button');
     const mapContainer = document.getElementById('map');
@@ -7339,6 +7394,8 @@ function updateGaarDrawingButtonState() {
         mapContainer.classList.toggle('gaar-editing-active', isDrawingMode);
     }
 
+    setGaarEditingBannerVisible(isDrawingMode);
+
     if (status) {
         status.textContent = isDrawingMode
             ? 'Mode CRÉER/MODIFIER actif. Cliquez sur la carte pour ajouter un point ou sur un point pour renommer.'
@@ -7349,10 +7406,30 @@ function updateGaarDrawingButtonState() {
 function toggleGaarDrawingMode() {
     isDrawingMode = !isDrawingMode;
     updateGaarDrawingButtonState();
-    /* v13.61 : étiquettes visibles en mode modification + état du bouton beaucoup plus lisible. */
+    /* v13.62 : étiquettes visibles en mode modification + état du bouton beaucoup plus lisible. */
     redrawGaarCircuits();
 }
-async function handleGaarMapClick(e) { if (!isDrawingMode) return; let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3); if (!targetCircuit) { const manualCircuitsCount = gaarCircuits.filter(c => c && c.isManual).length; targetCircuit = { points: [], color: manualCircuitColors[manualCircuitsCount % manualCircuitColors.length], isManual: true, }; gaarCircuits.push(targetCircuit); } const pointName = await reverseGeocode(e.latlng) || `Point Manuel`; targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName }); redrawGaarCircuits(); saveGaarCircuits(); }
+async function handleGaarMapClick(e) {
+    if (!isDrawingMode) return;
+    if (!e || !e.latlng) return;
+    if (shouldIgnoreGaarMapClick(e)) return;
+
+    let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3);
+    if (!targetCircuit) {
+        const manualCircuitsCount = gaarCircuits.filter(c => c && c.isManual).length;
+        targetCircuit = {
+            points: [],
+            color: manualCircuitColors[manualCircuitsCount % manualCircuitColors.length],
+            isManual: true,
+        };
+        gaarCircuits.push(targetCircuit);
+    }
+
+    const pointName = await reverseGeocode(e.latlng) || `Point Manuel`;
+    targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName });
+    redrawGaarCircuits();
+    saveGaarCircuits();
+}
 async function reverseGeocode(latlng) { document.getElementById('gaar-status').textContent = 'Recherche du nom...'; try { if (!navigator.onLine) { throw new Error("Application hors ligne."); } const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latlng.lat}&lon=${latlng.lng}&zoom=10`); if (!response.ok) throw new Error('La réponse du réseau n\'était pas OK.'); const data = await response.json(); const name = data.address.city || data.address.town || data.address.village || data.display_name.split(',')[0]; document.getElementById('gaar-status').textContent = `Point ajouté près de ${name}.`; return name; } catch (error) { const closestCommuneName = findClosestCommuneName(latlng.lat, latlng.lng); if (closestCommuneName) { document.getElementById('gaar-status').textContent = `Point ajouté près de ${closestCommuneName} (hors-ligne).`; return closestCommuneName; } else { document.getElementById('gaar-status').textContent = 'Nom non trouvé (hors-ligne).'; return null; } } }
 function getGaarPointDisplayName(point) {
     const raw = String(point?.name || '').trim();
@@ -7421,13 +7498,14 @@ function closeGaarPointSearchOverlay() {
     try {
         const overlay = document.getElementById('gaar-point-search-overlay');
         if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (document.body) document.body.classList.remove('gaar-point-search-open');
     } catch (_) {}
     gaarPointSearchOverlayState = null;
 }
 
 function closeFireSearchPanelForGaarPointEdit() {
     /*
-     * v13.61 — édition nom point GAAR en panneau haut iPad :
+     * v13.62 — édition nom point GAAR en panneau haut iPad :
      * on ferme la fenêtre de recherche feu pour libérer l'écran et éviter que
      * la liste de résultats du point passe dessous / soit masquée par le clavier.
      * Les états GAAR (affichage + modification/création de circuit) ne sont pas modifiés.
@@ -7463,6 +7541,10 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     const overlay = document.createElement('div');
     overlay.id = 'gaar-point-search-overlay';
     overlay.className = 'gaar-point-search-overlay';
+    if (document.body) document.body.classList.add('gaar-point-search-open');
+    ['click', 'pointerdown', 'touchstart', 'mousedown'].forEach(type => {
+        overlay.addEventListener(type, (event) => stopGaarUiEvent(event, { preventDefault: false, durationMs: 900 }), { passive: true });
+    });
 
     const panel = document.createElement('div');
     panel.className = 'gaar-point-search-panel';
@@ -7479,7 +7561,11 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     closeButton.className = 'gaar-point-search-close';
     closeButton.setAttribute('aria-label', 'Fermer');
     closeButton.textContent = '×';
-    closeButton.addEventListener('click', closeGaarPointSearchOverlay);
+    closeButton.addEventListener('pointerdown', (event) => stopGaarUiEvent(event), { passive: false });
+    closeButton.addEventListener('click', (event) => {
+        stopGaarUiEvent(event);
+        closeGaarPointSearchOverlay();
+    });
 
     header.appendChild(title);
     header.appendChild(closeButton);
@@ -7528,16 +7614,22 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
         searchTimer = setTimeout(renderResults, 160);
     });
 
-    /* v13.61 : pas de focus automatique différé. Sur iPad, il peut bloquer le clavier.
-       Le clavier doit s'ouvrir sur le tap réel de l'utilisateur dans cette barre. */
+    /* v13.62 : on ne force plus le focus par JS sur iPad.
+       Le clavier s'ouvre via le tap natif dans l'input ; on bloque seulement la propagation vers la carte. */
     input.addEventListener('focus', renderResults);
-    input.addEventListener('click', () => {
-        try { input.focus(); } catch (_) {}
+    input.addEventListener('pointerdown', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+        suppressNextGaarMapClick(900);
+    }, { passive: true });
+    input.addEventListener('touchstart', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+        suppressNextGaarMapClick(900);
+    }, { passive: true });
+    input.addEventListener('click', (event) => {
+        try { event.stopPropagation(); } catch (_) {}
+        suppressNextGaarMapClick(900);
         renderResults();
     });
-    input.addEventListener('touchend', () => {
-        try { input.focus(); } catch (_) {}
-    }, { passive: true });
 
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
@@ -7556,13 +7648,21 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     okButton.type = 'button';
     okButton.className = 'gaar-point-ok-btn';
     okButton.textContent = 'OK';
-    okButton.addEventListener('click', () => setGaarPointName(circuitIndex, pointIndex, input.value));
+    okButton.addEventListener('pointerdown', (event) => stopGaarUiEvent(event), { passive: false });
+    okButton.addEventListener('click', (event) => {
+        stopGaarUiEvent(event);
+        setGaarPointName(circuitIndex, pointIndex, input.value);
+    });
 
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.className = 'delete-point-btn gaar-point-delete-btn';
     deleteButton.textContent = 'Supprimer';
-    deleteButton.addEventListener('click', () => window.deleteGaarPoint(circuitIndex, pointIndex));
+    deleteButton.addEventListener('pointerdown', (event) => stopGaarUiEvent(event), { passive: false });
+    deleteButton.addEventListener('click', (event) => {
+        stopGaarUiEvent(event);
+        window.deleteGaarPoint(circuitIndex, pointIndex);
+    });
 
     actions.appendChild(okButton);
     actions.appendChild(deleteButton);
@@ -7604,12 +7704,14 @@ function redrawGaarCircuits() {
                 fillOpacity: 0.85
             }).addTo(gaarLayer);
 
+            ['mousedown', 'touchstart', 'pointerdown'].forEach(type => {
+                marker.on(type, (event) => {
+                    stopGaarUiEvent(event, { preventDefault: false, durationMs: 900 });
+                });
+            });
+
             marker.on('click', (event) => {
-                try {
-                    if (event && event.originalEvent && L && L.DomEvent) {
-                        L.DomEvent.stop(event.originalEvent);
-                    }
-                } catch (_) {}
+                stopGaarUiEvent(event, { durationMs: 900 });
                 openGaarPointSearchOverlay(circuitIndex, pointIndex);
             });
 
@@ -7630,6 +7732,7 @@ window.updateGaarPoint = function(circuitIndex, pointIndex) {
     setGaarPointName(circuitIndex, pointIndex, input ? input.value : '');
 };
 window.deleteGaarPoint = function(circuitIndex, pointIndex) {
+    suppressNextGaarMapClick(1200);
     if (!gaarCircuits[circuitIndex] || !gaarCircuits[circuitIndex].points[pointIndex]) return;
     gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
     if (gaarCircuits[circuitIndex].points.length === 0) {
@@ -7639,6 +7742,10 @@ window.deleteGaarPoint = function(circuitIndex, pointIndex) {
     saveGaarCircuits();
     closeGaarPointSearchOverlay();
     if (map) map.closePopup();
+    const status = document.getElementById('gaar-status');
+    if (status && isDrawingMode) {
+        status.textContent = 'Point GAAR supprimé. Mode création/modification toujours actif.';
+    }
 };
 function clearAllGaarCircuits() { gaarCircuits = []; gaarLayer.clearLayers(); saveGaarCircuits(); }
 function saveGaarCircuits() { localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits)); }
