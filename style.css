@@ -8372,3 +8372,64 @@ body:not(.app-ready) #nearest-commune-display {
         max-height: 160px !important;
     }
 }
+
+
+/* v13.62 — GAAR : bandeau clair de création/modification + sécurisation des clics suppression */
+.gaar-editing-banner {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2147483300;
+    width: min(680px, calc(100vw - 24px));
+    box-sizing: border-box;
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(22, 163, 74, .98), rgba(13, 122, 52, .98));
+    color: #ffffff;
+    border: 2px solid rgba(6, 78, 59, .98);
+    box-shadow: 0 8px 24px rgba(0,0,0,.34);
+    text-align: center;
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: .01em;
+    pointer-events: none;
+}
+
+.gaar-editing-banner .gaar-editing-banner-subtitle {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    font-weight: 750;
+    opacity: .92;
+}
+
+body.gaar-editing-active-ui #map {
+    outline: 5px solid rgba(22, 163, 74, .55);
+    outline-offset: -5px;
+}
+
+body.gaar-point-search-open .gaar-editing-banner {
+    top: calc(env(safe-area-inset-top, 0px) + 84px);
+    opacity: .94;
+}
+
+.gaar-point-delete-btn {
+    min-height: 54px !important;
+    font-size: 17px !important;
+}
+
+@media (max-height: 760px) {
+    .gaar-editing-banner {
+        top: calc(env(safe-area-inset-top, 0px) + 5px);
+        padding: 8px 10px;
+        font-size: 15px;
+        border-radius: 13px;
+    }
+    .gaar-editing-banner .gaar-editing-banner-subtitle {
+        font-size: 11px;
+    }
+    body.gaar-point-search-open .gaar-editing-banner {
+        top: calc(env(safe-area-inset-top, 0px) + 70px);
+    }
+}
