@@ -1,20 +1,18 @@
-NPF-Q400 — TEST v13.60
+NPF-Q400 — TEST v13.61
 
 Base utilisée
-- Reprise de TEST v13.59, elle-même basée sur v13.58 validée comme référence fluidité.
+- v13.58 conservée comme référence fluidité validée.
+- Corrections v13.59 et v13.60 conservées.
 
-Corrections demandées
-- Circuits GAAR : les étiquettes des points sont visibles uniquement lorsque le mode Modification / Création de circuit est actif.
-- Hors mode modification, les noms ne sont plus affichés en permanence ; ils restent disponibles au clic sur le point.
-- Lorsqu'on modifie le nom d'un point GAAR, la fenêtre de recherche feu se ferme automatiquement pour libérer l'écran.
-- La fermeture de la recherche feu ne désactive pas le mode GAAR ni le mode modification/création de circuit.
-- Recherche du nom du point GAAR : comportement rapproché de la recherche feu ; un appui sur un résultat valide directement le nom du point.
-- Popup point GAAR prioritaire et plus exploitable sur iPad avec clavier ouvert.
-
-Conservé
-- Fluidité validée de v13.58.
-- Corrections v13.59 sur les pélicandromes ajoutés manuellement pris en compte dans BINGO / Prévi / Suivi.
-- Intérieur des triangles GAAR transparent.
+Corrections v13.61
+- Bouton GAAR renommé en « Créer/Modifier ».
+- État modification GAAR rendu beaucoup plus visible : bouton vert plein, mention ACTIF, contour carte en mode édition.
+- Les étiquettes des points GAAR restent visibles tant que le mode Créer/Modifier est actif.
+- La fenêtre de recherche/renommage d'un point GAAR n'est plus attachée au point Leaflet.
+- La recherche du nom du point s'affiche maintenant en panneau fixe en haut de l'écran.
+- L'ouverture du panneau ferme la recherche feu mais conserve le mode création/modification du circuit GAAR.
+- Suppression du focus automatique différé qui pouvait empêcher le clavier iPad de s'ouvrir.
+- Le clavier doit s'ouvrir sur le tap réel dans la barre de recherche du point.
 
 Contrôles effectués
 - node --check script.js : OK.
