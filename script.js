@@ -519,11 +519,15 @@ const COMMUNES_DISPLAY_MIN_ZOOM = 10.5;
 const ONLINE_MAX_NATIVE_ZOOM = 18;
 const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
 const OFFLINE_HARD_MAX_NATIVE_ZOOM = 13;
-// v13.55 — iPad : tampon de tuiles réduit pour éviter la saturation Leaflet/IndexedDB.
+// v13.56 — iPad : démarrage offline séquencé, sans scan IndexedDB lourd au lancement.
 const OFFLINE_TILE_KEEP_BUFFER = 2;
 const OFFLINE_TILE_UPDATE_INTERVAL_MS = 80;
-const OFFLINE_TILE_WAKE_DELAYS_MS = [120, 450, 1000, 2000];
+const OFFLINE_TILE_WAKE_DELAYS_MS = [250, 900, 1800, 3500, 6500, 10000];
+const OFFLINE_AUX_LAYER_START_DELAY_MS = 6500;
+const OFFLINE_DISABLE_STARTUP_FORCE_SCAN = true;
 let offlineTileWakeToken = 0;
+let offlineMapSwitchToken = 0;
+let highVoltageLinesRetryToken = 0;
 const GLOBAL_MAX_ZOOM = 18;
 const GLOBAL_MIN_ZOOM = 0;
 let baseTileMaxNativeZoom = ONLINE_MAX_NATIVE_ZOOM;
@@ -691,8 +695,9 @@ async function clearTileCaches() {
 
 async function refreshOfflineTilesRendering() {
     notifyServiceWorkerActivePacks(activeOfflinePacks);
-    if (map && baseTileLayer) {
+    if (map) {
         setupBaseTileLayer();
+        scheduleOfflineTileWake('refreshOfflineTilesRendering');
     }
 }
 
@@ -1468,11 +1473,8 @@ async function initializeApp() {
         }
 
         await initializeOfflineTilePreference();
-        // Démarrage rapide: utilise d'abord les bornes de zoom déjà connues, puis lance un scan complet en arrière-plan.
+        // v13.56 — démarrage rapide : pas de scan complet IndexedDB au lancement.
         await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
-        setTimeout(() => {
-            updateBaseTileNativeZoomFromAvailability({ forceScan: true }).catch(() => {});
-        }, 0);
         displayInstalledMaps();
     } else {
         mapSourceMode = DEFAULT_MAP_SOURCE_MODE;
@@ -1535,8 +1537,8 @@ async function initializeApp() {
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
     setTimeout(showUpdateReminderIfDue, 1700);
     setTimeout(() => {
-        updateBaseTileNativeZoomFromAvailability({ forceScan: true }).catch(() => {});
-    }, 0);
+        scheduleOfflineTileWake('startup-post-init');
+    }, 250);
     setupGpsResumeHandlers();
     setTimeout(() => {
         ensureCommunesLayerDataLoaded()
@@ -1956,7 +1958,7 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-        // v13.55 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
+        // v13.56 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
         zoomAnimation: false,
         fadeAnimation: false,
         markerZoomAnimation: false
@@ -1996,22 +1998,7 @@ function initMap() {
     drawFireHistoryMarkers();
     redrawGaarCircuits();
 
-    if (areDepartmentsVisible) {
-        setTimeout(() => { toggleDepartmentsLayer(true); }, 150);
-    }
-
-    if (showHighVoltageLinesLayer) {
-        setTimeout(() => { toggleHighVoltageLinesLayer(true); }, 350);
-    }
-
-    if (showTrafficLayer) {
-        setTimeout(() => { toggleTrafficLayer(true); }, 600);
-    }
-
-    areCommunesVisible = localStorage.getItem(SHOW_COMMUNES_LAYER_KEY) === 'true';
-    if (areCommunesVisible) {
-        setTimeout(() => { toggleCommunesLayer(true); }, 250);
-    }
+    scheduleStartupAuxiliaryLayers();
 
     map.on('click', handleGaarMapClick);
 
@@ -2156,6 +2143,61 @@ function scheduleOfflineTileWake(reason = 'startup') {
             }
         }, delay);
     });
+}
+
+function scheduleStartupAuxiliaryLayers() {
+    /*
+     * v13.56 — iPad : on ne charge plus les couches annexes en même temps que les
+     * premières tuiles offline. Safari/IndexedDB devient très lent si la carte,
+     * les lignes HT, les communes et les départements démarrent simultanément.
+     */
+    const baseDelay = offlineTilesMode ? OFFLINE_AUX_LAYER_START_DELAY_MS : 900;
+
+    if (areDepartmentsVisible) {
+        setTimeout(() => { toggleDepartmentsLayer(true); }, baseDelay + 600);
+    }
+
+    areCommunesVisible = localStorage.getItem(SHOW_COMMUNES_LAYER_KEY) === 'true';
+    if (areCommunesVisible) {
+        setTimeout(() => { toggleCommunesLayer(true); }, baseDelay + 1400);
+    }
+
+    if (showHighVoltageLinesLayer) {
+        setTimeout(() => {
+            toggleHighVoltageLinesLayer(true, { silent: true, retry: true, source: 'startup' });
+        }, baseDelay + 2200);
+    }
+
+    if (showTrafficLayer) {
+        setTimeout(() => { toggleTrafficLayer(true); }, baseDelay + 3200);
+    }
+}
+
+function setOfflineMapSwitchBusy(message = 'Changement de carte offline...') {
+    try {
+        const statusMessage = document.getElementById('import-status-message');
+        if (statusMessage) statusMessage.textContent = message;
+    } catch (_) {}
+}
+
+function closeOfflineMapModalSoon(delay = 120) {
+    setTimeout(() => {
+        try {
+            const modal = document.getElementById('offline-map-modal');
+            if (modal) modal.style.display = 'none';
+        } catch (_) {}
+    }, delay);
+}
+
+function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
+    try {
+        if (map) {
+            setupBaseTileLayer();
+            scheduleOfflineTileWake(reason);
+        }
+    } catch (error) {
+        console.warn('Reconstruction carte offline impossible:', reason, error);
+    }
 }
 
 function setupBaseTileLayer() {
@@ -2834,7 +2876,7 @@ async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = 
         let offlineMinZoom = Number.isFinite(storedOfflineMinZoom) ? storedOfflineMinZoom : null;
         let offlineMaxZoom = Number.isFinite(storedOfflineMaxZoom) ? storedOfflineMaxZoom : null;
 
-        if (shouldForceScan) {
+        if (shouldForceScan && !OFFLINE_DISABLE_STARTUP_FORCE_SCAN) {
             const zoomRange = await findOfflineTileZoomRange();
             if (!zoomRange) {
                 offlineMinZoom = null;
@@ -3329,18 +3371,35 @@ async function loadHighVoltageLinesLayerData() {
     }
 }
 
-async function toggleHighVoltageLinesLayer(forceState = null) {
+function scheduleHighVoltageLinesRetry(source = 'retry') {
+    const token = ++highVoltageLinesRetryToken;
+    const delays = [2500, 7000, 15000, 30000];
+    delays.forEach((delay) => {
+        setTimeout(() => {
+            if (token !== highVoltageLinesRetryToken) return;
+            if (!showHighVoltageLinesLayer || hasLoadedHighVoltageLines) return;
+            toggleHighVoltageLinesLayer(true, { silent: true, retry: false, source }).catch(() => {});
+        }, delay);
+    });
+}
+
+async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
     const shouldShow = forceState === null ? !showHighVoltageLinesLayer : Boolean(forceState);
+    const silent = !!options.silent;
+    const allowRetry = options.retry !== false;
 
     if (shouldShow && !hasLoadedHighVoltageLines) {
         try {
             await loadHighVoltageLinesLayerData();
         } catch (error) {
-            console.error('Erreur de chargement du calque lignes HT:', error);
-            alert("Impossible de charger le calque Lignes HT. Vérifiez que le fichier lignes_ht_rte_simplifiees.geojson est bien présent à la racine du dépôt et que l'application a été mise à jour.");
-            showHighVoltageLinesLayer = false;
-            localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, 'false');
+            console.warn('Chargement lignes HT différé:', options.source || 'manual', error);
+            showHighVoltageLinesLayer = true;
+            localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, 'true');
             refreshHighVoltageLinesButtonState();
+            if (allowRetry) scheduleHighVoltageLinesRetry(options.source || 'load-error');
+            if (!silent) {
+                alert("Chargement Lignes HT différé. L'application va réessayer automatiquement.");
+            }
             return;
         }
     }
@@ -7389,20 +7448,13 @@ async function setMapSourceMode(mode) {
     localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
     updateMapSourceButtons();
     updateOfflineStatus();
+    setOfflineMapSwitchBusy(nextMode === 'offline' ? 'Activation carte offline...' : 'Retour carte online...');
     try {
         await setOfflineTilesEnabled(mapSourceMode === 'offline');
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
-        try {
-            await withTimeout(
-                updateBaseTileNativeZoomFromAvailability({ forceScan: true }),
-                5000,
-                'Analyse des tuiles trop longue.'
-            );
-        } catch (zoomError) {
-            console.warn('Analyse zoom offline interrompue:', zoomError);
-        }
-        if (map && baseTileLayer) setupBaseTileLayer();
+        await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode');
     } catch (error) {
         mapSourceMode = previousMode;
         localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
@@ -7475,7 +7527,7 @@ async function purgeInactivePacksCache() {
 
     const updatedInstalled = installedPacks.filter((pack) => !inactiveSet.has(pack.name));
     localStorage.setItem('installedMapPacks', JSON.stringify(updatedInstalled));
-    await updateBaseTileNativeZoomFromAvailability({ forceScan: mapSourceMode === 'offline' });
+    await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
     displayInstalledMaps();
     alert(`Purge terminée: ${deletedCount} tuiles supprimées (${inactiveNames.length} pack(s)).`);
 }
@@ -8175,6 +8227,52 @@ function displayInstalledMaps() {
     updateOfflineStatus();
 }
 
+async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packNames) {
+    /*
+     * v13.56 — changement de carte sans recharger toute la PWA.
+     * Le rechargement complet relançait service worker + IndexedDB + couches annexes,
+     * ce qui pouvait bloquer la fenêtre de sélection plusieurs dizaines de secondes sur iPad.
+     */
+    const token = ++offlineMapSwitchToken;
+    const nextPacks = checked ? packNames : [];
+    const nextMode = checked ? 'offline' : 'online';
+
+    isMapSourceSwitching = true;
+    updateMapSourceButtons();
+    setOfflineMapSwitchBusy(
+        checked
+            ? `Carte ${groupName} sélectionnée (${packNames.length} fichier(s)). Chargement progressif...`
+            : 'Carte offline désactivée. Retour online...'
+    );
+    closeOfflineMapModalSoon(120);
+
+    try {
+        await persistSimpleActiveOfflinePacks(nextPacks);
+        if (token !== offlineMapSwitchToken) return;
+
+        mapSourceMode = nextMode;
+        localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
+        await setOfflineTilesEnabled(mapSourceMode === 'offline');
+        setOfflineOnlineFallbackMode(false);
+        notifyServiceWorkerActivePacks(activeOfflinePacks);
+        await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup');
+
+        setTimeout(() => rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-second-pass'), 1200);
+        setTimeout(() => scheduleStartupAuxiliaryLayers(), 2500);
+    } catch (error) {
+        console.error('Changement de carte offline impossible:', error);
+        alert(`Impossible de changer de carte offline: ${error.message || error}`);
+    } finally {
+        if (token === offlineMapSwitchToken) {
+            isMapSourceSwitching = false;
+            updateMapSourceButtons();
+            updateOfflineStatus();
+            displayInstalledMaps();
+        }
+    }
+}
+
 window.selectSimpleMapGroup = async function(groupName, checked = true) {
     const packNames = getInstalledPackNamesForGroup(groupName);
     if (!packNames.length) {
@@ -8187,12 +8285,7 @@ window.selectSimpleMapGroup = async function(groupName, checked = true) {
      * v12.12 — une seule carte active à la fois, mais une carte peut être composée
      * de plusieurs ZIP indépendants : OpenStreet_01...OpenStreet_05.
      */
-    await persistSimpleActiveOfflinePacks(checked ? packNames : []);
-    reloadAfterOfflinePackChange(
-        checked
-            ? `Carte ${groupName} sélectionnée (${packNames.length} fichier(s)). Rechargement...`
-            : 'Carte offline désactivée. Rechargement...'
-    );
+    await applyOfflineMapGroupSelectionInPlace(groupName, checked, packNames);
 };
 
 window.selectSimpleMapPack = async function(packName, checked = true) {
