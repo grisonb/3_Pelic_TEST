@@ -8021,8 +8021,7 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
-/* v13.50 — Volume/Masse retardant : ligne Réfracto. compacte pour dégager le clavier iPad.
-   Retour au système offline raster ZIP validé, sans styles PMTiles.
+/* v13.54 — Volume/Masse retardant : ligne Réfracto. compacte pour dégager le clavier iPad.
    Objectif : gagner de la hauteur uniquement sur la ligne Réfracto. = Densité,
    sans réduire les deux lignes de calcul Masse/Volume ni les boutons. */
 .rlt-refracto-row {
