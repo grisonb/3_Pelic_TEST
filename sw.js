@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v2026-56-sans-3d';
+const SW_VERSION = 'sw-v13-55-fluidite-carte-ipad';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
