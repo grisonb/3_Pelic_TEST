@@ -7406,7 +7406,7 @@ function updateGaarDrawingButtonState() {
 function toggleGaarDrawingMode() {
     isDrawingMode = !isDrawingMode;
     updateGaarDrawingButtonState();
-    /* v13.62 : étiquettes visibles en mode modification + état du bouton beaucoup plus lisible. */
+    /* v13.64 : étiquettes visibles en mode modification + état du bouton beaucoup plus lisible. */
     redrawGaarCircuits();
 }
 async function handleGaarMapClick(e) {
@@ -7481,11 +7481,92 @@ function searchCommunesForGaarPoint(rawSearch) {
         .slice(0, 10);
 }
 
-function setGaarPointName(circuitIndex, pointIndex, value) {
+function getGaarCommuneLatLng(commune) {
+    if (!commune) return null;
+    const lat = Number(
+        commune.latitude_mairie ??
+        commune.lat ??
+        commune.latitude ??
+        commune.centre_lat
+    );
+    const lng = Number(
+        commune.longitude_mairie ??
+        commune.lng ??
+        commune.lon ??
+        commune.longitude ??
+        commune.centre_lon
+    );
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+}
+
+function findBestGaarCommuneForInput(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+
+    const normalizedInput = simplifyString(
+        raw
+            .replace(/\s*\([^)]*\)\s*$/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+    );
+
+    const results = searchCommunesForGaarPoint(raw);
+    if (!results.length) return null;
+
+    const exact = results.find((candidate) => {
+        const candidateName = simplifyString(candidate?.nom_standard || candidate?.name || '');
+        const candidateWithDep = simplifyString(formatGaarCommuneResultName(candidate));
+        return candidateName === normalizedInput || candidateWithDep === simplifyString(raw);
+    });
+
+    return exact || results[0];
+}
+
+function applyGaarPointCommune(circuitIndex, pointIndex, commune, fallbackName = '') {
+    const circuit = gaarCircuits[circuitIndex];
+    const point = circuit && circuit.points ? circuit.points[pointIndex] : null;
+    if (!point || !commune) return false;
+
+    const latLng = getGaarCommuneLatLng(commune);
+    if (!latLng) return false;
+
+    point.name = formatGaarCommuneResultName(commune) || String(fallbackName || point.name || 'Point GAAR').trim();
+    point.lat = latLng.lat;
+    point.lng = latLng.lng;
+
+    redrawGaarCircuits();
+    saveGaarCircuits();
+    closeGaarPointSearchOverlay();
+    if (map) {
+        map.closePopup();
+        try { map.panTo([point.lat, point.lng], { animate: false }); } catch (_) {}
+    }
+
+    const status = document.getElementById('gaar-status');
+    if (status) status.textContent = `Point GAAR déplacé sur ${point.name}.`;
+    return true;
+}
+
+function setGaarPointName(circuitIndex, pointIndex, value, options = {}) {
     const newName = String(value || '').trim();
     if (!newName) return false;
-    if (!gaarCircuits[circuitIndex] || !gaarCircuits[circuitIndex].points[pointIndex]) return false;
-    gaarCircuits[circuitIndex].points[pointIndex].name = newName;
+
+    if (options && options.moveToCommune === true) {
+        const commune = options.commune || findBestGaarCommuneForInput(newName);
+        if (commune && applyGaarPointCommune(circuitIndex, pointIndex, commune, newName)) {
+            return true;
+        }
+    }
+
+    const circuit = gaarCircuits[circuitIndex];
+    const point = circuit && circuit.points ? circuit.points[pointIndex] : null;
+    if (!point) return false;
+
+    /* v13.64 — saisie libre sans commune reconnue : renommage simple.
+       Sélection d'une commune / OK sur une ville reconnue : déplacement du point sur la commune. */
+    point.name = newName;
+
     redrawGaarCircuits();
     saveGaarCircuits();
     closeGaarPointSearchOverlay();
@@ -7505,7 +7586,7 @@ function closeGaarPointSearchOverlay() {
 
 function closeFireSearchPanelForGaarPointEdit() {
     /*
-     * v13.62 — édition nom point GAAR en panneau haut iPad :
+     * v13.64 — édition nom point GAAR en panneau haut iPad :
      * on ferme la fenêtre de recherche feu pour libérer l'écran et éviter que
      * la liste de résultats du point passe dessous / soit masquée par le clavier.
      * Les états GAAR (affichage + modification/création de circuit) ne sont pas modifiés.
@@ -7570,6 +7651,9 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     header.appendChild(title);
     header.appendChild(closeButton);
 
+    const inputWrapper = document.createElement('div');
+    inputWrapper.className = 'gaar-point-search-field-wrapper gaar-point-search-field-wrapper-top';
+
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'gaar-point-search-input gaar-point-search-input-top';
@@ -7580,6 +7664,15 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     input.autocapitalize = 'words';
     input.spellcheck = false;
     input.inputMode = 'text';
+
+    const clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'gaar-point-search-clear';
+    clearButton.setAttribute('aria-label', 'Effacer la recherche');
+    clearButton.textContent = '×';
+
+    inputWrapper.appendChild(input);
+    inputWrapper.appendChild(clearButton);
 
     const resultsList = document.createElement('ul');
     resultsList.className = 'gaar-point-results gaar-point-results-top';
@@ -7596,25 +7689,58 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
         results.forEach((result) => {
             const li = document.createElement('li');
             li.textContent = `${result.nom_standard} (${result.dep_nom || result.dep_code} - ${result.dep_code})`;
-            li.addEventListener('pointerdown', (event) => {
-                event.preventDefault();
-                event.stopPropagation();
+            const applyResultName = (event) => {
+                if (event) {
+                    try { event.preventDefault(); } catch (_) {}
+                    try { event.stopPropagation(); } catch (_) {}
+                }
+                suppressNextGaarMapClick(900);
                 const selectedName = formatGaarCommuneResultName(result);
                 input.value = selectedName;
-                setGaarPointName(circuitIndex, pointIndex, selectedName);
-            });
+                /* v13.64 : sélection d'une commune = déplacement du point sur cette commune. */
+                setGaarPointName(circuitIndex, pointIndex, selectedName, { moveToCommune: true, commune: result });
+            };
+            li.addEventListener('pointerdown', applyResultName, { passive: false });
+            li.addEventListener('click', applyResultName);
             resultsList.appendChild(li);
         });
         resultsList.style.display = 'block';
     };
 
+    const updateClearButtonVisibility = () => {
+        clearButton.style.display = input.value ? 'inline-flex' : 'none';
+    };
+
+    const clearGaarPointSearchInput = () => {
+        input.value = '';
+        resultsList.innerHTML = '';
+        resultsList.style.display = 'none';
+        updateClearButtonVisibility();
+    };
+
     let searchTimer = null;
     input.addEventListener('input', () => {
+        updateClearButtonVisibility();
         if (searchTimer) clearTimeout(searchTimer);
         searchTimer = setTimeout(renderResults, 160);
     });
 
-    /* v13.62 : on ne force plus le focus par JS sur iPad.
+    clearButton.addEventListener('pointerdown', (event) => {
+        stopGaarUiEvent(event, { durationMs: 900 });
+        clearGaarPointSearchInput();
+        /* Garder le clavier ouvert quand iPad l'a déjà affiché. */
+        try { input.focus({ preventScroll: true }); } catch (_) { try { input.focus(); } catch (_) {} }
+    }, { passive: false });
+
+    clearButton.addEventListener('click', (event) => {
+        stopGaarUiEvent(event, { durationMs: 900 });
+        clearGaarPointSearchInput();
+        try { input.focus({ preventScroll: true }); } catch (_) { try { input.focus(); } catch (_) {} }
+    });
+
+    updateClearButtonVisibility();
+
+    /* v13.64 : on ne force plus le focus par JS sur iPad.
        Le clavier s'ouvre via le tap natif dans l'input ; on bloque seulement la propagation vers la carte. */
     input.addEventListener('focus', renderResults);
     input.addEventListener('pointerdown', (event) => {
@@ -7634,7 +7760,7 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
-            setGaarPointName(circuitIndex, pointIndex, input.value);
+            setGaarPointName(circuitIndex, pointIndex, input.value, { moveToCommune: true });
         } else if (event.key === 'Escape') {
             event.preventDefault();
             closeGaarPointSearchOverlay();
@@ -7651,7 +7777,7 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     okButton.addEventListener('pointerdown', (event) => stopGaarUiEvent(event), { passive: false });
     okButton.addEventListener('click', (event) => {
         stopGaarUiEvent(event);
-        setGaarPointName(circuitIndex, pointIndex, input.value);
+        setGaarPointName(circuitIndex, pointIndex, input.value, { moveToCommune: true });
     });
 
     const deleteButton = document.createElement('button');
@@ -7668,7 +7794,7 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     actions.appendChild(deleteButton);
 
     panel.appendChild(header);
-    panel.appendChild(input);
+    panel.appendChild(inputWrapper);
     panel.appendChild(resultsList);
     panel.appendChild(actions);
     overlay.appendChild(panel);
@@ -7729,7 +7855,7 @@ function redrawGaarCircuits() {
 
 window.updateGaarPoint = function(circuitIndex, pointIndex) {
     const input = document.getElementById(`gaar-input-${circuitIndex}-${pointIndex}`);
-    setGaarPointName(circuitIndex, pointIndex, input ? input.value : '');
+    setGaarPointName(circuitIndex, pointIndex, input ? input.value : '', { moveToCommune: true });
 };
 window.deleteGaarPoint = function(circuitIndex, pointIndex) {
     suppressNextGaarMapClick(1200);
