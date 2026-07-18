@@ -1,25 +1,29 @@
-NPF-Q400 — TEST v13.58
+NPF-Q400 — TEST v13.59
 
 Base utilisée
-- Reprise de la TEST v13.57, elle-même issue de v13.56 qui a validé le très haut niveau de fluidité.
+- Reprise de la TEST v13.58, conservée comme référence de fluidité carte.
 
-Objet de la version
-- Corriger les derniers flashes blancs furtifs sur la carte NPF lors des zoom in / zoom out.
-- Corriger le zoom in OACI qui allait encore au-delà des tuiles disponibles.
-- Conserver la fluidité obtenue en v13.56/v13.57.
+Corrections incluses
+1. Pélicandromes ajoutés manuellement
+- Un terrain transformé en PÉLIC, par exemple Melun, est maintenant traité comme un vrai pélicandrome pour les calculs.
+- Correction des BINGO / Prévi / Suivi : le calcul n'utilise plus seulement la liste des pélicandromes par défaut.
+- Lorsqu'un terrain est ajouté en PÉLIC, il devient aussi le pélicandrome sélectionné.
 
-Modifications
-- Buffer de tuiles offline augmenté modérément : keepBuffer 4 -> 6.
-  Objectif : garder un peu plus de tuiles autour de l'écran pendant les zooms, sans revenir au keepBuffer 32 qui saturait l'iPad.
-- Fond de chargement de la carte renforcé : #eef2f5 -> #d8e2e8.
-  Objectif : rendre les manques de tuiles beaucoup moins visibles.
-- Ajout d'une tuile neutre opaque comme errorTileUrl.
-  Objectif : éviter l'effet "page blanche" quand une tuile n'est pas encore disponible ou manque brièvement.
-- Plafond OACI abaissé : zoom natif maximum 11 -> 10.
-  Objectif : empêcher le zoom in OACI d'aller dans des niveaux sans tuiles.
-- Détection OACI élargie aux packs nommés IGN / Scan / OACI IGN.
-  Objectif : corriger le cas où la carte OACI est classée comme IGN et échappe au plafond OACI.
-- Conservation du séquençage de démarrage, du changement de carte offline sans reload complet et du retry Lignes HT introduits en v13.56.
+2. Circuits GAAR
+- Suppression des étiquettes permanentes des points du triangle.
+- Le nom du point s'affiche uniquement au clic sur le point.
+- L'intérieur du triangle GAAR est transparent : seul le contour reste visible.
+
+3. Popup point GAAR
+- Fenêtre agrandie.
+- Champ de nom plus grand et plus tactile.
+- Recherche de commune intégrée avec le même moteur que la recherche feu : approximations, département, alias.
+- Sélection d'une commune depuis la liste, puis validation OK.
+
+Conservé depuis v13.58
+- Fluidité carte offline validée.
+- Réduction des pages blanches/fonds bleus pendant zoom/dézoom.
+- Plafond OACI renforcé.
 
 Contrôles effectués
 - node --check script.js : OK.
