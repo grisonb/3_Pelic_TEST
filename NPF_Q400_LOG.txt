@@ -1,18 +1,21 @@
-NPF-Q400 — TEST v13.61
+NPF-Q400 — TEST v13.62
 
 Base utilisée
 - v13.58 conservée comme référence fluidité validée.
-- Corrections v13.59 et v13.60 conservées.
+- Corrections v13.59, v13.60 et v13.61 conservées.
 
-Corrections v13.61
-- Bouton GAAR renommé en « Créer/Modifier ».
-- État modification GAAR rendu beaucoup plus visible : bouton vert plein, mention ACTIF, contour carte en mode édition.
-- Les étiquettes des points GAAR restent visibles tant que le mode Créer/Modifier est actif.
-- La fenêtre de recherche/renommage d'un point GAAR n'est plus attachée au point Leaflet.
-- La recherche du nom du point s'affiche maintenant en panneau fixe en haut de l'écran.
-- L'ouverture du panneau ferme la recherche feu mais conserve le mode création/modification du circuit GAAR.
-- Suppression du focus automatique différé qui pouvait empêcher le clavier iPad de s'ouvrir.
-- Le clavier doit s'ouvrir sur le tap réel dans la barre de recherche du point.
+Objet de la version
+- Correction du mode création/modification circuit GAAR.
+- Suppression des points GAAR sécurisée.
+- Ajout d'un bandeau haut explicite quand le mode création/modification est actif.
+
+Corrections
+- Ajout du bandeau : « Mode création/modification circuit GAAR activé ».
+- Clic sur un point existant : n'ajoute plus de nouveau point par rebond sur la carte.
+- Bouton Supprimer du point : stoppe la propagation vers la carte avant suppression.
+- Après suppression, le mode création/modification reste actif.
+- Recherche nom point GAAR : événements clavier/toucher sécurisés pour ne plus bloquer la carte ni créer de point involontaire.
+- Maintien des étiquettes visibles seulement lorsque Créer/Modifier est actif.
 
 Contrôles effectués
 - node --check script.js : OK.
