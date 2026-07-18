@@ -1,21 +1,20 @@
-NPF-Q400 — TEST v13.62
+NPF-Q400 — TEST v13.64
 
 Base utilisée
-- v13.58 conservée comme référence fluidité validée.
-- Corrections v13.59, v13.60 et v13.61 conservées.
+- Reprise de v13.63, elle-même basée sur v13.58 validée comme référence fluidité.
 
 Objet de la version
-- Correction du mode création/modification circuit GAAR.
-- Suppression des points GAAR sécurisée.
-- Ajout d'un bandeau haut explicite quand le mode création/modification est actif.
+- Correction du comportement de recherche du nom d'un point de circuit GAAR.
 
 Corrections
-- Ajout du bandeau : « Mode création/modification circuit GAAR activé ».
-- Clic sur un point existant : n'ajoute plus de nouveau point par rebond sur la carte.
-- Bouton Supprimer du point : stoppe la propagation vers la carte avant suppression.
-- Après suppression, le mode création/modification reste actif.
-- Recherche nom point GAAR : événements clavier/toucher sécurisés pour ne plus bloquer la carte ni créer de point involontaire.
-- Maintien des étiquettes visibles seulement lorsque Créer/Modifier est actif.
+- Sélection d'une commune dans la recherche du point GAAR :
+  - le nom du point est mis à jour ;
+  - le point est déplacé sur les coordonnées de la commune sélectionnée.
+- Validation par OK ou Entrée :
+  - si la saisie correspond à une commune trouvée, le point est déplacé sur cette commune ;
+  - si aucune commune fiable n'est trouvée, seul le nom saisi est appliqué.
+- Le bouton X de la recherche point est conservé.
+- Le mode Création/Modification GAAR, les étiquettes en modification, la suppression de points, le bandeau actif et la fluidité v13.58 restent conservés.
 
 Contrôles effectués
 - node --check script.js : OK.
