@@ -1,30 +1,27 @@
-NPF-Q400 — TEST v13.55
+NPF-Q400 — TEST v13.56
 
 Base utilisée
-- Reprise de TEST v13.54 bloc/fuel HDV fuel OACI.
+- TEST v13.55 fluidité carte iPad.
 
 Objet de la version
-- Correction ciblée de la fluidité carte iPad/PWA.
-- Diagnostic : problème constaté aussi avec la carte OACI légère ; la cause probable est donc le rendu Leaflet / tampon de tuiles, pas seulement le poids du pack raster.
+- Corriger les lenteurs au démarrage à froid et lors des changements de carte offline.
+- Éviter que la PWA lance simultanément carte offline, scan IndexedDB, communes, départements, lignes HT et trafic.
 
-Modifications carte
-- Réduction du tampon Leaflet des tuiles : keepBuffer 32 -> 2.
-- Réduction de l'intervalle de mise à jour des tuiles : 160 ms -> 80 ms.
-- Désactivation des animations de zoom et de zoom marqueurs pour limiter les anciennes tuiles étirées / zones bleues après zoom.
-- Ajout d'un réveil automatique du calque carte après création : invalidateSize + redraw à 120 ms, 450 ms, 1000 ms et 2000 ms.
+Modifications principales
+- Suppression du scan complet IndexedDB au démarrage et lors du passage online/offline.
+- Changement de carte offline sans rechargement complet de la PWA : la fenêtre de sélection se ferme rapidement, le calque carte est reconstruit en place.
+- Séquençage du démarrage : couches annexes différées après les premières tuiles offline.
+- Lignes HT : plus d'erreur définitive immédiate au démarrage ; retry automatique silencieux si le fichier GeoJSON n'est pas prêt au premier essai.
+- Conservation de la correction v13.55 : keepBuffer réduit, animations Leaflet désactivées, réveils carte progressifs.
 
-Conservé
-- Pas de PMTiles.
-- Pas de 3D / Cesium.
-- Conservation des corrections v13.54 : LIMITE HDV figée par vol, fuel départ 3500 kg, OACI corrigés.
-- Service worker et base IndexedDB offline inchangés : OfflineTilesDB_v12_21.
+À tester
+1. Ouvrir l'application après fermeture prolongée.
+2. Ne rien toucher pendant 20 à 30 secondes et vérifier si la carte apparaît seule.
+3. Changer NPF ↔ OACI depuis Gestion des cartes.
+4. Vérifier que la fenêtre ne reste plus bloquée longtemps.
+5. Vérifier que les lignes HT finissent par apparaître sans alerte bloquante.
 
 Contrôles effectués
 - node --check script.js : OK.
 - node --check sw.js : OK.
-- manifest.json : JSON valide.
-
-Test attendu
-- À l'ouverture, la carte doit afficher les tuiles sans devoir zoomer/dézoomer.
-- Après zoom/dézoom, les anciennes zones bleues doivent disparaître plus vite.
-- Si le déplacement devient moins agréable, garder cette version uniquement comme diagnostic et remonter keepBuffer à 4 dans un second test.
+- manifest.json : valide.
