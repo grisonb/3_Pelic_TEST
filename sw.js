@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-62-gaar-suppression-points-bandeau';
+const SW_VERSION = 'sw-v13-64-gaar_point_deplace_commune';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
