@@ -8085,3 +8085,116 @@ body:not(.app-ready) #nearest-commune-display {
     }
 }
 
+
+/* v13.59 — GAAR : popup point plus large + recherche commune type feu */
+.leaflet-popup.gaar-point-popup .leaflet-popup-content-wrapper {
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.28);
+}
+
+.leaflet-popup.gaar-point-popup .leaflet-popup-content {
+    width: 370px !important;
+    max-width: 82vw !important;
+    margin: 14px 16px;
+}
+
+.gaar-point-popup-form {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.gaar-point-popup-title {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 10px;
+    color: #1f2937;
+    font-size: 15px;
+}
+
+.gaar-point-popup-title b {
+    color: #005a9c;
+    font-size: 17px;
+}
+
+.gaar-point-search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.gaar-point-search-input {
+    width: 100%;
+    min-height: 50px;
+    padding: 13px 14px;
+    font-size: 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    outline: none;
+}
+
+.gaar-point-search-input:focus {
+    border-color: #005a9c;
+    box-shadow: 0 0 0 3px rgba(0, 90, 156, .18);
+}
+
+.gaar-point-results {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    max-height: 230px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: #ffffff;
+    -webkit-overflow-scrolling: touch;
+}
+
+.gaar-point-results li {
+    padding: 13px 14px;
+    border-bottom: 1px solid #eef2f5;
+    font-size: 16px;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.gaar-point-results li:last-child {
+    border-bottom: none;
+}
+
+.gaar-point-results li:active,
+.gaar-point-results li:hover {
+    background: #e9f5ff;
+}
+
+.gaar-point-popup-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.gaar-point-popup-actions button {
+    flex: 1;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.gaar-point-ok-btn {
+    background: var(--success-color);
+}
+
+.gaar-point-delete-btn {
+    background: var(--secondary-color);
+}
+
+.gaar-point-label {
+    display: none !important;
+}
+
