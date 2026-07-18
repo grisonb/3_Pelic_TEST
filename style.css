@@ -8374,7 +8374,7 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 
-/* v13.62 — GAAR : bandeau clair de création/modification + sécurisation des clics suppression */
+/* v13.64 — GAAR : bandeau clair de création/modification + sécurisation des clics suppression */
 .gaar-editing-banner {
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 10px);
@@ -8432,4 +8432,42 @@ body.gaar-point-search-open .gaar-editing-banner {
     body.gaar-point-search-open .gaar-editing-banner {
         top: calc(env(safe-area-inset-top, 0px) + 70px);
     }
+}
+
+
+/* ========================================================================== 
+   v13.64 TEST — GAAR : X d'effacement dans recherche point + renommage sans déplacement
+   ========================================================================== */
+.gaar-point-search-field-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.gaar-point-search-field-wrapper .gaar-point-search-input {
+    padding-right: 54px !important;
+}
+
+.gaar-point-search-clear {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, .10);
+    color: #334155;
+    font-size: 27px;
+    font-weight: 900;
+    line-height: 1;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    z-index: 2;
+}
+
+.gaar-point-search-clear:active {
+    background: rgba(15, 23, 42, .18);
 }
