@@ -7321,15 +7321,35 @@ function drawLftwRoute() {
 
 function toggleGaarVisibility() { isGaarMode = !isGaarMode; updateGaarButtonState(); if (isGaarMode) { redrawGaarCircuits(); } else { gaarLayer.clearLayers(); if (isDrawingMode) { toggleGaarDrawingMode(); } } }
 function updateGaarButtonState() { const gaarButton = document.getElementById('gaar-mode-button'); const gaarControls = document.getElementById('gaar-controls'); gaarButton.classList.toggle('active', isGaarMode); gaarControls.style.display = isGaarMode ? 'flex' : 'none'; }
-function toggleGaarDrawingMode() {
+function updateGaarDrawingButtonState() {
     const editButton = document.getElementById('edit-circuits-button');
     const mapContainer = document.getElementById('map');
     const status = document.getElementById('gaar-status');
+
+    if (editButton) {
+        editButton.classList.toggle('active', isDrawingMode);
+        editButton.setAttribute('aria-pressed', isDrawingMode ? 'true' : 'false');
+        editButton.innerHTML = isDrawingMode
+            ? 'Créer/Modifier<br><span class="gaar-edit-state-label">ACTIF</span>'
+            : 'Créer/Modifier';
+    }
+
+    if (mapContainer) {
+        mapContainer.classList.toggle('crosshair-cursor', isDrawingMode);
+        mapContainer.classList.toggle('gaar-editing-active', isDrawingMode);
+    }
+
+    if (status) {
+        status.textContent = isDrawingMode
+            ? 'Mode CRÉER/MODIFIER actif. Cliquez sur la carte pour ajouter un point ou sur un point pour renommer.'
+            : '';
+    }
+}
+
+function toggleGaarDrawingMode() {
     isDrawingMode = !isDrawingMode;
-    editButton.classList.toggle('active', isDrawingMode);
-    mapContainer.classList.toggle('crosshair-cursor', isDrawingMode);
-    status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : '';
-    /* v13.60 : les étiquettes des points GAAR ne sont visibles que pendant la modification. */
+    updateGaarDrawingButtonState();
+    /* v13.61 : étiquettes visibles en mode modification + état du bouton beaucoup plus lisible. */
     redrawGaarCircuits();
 }
 async function handleGaarMapClick(e) { if (!isDrawingMode) return; let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3); if (!targetCircuit) { const manualCircuitsCount = gaarCircuits.filter(c => c && c.isManual).length; targetCircuit = { points: [], color: manualCircuitColors[manualCircuitsCount % manualCircuitColors.length], isManual: true, }; gaarCircuits.push(targetCircuit); } const pointName = await reverseGeocode(e.latlng) || `Point Manuel`; targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName }); redrawGaarCircuits(); saveGaarCircuits(); }
@@ -7391,14 +7411,23 @@ function setGaarPointName(circuitIndex, pointIndex, value) {
     gaarCircuits[circuitIndex].points[pointIndex].name = newName;
     redrawGaarCircuits();
     saveGaarCircuits();
+    closeGaarPointSearchOverlay();
     if (map) map.closePopup();
     return true;
 }
 
 
+function closeGaarPointSearchOverlay() {
+    try {
+        const overlay = document.getElementById('gaar-point-search-overlay');
+        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    } catch (_) {}
+    gaarPointSearchOverlayState = null;
+}
+
 function closeFireSearchPanelForGaarPointEdit() {
     /*
-     * v13.60 — édition nom point GAAR sur iPad :
+     * v13.61 — édition nom point GAAR en panneau haut iPad :
      * on ferme la fenêtre de recherche feu pour libérer l'écran et éviter que
      * la liste de résultats du point passe dessous / soit masquée par le clavier.
      * Les états GAAR (affichage + modification/création de circuit) ne sont pas modifiés.
@@ -7421,36 +7450,53 @@ function closeFireSearchPanelForGaarPointEdit() {
     } catch (_) {}
 }
 
-function buildGaarPointPopup(circuitIndex, pointIndex) {
+function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
     closeFireSearchPanelForGaarPointEdit();
-    const point = gaarCircuits[circuitIndex]?.points?.[pointIndex];
-    const container = document.createElement('div');
-    container.className = 'gaar-popup-form gaar-point-popup-form';
+    if (map) map.closePopup();
 
-    if (!point) {
-        container.textContent = 'Point GAAR introuvable.';
-        return container;
-    }
+    const point = gaarCircuits[circuitIndex]?.points?.[pointIndex];
+    if (!point) return;
+
+    closeGaarPointSearchOverlay();
+    gaarPointSearchOverlayState = { circuitIndex, pointIndex };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'gaar-point-search-overlay';
+    overlay.className = 'gaar-point-search-overlay';
+
+    const panel = document.createElement('div');
+    panel.className = 'gaar-point-search-panel';
+
+    const header = document.createElement('div');
+    header.className = 'gaar-point-search-header';
 
     const title = document.createElement('div');
-    title.className = 'gaar-point-popup-title';
+    title.className = 'gaar-point-search-title';
     title.innerHTML = `<b>Point ${pointIndex + 1}</b><span>${escapeHtml(getGaarPointDisplayName(point))}</span>`;
 
-    const inputWrapper = document.createElement('div');
-    inputWrapper.className = 'gaar-point-search-wrapper';
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'gaar-point-search-close';
+    closeButton.setAttribute('aria-label', 'Fermer');
+    closeButton.textContent = '×';
+    closeButton.addEventListener('click', closeGaarPointSearchOverlay);
+
+    header.appendChild(title);
+    header.appendChild(closeButton);
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.className = 'gaar-point-search-input';
+    input.className = 'gaar-point-search-input gaar-point-search-input-top';
     input.id = `gaar-input-${circuitIndex}-${pointIndex}`;
     input.value = getGaarPointDisplayName(point);
     input.placeholder = 'Rechercher une commune...';
     input.autocomplete = 'off';
     input.autocapitalize = 'words';
     input.spellcheck = false;
+    input.inputMode = 'text';
 
     const resultsList = document.createElement('ul');
-    resultsList.className = 'gaar-point-results';
+    resultsList.className = 'gaar-point-results gaar-point-results-top';
     resultsList.style.display = 'none';
 
     const renderResults = () => {
@@ -7464,13 +7510,11 @@ function buildGaarPointPopup(circuitIndex, pointIndex) {
         results.forEach((result) => {
             const li = document.createElement('li');
             li.textContent = `${result.nom_standard} (${result.dep_nom || result.dep_code} - ${result.dep_code})`;
-            li.addEventListener('click', (event) => {
+            li.addEventListener('pointerdown', (event) => {
                 event.preventDefault();
                 event.stopPropagation();
                 const selectedName = formatGaarCommuneResultName(result);
                 input.value = selectedName;
-                resultsList.style.display = 'none';
-                /* v13.60 : comme la recherche feu, un tap sur le résultat valide directement. */
                 setGaarPointName(circuitIndex, pointIndex, selectedName);
             });
             resultsList.appendChild(li);
@@ -7481,26 +7525,32 @@ function buildGaarPointPopup(circuitIndex, pointIndex) {
     let searchTimer = null;
     input.addEventListener('input', () => {
         if (searchTimer) clearTimeout(searchTimer);
-        searchTimer = setTimeout(renderResults, 220);
+        searchTimer = setTimeout(renderResults, 160);
     });
-    input.addEventListener('focus', () => {
-        try { input.select(); } catch (_) {}
+
+    /* v13.61 : pas de focus automatique différé. Sur iPad, il peut bloquer le clavier.
+       Le clavier doit s'ouvrir sur le tap réel de l'utilisateur dans cette barre. */
+    input.addEventListener('focus', renderResults);
+    input.addEventListener('click', () => {
+        try { input.focus(); } catch (_) {}
         renderResults();
     });
+    input.addEventListener('touchend', () => {
+        try { input.focus(); } catch (_) {}
+    }, { passive: true });
+
     input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
             setGaarPointName(circuitIndex, pointIndex, input.value);
         } else if (event.key === 'Escape') {
             event.preventDefault();
-            if (map) map.closePopup();
+            closeGaarPointSearchOverlay();
         }
     });
 
-    inputWrapper.appendChild(input);
-
     const actions = document.createElement('div');
-    actions.className = 'gaar-point-popup-actions';
+    actions.className = 'gaar-point-popup-actions gaar-point-search-actions';
 
     const okButton = document.createElement('button');
     okButton.type = 'button';
@@ -7516,19 +7566,13 @@ function buildGaarPointPopup(circuitIndex, pointIndex) {
 
     actions.appendChild(okButton);
     actions.appendChild(deleteButton);
-    container.appendChild(title);
-    container.appendChild(inputWrapper);
-    container.appendChild(resultsList);
-    container.appendChild(actions);
 
-    setTimeout(() => {
-        try {
-            input.focus({ preventScroll: true });
-            input.select();
-        } catch (_) {}
-    }, 80);
-
-    return container;
+    panel.appendChild(header);
+    panel.appendChild(input);
+    panel.appendChild(resultsList);
+    panel.appendChild(actions);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
 }
 
 function redrawGaarCircuits() {
@@ -7560,14 +7604,13 @@ function redrawGaarCircuits() {
                 fillOpacity: 0.85
             }).addTo(gaarLayer);
 
-            marker.bindPopup(() => buildGaarPointPopup(circuitIndex, pointIndex), {
-                className: 'gaar-point-popup',
-                minWidth: 360,
-                maxWidth: 520,
-                autoPan: true,
-                autoPanPaddingTopLeft: L.point(20, 90),
-                autoPanPaddingBottomRight: L.point(20, 300),
-                closeButton: true
+            marker.on('click', (event) => {
+                try {
+                    if (event && event.originalEvent && L && L.DomEvent) {
+                        L.DomEvent.stop(event.originalEvent);
+                    }
+                } catch (_) {}
+                openGaarPointSearchOverlay(circuitIndex, pointIndex);
             });
 
             if (isDrawingMode) {
@@ -7594,6 +7637,7 @@ window.deleteGaarPoint = function(circuitIndex, pointIndex) {
     }
     redrawGaarCircuits();
     saveGaarCircuits();
+    closeGaarPointSearchOverlay();
     if (map) map.closePopup();
 };
 function clearAllGaarCircuits() { gaarCircuits = []; gaarLayer.clearLayers(); saveGaarCircuits(); }
