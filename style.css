@@ -8471,3 +8471,30 @@ body.gaar-point-search-open .gaar-editing-banner {
 .gaar-point-search-clear:active {
     background: rgba(15, 23, 42, .18);
 }
+
+
+/* v13.65 — GAAR : hors mode Créer/Modifier, clic point = petite étiquette simple */
+.gaar-point-name-popup .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(0, 0, 0, 0.22);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+    padding: 0;
+}
+
+.gaar-point-name-popup .leaflet-popup-content {
+    margin: 0;
+}
+
+.gaar-point-name-popup .leaflet-popup-tip-container {
+    display: none;
+}
+
+.gaar-point-simple-label {
+    padding: 5px 9px;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.15;
+    white-space: nowrap;
+}
