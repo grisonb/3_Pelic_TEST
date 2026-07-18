@@ -8086,7 +8086,7 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 
-/* v13.59 — GAAR : popup point plus large + recherche commune type feu */
+/* v13.59/v13.60 — GAAR : popup point plus large + recherche commune type feu */
 .leaflet-popup.gaar-point-popup .leaflet-popup-content-wrapper {
     border-radius: 16px;
     box-shadow: 0 8px 28px rgba(0,0,0,.28);
@@ -8194,7 +8194,47 @@ body:not(.app-ready) #nearest-commune-display {
     background: var(--secondary-color);
 }
 
-.gaar-point-label {
-    display: none !important;
+/* v13.60 — étiquettes des points visibles uniquement lorsque le mode modification GAAR est actif.
+   Le JS ne crée ces tooltips que pendant isDrawingMode. */
+.leaflet-tooltip.gaar-point-label {
+    display: block !important;
+    background: rgba(255,255,255,.96) !important;
+    border: 1px solid rgba(0,0,0,.35) !important;
+    border-radius: 7px !important;
+    color: #1f2937 !important;
+    box-shadow: 0 2px 7px rgba(0,0,0,.22) !important;
+    padding: 3px 7px !important;
+    font-size: 12px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+}
+
+/* v13.60 — la popup de recherche point GAAR passe devant et reste exploitable au clavier iPad. */
+.leaflet-popup.gaar-point-popup {
+    z-index: 2147483200 !important;
+}
+
+.leaflet-popup.gaar-point-popup .leaflet-popup-content {
+    width: min(520px, calc(100vw - 42px)) !important;
+    max-width: calc(100vw - 42px) !important;
+}
+
+.gaar-point-results {
+    max-height: min(46vh, 330px) !important;
+}
+
+@media (max-height: 760px) {
+    .gaar-point-results {
+        max-height: 180px !important;
+    }
+
+    .leaflet-popup.gaar-point-popup .leaflet-popup-content {
+        margin: 10px 12px !important;
+    }
+
+    .gaar-point-search-input {
+        min-height: 46px !important;
+        font-size: 17px !important;
+    }
 }
 
