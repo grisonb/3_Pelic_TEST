@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-56-demarrage-offline-ipad';
+const SW_VERSION = 'sw-v13-57-oaci-zoom-flash-bleu';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
