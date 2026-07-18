@@ -519,12 +519,14 @@ const COMMUNES_DISPLAY_MIN_ZOOM = 10.5;
 const ONLINE_MAX_NATIVE_ZOOM = 18;
 const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
 const OFFLINE_HARD_MAX_NATIVE_ZOOM = 13;
-// v13.57 — iPad : démarrage offline séquencé, sans scan IndexedDB lourd au lancement.
-// Buffer légèrement augmenté pour limiter les fonds bleus transitoires au zoom/dézoom sans revenir au keepBuffer 32.
-const OFFLINE_TILE_KEEP_BUFFER = 4;
+// v13.58 — iPad : démarrage offline séquencé, sans scan IndexedDB lourd au lancement.
+// Buffer augmenté modérément pour réduire les flashes blancs furtifs sur la carte NPF sans revenir au keepBuffer 32.
+const OFFLINE_TILE_KEEP_BUFFER = 6;
 const OFFLINE_TILE_UPDATE_INTERVAL_MS = 80;
-// Carte OACI : plafond de zoom dédié pour éviter de demander des tuiles inexistantes.
-const OACI_OFFLINE_MAX_NATIVE_ZOOM = 11;
+// Tuile neutre opaque : évite l'effet page blanche si une tuile manque brièvement.
+const OFFLINE_TILE_PLACEHOLDER_DATA_URL = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22256%22%20height%3D%22256%22%3E%3Crect%20width%3D%22256%22%20height%3D%22256%22%20fill%3D%22%23d8e2e8%22/%3E%3C/svg%3E';
+// Carte OACI/IGN : plafond plus strict pour éviter de demander des tuiles inexistantes.
+const OACI_OFFLINE_MAX_NATIVE_ZOOM = 10;
 const OFFLINE_TILE_WAKE_DELAYS_MS = [250, 900, 1800, 3500, 6500, 10000];
 const OFFLINE_AUX_LAYER_START_DELAY_MS = 6500;
 const OFFLINE_DISABLE_STARTUP_FORCE_SCAN = true;
@@ -1476,7 +1478,7 @@ async function initializeApp() {
         }
 
         await initializeOfflineTilePreference();
-        // v13.57 — démarrage rapide : pas de scan complet IndexedDB au lancement.
+        // v13.58 — démarrage rapide : pas de scan complet IndexedDB au lancement.
         await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
         displayInstalledMaps();
     } else {
@@ -1915,11 +1917,11 @@ function searchAliasCommunes(searchWords, departmentFilter = null) {
 
 function applyMapNoBackgroundStyle() {
     /*
-     * v13.57 — le fond transparent laissait apparaître le bleu de l'app pendant
+     * v13.58 — le fond transparent laissait apparaître le bleu de l'app pendant
      * les très courts chargements de tuiles au zoom/dézoom. On garde un fond
      * neutre fixe : si une tuile manque brièvement, l'écran ne devient plus bleu.
      */
-    const mapLoadingBackground = '#eef2f5';
+    const mapLoadingBackground = '#d8e2e8';
     const styleId = 'map-no-background-style';
     if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
@@ -1967,7 +1969,7 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-        // v13.57 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
+        // v13.58 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
         zoomAnimation: false,
         fadeAnimation: false,
         markerZoomAnimation: false
@@ -2109,12 +2111,19 @@ function isOaciOfflinePackName(packName) {
 
 function getOfflinePackMaxNativeZoomLimitForPacks(packs = activeOfflinePacks) {
     /*
-     * v13.57 — certains packs, notamment OACI, ont un zoom natif plus bas que
-     * la carte NPF. Sans plafond par type de pack, Leaflet peut demander des
-     * tuiles inexistantes en zoom in, ce qui affiche un fond vide/bleu.
+     * v13.58 — plafond plus strict pour les packs OACI/IGN.
+     * Dans certains imports, la carte OACI peut être groupée ou nommée comme IGN ;
+     * on limite donc aussi les packs reconnus IGN/Scan pour éviter que Leaflet
+     * demande des z11/z12/z13 absents et laisse un écran vide.
      */
     const packList = Array.isArray(packs) ? packs.filter(Boolean) : [];
-    if (packList.some(name => isOaciOfflinePackName(name))) {
+    const hasOaciOrIgnPack = packList.some(name => {
+        const simplified = String(name || '').normalize("NFD").replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return isOaciOfflinePackName(name)
+            || isIgnOfflinePackName(name)
+            || /oaci|sia|scan\s*oaci|carte\s*oaci|\bign\b|scan\s*25|scan25/.test(simplified);
+    });
+    if (hasOaciOrIgnPack) {
         return Math.min(OFFLINE_HARD_MAX_NATIVE_ZOOM, OACI_OFFLINE_MAX_NATIVE_ZOOM);
     }
     return OFFLINE_HARD_MAX_NATIVE_ZOOM;
@@ -2170,7 +2179,7 @@ function scheduleOfflineTileWake(reason = 'startup') {
 
 function scheduleStartupAuxiliaryLayers() {
     /*
-     * v13.57 — iPad : on ne charge plus les couches annexes en même temps que les
+     * v13.58 — iPad : on ne charge plus les couches annexes en même temps que les
      * premières tuiles offline. Safari/IndexedDB devient très lent si la carte,
      * les lignes HT, les communes et les départements démarrent simultanément.
      */
@@ -2278,7 +2287,7 @@ function setupBaseTileLayer() {
         updateWhenIdle: true,
         updateInterval: OFFLINE_TILE_UPDATE_INTERVAL_MS,
         noWrap: true,
-        errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+        errorTileUrl: OFFLINE_TILE_PLACEHOLDER_DATA_URL
     }).addTo(map);
 
     enforceOfflineZoomLimit();
@@ -8254,7 +8263,7 @@ function displayInstalledMaps() {
 
 async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packNames) {
     /*
-     * v13.57 — changement de carte sans recharger toute la PWA.
+     * v13.58 — changement de carte sans recharger toute la PWA.
      * Le rechargement complet relançait service worker + IndexedDB + couches annexes,
      * ce qui pouvait bloquer la fenêtre de sélection plusieurs dizaines de secondes sur iPad.
      */
