@@ -4338,9 +4338,16 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 
     const numAirports = parseInt(document.getElementById('airport-count').value, 10);
     const closestAirports = getClosestAirports(lat, lon, numAirports);
+    const selectedPelicAirport = getSelectedPelicanAirport();
+    if (selectedPelicAirport && !disabledAirports.has(selectedPelicAirport.oaci) && !closestAirports.some(ap => ap.oaci === selectedPelicAirport.oaci)) {
+        closestAirports.push({
+            ...selectedPelicAirport,
+            distance: calculateDistanceInNm(lat, lon, selectedPelicAirport.lat, selectedPelicAirport.lon)
+        });
+    }
 
     const closestOACIs = new Set(closestAirports.map(ap => ap.oaci));
-    if (!selectedPelicanOACI || !closestOACIs.has(selectedPelicanOACI)) {
+    if (!selectedPelicanOACI || !closestOACIs.has(selectedPelicanOACI) || !isSelectablePelicanAirport(selectedPelicanOACI)) {
         selectedPelicanOACI = closestAirports.length > 0 ? closestAirports[0].oaci : null;
     }
 
@@ -4488,9 +4495,42 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
 }
 
 
-function getClosestAirports(lat, lon, count) { const customPelican = otherAirports.filter(ap => customPelicanAirports.has(ap.oaci)); return [...pelicanAirports, ...customPelican].filter(ap => !disabledAirports.has(ap.oaci)).map(ap => ({ ...ap, distance: calculateDistanceInNm(lat, lon, ap.lat, ap.lon) })).sort((a, b) => a.distance - b.distance).slice(0, count); }
+function getPelicCandidateAirports() {
+    /*
+     * v13.59 — les terrains ajoutés manuellement comme PÉLIC sont traités
+     * comme de vrais pélicandromes pour les routes, les bingos et les calculs.
+     */
+    const merged = [...pelicanAirports];
+    otherAirports.forEach(ap => {
+        if (customPelicanAirports.has(ap.oaci) && !merged.some(existing => existing.oaci === ap.oaci)) {
+            merged.push(ap);
+        }
+    });
+    return merged;
+}
+
+function isSelectablePelicanAirport(oaci) {
+    const normalized = normalizeOaciCodeInput(oaci);
+    if (!normalized) return false;
+    return pelicanAirports.some(ap => ap.oaci === normalized) || customPelicanAirports.has(normalized);
+}
+
+function getSelectedPelicanAirport() {
+    if (!selectedPelicanOACI || !isSelectablePelicanAirport(selectedPelicanOACI)) return null;
+    return getAirportByOaci(selectedPelicanOACI);
+}
+
+function getClosestAirports(lat, lon, count) {
+    return getPelicCandidateAirports()
+        .filter(ap => !disabledAirports.has(ap.oaci))
+        .map(ap => ({ ...ap, distance: calculateDistanceInNm(lat, lon, ap.lat, ap.lon) }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, count);
+}
+
 function getAirportByOaci(oaci) {
-    return [...pelicanAirports, ...otherAirports].find(ap => ap.oaci === oaci) || null;
+    const normalized = normalizeOaciCodeInput(oaci);
+    return [...pelicanAirports, ...otherAirports].find(ap => ap.oaci === normalized) || null;
 }
 
 function normalizeOaciCodeInput(value) {
@@ -5778,16 +5818,22 @@ const saveState = () => {
 window.toggleAirport = oaci => { disabledAirports.has(oaci) ? disabledAirports.delete(oaci) : (disabledAirports.add(oaci), waterAirports.delete(oaci)), saveState(), refreshUI() };
 window.toggleWater = oaci => { waterAirports.has(oaci) ? waterAirports.delete(oaci) : (waterAirports.add(oaci), disabledAirports.delete(oaci)), saveState(), refreshUI() };
 window.toggleCustomPelican = oaci => {
-    if (customPelicanAirports.has(oaci)) {
-        customPelicanAirports.delete(oaci);
-        waterAirports.delete(oaci);
-        disabledAirports.delete(oaci);
+    const normalizedOaci = normalizeOaciCodeInput(oaci);
+    if (!normalizedOaci || !getAirportByOaci(normalizedOaci)) return;
+
+    if (customPelicanAirports.has(normalizedOaci)) {
+        customPelicanAirports.delete(normalizedOaci);
+        waterAirports.delete(normalizedOaci);
+        disabledAirports.delete(normalizedOaci);
+        if (selectedPelicanOACI === normalizedOaci) selectedPelicanOACI = null;
     } else {
-        customPelicanAirports.add(oaci);
-        disabledAirports.delete(oaci);
+        customPelicanAirports.add(normalizedOaci);
+        disabledAirports.delete(normalizedOaci);
+        selectedPelicanOACI = normalizedOaci;
     }
     saveState();
     refreshUI();
+    if (map) map.closePopup();
 };
 window.setBaseAirport = oaci => {
     const normalizedOaci = normalizeOaciCodeInput(oaci);
@@ -7278,9 +7324,232 @@ function updateGaarButtonState() { const gaarButton = document.getElementById('g
 function toggleGaarDrawingMode() { const editButton = document.getElementById('edit-circuits-button'); const mapContainer = document.getElementById('map'); const status = document.getElementById('gaar-status'); isDrawingMode = !isDrawingMode; editButton.classList.toggle('active', isDrawingMode); mapContainer.classList.toggle('crosshair-cursor', isDrawingMode); status.textContent = isDrawingMode ? 'Mode modification activé. Cliquez pour ajouter des points.' : ''; }
 async function handleGaarMapClick(e) { if (!isDrawingMode) return; let targetCircuit = gaarCircuits.find(c => c && c.isManual && c.points.length < 3); if (!targetCircuit) { const manualCircuitsCount = gaarCircuits.filter(c => c && c.isManual).length; targetCircuit = { points: [], color: manualCircuitColors[manualCircuitsCount % manualCircuitColors.length], isManual: true, }; gaarCircuits.push(targetCircuit); } const pointName = await reverseGeocode(e.latlng) || `Point Manuel`; targetCircuit.points.push({ lat: e.latlng.lat, lng: e.latlng.lng, name: pointName }); redrawGaarCircuits(); saveGaarCircuits(); }
 async function reverseGeocode(latlng) { document.getElementById('gaar-status').textContent = 'Recherche du nom...'; try { if (!navigator.onLine) { throw new Error("Application hors ligne."); } const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latlng.lat}&lon=${latlng.lng}&zoom=10`); if (!response.ok) throw new Error('La réponse du réseau n\'était pas OK.'); const data = await response.json(); const name = data.address.city || data.address.town || data.address.village || data.display_name.split(',')[0]; document.getElementById('gaar-status').textContent = `Point ajouté près de ${name}.`; return name; } catch (error) { const closestCommuneName = findClosestCommuneName(latlng.lat, latlng.lng); if (closestCommuneName) { document.getElementById('gaar-status').textContent = `Point ajouté près de ${closestCommuneName} (hors-ligne).`; return closestCommuneName; } else { document.getElementById('gaar-status').textContent = 'Nom non trouvé (hors-ligne).'; return null; } } }
-function redrawGaarCircuits() { gaarLayer.clearLayers(); gaarCircuits.forEach((circuit, circuitIndex) => { if (!circuit || circuit.points.length === 0) return; const latlngs = circuit.points.map(p => [p.lat, p.lng]); const styleOptions = { color: circuit.color, weight: 3, opacity: 0.6, fillColor: circuit.color, fillOpacity: 0.2 }; if (latlngs.length >= 3) { L.polygon(latlngs, styleOptions).addTo(gaarLayer); } else if (latlngs.length > 1) { L.polyline(latlngs, styleOptions).addTo(gaarLayer); } circuit.points.forEach((point, pointIndex) => { const marker = L.circleMarker([point.lat, point.lng], { radius: 8, fillColor: circuit.color, color: '#000', weight: 1, opacity: 1, fillOpacity: 0.8 }).addTo(gaarLayer); marker.bindTooltip(`${pointIndex + 1}. ${point.name}`, { permanent: true, direction: 'top', className: 'gaar-point-label' }); const popupContent = `<div class="gaar-popup-form"><input type="text" id="gaar-input-${circuitIndex}-${pointIndex}" value="${point.name}"><button onclick="updateGaarPoint(${circuitIndex}, ${pointIndex})">OK</button><button class="delete-point-btn" onclick="deleteGaarPoint(${circuitIndex}, ${pointIndex})">Supprimer</button></div>`; marker.bindPopup(popupContent); }); }); }
-window.updateGaarPoint = function(circuitIndex, pointIndex) { const input = document.getElementById(`gaar-input-${circuitIndex}-${pointIndex}`); const newName = input.value.trim(); if (newName) { gaarCircuits[circuitIndex].points[pointIndex].name = newName; redrawGaarCircuits(); saveGaarCircuits(); map.closePopup(); } };
-window.deleteGaarPoint = function(circuitIndex, pointIndex) { gaarCircuits[circuitIndex].points.splice(pointIndex, 1); if (gaarCircuits[circuitIndex].points.length === 0) { gaarCircuits.splice(circuitIndex, 1); } redrawGaarCircuits(); saveGaarCircuits(); };
+function getGaarPointDisplayName(point) {
+    const raw = String(point?.name || '').trim();
+    return raw || 'Point GAAR';
+}
+
+function formatGaarCommuneResultName(c) {
+    const name = c?.nom_standard || c?.name || '';
+    const dep = c?.dep_code || '';
+    return dep ? `${name} (${dep})` : name;
+}
+
+function searchCommunesForGaarPoint(rawSearch) {
+    let departmentFilter = null;
+    let searchTerm = String(rawSearch || '');
+    const depRegex = /\s(\d{1,3}|2A|2B)$/i;
+    const match = searchTerm.match(depRegex);
+    if (match) {
+        departmentFilter = match[1].length === 1 ? '0' + match[1] : match[1].toUpperCase();
+        searchTerm = searchTerm.substring(0, match.index).trim();
+    }
+
+    const simplifiedSearch = simplifyString(searchTerm);
+    if (simplifiedSearch.length < 2) return [];
+
+    const searchWords = simplifiedSearch.split(' ').filter(Boolean);
+    const searchCompact = searchWords.join('');
+    const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
+
+    const scoredResults = communesToSearch
+        .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
+        .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords) }))
+        .filter(c => c.score < 999);
+
+    const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
+    const seenResultKeys = new Set(scoredResults.map(c => `commune:${c.code_insee}:${simplifyString(c.nom_standard)}`));
+
+    aliasResults.forEach((alias) => {
+        const key = `alias:${alias.alias_target_code_insee}:${simplifyString(alias.nom_standard)}`;
+        const sameVisibleNameAlreadyPresent = seenResultKeys.has(`commune:${alias.code_insee}:${simplifyString(alias.nom_standard)}`);
+        if (!seenResultKeys.has(key) && !sameVisibleNameAlreadyPresent) {
+            seenResultKeys.add(key);
+            scoredResults.push(alias);
+        }
+    });
+
+    return scoredResults
+        .sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length)
+        .slice(0, 10);
+}
+
+function setGaarPointName(circuitIndex, pointIndex, value) {
+    const newName = String(value || '').trim();
+    if (!newName) return false;
+    if (!gaarCircuits[circuitIndex] || !gaarCircuits[circuitIndex].points[pointIndex]) return false;
+    gaarCircuits[circuitIndex].points[pointIndex].name = newName;
+    redrawGaarCircuits();
+    saveGaarCircuits();
+    if (map) map.closePopup();
+    return true;
+}
+
+function buildGaarPointPopup(circuitIndex, pointIndex) {
+    const point = gaarCircuits[circuitIndex]?.points?.[pointIndex];
+    const container = document.createElement('div');
+    container.className = 'gaar-popup-form gaar-point-popup-form';
+
+    if (!point) {
+        container.textContent = 'Point GAAR introuvable.';
+        return container;
+    }
+
+    const title = document.createElement('div');
+    title.className = 'gaar-point-popup-title';
+    title.innerHTML = `<b>Point ${pointIndex + 1}</b><span>${escapeHtml(getGaarPointDisplayName(point))}</span>`;
+
+    const inputWrapper = document.createElement('div');
+    inputWrapper.className = 'gaar-point-search-wrapper';
+
+    const input = document.createElement('input');
+    input.type = 'search';
+    input.className = 'gaar-point-search-input';
+    input.id = `gaar-input-${circuitIndex}-${pointIndex}`;
+    input.value = getGaarPointDisplayName(point);
+    input.placeholder = 'Rechercher une commune...';
+    input.autocomplete = 'off';
+    input.autocapitalize = 'words';
+    input.spellcheck = false;
+
+    const resultsList = document.createElement('ul');
+    resultsList.className = 'gaar-point-results';
+    resultsList.style.display = 'none';
+
+    const renderResults = () => {
+        const results = searchCommunesForGaarPoint(input.value);
+        resultsList.innerHTML = '';
+        if (!results.length) {
+            resultsList.style.display = 'none';
+            return;
+        }
+
+        results.forEach((result) => {
+            const li = document.createElement('li');
+            li.textContent = `${result.nom_standard} (${result.dep_nom || result.dep_code} - ${result.dep_code})`;
+            li.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                input.value = formatGaarCommuneResultName(result);
+                resultsList.style.display = 'none';
+                try {
+                    input.focus({ preventScroll: true });
+                    const end = input.value.length;
+                    input.setSelectionRange(end, end);
+                } catch (_) {}
+            });
+            resultsList.appendChild(li);
+        });
+        resultsList.style.display = 'block';
+    };
+
+    let searchTimer = null;
+    input.addEventListener('input', () => {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(renderResults, 220);
+    });
+    input.addEventListener('focus', () => {
+        try { input.select(); } catch (_) {}
+        renderResults();
+    });
+    input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            setGaarPointName(circuitIndex, pointIndex, input.value);
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            if (map) map.closePopup();
+        }
+    });
+
+    inputWrapper.appendChild(input);
+
+    const actions = document.createElement('div');
+    actions.className = 'gaar-point-popup-actions';
+
+    const okButton = document.createElement('button');
+    okButton.type = 'button';
+    okButton.className = 'gaar-point-ok-btn';
+    okButton.textContent = 'OK';
+    okButton.addEventListener('click', () => setGaarPointName(circuitIndex, pointIndex, input.value));
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'delete-point-btn gaar-point-delete-btn';
+    deleteButton.textContent = 'Supprimer';
+    deleteButton.addEventListener('click', () => window.deleteGaarPoint(circuitIndex, pointIndex));
+
+    actions.appendChild(okButton);
+    actions.appendChild(deleteButton);
+    container.appendChild(title);
+    container.appendChild(inputWrapper);
+    container.appendChild(resultsList);
+    container.appendChild(actions);
+
+    setTimeout(() => {
+        try {
+            input.focus({ preventScroll: true });
+            input.select();
+        } catch (_) {}
+    }, 80);
+
+    return container;
+}
+
+function redrawGaarCircuits() {
+    gaarLayer.clearLayers();
+    gaarCircuits.forEach((circuit, circuitIndex) => {
+        if (!circuit || circuit.points.length === 0) return;
+        const latlngs = circuit.points.map(p => [p.lat, p.lng]);
+        const lineStyleOptions = {
+            color: circuit.color,
+            weight: 3,
+            opacity: 0.75,
+            fillColor: 'transparent',
+            fillOpacity: 0
+        };
+
+        if (latlngs.length >= 3) {
+            L.polygon(latlngs, lineStyleOptions).addTo(gaarLayer);
+        } else if (latlngs.length > 1) {
+            L.polyline(latlngs, lineStyleOptions).addTo(gaarLayer);
+        }
+
+        circuit.points.forEach((point, pointIndex) => {
+            const marker = L.circleMarker([point.lat, point.lng], {
+                radius: 8,
+                fillColor: circuit.color,
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.85
+            }).addTo(gaarLayer);
+
+            marker.bindPopup(() => buildGaarPointPopup(circuitIndex, pointIndex), {
+                className: 'gaar-point-popup',
+                minWidth: 340,
+                maxWidth: 430,
+                autoPan: true,
+                closeButton: true
+            });
+        });
+    });
+}
+
+window.updateGaarPoint = function(circuitIndex, pointIndex) {
+    const input = document.getElementById(`gaar-input-${circuitIndex}-${pointIndex}`);
+    setGaarPointName(circuitIndex, pointIndex, input ? input.value : '');
+};
+window.deleteGaarPoint = function(circuitIndex, pointIndex) {
+    if (!gaarCircuits[circuitIndex] || !gaarCircuits[circuitIndex].points[pointIndex]) return;
+    gaarCircuits[circuitIndex].points.splice(pointIndex, 1);
+    if (gaarCircuits[circuitIndex].points.length === 0) {
+        gaarCircuits.splice(circuitIndex, 1);
+    }
+    redrawGaarCircuits();
+    saveGaarCircuits();
+    if (map) map.closePopup();
+};
 function clearAllGaarCircuits() { gaarCircuits = []; gaarLayer.clearLayers(); saveGaarCircuits(); }
 function saveGaarCircuits() { localStorage.setItem('gaarCircuits', JSON.stringify(gaarCircuits)); }
 
@@ -7289,7 +7558,7 @@ function updateCalculatorData() {
         CALCULATOR_DATA = { distBaseFeu: 0, distPelicFeu: 0, csFeu: '--:--', distGpsFeu: 0 };
     } else {
         const baseAirport = getAirportByOaci(selectedBaseOACI);
-        const selectedPelican = pelicanAirports.find(ap => ap.oaci === selectedPelicanOACI);
+        const selectedPelican = getSelectedPelicanAirport();
         const { latitude_mairie: feuLat, longitude_mairie: feuLon } = currentCommune;
         let distBaseFeu = 0; if (baseAirport) { distBaseFeu = calculateDistanceInNm(baseAirport.lat, baseAirport.lon, feuLat, feuLon); }
         let distPelicFeu = 0; if (selectedPelican) { distPelicFeu = calculateDistanceInNm(selectedPelican.lat, selectedPelican.lon, feuLat, feuLon); }
