@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-64-gaar_point_deplace_commune';
+const SW_VERSION = 'sw-v13-65-gaar_clic_hors_modif_etiquette';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
