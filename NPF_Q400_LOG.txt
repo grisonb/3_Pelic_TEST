@@ -1,20 +1,24 @@
-NPF-Q400 — TEST v13.57
+NPF-Q400 — TEST v13.58
 
 Base utilisée
-- Reprise de la TEST v13.56 démarrage offline iPad, qui conserve les corrections de fluidité validées.
+- Reprise de la TEST v13.57, elle-même issue de v13.56 qui a validé le très haut niveau de fluidité.
 
 Objet de la version
-- Conserver le niveau de fluidité obtenu en v13.56.
-- Réduire l'affichage bleu transitoire lors des zoom in / zoom out.
-- Empêcher la carte OACI offline de zoomer au-delà de son niveau natif disponible.
+- Corriger les derniers flashes blancs furtifs sur la carte NPF lors des zoom in / zoom out.
+- Corriger le zoom in OACI qui allait encore au-delà des tuiles disponibles.
+- Conserver la fluidité obtenue en v13.56/v13.57.
 
 Modifications
-- Buffer de tuiles offline légèrement augmenté : keepBuffer 2 -> 4.
+- Buffer de tuiles offline augmenté modérément : keepBuffer 4 -> 6.
   Objectif : garder un peu plus de tuiles autour de l'écran pendant les zooms, sans revenir au keepBuffer 32 qui saturait l'iPad.
-- Fond de carte de chargement remplacé par un fond neutre #eef2f5.
-  Objectif : si une tuile manque brièvement, l'écran ne devient plus bleu.
-- Ajout d'un plafond dédié pour les packs OACI : zoom natif maximum 11.
-  Objectif : éviter les demandes de tuiles OACI inexistantes en zoom in.
+- Fond de chargement de la carte renforcé : #eef2f5 -> #d8e2e8.
+  Objectif : rendre les manques de tuiles beaucoup moins visibles.
+- Ajout d'une tuile neutre opaque comme errorTileUrl.
+  Objectif : éviter l'effet "page blanche" quand une tuile n'est pas encore disponible ou manque brièvement.
+- Plafond OACI abaissé : zoom natif maximum 11 -> 10.
+  Objectif : empêcher le zoom in OACI d'aller dans des niveaux sans tuiles.
+- Détection OACI élargie aux packs nommés IGN / Scan / OACI IGN.
+  Objectif : corriger le cas où la carte OACI est classée comme IGN et échappe au plafond OACI.
 - Conservation du séquençage de démarrage, du changement de carte offline sans reload complet et du retry Lignes HT introduits en v13.56.
 
 Contrôles effectués
