@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-54-blocfuel-hdv-fuel-oaci';
+const SW_VERSION = 'sw-v13-50-retour-zip-raster';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
