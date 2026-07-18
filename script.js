@@ -519,9 +519,12 @@ const COMMUNES_DISPLAY_MIN_ZOOM = 10.5;
 const ONLINE_MAX_NATIVE_ZOOM = 18;
 const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
 const OFFLINE_HARD_MAX_NATIVE_ZOOM = 13;
-// v13.56 — iPad : démarrage offline séquencé, sans scan IndexedDB lourd au lancement.
-const OFFLINE_TILE_KEEP_BUFFER = 2;
+// v13.57 — iPad : démarrage offline séquencé, sans scan IndexedDB lourd au lancement.
+// Buffer légèrement augmenté pour limiter les fonds bleus transitoires au zoom/dézoom sans revenir au keepBuffer 32.
+const OFFLINE_TILE_KEEP_BUFFER = 4;
 const OFFLINE_TILE_UPDATE_INTERVAL_MS = 80;
+// Carte OACI : plafond de zoom dédié pour éviter de demander des tuiles inexistantes.
+const OACI_OFFLINE_MAX_NATIVE_ZOOM = 11;
 const OFFLINE_TILE_WAKE_DELAYS_MS = [250, 900, 1800, 3500, 6500, 10000];
 const OFFLINE_AUX_LAYER_START_DELAY_MS = 6500;
 const OFFLINE_DISABLE_STARTUP_FORCE_SCAN = true;
@@ -1473,7 +1476,7 @@ async function initializeApp() {
         }
 
         await initializeOfflineTilePreference();
-        // v13.56 — démarrage rapide : pas de scan complet IndexedDB au lancement.
+        // v13.57 — démarrage rapide : pas de scan complet IndexedDB au lancement.
         await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
         displayInstalledMaps();
     } else {
@@ -1911,6 +1914,12 @@ function searchAliasCommunes(searchWords, departmentFilter = null) {
 
 
 function applyMapNoBackgroundStyle() {
+    /*
+     * v13.57 — le fond transparent laissait apparaître le bleu de l'app pendant
+     * les très courts chargements de tuiles au zoom/dézoom. On garde un fond
+     * neutre fixe : si une tuile manque brièvement, l'écran ne devient plus bleu.
+     */
+    const mapLoadingBackground = '#eef2f5';
     const styleId = 'map-no-background-style';
     if (!document.getElementById(styleId)) {
         const style = document.createElement('style');
@@ -1921,12 +1930,12 @@ function applyMapNoBackgroundStyle() {
             .leaflet-pane,
             .leaflet-map-pane,
             .leaflet-tile-pane {
-                background: transparent !important;
-                background-color: transparent !important;
+                background: ${mapLoadingBackground} !important;
+                background-color: ${mapLoadingBackground} !important;
             }
 
             .leaflet-tile {
-                background: transparent !important;
+                background: ${mapLoadingBackground} !important;
             }
         `;
         document.head.appendChild(style);
@@ -1934,21 +1943,21 @@ function applyMapNoBackgroundStyle() {
 
     const mapElement = document.getElementById('map');
     if (mapElement) {
-        mapElement.style.background = 'transparent';
-        mapElement.style.backgroundColor = 'transparent';
+        mapElement.style.background = mapLoadingBackground;
+        mapElement.style.backgroundColor = mapLoadingBackground;
     }
 
     if (map && map.getContainer) {
         const container = map.getContainer();
         if (container) {
-            container.style.background = 'transparent';
-            container.style.backgroundColor = 'transparent';
+            container.style.background = mapLoadingBackground;
+            container.style.backgroundColor = mapLoadingBackground;
         }
     }
 
     document.querySelectorAll('.leaflet-container, .leaflet-pane, .leaflet-map-pane, .leaflet-tile-pane').forEach((element) => {
-        element.style.background = 'transparent';
-        element.style.backgroundColor = 'transparent';
+        element.style.background = mapLoadingBackground;
+        element.style.backgroundColor = mapLoadingBackground;
     });
 }
 
@@ -1958,7 +1967,7 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-        // v13.56 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
+        // v13.57 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
         zoomAnimation: false,
         fadeAnimation: false,
         markerZoomAnimation: false
@@ -2024,12 +2033,13 @@ function initMap() {
 function enforceOfflineZoomLimit() {
     if (!map || !offlineTilesMode) return;
 
+    const activeOfflineMaxZoomLimit = getOfflinePackMaxNativeZoomLimitForPacks(activeOfflinePacks);
     const safeMaxZoom = Math.max(
         GLOBAL_MIN_ZOOM,
         Math.min(
             GLOBAL_MAX_ZOOM,
-            OFFLINE_HARD_MAX_NATIVE_ZOOM,
-            Number.isFinite(baseTileMaxNativeZoom) ? baseTileMaxNativeZoom : OFFLINE_HARD_MAX_NATIVE_ZOOM
+            activeOfflineMaxZoomLimit,
+            Number.isFinite(baseTileMaxNativeZoom) ? baseTileMaxNativeZoom : activeOfflineMaxZoomLimit
         )
     );
 
@@ -2097,6 +2107,19 @@ function isOaciOfflinePackName(packName) {
     return /\boaci\b|carte\s*oaci/.test(simplified);
 }
 
+function getOfflinePackMaxNativeZoomLimitForPacks(packs = activeOfflinePacks) {
+    /*
+     * v13.57 — certains packs, notamment OACI, ont un zoom natif plus bas que
+     * la carte NPF. Sans plafond par type de pack, Leaflet peut demander des
+     * tuiles inexistantes en zoom in, ce qui affiche un fond vide/bleu.
+     */
+    const packList = Array.isArray(packs) ? packs.filter(Boolean) : [];
+    if (packList.some(name => isOaciOfflinePackName(name))) {
+        return Math.min(OFFLINE_HARD_MAX_NATIVE_ZOOM, OACI_OFFLINE_MAX_NATIVE_ZOOM);
+    }
+    return OFFLINE_HARD_MAX_NATIVE_ZOOM;
+}
+
 function buildOfflineTileUrlForPack(tilePath, packName, isLargeZip = false) {
     /*
      * v12.14 — correction IGN multi-ZIP.
@@ -2147,7 +2170,7 @@ function scheduleOfflineTileWake(reason = 'startup') {
 
 function scheduleStartupAuxiliaryLayers() {
     /*
-     * v13.56 — iPad : on ne charge plus les couches annexes en même temps que les
+     * v13.57 — iPad : on ne charge plus les couches annexes en même temps que les
      * premières tuiles offline. Safari/IndexedDB devient très lent si la carte,
      * les lignes HT, les communes et les départements démarrent simultanément.
      */
@@ -2213,12 +2236,13 @@ function setupBaseTileLayer() {
      * - plafond dur z12 pour éviter que Leaflet demande des tuiles absentes ;
      * - animations désactivées pour éviter le flash blanc pendant le rafraîchissement.
      */
+    const activeOfflineMaxZoomLimit = getOfflinePackMaxNativeZoomLimitForPacks(activeOfflinePacks);
     const offlineNativeMaxZoom = Math.max(
         GLOBAL_MIN_ZOOM,
         Math.min(
             GLOBAL_MAX_ZOOM,
-            OFFLINE_HARD_MAX_NATIVE_ZOOM,
-            Number.isFinite(baseTileMaxNativeZoom) ? baseTileMaxNativeZoom : OFFLINE_HARD_MAX_NATIVE_ZOOM
+            activeOfflineMaxZoomLimit,
+            Number.isFinite(baseTileMaxNativeZoom) ? baseTileMaxNativeZoom : activeOfflineMaxZoomLimit
         )
     );
 
@@ -2867,6 +2891,7 @@ async function findOfflineTileZoomRange() {
 async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = {}) {
     const offlineEnabled = await getOfflineTilesEnabled();
     const shouldForceScan = forceScan;
+    const activeOfflineMaxZoomLimit = getOfflinePackMaxNativeZoomLimitForPacks(activeOfflinePacks);
     if (!offlineEnabled) {
         baseTileMinNativeZoom = GLOBAL_MIN_ZOOM;
         baseTileMaxNativeZoom = ONLINE_MAX_NATIVE_ZOOM;
@@ -2893,10 +2918,10 @@ async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = 
 
         if (offlineMinZoom === null || offlineMaxZoom === null) {
             baseTileMinNativeZoom = GLOBAL_MIN_ZOOM;
-            baseTileMaxNativeZoom = OFFLINE_HARD_MAX_NATIVE_ZOOM;
+            baseTileMaxNativeZoom = activeOfflineMaxZoomLimit;
         } else {
             baseTileMinNativeZoom = Math.max(GLOBAL_MIN_ZOOM, Math.min(GLOBAL_MAX_ZOOM, offlineMinZoom));
-            baseTileMaxNativeZoom = Math.max(0, Math.min(OFFLINE_HARD_MAX_NATIVE_ZOOM, offlineMaxZoom));
+            baseTileMaxNativeZoom = Math.max(0, Math.min(activeOfflineMaxZoomLimit, offlineMaxZoom));
         }
     }
 
@@ -8229,7 +8254,7 @@ function displayInstalledMaps() {
 
 async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packNames) {
     /*
-     * v13.56 — changement de carte sans recharger toute la PWA.
+     * v13.57 — changement de carte sans recharger toute la PWA.
      * Le rechargement complet relançait service worker + IndexedDB + couches annexes,
      * ce qui pouvait bloquer la fenêtre de sélection plusieurs dizaines de secondes sur iPad.
      */
