@@ -1,20 +1,19 @@
-NPF-Q400 — TEST v13.64
+NPF-Q400 — TEST v13.65
 
 Base utilisée
-- Reprise de v13.63, elle-même basée sur v13.58 validée comme référence fluidité.
+- Reprise de TEST v13.64.
+- v13.58 conservée comme référence fluidité validée.
+- Corrections GAAR v13.59 à v13.64 conservées.
 
 Objet de la version
-- Correction du comportement de recherche du nom d'un point de circuit GAAR.
+- Clarifier le comportement des points de circuit GAAR hors mode Créer/Modifier.
 
 Corrections
-- Sélection d'une commune dans la recherche du point GAAR :
-  - le nom du point est mis à jour ;
-  - le point est déplacé sur les coordonnées de la commune sélectionnée.
-- Validation par OK ou Entrée :
-  - si la saisie correspond à une commune trouvée, le point est déplacé sur cette commune ;
-  - si aucune commune fiable n'est trouvée, seul le nom saisi est appliqué.
-- Le bouton X de la recherche point est conservé.
-- Le mode Création/Modification GAAR, les étiquettes en modification, la suppression de points, le bandeau actif et la fluidité v13.58 restent conservés.
+- Hors mode Créer/Modifier : un clic sur un point GAAR n'ouvre plus la fenêtre de recherche/modification.
+- Hors mode Créer/Modifier : un clic affiche seulement une petite étiquette avec le nom du point/ville.
+- En mode Créer/Modifier : le clic sur un point conserve l'ouverture du panneau de modification/suppression.
+- Les étiquettes permanentes des points restent visibles uniquement lorsque Créer/Modifier est actif.
+- Aucun changement sur la fluidité carte validée en v13.58/v13.56.
 
 Contrôles effectués
 - node --check script.js : OK.
