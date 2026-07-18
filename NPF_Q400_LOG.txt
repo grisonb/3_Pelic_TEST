@@ -1,34 +1,30 @@
-NPF-Q400 — TEST v13.54 — Bloc/Fuel HDV figée, fuel 3500 kg, OACI corrigés
+NPF-Q400 — TEST v13.55
 
-Base : TEST v13.53 sans 3D.
+Base utilisée
+- Reprise de TEST v13.54 bloc/fuel HDV fuel OACI.
 
-Modifications Bloc/Fuel :
-1. LIMITE HDV figée par vol :
-   - vol n°1 : la LIMITE HDV reste la valeur saisie par l'utilisateur ;
-   - vols n°2 et suivants : la LIMITE HDV affichée dépend des heures restantes après les vols précédents ;
-   - le vol actif ne fait plus baisser son propre champ LIMITE HDV pendant la saisie des BLOC ARRIVÉE.
-2. La limite HDV globale ne peut être modifiée que depuis le vol n°1.
-3. FUEL DÉPART par défaut passé à 3500 kg.
-4. FUEL DÉPART Prévi par défaut passé à 3500 kg.
+Objet de la version
+- Correction ciblée de la fluidité carte iPad/PWA.
+- Diagnostic : problème constaté aussi avec la carte OACI légère ; la cause probable est donc le rendu Leaflet / tampon de tuiles, pas seulement le poids du pack raster.
 
-Corrections OACI intégrées :
-- Melun-Villaroche : LFPM au lieu de LFXM.
-- Beauvais-Tillé : LFOB au lieu de LFXO ; suppression du doublon erroné LFOB Paris-Le Bourget.
-- Saint-Omer-Wizernes : LFQN au lieu de LFXQ.
-- Reims-Prunay : LFQA.
-- Reims-Champagne : LFSR.
-- Lille-Lesquin : suppression du doublon LFYL ; entrée LFQQ conservée.
+Modifications carte
+- Réduction du tampon Leaflet des tuiles : keepBuffer 32 -> 2.
+- Réduction de l'intervalle de mise à jour des tuiles : 160 ms -> 80 ms.
+- Désactivation des animations de zoom et de zoom marqueurs pour limiter les anciennes tuiles étirées / zones bleues après zoom.
+- Ajout d'un réveil automatique du calque carte après création : invalidateSize + redraw à 120 ms, 450 ms, 1000 ms et 2000 ms.
 
-Carte :
-- aucune modification du moteur carte dans cette version ;
-- la question de couverture/zoom Nord-Sud est à traiter séparément côté génération ZIP/gabarit.
+Conservé
+- Pas de PMTiles.
+- Pas de 3D / Cesium.
+- Conservation des corrections v13.54 : LIMITE HDV figée par vol, fuel départ 3500 kg, OACI corrigés.
+- Service worker et base IndexedDB offline inchangés : OfflineTilesDB_v12_21.
 
-3D :
-- aucune carte 3D ;
-- aucune référence Cesium ;
-- aucune référence vue-3d.html.
+Contrôles effectués
+- node --check script.js : OK.
+- node --check sw.js : OK.
+- manifest.json : JSON valide.
 
-Contrôles :
-- node --check script.js : OK
-- node --check sw.js : OK
-- manifest.json : OK
+Test attendu
+- À l'ouverture, la carte doit afficher les tuiles sans devoir zoomer/dézoomer.
+- Après zoom/dézoom, les anciennes zones bleues doivent disparaître plus vite.
+- Si le déplacement devient moins agréable, garder cette version uniquement comme diagnostic et remonter keepBuffer à 4 dans un second test.
