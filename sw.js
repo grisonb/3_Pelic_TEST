@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-61-gaar-mode-recherche-haut-clavier';
+const SW_VERSION = 'sw-v13-62-gaar-suppression-points-bandeau';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
