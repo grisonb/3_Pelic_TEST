@@ -519,6 +519,11 @@ const COMMUNES_DISPLAY_MIN_ZOOM = 10.5;
 const ONLINE_MAX_NATIVE_ZOOM = 18;
 const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
 const OFFLINE_HARD_MAX_NATIVE_ZOOM = 13;
+// v13.55 — iPad : tampon de tuiles réduit pour éviter la saturation Leaflet/IndexedDB.
+const OFFLINE_TILE_KEEP_BUFFER = 2;
+const OFFLINE_TILE_UPDATE_INTERVAL_MS = 80;
+const OFFLINE_TILE_WAKE_DELAYS_MS = [120, 450, 1000, 2000];
+let offlineTileWakeToken = 0;
 const GLOBAL_MAX_ZOOM = 18;
 const GLOBAL_MIN_ZOOM = 0;
 let baseTileMaxNativeZoom = ONLINE_MAX_NATIVE_ZOOM;
@@ -1951,9 +1956,10 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-        zoomAnimation: true,
+        // v13.55 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
+        zoomAnimation: false,
         fadeAnimation: false,
-        markerZoomAnimation: true
+        markerZoomAnimation: false
     }).setView([46.6, 2.2], 5.5);
 
     map.on('zoomend', enforceOfflineZoomLimit);
@@ -2124,6 +2130,34 @@ function buildOfflineTileUrlForPack(tilePath, packName, isLargeZip = false) {
     return `https://${hostPrefix}.tile.openstreetmap.org/${tilePath}`;
 }
 
+
+function scheduleOfflineTileWake(reason = 'startup') {
+    const token = ++offlineTileWakeToken;
+
+    OFFLINE_TILE_WAKE_DELAYS_MS.forEach((delay, index) => {
+        setTimeout(() => {
+            if (token !== offlineTileWakeToken) return;
+            try {
+                if (!map || !baseTileLayer) return;
+
+                if (typeof map.invalidateSize === 'function') {
+                    map.invalidateSize({ animate: false, pan: false });
+                }
+
+                if (typeof baseTileLayer.redraw === 'function' && index <= 2) {
+                    baseTileLayer.redraw();
+                }
+
+                if (index === OFFLINE_TILE_WAKE_DELAYS_MS.length - 1 && typeof enforceOfflineZoomLimit === 'function') {
+                    enforceOfflineZoomLimit();
+                }
+            } catch (error) {
+                console.warn('Réveil carte offline impossible:', reason, error);
+            }
+        }, delay);
+    });
+}
+
 function setupBaseTileLayer() {
     if (!map) return;
     if (baseTileLayer) {
@@ -2173,10 +2207,10 @@ function setupBaseTileLayer() {
         minZoom: effectiveMinZoom,
         maxZoom: effectiveMaxZoom,
         attribution: '© OpenStreetMap',
-        keepBuffer: 32,
+        keepBuffer: OFFLINE_TILE_KEEP_BUFFER,
         updateWhenZooming: false,
         updateWhenIdle: true,
-        updateInterval: 160,
+        updateInterval: OFFLINE_TILE_UPDATE_INTERVAL_MS,
         noWrap: true,
         errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
     }).addTo(map);
@@ -2185,6 +2219,7 @@ function setupBaseTileLayer() {
 
 
     applyMapNoBackgroundStyle();
+    scheduleOfflineTileWake('setupBaseTileLayer');
 }
 
 function clearCurrentSelection(options = {}) {
