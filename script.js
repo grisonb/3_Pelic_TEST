@@ -7838,7 +7838,31 @@ function redrawGaarCircuits() {
 
             marker.on('click', (event) => {
                 stopGaarUiEvent(event, { durationMs: 900 });
-                openGaarPointSearchOverlay(circuitIndex, pointIndex);
+
+                if (isDrawingMode) {
+                    openGaarPointSearchOverlay(circuitIndex, pointIndex);
+                    return;
+                }
+
+                /*
+                 * v13.65 — hors mode Créer/Modifier :
+                 * un clic sur un point GAAR affiche seulement une petite étiquette
+                 * avec le nom du point/ville. Aucune fenêtre d'édition, aucun bouton.
+                 */
+                try {
+                    if (map && typeof map.closePopup === 'function') map.closePopup();
+                    if (typeof L !== 'undefined' && L.popup && map) {
+                        L.popup({
+                            autoPan: false,
+                            closeButton: false,
+                            className: 'gaar-point-name-popup',
+                            offset: [0, -8]
+                        })
+                            .setLatLng([point.lat, point.lng])
+                            .setContent(`<div class="gaar-point-simple-label">${escapeHtml(getGaarPointDisplayName(point))}</div>`)
+                            .openOn(map);
+                    }
+                } catch (_) {}
             });
 
             if (isDrawingMode) {
