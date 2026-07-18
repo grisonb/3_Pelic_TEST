@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-57-oaci-zoom-flash-bleu';
+const SW_VERSION = 'sw-v13-58-oaci-zoom-blanche-npf';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
