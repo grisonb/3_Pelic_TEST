@@ -1,21 +1,18 @@
-NPF-Q400 — TEST v13.65
+NPF-Q400 TEST v13.67 — PDF Doc FDF Réduité + Carte Fréquences OPS
 
-Base utilisée
-- Reprise de TEST v13.64.
-- v13.58 conservée comme référence fluidité validée.
-- Corrections GAAR v13.59 à v13.64 conservées.
+Base : v13.66, elle-même basée sur v13.65 et sur la référence fluidité validée v13.58.
 
-Objet de la version
-- Clarifier le comportement des points de circuit GAAR hors mode Créer/Modifier.
+Modifications :
+- Bouton d’import renommé : « Télécharger PDFs Doc Fdf Réduité ».
+- Import PDF : acceptation du document commun « Carte Fréquences OPS.pdf ».
+- Le document « Carte Fréquences OPS » est stocké dans la même base offline que les PDF aérodromes/FDF.
+- Ajout d’un bouton carte sous « Lignes HT » : « Fréquences OPS ».
+- Icône du bouton : antenne radio avec ondes, en SVG monochrome intégré.
+- Clic sur « Fréquences OPS » : ouverture du PDF commun « Carte Fréquences OPS ».
+- Le bouton fonctionne avec le PDF importé offline et avec les chemins serveur ./pdf/Carte Fréquences OPS.pdf / ./pdf/Carte Frequences OPS.pdf.
+- Les PDF pélicandromes et le document commun « Doc PDF Réduite » restent conservés.
 
-Corrections
-- Hors mode Créer/Modifier : un clic sur un point GAAR n'ouvre plus la fenêtre de recherche/modification.
-- Hors mode Créer/Modifier : un clic affiche seulement une petite étiquette avec le nom du point/ville.
-- En mode Créer/Modifier : le clic sur un point conserve l'ouverture du panneau de modification/suppression.
-- Les étiquettes permanentes des points restent visibles uniquement lorsque Créer/Modifier est actif.
-- Aucun changement sur la fluidité carte validée en v13.58/v13.56.
-
-Contrôles effectués
-- node --check script.js : OK.
-- node --check sw.js : OK.
-- manifest.json : valide.
+Contrôles :
+- script.js : contrôle syntaxe OK.
+- sw.js : contrôle syntaxe OK.
+- manifest.json : JSON valide.
