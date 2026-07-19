@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-68_frequences_ops_icone_parabole';
+const SW_VERSION = 'sw-v13-69_import_zip_stable_ipad';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
@@ -176,10 +176,26 @@ self.addEventListener('message', event => {
         activeOfflinePacks = [];
         offlineTilesEnabled = false;
         offlineSettingsLoadedAt = Date.now();
+
+        const acknowledgeHeavyWriteReady = async () => {
+            /*
+             * v13.69 — import ZIP iPad : accusé de réception réel.
+             * La page attend cette réponse avant de commencer à écrire dans IndexedDB.
+             * Cela évite que le service worker garde encore une connexion/lecture active
+             * au moment du premier lot d'écriture, blocage constaté vers 171/22387.
+             */
+            await closeOfflineDBForHeavyWrite();
+            try {
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({ type: 'OFFLINE_IMPORT_READY' });
+                }
+            } catch (_) {}
+        };
+
         if (event.waitUntil) {
-            event.waitUntil(closeOfflineDBForHeavyWrite());
+            event.waitUntil(acknowledgeHeavyWriteReady());
         } else {
-            closeOfflineDBForHeavyWrite();
+            acknowledgeHeavyWriteReady();
         }
         return;
     }
