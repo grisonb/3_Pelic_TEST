@@ -5266,7 +5266,7 @@ body {
     border-color: rgba(255,255,255,.75);
 }
 
-/* v13.67 — bouton carte Fréquences OPS */
+/* v13.68 — bouton carte Fréquences OPS avec icône parabole */
 .ops-frequencies-map-button .radio-frequency-icon {
     width: 62px;
     height: 62px;
@@ -5281,10 +5281,11 @@ body {
     overflow: visible;
 }
 
-.ops-frequencies-map-button .radio-antenna-base,
-.ops-frequencies-map-button .radio-antenna-mast,
+.ops-frequencies-map-button .radio-dish-bowl,
+.ops-frequencies-map-button .radio-dish-rim,
+.ops-frequencies-map-button .radio-dish-arm,
 .ops-frequencies-map-button .radio-wave,
-.ops-frequencies-map-button .radio-antenna-feet {
+.ops-frequencies-map-button .radio-dish-foot {
     fill: none;
     stroke: currentColor;
     stroke-width: 4;
@@ -5292,11 +5293,19 @@ body {
     stroke-linejoin: round;
 }
 
-.ops-frequencies-map-button .radio-wave {
-    stroke-width: 3.4;
+.ops-frequencies-map-button .radio-dish-bowl {
+    stroke-width: 4.4;
 }
 
-.ops-frequencies-map-button .radio-antenna-node {
+.ops-frequencies-map-button .radio-dish-rim {
+    stroke-width: 4.8;
+}
+
+.ops-frequencies-map-button .radio-wave {
+    stroke-width: 3.7;
+}
+
+.ops-frequencies-map-button .radio-dish-node {
     fill: currentColor;
     stroke: currentColor;
     stroke-width: 1;
