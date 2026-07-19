@@ -8274,7 +8274,87 @@ async function purgeInactivePacksCache() {
 }
 
 
+
+async function persistOfflineImportPauseSettings() {
+    /*
+     * v13.69 — import ZIP stable iPad.
+     * On écrit réellement dans IndexedDB/settings que les tuiles offline sont suspendues
+     * et qu'aucun pack n'est actif. Le service worker relit périodiquement ces settings :
+     * si on ne les met pas à jour, il peut reprendre la lecture de l'ancien pack pendant
+     * que l'import écrit le nouveau ZIP, ce qui bloque Safari/iPadOS dès le premier lot.
+     */
+    try { localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false'); } catch (_) {}
+    try { localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([])); } catch (_) {}
+
+    if (!db) {
+        try { await initDB(); } catch (_) {}
+    }
+
+    if (!db) return;
+
+    await new Promise((resolve, reject) => {
+        try {
+            const tx = db.transaction('settings', 'readwrite');
+            const store = tx.objectStore('settings');
+            store.put({ key: OFFLINE_TILES_ENABLED_KEY, value: false });
+            store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: [] });
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error || new Error('Erreur suspension settings offline'));
+            tx.onabort = () => reject(tx.error || new Error('Transaction suspension settings annulée'));
+        } catch (error) {
+            reject(error);
+        }
+    }).catch((error) => {
+        console.warn('[Offline] Suspension settings import incomplète:', error);
+    });
+}
+
+function postServiceWorkerMessageWithAck(message, expectedType = 'OFFLINE_IMPORT_READY', timeoutMs = 2500) {
+    return new Promise((resolve) => {
+        try {
+            if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller || typeof MessageChannel === 'undefined') {
+                resolve(false);
+                return;
+            }
+
+            const channel = new MessageChannel();
+            let done = false;
+            const finish = (value) => {
+                if (done) return;
+                done = true;
+                try { channel.port1.close(); } catch (_) {}
+                resolve(value);
+            };
+
+            const timer = setTimeout(() => finish(false), timeoutMs);
+            channel.port1.onmessage = (event) => {
+                const data = event.data || {};
+                if (data.type === expectedType) {
+                    clearTimeout(timer);
+                    finish(true);
+                }
+            };
+
+            navigator.serviceWorker.controller.postMessage(message, [channel.port2]);
+        } catch (error) {
+            console.warn('[Offline] ACK service worker impossible:', error);
+            resolve(false);
+        }
+    });
+}
+
+
 async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline en cours') {
+    /*
+     * v13.69 — suspension renforcée.
+     * La suspension n'est plus seulement en mémoire/localStorage : elle est aussi
+     * écrite dans IndexedDB/settings pour empêcher le service worker de reprendre
+     * l'ancien pack en plein import.
+     */
+
+    await persistOfflineImportPauseSettings();
+    offlineTilesMode = false;
+
     /*
      * v12.16 — accélération du deuxième gros import.
      *
@@ -8302,6 +8382,7 @@ async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline e
     } catch (_) {}
 
     try {
+        notifyServiceWorkerOfflineTilesPreference(false);
         notifyServiceWorkerActivePacks([]);
     } catch (_) {}
 
@@ -8341,9 +8422,7 @@ async function releaseOfflineDatabaseForHeavyOperation(reason = 'Opération offl
     await suspendOfflineMapRenderingDuringImport(reason);
 
     try {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-            navigator.serviceWorker.controller.postMessage({ type: 'OFFLINE_IMPORT_START' });
-        }
+        await postServiceWorkerMessageWithAck({ type: 'OFFLINE_IMPORT_START' }, 'OFFLINE_IMPORT_READY', 3000);
     } catch (_) {}
 
     try {
@@ -8351,7 +8430,7 @@ async function releaseOfflineDatabaseForHeavyOperation(reason = 'Opération offl
     } catch (_) {}
     db = null;
 
-    await new Promise(resolve => setTimeout(resolve, 900));
+    await new Promise(resolve => setTimeout(resolve, 1200));
     await initDB();
 }
 
@@ -8376,6 +8455,11 @@ async function handleZipImport(file) {
     statusMessage.textContent = `Ouverture du ZIP ${packName}...`;
     isZipImportRunning = true;
     try { sessionStorage.setItem('npfZipImportRunning', '1'); } catch (_) {}
+
+    const previousImportOfflineTilesMode = !!offlineTilesMode;
+    const previousImportMapSourceMode = mapSourceMode;
+    const previousImportActiveOfflinePacks = Array.isArray(activeOfflinePacks) ? [...activeOfflinePacks] : [];
+    let zipImportCompletedSuccessfully = false;
 
     /*
      * v12.25 — OpenStreet en ZIP découpés : import progressif.
@@ -8433,7 +8517,7 @@ async function handleZipImport(file) {
         }
     };
 
-    const putTileBatch = (batch) => new Promise((resolve, reject) => {
+    const putTileBatch = (batch, timeoutMs = 22000) => new Promise((resolve, reject) => {
         if (!batch.length) {
             resolve();
             return;
@@ -8441,15 +8525,55 @@ async function handleZipImport(file) {
 
         const transaction = getTileWriteTransaction();
         const store = transaction.objectStore('tiles');
+        let finished = false;
 
-        batch.forEach(tileData => {
-            store.put(tileData);
-        });
+        const finish = (callback, value) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            callback(value);
+        };
 
-        transaction.oncomplete = resolve;
-        transaction.onerror = () => reject(transaction.error);
-        transaction.onabort = () => reject(transaction.error || new Error('Transaction IndexedDB annulée'));
+        const timer = setTimeout(() => {
+            try { transaction.abort(); } catch (_) {}
+            finish(reject, new Error(`Transaction IndexedDB bloquée plus de ${Math.round(timeoutMs / 1000)} s`));
+        }, timeoutMs);
+
+        try {
+            batch.forEach(tileData => {
+                store.put(tileData);
+            });
+        } catch (error) {
+            try { transaction.abort(); } catch (_) {}
+            finish(reject, error);
+            return;
+        }
+
+        transaction.oncomplete = () => finish(resolve);
+        transaction.onerror = () => finish(reject, transaction.error || new Error('Erreur transaction IndexedDB'));
+        transaction.onabort = () => finish(reject, transaction.error || new Error('Transaction IndexedDB annulée'));
     });
+
+    const putTileBatchResilient = async (batch) => {
+        try {
+            await putTileBatch(batch);
+            return;
+        } catch (error) {
+            /*
+             * v13.69 — reprise automatique si Safari bloque une transaction.
+             * Le blocage observé à 171/22387 correspond typiquement au premier
+             * gros lot qui ne se termine jamais après utilisation d'une carte active.
+             * On rouvre la base et on réécrit le même lot en micro-lots.
+             */
+            console.warn('[Offline] Lot IndexedDB bloqué, reprise micro-lots:', error);
+            await updateImportProgress('Base iPad occupée : reprise en petits lots...', null, true);
+            await reopenDbCleanly();
+            for (let i = 0; i < batch.length; i += 12) {
+                await putTileBatch(batch.slice(i, i + 12), 18000);
+                await idle(6);
+            }
+        }
+    };
 
     const deleteExistingTilesForPack = (packNameToDelete, isLargeZipPack) => new Promise((resolve, reject) => {
         /*
@@ -8548,18 +8672,19 @@ async function handleZipImport(file) {
          */
         const useConservativeLargeImport = isLargeZip && isOpenStreetPack;
         const useSplitZipFastProfile = isOpenStreetPack && !isLargeZip;
+        const useSafeMultiZipImport = !isLargeZip && totalFiles >= 5000 && !useSplitZipFastProfile;
 
         /*
-         * v12.51 — profil ZIP fractionné rapide sans blocage 1008.
-         * v12.50 était trop prudent : beaucoup de petites transactions de 120
-         * tuiles ralentissaient l'installation. On repasse sur un débit plus
-         * élevé avec 240 tuiles par transaction et 48 lectures parallèles, mais
-         * sans revenir aux transactions de ~1000 tuiles qui bloquaient Safari.
+         * v13.69 — profil multi-ZIP stable iPad.
+         * Les nouveaux ZIP de carte France peuvent contenir ~20 000 à 25 000 tuiles par bloc
+         * sans être nommés OpenStreet. Après utilisation d'une carte active, Safari bloquait
+         * le premier gros lot autour de 171/22387. On force donc un profil plus petit,
+         * progressif et rouvert régulièrement pour ces ZIP.
          */
         const batchSize = useConservativeLargeImport
             ? 35
-            : (useSplitZipFastProfile ? 240 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180))));
-        const reopenEveryTiles = useConservativeLargeImport ? 700 : (isOaciPack ? 350 : 0);
+            : (useSafeMultiZipImport ? 40 : (useSplitZipFastProfile ? 240 : (isIgnPack ? 320 : (isOaciPack ? 35 : (isLargeZip ? 160 : 180)))));
+        const reopenEveryTiles = useConservativeLargeImport ? 700 : (useSafeMultiZipImport ? 400 : (isOaciPack ? 350 : 0));
         const splitZipReadConcurrency = useSplitZipFastProfile ? 48 : 1;
         const splitZipUiYieldEveryTiles = useSplitZipFastProfile ? 960 : 0;
         const usePackScopedKey = !isOpenStreetPack;
@@ -8602,16 +8727,18 @@ async function handleZipImport(file) {
             if (!batch.length) return;
             const toWrite = batch;
             batch = [];
-            await putTileBatch(toWrite);
+            await putTileBatchResilient(toWrite);
             processedFiles += toWrite.length;
 
             const percent = Math.min(100, Math.round((processedFiles / totalFiles) * 100));
             await updateImportProgress(
                 useSplitZipFastProfile
                     ? `ZIP fractionné rapide : ${processedFiles} / ${totalFiles} tuiles`
-                    : `Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`,
+                    : (useSafeMultiZipImport
+                        ? `Import sécurisé iPad : ${processedFiles} / ${totalFiles} tuiles`
+                        : `Écriture iPad... ${processedFiles} / ${totalFiles} tuiles`),
                 percent,
-                useConservativeLargeImport || useSplitZipFastProfile
+                useConservativeLargeImport || useSplitZipFastProfile || useSafeMultiZipImport
             );
 
             if (reopenEveryTiles && processedFiles > 0 && processedFiles % reopenEveryTiles < toWrite.length) {
@@ -8683,7 +8810,9 @@ async function handleZipImport(file) {
 
                 if (!useConservativeLargeImport && !useSplitZipFastProfile && (i === 0 || i % 10 === 0)) {
                     const readPercent = Math.min(95, Math.max(2, Math.round((i / totalFiles) * 100)));
-                    await updateImportProgress(`Lecture tuiles... ${i + 1} / ${totalFiles}`, readPercent, true);
+                    await updateImportProgress(useSafeMultiZipImport
+                        ? `Import sécurisé : lecture ${i + 1} / ${totalFiles}`
+                        : `Lecture tuiles... ${i + 1} / ${totalFiles}`, readPercent, true);
                 }
 
                 if (useConservativeLargeImport && (i === 0 || i % 10 === 0)) {
@@ -8746,6 +8875,15 @@ async function handleZipImport(file) {
         const importedGroupPacks = getInstalledPackNamesForGroup(importedGroupName);
         await persistSimpleActiveOfflinePacks(importedGroupPacks.length ? importedGroupPacks : [packName]);
 
+        const restoreOfflineAfterImport = previousImportMapSourceMode === 'offline' || previousImportOfflineTilesMode;
+        mapSourceMode = restoreOfflineAfterImport ? 'offline' : 'online';
+        localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
+        await setOfflineTilesEnabled(restoreOfflineAfterImport);
+        notifyServiceWorkerActivePacks(activeOfflinePacks);
+        updateMapSourceButtons();
+        updateOfflineStatus();
+        zipImportCompletedSuccessfully = true;
+
         if (isLargeZip) {
             reloadAfterOfflinePackChange(`Importation de ${packName} terminée. Rechargement mémoire...`);
             return;
@@ -8761,6 +8899,20 @@ async function handleZipImport(file) {
             statusMessage.textContent += " — vérifiez l'espace iPad disponible, puis relancez après fermeture/réouverture de NPF.";
         }
         console.error("Erreur d'importation ZIP:", error);
+
+        if (!zipImportCompletedSuccessfully) {
+            try {
+                mapSourceMode = previousImportMapSourceMode || 'online';
+                localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
+                await persistSimpleActiveOfflinePacks(previousImportActiveOfflinePacks);
+                await setOfflineTilesEnabled(previousImportOfflineTilesMode);
+                notifyServiceWorkerActivePacks(previousImportActiveOfflinePacks);
+                updateMapSourceButtons();
+                updateOfflineStatus();
+            } catch (restoreError) {
+                console.warn('[Offline] Restauration état offline après échec import impossible:', restoreError);
+            }
+        }
     } finally {
         isZipImportRunning = false;
         try { sessionStorage.removeItem('npfZipImportRunning'); } catch (_) {}
