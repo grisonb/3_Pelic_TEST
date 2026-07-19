@@ -1,18 +1,29 @@
-NPF-Q400 TEST v13.67 — PDF Doc FDF Réduité + Carte Fréquences OPS
+NPF-Q400 TEST v13.68 — Icône Fréquences OPS parabole
 
-Base : v13.66, elle-même basée sur v13.65 et sur la référence fluidité validée v13.58.
+Base : v13.67 — Doc FDF Réduité + Carte Fréquences OPS.
+Référence fluidité conservée : v13.58.
 
-Modifications :
-- Bouton d’import renommé : « Télécharger PDFs Doc Fdf Réduité ».
-- Import PDF : acceptation du document commun « Carte Fréquences OPS.pdf ».
-- Le document « Carte Fréquences OPS » est stocké dans la même base offline que les PDF aérodromes/FDF.
-- Ajout d’un bouton carte sous « Lignes HT » : « Fréquences OPS ».
-- Icône du bouton : antenne radio avec ondes, en SVG monochrome intégré.
-- Clic sur « Fréquences OPS » : ouverture du PDF commun « Carte Fréquences OPS ».
-- Le bouton fonctionne avec le PDF importé offline et avec les chemins serveur ./pdf/Carte Fréquences OPS.pdf / ./pdf/Carte Frequences OPS.pdf.
-- Les PDF pélicandromes et le document commun « Doc PDF Réduite » restent conservés.
+Changement demandé :
+- remplacement de l'icône du bouton carte « Fréquences OPS » par une icône type parabole / antenne satellite avec ondes, conforme à l'exemple fourni.
+
+Conservé :
+- bouton « Fréquences OPS » sous « Lignes HT » ;
+- ouverture du PDF commun « Carte Fréquences OPS » ;
+- import du PDF « Carte Fréquences OPS.pdf » ;
+- bouton « Télécharger PDFs Doc Fdf Réduité » ;
+- PDF pélicandromes ;
+- Doc PDF Réduite commune ;
+- corrections GAAR précédentes ;
+- corrections fluidité/OACI v13.58.
+
+Fichiers à remplacer dans GitHub :
+- index.html
+- manifest.json
+- script.js
+- style.css
+- sw.js
 
 Contrôles :
-- script.js : contrôle syntaxe OK.
-- sw.js : contrôle syntaxe OK.
-- manifest.json : JSON valide.
+- script.js : syntaxe OK
+- sw.js : syntaxe OK
+- manifest.json : JSON valide
