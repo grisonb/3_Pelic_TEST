@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.65">
-    <link rel="manifest" href="manifest.json?appv=v13.65">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.65">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.65">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.65">
+    <link rel="stylesheet" href="style.css?appv=v13.67">
+    <link rel="manifest" href="manifest.json?appv=v13.67">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.67">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.67">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.67">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.65';
+        const APP_VERSION = 'v13.67';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -324,6 +324,21 @@
             </span>
             <span class="powerline-label">HT</span>
         </button>
+        <button id="ops-frequencies-pdf-button" class="left-map-action-button ops-frequencies-map-button" title="Ouvrir la carte fréquences OPS" aria-label="Ouvrir la carte fréquences OPS">
+            <span class="radio-frequency-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 64" focusable="false" role="img">
+                    <path class="radio-antenna-base" d="M32 56 V31"/>
+                    <path class="radio-antenna-mast" d="M32 31 L23 11"/>
+                    <circle class="radio-antenna-node" cx="23" cy="11" r="3.5"/>
+                    <path class="radio-wave" d="M37 17 C43 20 47 26 47 33 C47 40 43 46 37 49"/>
+                    <path class="radio-wave" d="M42 8 C52 14 58 23 58 33 C58 43 52 52 42 58"/>
+                    <path class="radio-wave" d="M19 17 C13 20 9 26 9 33 C9 40 13 46 19 49"/>
+                    <path class="radio-wave" d="M14 8 C4 14 -2 23 -2 33 C-2 43 4 52 14 58"/>
+                    <path class="radio-antenna-feet" d="M21 56 H43 M27 56 L23 62 M37 56 L41 62"/>
+                </svg>
+            </span>
+            <span class="ops-frequency-label">OPS</span>
+        </button>
         <button id="traffic-layer-button" class="left-map-action-button traffic-map-button" title="Afficher/Masquer le trafic ADS-B indicatif — appui long: filtres" aria-label="Afficher/Masquer le trafic ADS-B indicatif">
             <span class="traffic-icon" aria-hidden="true">✈</span>
             <span id="traffic-button-count" class="traffic-button-count">0</span>
@@ -418,7 +433,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.65"></script>
+    <script src="script.js?appv=v13.67"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -678,9 +693,9 @@
                     </ul>
                 </div>
                 <div class="airport-pdf-section">
-                    <h3>PDF aérodromes offline</h3>
-                    <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne depuis le bouton PDF des pélicandromes.</p>
-                    <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDF aérodromes</label>
+                    <h3>PDFs FDF réduite / aérodromes offline</h3>
+                    <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>, ou les documents communs <b>Doc Fdf Réduité.pdf</b> et <b>Carte Fréquences OPS.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne.</p>
+                    <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDFs Doc Fdf Réduité</label>
                     <input type="file" id="airport-pdf-importer-input" accept="application/pdf,.pdf" multiple style="display: none;">
                     <ul id="installed-airport-pdfs-list">
                         <li class="no-pdfs-placeholder">Aucun PDF aérodrome stocké.</li>
