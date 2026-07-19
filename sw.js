@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-65-gaar_clic_hors_modif_etiquette';
+const SW_VERSION = 'sw-v13-67_pdf_doc_fdf_frequences_ops';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
