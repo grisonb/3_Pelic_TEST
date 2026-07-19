@@ -467,6 +467,24 @@ const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV2';
 const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
 const AIRPORT_PDF_DB_NAME = 'AirportPdfsDB';
 const AIRPORT_PDF_DB_VERSION = 1;
+const FDF_REDUCED_PDF_KEY = 'DOC_FDF_REDUITE';
+const FDF_REDUCED_PDF_FILENAME = 'Doc Fdf Réduite.pdf';
+const FDF_REDUCED_PDF_LABEL = 'Doc FDF réduite';
+const FDF_REDUCED_PDF_SERVER_CANDIDATES = [
+    './pdf/Doc%20Fdf%20R%C3%A9duite.pdf',
+    './pdf/Doc%20Fdf%20R%C3%A9duit%C3%A9.pdf',
+    './pdf/Doc Fdf Réduite.pdf',
+    './pdf/Doc Fdf Réduité.pdf'
+];
+const OPS_FREQUENCIES_PDF_KEY = 'CARTE_FREQUENCES_OPS';
+const OPS_FREQUENCIES_PDF_FILENAME = 'Carte Fréquences OPS.pdf';
+const OPS_FREQUENCIES_PDF_LABEL = 'Carte Fréquences OPS';
+const OPS_FREQUENCIES_PDF_SERVER_CANDIDATES = [
+    './pdf/Carte%20Fr%C3%A9quences%20OPS.pdf',
+    './pdf/Carte%20Frequences%20OPS.pdf',
+    './pdf/Carte Fréquences OPS.pdf',
+    './pdf/Carte Frequences OPS.pdf'
+];
 let airportPdfDb = null;
 const WATER_POINTS_LAYER_KEY = 'showWaterPointsLayer';
 let showWaterPointsLayer = localStorage.getItem(WATER_POINTS_LAYER_KEY) === 'true';
@@ -2370,6 +2388,7 @@ function setupEventListeners() {
     const communesLayerButton = document.getElementById('communes-layer-button');
     const waterPointsButton = document.getElementById('water-points-button');
     const highVoltageLinesButton = document.getElementById('high-voltage-lines-button');
+    const opsFrequenciesButton = document.getElementById('ops-frequencies-pdf-button');
     const trafficLayerButton = document.getElementById('traffic-layer-button');
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
@@ -2448,6 +2467,12 @@ function setupEventListeners() {
         refreshHighVoltageLinesButtonState();
         highVoltageLinesButton.addEventListener('click', () => {
             toggleHighVoltageLinesLayer();
+        });
+    }
+
+    if (opsFrequenciesButton) {
+        opsFrequenciesButton.addEventListener('click', () => {
+            openOpsFrequenciesPdf();
         });
     }
 
@@ -4720,12 +4745,39 @@ function initAirportPdfDB() {
 
 function normalizeAirportPdfOaciFromFilename(filename) {
     const baseName = String(filename || '').split(/[\\/]/).pop().trim();
+    const nameWithoutExt = baseName.replace(/\.pdf$/i, '').trim();
+    const simplifiedName = nameWithoutExt
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+
+    /*
+     * v13.66 — PDF commun FDF réduite :
+     * accepte "Doc Fdf Réduite.pdf" ou "Doc Fdf Réduité.pdf"
+     * et le stocke avec une clé unique, commune à tous les pélicandromes.
+     * v13.67 — accepte aussi "Carte Fréquences OPS.pdf" comme PDF commun.
+     */
+    if (simplifiedName === 'docfdfreduite') {
+        return FDF_REDUCED_PDF_KEY;
+    }
+    if (simplifiedName === 'cartefrequencesops') {
+        return OPS_FREQUENCIES_PDF_KEY;
+    }
+
     const match = baseName.match(/^([A-Z0-9]{4})\.pdf$/i);
     return match ? match[1].toUpperCase() : null;
 }
 
+function getAirportPdfDisplayLabel(recordOrKey) {
+    const key = typeof recordOrKey === 'string' ? recordOrKey : String((recordOrKey && recordOrKey.oaci) || '');
+    if (key === FDF_REDUCED_PDF_KEY) return FDF_REDUCED_PDF_LABEL;
+    if (key === OPS_FREQUENCIES_PDF_KEY) return OPS_FREQUENCIES_PDF_LABEL;
+    return key;
+}
+
 async function getAirportPdfRecord(oaci) {
-    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
     if (!safeOaci) return null;
     try {
         const pdfDb = await initAirportPdfDB();
@@ -4745,7 +4797,7 @@ async function getAirportPdfRecord(oaci) {
 async function importAirportPdfFiles(files = []) {
     const pdfFiles = Array.from(files || []).filter(file => file && /\.pdf$/i.test(file.name));
     if (!pdfFiles.length) {
-        alert('Sélectionne un ou plusieurs fichiers PDF nommés avec le code OACI, par exemple LFTW.pdf.');
+        alert('Sélectionne un ou plusieurs fichiers PDF : LFTW.pdf pour un aérodrome, Doc Fdf Réduité.pdf pour le document FDF réduit commun, ou Carte Fréquences OPS.pdf pour la carte fréquences OPS.');
         return;
     }
 
@@ -4759,7 +4811,7 @@ async function importAirportPdfFiles(files = []) {
         }
         records.push({
             oaci,
-            filename: `${oaci}.pdf`,
+            filename: oaci === FDF_REDUCED_PDF_KEY ? FDF_REDUCED_PDF_FILENAME : (oaci === OPS_FREQUENCIES_PDF_KEY ? OPS_FREQUENCIES_PDF_FILENAME : `${oaci}.pdf`),
             blob: file,
             size: file.size || 0,
             updatedAt: Date.now()
@@ -4767,7 +4819,7 @@ async function importAirportPdfFiles(files = []) {
     }
 
     if (!records.length) {
-        alert(`Aucun PDF importé. Les fichiers doivent être nommés LFTW.pdf, LFKJ.pdf, etc.${invalidNames.length ? `\nIgnorés : ${invalidNames.join(', ')}` : ''}`);
+        alert(`Aucun PDF importé. Les fichiers doivent être nommés LFTW.pdf, LFKJ.pdf, etc., Doc Fdf Réduité.pdf ou Carte Fréquences OPS.pdf.${invalidNames.length ? `\nIgnorés : ${invalidNames.join(', ')}` : ''}`);
         return;
     }
 
@@ -4782,7 +4834,7 @@ async function importAirportPdfFiles(files = []) {
             tx.onabort = () => reject(tx.error || new Error('Import PDF interrompu'));
         });
         displayInstalledAirportPdfs();
-        alert(`${records.length} PDF aérodrome(s) stocké(s) hors ligne.${invalidNames.length ? `\nIgnorés : ${invalidNames.join(', ')}` : ''}`);
+        alert(`${records.length} PDF(s) FDF/aérodrome/OPS stocké(s) hors ligne.${invalidNames.length ? `\nIgnorés : ${invalidNames.join(', ')}` : ''}`);
     } catch (error) {
         console.error('Import PDF aérodromes impossible:', error);
         alert(`Import PDF impossible : ${error.message || error}`);
@@ -4813,7 +4865,7 @@ async function displayInstalledAirportPdfs() {
     list.innerHTML = '';
 
     if (!records.length) {
-        list.innerHTML = '<li class="no-pdfs-placeholder">Aucun PDF aérodrome stocké.</li>';
+        list.innerHTML = '<li class="no-pdfs-placeholder">Aucun PDF FDF/aérodrome/OPS stocké.</li>';
         return;
     }
 
@@ -4821,10 +4873,13 @@ async function displayInstalledAirportPdfs() {
         const li = document.createElement('li');
         const sizeKb = record.size ? `${Math.max(1, Math.round(record.size / 1024))} ko` : 'taille inconnue';
         const date = record.updatedAt ? new Date(record.updatedAt).toLocaleDateString('fr-FR') : '--/--/----';
+        const openAction = record.oaci === FDF_REDUCED_PDF_KEY
+            ? 'window.openFdfReducedPdf()'
+            : (record.oaci === OPS_FREQUENCIES_PDF_KEY ? 'window.openOpsFrequenciesPdf()' : `window.openAirportPdf('${record.oaci}')`);
         li.innerHTML = `
-            <span><strong>${record.oaci}</strong> — ${record.filename || `${record.oaci}.pdf`} <small>(${sizeKb}, ${date})</small></span>
+            <span><strong>${getAirportPdfDisplayLabel(record)}</strong> — ${record.filename || `${record.oaci}.pdf`} <small>(${sizeKb}, ${date})</small></span>
             <div class="airport-pdf-actions">
-                <button type="button" class="open-pdf-btn" onclick="window.openAirportPdf('${record.oaci}')">Ouvrir</button>
+                <button type="button" class="open-pdf-btn" onclick="${openAction}">Ouvrir</button>
                 <button type="button" class="delete-pdf-btn" onclick="window.deleteAirportPdf('${record.oaci}')">Supprimer</button>
             </div>
         `;
@@ -4833,9 +4888,9 @@ async function displayInstalledAirportPdfs() {
 }
 
 async function deleteAirportPdf(oaci) {
-    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
     if (!safeOaci) return;
-    if (!confirm(`Supprimer le PDF offline ${safeOaci} ?`)) return;
+    if (!confirm(`Supprimer le PDF offline ${getAirportPdfDisplayLabel(safeOaci)} ?`)) return;
     try {
         const pdfDb = await initAirportPdfDB();
         await new Promise((resolve, reject) => {
@@ -4860,20 +4915,23 @@ async function airportServerPdfExists(url) {
     }
 }
 
-async function openAirportPdf(oaci) {
-    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!safeOaci) return;
+async function openAirportPdfByKey(pdfKey, options = {}) {
+    const safeKey = String(pdfKey || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
+    if (!safeKey) return;
 
     /*
-     * v12.58 — sécurité PDF pélicandrome/aérodrome :
+     * v12.58/v13.66 — sécurité PDF pélicandrome/aérodrome/FDF réduite :
      * si aucun PDF offline ni serveur n'est trouvé, on n'envoie plus l'iPad
      * vers une page PDF inexistante. La fenêtre pré-ouverte est fermée proprement.
      */
     const openedWindow = window.open('', '_blank');
-    const serverPdfUrl = `./pdf/${safeOaci}.pdf`;
+    const label = options.label || getAirportPdfDisplayLabel(safeKey);
+    const serverPdfUrls = Array.isArray(options.serverPdfUrls) && options.serverPdfUrls.length
+        ? options.serverPdfUrls
+        : [`./pdf/${safeKey}.pdf`];
 
     try {
-        const record = await getAirportPdfRecord(safeOaci);
+        const record = await getAirportPdfRecord(safeKey);
         if (record && record.blob) {
             const pdfUrl = URL.createObjectURL(record.blob);
             if (openedWindow) {
@@ -4888,24 +4946,51 @@ async function openAirportPdf(oaci) {
         console.warn('Ouverture PDF offline impossible:', error);
     }
 
-    const hasServerPdf = await airportServerPdfExists(serverPdfUrl);
-    if (hasServerPdf) {
-        if (openedWindow) {
-            openedWindow.location.href = serverPdfUrl;
-        } else {
-            window.location.href = serverPdfUrl;
+    for (const serverPdfUrl of serverPdfUrls) {
+        const hasServerPdf = await airportServerPdfExists(serverPdfUrl);
+        if (hasServerPdf) {
+            if (openedWindow) {
+                openedWindow.location.href = serverPdfUrl;
+            } else {
+                window.location.href = serverPdfUrl;
+            }
+            return;
         }
-        return;
     }
 
     try {
         if (openedWindow && !openedWindow.closed) openedWindow.close();
     } catch (_) {}
 
-    alert(`Aucun PDF associé à ${safeOaci}.`);
+    alert(`Aucun PDF associé à ${label}.`);
+}
+
+async function openAirportPdf(oaci) {
+    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!safeOaci) return;
+    return openAirportPdfByKey(safeOaci, {
+        label: safeOaci,
+        serverPdfUrls: [`./pdf/${safeOaci}.pdf`]
+    });
+}
+
+async function openFdfReducedPdf() {
+    return openAirportPdfByKey(FDF_REDUCED_PDF_KEY, {
+        label: FDF_REDUCED_PDF_LABEL,
+        serverPdfUrls: FDF_REDUCED_PDF_SERVER_CANDIDATES
+    });
+}
+
+async function openOpsFrequenciesPdf() {
+    return openAirportPdfByKey(OPS_FREQUENCIES_PDF_KEY, {
+        label: OPS_FREQUENCIES_PDF_LABEL,
+        serverPdfUrls: OPS_FREQUENCIES_PDF_SERVER_CANDIDATES
+    });
 }
 
 window.openAirportPdf = openAirportPdf;
+window.openFdfReducedPdf = openFdfReducedPdf;
+window.openOpsFrequenciesPdf = openOpsFrequenciesPdf;
 window.deleteAirportPdf = deleteAirportPdf;
 
 
@@ -4922,6 +5007,12 @@ function buildPermanentAirportDotIcon() {
         iconSize: [10, 10],
         iconAnchor: [5, 5]
     });
+}
+
+
+function buildPelicPdfButtonsHtml(oaci) {
+    const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return `<div class="popup-buttons popup-pdf-buttons"><button class="pdf-btn" onclick="window.openAirportPdf('${safeOaci}')">PDF Pélic</button><button class="pdf-btn fdf-reduced-pdf-btn" onclick="window.openFdfReducedPdf()">Doc PDF Réduite</button></div>`;
 }
 
 function drawPermanentAirportMarkers() {
@@ -4945,7 +5036,7 @@ function drawPermanentAirportMarkers() {
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -9] }), zIndexOffset: 2500, keyboard: false });
-            marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div></div>`);
+            marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`);
             marker.addTo(permanentAirportLayer);
             return;
         }
@@ -5003,7 +5094,7 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="pdf-btn" onclick="window.openAirportPdf('${airport.oaci}')">PDF</button></div></div>`);
+        marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`);
         marker.addTo(permanentAirportLayer);
     });
 }
