@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-67_pdf_doc_fdf_frequences_ops';
+const SW_VERSION = 'sw-v13-68_frequences_ops_icone_parabole';
 
 const DB_NAME = 'OfflineTilesDB_v12_21';
 const DB_VERSION = 3;
