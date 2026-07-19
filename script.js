@@ -452,7 +452,7 @@ let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
 let db; // Variable pour la connexion à la base de données IndexedDB
-const OFFLINE_DB_NAME = 'OfflineTilesDB_v12_21';
+const OFFLINE_DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
 const DEFAULT_OFFLINE_TILES_ENABLED = true;
 const MAP_SOURCE_MODE_KEY = 'mapSourceMode';
@@ -8052,6 +8052,12 @@ function initDB() {
 
         request.onsuccess = event => {
             db = event.target.result;
+            try {
+                db.onversionchange = () => {
+                    try { db.close(); } catch (_) {}
+                    if (window.db === db) window.db = null;
+                };
+            } catch (_) {}
             console.log("[DB] Connexion réussie.");
             resolve(db);
         };
@@ -8277,7 +8283,7 @@ async function purgeInactivePacksCache() {
 
 async function persistOfflineImportPauseSettings() {
     /*
-     * v13.69 — import ZIP stable iPad.
+     * v13.70 — import ZIP stable iPad.
      * On écrit réellement dans IndexedDB/settings que les tuiles offline sont suspendues
      * et qu'aucun pack n'est actif. Le service worker relit périodiquement ces settings :
      * si on ne les met pas à jour, il peut reprendre la lecture de l'ancien pack pendant
@@ -8346,7 +8352,7 @@ function postServiceWorkerMessageWithAck(message, expectedType = 'OFFLINE_IMPORT
 
 async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline en cours') {
     /*
-     * v13.69 — suspension renforcée.
+     * v13.70 — suspension renforcée.
      * La suspension n'est plus seulement en mémoire/localStorage : elle est aussi
      * écrite dans IndexedDB/settings pour empêcher le service worker de reprendre
      * l'ancien pack en plein import.
@@ -8560,7 +8566,7 @@ async function handleZipImport(file) {
             return;
         } catch (error) {
             /*
-             * v13.69 — reprise automatique si Safari bloque une transaction.
+             * v13.70 — reprise automatique si Safari bloque une transaction.
              * Le blocage observé à 171/22387 correspond typiquement au premier
              * gros lot qui ne se termine jamais après utilisation d'une carte active.
              * On rouvre la base et on réécrit le même lot en micro-lots.
@@ -8675,7 +8681,7 @@ async function handleZipImport(file) {
         const useSafeMultiZipImport = !isLargeZip && totalFiles >= 5000 && !useSplitZipFastProfile;
 
         /*
-         * v13.69 — profil multi-ZIP stable iPad.
+         * v13.70 — profil multi-ZIP stable iPad.
          * Les nouveaux ZIP de carte France peuvent contenir ~20 000 à 25 000 tuiles par bloc
          * sans être nommés OpenStreet. Après utilisation d'une carte active, Safari bloquait
          * le premier gros lot autour de 171/22387. On force donc un profil plus petit,
@@ -9084,7 +9090,7 @@ function displayInstalledMaps() {
                 <small>À utiliser si une suppression reste bloquée.</small>
             </span>
             <div class="offline-map-actions">
-                <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Tout réinitialiser</button>
+                <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Réinitialiser profond</button>
             </div>
         `;
         list.appendChild(resetLi);
@@ -9306,6 +9312,164 @@ window.resetAllOfflineMapsStorage = async function() {
         alert(`Réinitialisation impossible : ${message}`);
     }
 };;
+
+
+/*
+ * v13.70 — reset profond offline iPad.
+ * Le reset logique ne suffit pas sur iPadOS quand IndexedDB reste verrouillée :
+ * l'import suivant peut bloquer dès 31 tuiles, et seule la suppression de la PWA
+ * libère réellement le stockage. Cette version :
+ * - utilise une nouvelle base OfflineTilesDB_v13_70_clean ;
+ * - ferme la connexion page + service worker ;
+ * - supprime les bases OfflineTilesDB connues quand Safari l'autorise ;
+ * - désinscrit le service worker uniquement pendant le reset, puis recharge l'app
+ *   pour qu'il soit réinstallé proprement.
+ */
+function deleteIndexedDatabaseWithTimeoutForNpf(name, timeoutMs = 3200) {
+    return new Promise((resolve) => {
+        if (!name || typeof indexedDB === 'undefined') {
+            resolve({ name, status: 'skipped' });
+            return;
+        }
+        let done = false;
+        const finish = (status, detail = '') => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve({ name, status, detail });
+        };
+        const timer = setTimeout(() => finish('timeout'), timeoutMs);
+        try {
+            const request = indexedDB.deleteDatabase(name);
+            request.onsuccess = () => finish('deleted');
+            request.onerror = () => finish('error', request.error && request.error.message ? request.error.message : 'deleteDatabase error');
+            request.onblocked = () => finish('blocked');
+        } catch (error) {
+            finish('exception', error && error.message ? error.message : String(error));
+        }
+    });
+}
+
+async function getNpfOfflineDatabaseNamesForReset() {
+    const names = new Set([
+        OFFLINE_DB_NAME,
+        'OfflineTilesDB',
+        'OfflineTilesDB_v12_20',
+        'OfflineTilesDB_v12_21',
+        'OfflineTilesDB_v13_70_clean'
+    ]);
+    try {
+        if (indexedDB && typeof indexedDB.databases === 'function') {
+            const databases = await indexedDB.databases();
+            (databases || []).forEach((entry) => {
+                const name = entry && entry.name ? String(entry.name) : '';
+                if (/^OfflineTilesDB/i.test(name)) names.add(name);
+            });
+        }
+    } catch (_) {}
+    return Array.from(names).filter(Boolean);
+}
+
+window.resetAllOfflineMapsStorage = async function() {
+    const confirmed = confirm(
+        'Réinitialisation profonde des cartes offline ?\n\n' +
+        'Cette action désactive la carte offline, ferme IndexedDB, nettoie les bases de tuiles et recharge NPF.\n' +
+        'Elle remplace la suppression complète de la PWA dans la plupart des cas.'
+    );
+    if (!confirmed) return;
+
+    const progressSection = document.getElementById('import-progress-section');
+    const statusMessage = document.getElementById('import-status-message') || document.getElementById('offline-status');
+    const progressBar = document.getElementById('import-progress-bar');
+    const setProgress = async (message, percent) => {
+        if (progressSection) progressSection.style.display = 'block';
+        if (progressBar && typeof percent === 'number') progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        if (statusMessage) statusMessage.textContent = message;
+        await new Promise(resolve => setTimeout(resolve, 60));
+    };
+
+    try {
+        isZipImportRunning = false;
+        try { sessionStorage.removeItem('npfZipImportRunning'); } catch (_) {}
+
+        await setProgress('Réinitialisation profonde : suspension carte offline...', 5);
+        try {
+            mapSourceMode = 'online';
+            localStorage.setItem(MAP_SOURCE_MODE_KEY, 'online');
+            offlineTilesMode = false;
+            activeOfflinePacks = [];
+            localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false');
+            localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([]));
+            localStorage.setItem(OFFLINE_ONLINE_FALLBACK_KEY, 'false');
+            localStorage.removeItem('installedMapPacks');
+            notifyServiceWorkerOfflineTilesPreference(false);
+            notifyServiceWorkerOfflineOnlineFallback(false);
+            notifyServiceWorkerActivePacks([]);
+        } catch (_) {}
+
+        try {
+            if (map && baseTileLayer) {
+                map.removeLayer(baseTileLayer);
+                baseTileLayer = null;
+            }
+        } catch (_) {}
+
+        await setProgress('Fermeture service worker / IndexedDB...', 18);
+        try {
+            await postServiceWorkerMessageWithAck({ type: 'OFFLINE_FACTORY_RESET' }, 'OFFLINE_IMPORT_READY', 2500);
+        } catch (_) {}
+
+        try {
+            if (db) db.close();
+        } catch (_) {}
+        db = null;
+
+        await setProgress('Nettoyage caches de tuiles...', 35);
+        try { await clearTileCaches(); } catch (_) {}
+
+        await setProgress('Désinscription temporaire du service worker...', 48);
+        try {
+            if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistrations === 'function') {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all((registrations || []).map(reg => reg.unregister().catch(() => false)));
+            }
+        } catch (_) {}
+
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        await setProgress('Suppression bases offline...', 62);
+        const dbNames = await getNpfOfflineDatabaseNamesForReset();
+        const results = [];
+        for (const name of dbNames) {
+            const result = await deleteIndexedDatabaseWithTimeoutForNpf(name, 3200);
+            results.push(result);
+        }
+        const blockedOrTimedOut = results.filter(r => r && (r.status === 'blocked' || r.status === 'timeout'));
+
+        try {
+            localStorage.removeItem('installedMapPacks');
+            localStorage.removeItem(OFFLINE_ACTIVE_PACKS_KEY);
+            localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false');
+            localStorage.setItem(MAP_SOURCE_MODE_KEY, 'online');
+            localStorage.setItem('npfOfflineDeepResetAt', String(Date.now()));
+        } catch (_) {}
+
+        await setProgress(blockedOrTimedOut.length
+            ? 'Reset profond terminé avec bases verrouillées ignorées. Rechargement sur base neuve...'
+            : 'Reset profond terminé. Rechargement sur base neuve...', 100);
+
+        setTimeout(() => {
+            const refreshUrl = new URL(window.location.href);
+            refreshUrl.searchParams.set('appv', APP_VERSION);
+            refreshUrl.searchParams.set('resetdb', Date.now().toString());
+            window.location.replace(refreshUrl.toString());
+        }, 900);
+    } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        if (statusMessage) statusMessage.textContent = `Réinitialisation profonde impossible : ${message}`;
+        alert(`Réinitialisation profonde impossible : ${message}\n\nDernier recours : supprimer la PWA puis la réinstaller.`);
+    }
+};
 
 
 window.deleteMapGroup = async function(groupName) {
