@@ -1,29 +1,35 @@
-NPF-Q400 TEST v13.68 — Icône Fréquences OPS parabole
+NPF-Q400 TEST v13.69 — Import ZIP stable iPad après utilisation d'une carte
 
-Base : v13.67 — Doc FDF Réduité + Carte Fréquences OPS.
+Base : v13.68 Fréquences OPS icône parabole.
 Référence fluidité conservée : v13.58.
 
-Changement demandé :
-- remplacement de l'icône du bouton carte « Fréquences OPS » par une icône type parabole / antenne satellite avec ondes, conforme à l'exemple fourni.
+Corrections principales :
+- Correction du blocage d'import ZIP après utilisation d'une carte offline active.
+- Suspension renforcée de la carte offline avant import : plus seulement visuelle/localStorage, mais aussi persistée dans IndexedDB/settings.
+- Le service worker répond maintenant par accusé de réception avant que la page commence à écrire dans IndexedDB.
+- Pendant l'import, le service worker vide le cache mémoire des tuiles, désactive les packs actifs et ferme réellement sa connexion IndexedDB.
+- Profil d'import sécurisé pour les ZIP multi-blocs non volumineux contenant beaucoup de tuiles, typiquement les blocs à ~20 000 / 25 000 tuiles.
+- Réduction des lots IndexedDB pour ces ZIP : écriture en lots de 40 tuiles au lieu de gros lots pouvant bloquer Safari/iPadOS.
+- Réouverture périodique de la base toutes les 400 tuiles sur ces imports sécurisés.
+- Détection d'une transaction IndexedDB bloquée : timeout, abort, réouverture de la base, puis reprise automatique en micro-lots.
+- Messages d'import plus explicites : "Import sécurisé iPad".
+- Restauration propre de l'état offline précédent si l'import échoue.
 
-Conservé :
-- bouton « Fréquences OPS » sous « Lignes HT » ;
-- ouverture du PDF commun « Carte Fréquences OPS » ;
-- import du PDF « Carte Fréquences OPS.pdf » ;
-- bouton « Télécharger PDFs Doc Fdf Réduité » ;
-- PDF pélicandromes ;
-- Doc PDF Réduite commune ;
-- corrections GAAR précédentes ;
-- corrections fluidité/OACI v13.58.
+Ce qui est conservé :
+- v13.68 : bouton Fréquences OPS avec icône parabole.
+- v13.67 : import Carte Fréquences OPS / Doc FDF Réduité.
+- v13.66 : PDF Pélic + Doc PDF Réduite commune.
+- v13.65 : clic point GAAR hors modification = petite étiquette seule.
+- Corrections GAAR v13.59 à v13.64.
+- Fluidité carte validée v13.58.
 
-Fichiers à remplacer dans GitHub :
-- index.html
-- manifest.json
-- script.js
-- style.css
-- sw.js
+Mode de test recommandé :
+1. Installer v13.69.
+2. Relancer l'app si le message de mise à jour le demande.
+3. Utiliser une carte offline déjà installée.
+4. Revenir dans Téléchargement cartes.
+5. Importer le ZIP suivant.
+6. Le compteur ne doit plus rester bloqué vers 171 / 22387.
 
-Contrôles :
-- script.js : syntaxe OK
-- sw.js : syntaxe OK
-- manifest.json : JSON valide
+Remarque :
+L'import sera probablement un peu plus lent sur les gros blocs de tuiles, mais il doit être beaucoup plus stable sur iPad.
