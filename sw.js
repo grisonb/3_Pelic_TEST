@@ -1,6 +1,6 @@
-const SW_VERSION = 'sw-v13-69_import_zip_stable_ipad';
+const SW_VERSION = 'sw-v13-70_import_zip_reset_profond';
 
-const DB_NAME = 'OfflineTilesDB_v12_21';
+const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const DB_VERSION = 3;
 
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
@@ -179,7 +179,7 @@ self.addEventListener('message', event => {
 
         const acknowledgeHeavyWriteReady = async () => {
             /*
-             * v13.69 — import ZIP iPad : accusé de réception réel.
+             * v13.70 — import ZIP iPad : accusé de réception réel.
              * La page attend cette réponse avant de commencer à écrire dans IndexedDB.
              * Cela évite que le service worker garde encore une connexion/lecture active
              * au moment du premier lot d'écriture, blocage constaté vers 171/22387.
