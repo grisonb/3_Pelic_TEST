@@ -1649,6 +1649,20 @@ body.fuel-keyboard-open .fuel-split-hint {
     color: #ffffff;
 }
 
+
+/* v13.66 — PDF pélic + document FDF réduite commun */
+.airport-popup .popup-pdf-buttons {
+    margin-top: 6px;
+}
+.airport-popup .popup-pdf-buttons button {
+    min-width: 0;
+    white-space: nowrap;
+}
+.airport-popup .fdf-reduced-pdf-btn {
+    background-color: #0f766e;
+    color: #ffffff;
+}
+
 #offline-map-modal .main-container {
     max-height: calc(100dvh - 28px);
     overflow: hidden;
@@ -5252,6 +5266,67 @@ body {
     border-color: rgba(255,255,255,.75);
 }
 
+/* v13.67 — bouton carte Fréquences OPS */
+.ops-frequencies-map-button .radio-frequency-icon {
+    width: 62px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ops-frequencies-map-button svg {
+    width: 62px;
+    height: 62px;
+    overflow: visible;
+}
+
+.ops-frequencies-map-button .radio-antenna-base,
+.ops-frequencies-map-button .radio-antenna-mast,
+.ops-frequencies-map-button .radio-wave,
+.ops-frequencies-map-button .radio-antenna-feet {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ops-frequencies-map-button .radio-wave {
+    stroke-width: 3.4;
+}
+
+.ops-frequencies-map-button .radio-antenna-node {
+    fill: currentColor;
+    stroke: currentColor;
+    stroke-width: 1;
+}
+
+.ops-frequencies-map-button .ops-frequency-label {
+    position: absolute;
+    right: 7px;
+    bottom: 6px;
+    min-width: 31px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.92);
+    color: var(--primary-color);
+    border: 1px solid rgba(0,90,156,.28);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: .02em;
+}
+
+.left-map-action-button.active .ops-frequency-label {
+    background: rgba(255,255,255,.96);
+    color: var(--primary-color);
+    border-color: rgba(255,255,255,.75);
+}
+
 @media (max-width: 760px) {
     #left-map-action-buttons {
         top: calc(env(safe-area-inset-top, 0px) + 8px) !important;
@@ -5292,6 +5367,28 @@ body {
         padding: 0 3px !important;
         font-size: 9px !important;
     }
+
+    .ops-frequencies-map-button .radio-frequency-icon,
+    .ops-frequencies-map-button svg {
+        width: 36px !important;
+        height: 36px !important;
+    }
+
+    .ops-frequencies-map-button .radio-antenna-base,
+    .ops-frequencies-map-button .radio-antenna-mast,
+    .ops-frequencies-map-button .radio-wave,
+    .ops-frequencies-map-button .radio-antenna-feet {
+        stroke-width: 4.2px !important;
+    }
+
+    .ops-frequencies-map-button .ops-frequency-label {
+        right: 3px !important;
+        bottom: 3px !important;
+        min-width: 22px !important;
+        height: 14px !important;
+        padding: 0 3px !important;
+        font-size: 9px !important;
+    }
 }
 
 @media (max-width: 430px) {
@@ -5313,6 +5410,12 @@ body {
 
     .high-voltage-map-button .powerline-icon,
     .high-voltage-map-button svg {
+        width: 38px !important;
+        height: 38px !important;
+    }
+
+    .ops-frequencies-map-button .radio-frequency-icon,
+    .ops-frequencies-map-button svg {
         width: 38px !important;
         height: 38px !important;
     }
