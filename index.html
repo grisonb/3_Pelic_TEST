@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.70">
-    <link rel="manifest" href="manifest.json?appv=v13.70">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.70">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.70">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.70">
+    <link rel="stylesheet" href="style.css?appv=v13.71">
+    <link rel="manifest" href="manifest.json?appv=v13.71">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.71">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.71">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.71">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.70';
+        const APP_VERSION = 'v13.71';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -231,6 +231,24 @@
                 }
 
                 await checkForServiceWorkerUpdate();
+
+                // v13.71 — réparation mode hors ligne : après un reset profond, il faut
+                // impérativement qu'un service worker contrôle la PWA pour servir les tuiles IndexedDB.
+                try {
+                    if ('serviceWorker' in navigator && !navigator.serviceWorker.controller) {
+                        const guardKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:offline:${APP_VERSION}`;
+                        await navigator.serviceWorker.ready.catch(() => null);
+                        if (!navigator.serviceWorker.controller && sessionStorage.getItem(guardKey) !== '1') {
+                            sessionStorage.setItem(guardKey, '1');
+                            const refreshUrl = new URL(window.location.href);
+                            refreshUrl.searchParams.set('appv', APP_VERSION);
+                            refreshUrl.searchParams.set('swctl', Date.now().toString());
+                            markPostUpdateRestartNotice(APP_VERSION, 2);
+                            window.location.replace(refreshUrl.toString());
+                            return;
+                        }
+                    }
+                } catch (_) {}
             });
 
             window.addEventListener('pageshow', () => {
@@ -433,7 +451,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.70"></script>
+    <script src="script.js?appv=v13.71"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
