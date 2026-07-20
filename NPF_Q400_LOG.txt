@@ -1,26 +1,26 @@
-NPF-Q400 TEST v13.70 — Import ZIP / reset profond iPad
+NPF-Q400 TEST v13.71 — mode hors ligne / service worker rétabli
 
-Base : v13.69, elle-même basée sur v13.68 et sur la fluidité validée v13.58.
+Base : v13.70, avec les corrections précédentes conservées.
+Référence fluidité carte : v13.58 conservée.
 
 Corrections :
-- nouvelle base IndexedDB de tuiles : OfflineTilesDB_v13_70_clean ;
-- l’ancienne base v12_21 n’est plus réutilisée après mise à jour ;
-- ajout d’un vrai reset profond des cartes offline ;
-- le reset profond ferme la connexion IndexedDB de la page ;
-- le reset profond demande au service worker de libérer sa connexion IndexedDB ;
-- le reset profond désinscrit temporairement le service worker puis recharge l’app pour le réinstaller proprement ;
-- suppression tentée de toutes les bases OfflineTilesDB connues ;
-- ajout d’un handler onversionchange sur IndexedDB pour fermer proprement la base si Safari demande une suppression/changement de version ;
-- le bouton de maintenance devient Réinitialiser profond.
+- correction du mode hors ligne cassé après le reset profond v13.70 ;
+- le service worker n'est plus désinscrit pendant le reset profond ;
+- le reset ferme toujours IndexedDB et nettoie les bases offline, mais conserve le contrôleur nécessaire aux tuiles offline ;
+- ajout d'un contrôle avant activation du mode offline : si le service worker ne contrôle pas la PWA, il est réenregistré et la PWA se relance une fois ;
+- ajout d'une réparation au démarrage si la PWA est déjà en mode offline mais sans service worker actif ;
+- conservation de la base propre OfflineTilesDB_v13_70_clean pour ne pas changer encore de base IndexedDB ;
+- conservation des ajouts v13.66 à v13.68 : PDF Pélic, Doc PDF Réduite, Fréquences OPS et icône parabole ;
+- conservation du mode import ZIP sécurisé iPad v13.69/v13.70.
 
-Objectif : éviter le blocage d’import à 31 tuiles ou 171 tuiles qui ne se corrigeait qu’en supprimant complètement la PWA.
+Procédure conseillée après installation :
+1. lancer v13.71 en ligne ;
+2. faire les relances demandées ;
+3. ouvrir Gestion des Cartes ;
+4. sélectionner la carte offline ;
+5. passer en mode hors ligne seulement après cette relance complète.
 
-Procédure de test conseillée :
-1. Installer v13.70.
-2. Ouvrir Gestion des Cartes > Maintenance / dépannage.
-3. Cliquer Réinitialiser profond.
-4. Laisser l’app se recharger.
-5. Importer les ZIP de la carte France dans l’ordre.
-6. Importer l’OACI après la carte France.
-
-Limite connue : si iPadOS/Safari refuse encore de libérer le quota du site malgré le reset profond, le dernier recours reste la suppression de la PWA. Mais la v13.70 évite de réutiliser la base verrouillée actuelle.
+Contrôles :
+- script.js : syntaxe contrôlée ;
+- sw.js : syntaxe contrôlée ;
+- manifest.json : JSON contrôlé.
