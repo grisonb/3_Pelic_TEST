@@ -8212,7 +8212,7 @@ async function ensureServiceWorkerControlsPageForOffline() {
         if (sessionStorage.getItem(guardKey) !== '1') {
             sessionStorage.setItem(guardKey, '1');
             const refreshUrl = new URL(window.location.href);
-            refreshUrl.searchParams.set('appv', window.APP_VERSION || 'v13.71');
+            refreshUrl.searchParams.set('appv', window.APP_VERSION || 'v13.72');
             refreshUrl.searchParams.set('swctl', Date.now().toString());
             window.location.replace(refreshUrl.toString());
             await new Promise(() => {});
@@ -12253,13 +12253,48 @@ function initializeCalculator() {
         return { ...bestAirport, distance: bestDistance };
     }
 
+    function normalizeBlocDepartAirportOaci(value) {
+        return String(value || '').trim().toUpperCase();
+    }
+
     function getBlocDepartAirportOaci() {
         const blocDepartWrapper = document.getElementById('bloc-depart');
         const blocDepartValue = blocDepartWrapper?.querySelector('.display-input')?.value || '';
-        if (parseTime(blocDepartValue) === null) return '';
+
+        if (parseTime(blocDepartValue) === null) {
+            if (blocDepartWrapper) blocDepartWrapper.dataset.airportOaci = '';
+            return '';
+        }
+
+        return normalizeBlocDepartAirportOaci(blocDepartWrapper?.dataset?.airportOaci || '');
+    }
+
+    function setBlocDepartAirportOaci(oaci) {
+        const blocDepartWrapper = document.getElementById('bloc-depart');
+        if (!blocDepartWrapper) return '';
+        const normalized = normalizeBlocDepartAirportOaci(oaci);
+        blocDepartWrapper.dataset.airportOaci = normalized;
+        return normalized;
+    }
+
+    function clearBlocDepartAirportOaci() {
+        setBlocDepartAirportOaci('');
+    }
+
+    function lockBlocDepartAirportOaciIfNeeded({ force = false } = {}) {
+        const blocDepartWrapper = document.getElementById('bloc-depart');
+        const blocDepartValue = blocDepartWrapper?.querySelector('.display-input')?.value || '';
+
+        if (parseTime(blocDepartValue) === null) {
+            clearBlocDepartAirportOaci();
+            return '';
+        }
+
+        const existing = getBlocDepartAirportOaci();
+        if (existing && !force) return existing;
 
         const airport = getAirportAtCurrentPosition();
-        return airport ? airport.oaci : '';
+        return setBlocDepartAirportOaci(airport ? airport.oaci : '');
     }
 
     function updateBlocDepartAirportLabel() {
@@ -12367,6 +12402,7 @@ function initializeCalculator() {
             closed: false,
             state: {
                 'bloc-depart': '',
+                'bloc-depart-oaci': '',
                 'fuel-depart': '3500 kg',
                 'previ-bloc-depart': '',
                 'previ-fuel-depart': '3500 kg',
@@ -12479,6 +12515,8 @@ function initializeCalculator() {
                 state[wrapper.id] = value;
             }
         });
+
+        state['bloc-depart-oaci'] = getBlocDepartAirportOaci();
 
         const tableData = [];
         document.querySelectorAll('#bloc-fuel tbody tr').forEach(row => {
@@ -13291,6 +13329,7 @@ function initializeCalculator() {
             dailyFlights = [createEmptyFlight(1)];
             dailyFlights[0].state = {
                 'bloc-depart': legacyState['bloc-depart'] || '',
+                'bloc-depart-oaci': legacyState['bloc-depart-oaci'] || '',
                 'fuel-depart': legacyState['fuel-depart'] || '3500 kg',
                 'previ-bloc-depart': legacyState['previ-bloc-depart'] || legacyState['bloc-depart'] || '',
                 'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3500 kg',
@@ -13385,6 +13424,7 @@ function initializeCalculator() {
             tableBody.innerHTML = '';
 
             initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
+            setBlocDepartAirportOaci(state['bloc-depart-oaci'] || '');
             initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3500 kg');
             initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
@@ -13491,6 +13531,11 @@ function initializeCalculator() {
             syncSharedHeaderFromWrapper(wrapper);
 
             if (wrapperRole === 'bloc-depart') {
+                if (parseTime(displayInput.value || '') === null) {
+                    clearBlocDepartAirportOaci();
+                } else {
+                    lockBlocDepartAirportOaciIfNeeded();
+                }
                 updateBlocDepartAirportLabel();
             } else {
                 const row = wrapper.closest('tr');
