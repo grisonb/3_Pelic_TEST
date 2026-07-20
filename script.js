@@ -1496,6 +1496,9 @@ async function initializeApp() {
         }
 
         await initializeOfflineTilePreference();
+        if (mapSourceMode === 'offline') {
+            setTimeout(() => { ensureServiceWorkerControlsPageForOffline().catch(() => {}); }, 400);
+        }
         // v13.58 — démarrage rapide : pas de scan complet IndexedDB au lancement.
         await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
         displayInstalledMaps();
@@ -8181,10 +8184,51 @@ function updateMapSourceButtons() {
     offlineBtn.setAttribute('aria-pressed', String(mapSourceMode === 'offline'));
 }
 
+
+async function ensureServiceWorkerControlsPageForOffline() {
+    /*
+     * v13.71 — restauration mode hors ligne après reset profond.
+     * Le reset v13.70 pouvait désinscrire le service worker : la carte offline
+     * se retrouvait avec des URLs de tuiles que personne n'interceptait. Ici,
+     * avant d'activer la carte offline, on vérifie qu'un service worker contrôle
+     * réellement la page. Si ce n'est pas le cas, on le réinstalle puis on force
+     * une seule relance propre.
+     */
+    if (!('serviceWorker' in navigator)) return true;
+    if (navigator.serviceWorker.controller) return true;
+
+    try {
+        const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+        if (registration && typeof registration.update === 'function') {
+            await registration.update().catch(() => {});
+        }
+        await navigator.serviceWorker.ready.catch(() => null);
+    } catch (error) {
+        console.warn('[Offline] Service worker non prêt pour le mode hors ligne:', error);
+    }
+
+    if (!navigator.serviceWorker.controller) {
+        const guardKey = `npfOfflineSwControlReload:${window.APP_VERSION || 'unknown'}`;
+        if (sessionStorage.getItem(guardKey) !== '1') {
+            sessionStorage.setItem(guardKey, '1');
+            const refreshUrl = new URL(window.location.href);
+            refreshUrl.searchParams.set('appv', window.APP_VERSION || 'v13.71');
+            refreshUrl.searchParams.set('swctl', Date.now().toString());
+            window.location.replace(refreshUrl.toString());
+            await new Promise(() => {});
+        }
+    }
+
+    return !!navigator.serviceWorker.controller;
+}
+
 async function setMapSourceMode(mode) {
     if (isMapSourceSwitching) return;
     const previousMode = mapSourceMode;
     const nextMode = mode === 'offline' ? 'offline' : 'online';
+    if (nextMode === 'offline') {
+        await ensureServiceWorkerControlsPageForOffline();
+    }
     if (previousMode === nextMode) {
         updateMapSourceButtons();
         updateOfflineStatus();
@@ -9427,14 +9471,13 @@ window.resetAllOfflineMapsStorage = async function() {
         await setProgress('Nettoyage caches de tuiles...', 35);
         try { await clearTileCaches(); } catch (_) {}
 
-        await setProgress('Désinscription temporaire du service worker...', 48);
-        try {
-            if ('serviceWorker' in navigator && typeof navigator.serviceWorker.getRegistrations === 'function') {
-                const registrations = await navigator.serviceWorker.getRegistrations();
-                await Promise.all((registrations || []).map(reg => reg.unregister().catch(() => false)));
-            }
-        } catch (_) {}
-
+        await setProgress('Service worker conservé pour le mode hors ligne...', 48);
+        /*
+         * v13.71 — on ne désinscrit plus le service worker pendant le reset.
+         * La désinscription v13.70 nettoyait parfois trop bien : la PWA pouvait
+         * repartir sans contrôleur SW, donc les tuiles offline n'étaient plus
+         * servies. On ferme seulement sa connexion IndexedDB via OFFLINE_FACTORY_RESET.
+         */
         await new Promise(resolve => setTimeout(resolve, 600));
 
         await setProgress('Suppression bases offline...', 62);
@@ -9458,10 +9501,15 @@ window.resetAllOfflineMapsStorage = async function() {
             ? 'Reset profond terminé avec bases verrouillées ignorées. Rechargement sur base neuve...'
             : 'Reset profond terminé. Rechargement sur base neuve...', 100);
 
+        try {
+            await ensureServiceWorkerControlsPageForOffline();
+        } catch (_) {}
+
         setTimeout(() => {
             const refreshUrl = new URL(window.location.href);
             refreshUrl.searchParams.set('appv', APP_VERSION);
             refreshUrl.searchParams.set('resetdb', Date.now().toString());
+            refreshUrl.searchParams.set('swkeep', '1');
             window.location.replace(refreshUrl.toString());
         }, 900);
     } catch (error) {
