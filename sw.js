@@ -179,7 +179,7 @@ self.addEventListener('message', event => {
 
         const acknowledgeHeavyWriteReady = async () => {
             /*
-             * v13.70 — import ZIP iPad : accusé de réception réel.
+             * v13.71 — import ZIP iPad : accusé de réception réel.
              * La page attend cette réponse avant de commencer à écrire dans IndexedDB.
              * Cela évite que le service worker garde encore une connexion/lecture active
              * au moment du premier lot d'écriture, blocage constaté vers 171/22387.
