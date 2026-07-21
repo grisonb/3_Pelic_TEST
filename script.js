@@ -462,6 +462,8 @@ const DEFAULT_OFFLINE_ONLINE_FALLBACK = true;
 const OFFLINE_TILES_MAX_ZOOM_KEY = 'offlineTilesMaxZoom';
 const OFFLINE_TILES_MIN_ZOOM_KEY = 'offlineTilesMinZoom';
 const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
+const OFFLINE_ACTIVE_PACK_DATABASES_KEY = 'offlineActivePackDatabases';
+const OFFLINE_MAP_DATABASE_PREFIX = 'OfflineMap_';
 const COMMUNES_CACHE_KEY = 'communesDataCacheV1';
 const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV2';
 const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
@@ -559,6 +561,7 @@ let offlineTilesMode = DEFAULT_OFFLINE_TILES_ENABLED;
 let mapSourceMode = DEFAULT_MAP_SOURCE_MODE;
 let offlineOnlineFallbackMode = DEFAULT_OFFLINE_ONLINE_FALLBACK;
 let activeOfflinePacks = [];
+let activeOfflinePackDatabases = [];
 let isMapSourceSwitching = false;
 let isZipImportRunning = false;
 const STARTUP_GPS_CENTER_ZOOM = 10;
@@ -1480,6 +1483,10 @@ async function initializeApp() {
     if (!FORCE_DISPLAY_MODE) {
         activeOfflinePacks = JSON.parse(localStorage.getItem(OFFLINE_ACTIVE_PACKS_KEY) || '[]');
         if (!Array.isArray(activeOfflinePacks)) activeOfflinePacks = [];
+        activeOfflinePackDatabases = JSON.parse(localStorage.getItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY) || '[]');
+        if (!Array.isArray(activeOfflinePackDatabases) || !activeOfflinePackDatabases.length) {
+            activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
+        }
         const savedMapSourceMode = localStorage.getItem(MAP_SOURCE_MODE_KEY);
         mapSourceMode = savedMapSourceMode === 'offline' ? 'offline' : DEFAULT_MAP_SOURCE_MODE;
         offlineOnlineFallbackMode = localStorage.getItem(OFFLINE_ONLINE_FALLBACK_KEY) === null
@@ -1506,6 +1513,7 @@ async function initializeApp() {
         mapSourceMode = DEFAULT_MAP_SOURCE_MODE;
         offlineOnlineFallbackMode = DEFAULT_OFFLINE_ONLINE_FALLBACK;
         activeOfflinePacks = [];
+        activeOfflinePackDatabases = [];
         displayInstalledMaps();
         setTimeout(() => {
             initDB()
@@ -8076,6 +8084,87 @@ function initDB() {
     });
 }
 
+
+
+function sanitizeOfflineDatabaseToken(value) {
+    const base = String(value || 'Carte')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 72);
+    return base || 'Carte';
+}
+
+function getOfflineMapDatabaseNameForGroup(groupName) {
+    return `${OFFLINE_MAP_DATABASE_PREFIX}${sanitizeOfflineDatabaseToken(groupName)}`;
+}
+
+function getInstalledMapPacksSafe() {
+    try {
+        const packs = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
+        return Array.isArray(packs) ? packs : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function getOfflinePackDatabaseName(packName) {
+    const installed = getInstalledMapPacksSafe();
+    const found = installed.find(pack => pack && pack.name === packName);
+    if (found && found.dbName) return found.dbName;
+
+    const groupName = typeof getOfflinePackGroupName === 'function'
+        ? getOfflinePackGroupName(packName)
+        : String(packName || '').trim();
+    const sameGroupWithDb = installed.find(pack => pack && pack.dbName && typeof getOfflinePackGroupName === 'function' && getOfflinePackGroupName(pack.name) === groupName);
+    if (sameGroupWithDb && sameGroupWithDb.dbName) return sameGroupWithDb.dbName;
+
+    // Compatibilité cartes déjà installées avant v13.73 : ancienne base commune.
+    return OFFLINE_DB_NAME;
+}
+
+function getOfflineActivePackDatabasesForPacks(packs = activeOfflinePacks) {
+    const names = [];
+    (Array.isArray(packs) ? packs : []).forEach(packName => {
+        const dbName = getOfflinePackDatabaseName(packName);
+        if (dbName && !names.includes(dbName)) names.push(dbName);
+    });
+    return names;
+}
+
+function openOfflineTileDatabaseByName(dbName = OFFLINE_DB_NAME, version = 3) {
+    return new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB indisponible'));
+            return;
+        }
+        const safeName = String(dbName || OFFLINE_DB_NAME);
+        const request = indexedDB.open(safeName, version);
+        request.onupgradeneeded = event => {
+            const dbInstance = event.target.result;
+            if (!dbInstance.objectStoreNames.contains('tiles')) {
+                const store = dbInstance.createObjectStore('tiles', { keyPath: 'url' });
+                store.createIndex('packName', 'packName', { unique: false });
+                store.createIndex('tileUrl', 'tileUrl', { unique: false });
+            } else {
+                const store = event.target.transaction.objectStore('tiles');
+                if (!store.indexNames.contains('packName')) store.createIndex('packName', 'packName', { unique: false });
+                if (!store.indexNames.contains('tileUrl')) store.createIndex('tileUrl', 'tileUrl', { unique: false });
+            }
+            if (!dbInstance.objectStoreNames.contains('settings')) {
+                dbInstance.createObjectStore('settings', { keyPath: 'key' });
+            }
+        };
+        request.onsuccess = event => {
+            const openedDb = event.target.result;
+            try { openedDb.onversionchange = () => { try { openedDb.close(); } catch (_) {} }; } catch (_) {}
+            resolve(openedDb);
+        };
+        request.onerror = event => reject(event.target.error || new Error(`Erreur ouverture ${safeName}`));
+        request.onblocked = () => reject(new Error(`Base IndexedDB bloquée : ${safeName}`));
+    });
+}
+
 function getOfflineTilesEnabled() {
     return new Promise((resolve) => {
         if (!db) {
@@ -8139,21 +8228,31 @@ function notifyServiceWorkerOfflineOnlineFallback(enabled) {
 }
 
 function notifyServiceWorkerActivePacks(packs) {
+    const safePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
+    const dbNames = getOfflineActivePackDatabasesForPacks(safePacks);
+    activeOfflinePackDatabases = dbNames;
+    try { localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(dbNames)); } catch (_) {}
+
     if (!('serviceWorker' in navigator)) return;
     if (!navigator.serviceWorker.controller) return;
     navigator.serviceWorker.controller.postMessage({
         type: 'OFFLINE_ACTIVE_PACKS_CHANGED',
-        value: Array.isArray(packs) ? packs : []
+        value: safePacks,
+        dbNames
     });
 }
 
 async function setOfflineActivePacks(packs) {
     activeOfflinePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
+    activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
     localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
+    localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(activeOfflinePackDatabases));
     if (db) {
         try {
             const tx = db.transaction('settings', 'readwrite');
-            tx.objectStore('settings').put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: activeOfflinePacks });
+            const store = tx.objectStore('settings');
+            store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: activeOfflinePacks });
+            store.put({ key: OFFLINE_ACTIVE_PACK_DATABASES_KEY, value: activeOfflinePackDatabases });
         } catch (_) {}
     }
     notifyServiceWorkerActivePacks(activeOfflinePacks);
@@ -8212,7 +8311,7 @@ async function ensureServiceWorkerControlsPageForOffline() {
         if (sessionStorage.getItem(guardKey) !== '1') {
             sessionStorage.setItem(guardKey, '1');
             const refreshUrl = new URL(window.location.href);
-            refreshUrl.searchParams.set('appv', window.APP_VERSION || 'v13.72');
+            refreshUrl.searchParams.set('appv', window.APP_VERSION || 'v13.73');
             refreshUrl.searchParams.set('swctl', Date.now().toString());
             window.location.replace(refreshUrl.toString());
             await new Promise(() => {});
@@ -8335,6 +8434,7 @@ async function persistOfflineImportPauseSettings() {
      */
     try { localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false'); } catch (_) {}
     try { localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([])); } catch (_) {}
+    try { localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify([])); } catch (_) {}
 
     if (!db) {
         try { await initDB(); } catch (_) {}
@@ -8348,6 +8448,7 @@ async function persistOfflineImportPauseSettings() {
             const store = tx.objectStore('settings');
             store.put({ key: OFFLINE_TILES_ENABLED_KEY, value: false });
             store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: [] });
+            store.put({ key: OFFLINE_ACTIVE_PACK_DATABASES_KEY, value: [] });
             tx.oncomplete = resolve;
             tx.onerror = () => reject(tx.error || new Error('Erreur suspension settings offline'));
             tx.onabort = () => reject(tx.error || new Error('Transaction suspension settings annulée'));
@@ -8428,7 +8529,9 @@ async function suspendOfflineMapRenderingDuringImport(reason = 'Import offline e
      */
     try {
         activeOfflinePacks = [];
+        activeOfflinePackDatabases = [];
         localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([]));
+        localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify([]));
     } catch (_) {}
 
     try {
@@ -8496,6 +8599,9 @@ async function handleZipImport(file) {
     }
 
     const packName = file.name.replace(/\.zip$/i, '');
+    const packGroupNameForImport = getOfflinePackGroupName(packName);
+    const isolatedImportDbName = getOfflineMapDatabaseNameForGroup(packGroupNameForImport);
+    let importTileDb = null;
     const progressSection = document.getElementById('import-progress-section');
     const statusMessage = document.getElementById('import-status-message');
     const progressBar = document.getElementById('import-progress-bar');
@@ -8547,23 +8653,25 @@ async function handleZipImport(file) {
 
     const reopenDbCleanly = async () => {
         try {
-            if (db) db.close();
+            if (importTileDb) importTileDb.close();
         } catch (_) {}
-        db = null;
+        importTileDb = null;
         await idle(180);
-        await initDB();
+        importTileDb = await openOfflineTileDatabaseByName(isolatedImportDbName, 3);
     };
 
     const getTileWriteTransaction = () => {
         /*
-         * v12.11 — import gros volume renforcé.
-         * durability:'relaxed' accélère et stabilise les écritures IndexedDB quand le
-         * navigateur le supporte. Safari ignore parfois l'option : fallback standard.
+         * v13.73 — import isolé par carte.
+         * Les tuiles sont écrites dans une base dédiée au groupe de carte,
+         * afin de ne plus écrire dans la base IndexedDB déjà utilisée par la carte active.
          */
+        const targetDb = importTileDb || db;
+        if (!targetDb) throw new Error('Base de tuiles import indisponible');
         try {
-            return db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
+            return targetDb.transaction('tiles', 'readwrite', { durability: 'relaxed' });
         } catch (_) {
-            return db.transaction('tiles', 'readwrite');
+            return targetDb.transaction('tiles', 'readwrite');
         }
     };
 
@@ -8631,7 +8739,7 @@ async function handleZipImport(file) {
          * C'est critique pour OpenStreet ~900 Mo : sans purge préalable,
          * Safari/iPadOS peut atteindre le quota avant d'avoir remplacé les tuiles.
          */
-        if (!db || !packNameToDelete) {
+        if (!importTileDb || !packNameToDelete) {
             resolve(0);
             return;
         }
@@ -8705,7 +8813,7 @@ async function handleZipImport(file) {
             throw new Error("Aucune tuile valide trouvée dans le ZIP. La structure doit être /zoom/colonne/ligne.png");
         }
 
-        await updateImportProgress(`Préparation terminée. Lecture de ${totalFiles} tuiles...`, 1, true);
+        await updateImportProgress(`Préparation terminée. Base isolée ${isolatedImportDbName}. Lecture de ${totalFiles} tuiles...`, 1, true);
         await idle(120);
 
         const isLargeZip = file.size > 300 * 1024 * 1024;
@@ -8916,8 +9024,17 @@ async function handleZipImport(file) {
         const existingPack = installedPacks.find(p => p.name === packName);
         if (existingPack) {
             existingPack.date = new Date().toLocaleDateString();
+            existingPack.groupName = packGroupNameForImport;
+            existingPack.dbName = isolatedImportDbName;
+            existingPack.storageMode = 'isolated-v13.73';
         } else {
-            installedPacks.push({ name: packName, date: new Date().toLocaleDateString() });
+            installedPacks.push({
+                name: packName,
+                date: new Date().toLocaleDateString(),
+                groupName: packGroupNameForImport,
+                dbName: isolatedImportDbName,
+                storageMode: 'isolated-v13.73'
+            });
         }
         localStorage.setItem('installedMapPacks', JSON.stringify(installedPacks));
 
@@ -8933,6 +9050,9 @@ async function handleZipImport(file) {
         updateMapSourceButtons();
         updateOfflineStatus();
         zipImportCompletedSuccessfully = true;
+
+        try { if (importTileDb) importTileDb.close(); } catch (_) {}
+        importTileDb = null;
 
         if (isLargeZip) {
             reloadAfterOfflinePackChange(`Importation de ${packName} terminée. Rechargement mémoire...`);
@@ -8964,6 +9084,8 @@ async function handleZipImport(file) {
             }
         }
     } finally {
+        try { if (importTileDb) importTileDb.close(); } catch (_) {}
+        importTileDb = null;
         isZipImportRunning = false;
         try { sessionStorage.removeItem('npfZipImportRunning'); } catch (_) {}
         setTimeout(() => { progressSection.style.display = 'none'; }, 7000);
@@ -9007,13 +9129,15 @@ function parseTilePathFromName(name) {
 
 async function persistSimpleActiveOfflinePacks(packs) {
     /*
-     * v11.35 — affichage carte propre.
-     * Le pack actif est écrit à la fois dans localStorage et dans IndexedDB/settings,
-     * car le service worker relit périodiquement IndexedDB. Sans cela, il peut
-     * continuer à servir l'ancien pack et mélanger OACI / OpenStreet.
+     * v13.73 — affichage carte avec bases séparées.
+     * On persiste à la fois les packs actifs et la/les bases IndexedDB de tuiles
+     * correspondantes. Le service worker peut ainsi lire uniquement la base de la
+     * carte sélectionnée, sans toucher aux autres cartes installées.
      */
     activeOfflinePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
+    activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
     localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
+    localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(activeOfflinePackDatabases));
 
     if (!db) {
         try {
@@ -9153,12 +9277,13 @@ function displayInstalledMaps() {
         const partiallyActive = activeCount > 0 && !isActive;
         const packLabel = packNames.length > 1 ? `${packNames.length} fichiers` : '1 fichier';
         const dateLabel = group.date ? `Installé le ${group.date}` : 'Installé';
+        const storageLabel = group.packs.some(pack => pack && pack.dbName) ? 'base séparée' : 'base héritée';
 
         li.className = packNames.length > 1 ? 'offline-map-group-line' : '';
         li.innerHTML = `
             <span class="offline-map-name-line">
                 <input type="checkbox" class="offline-map-select-checkbox" ${isActive ? 'checked' : ''} data-partial="${partiallyActive ? 'true' : 'false'}" onchange="window.selectSimpleMapGroup('${group.name}', this.checked)">
-                <strong>${group.name}</strong> (${packLabel} — ${dateLabel})${isActive ? ' — actif' : partiallyActive ? ` — partiel ${activeCount}/${packNames.length}` : ''}
+                <strong>${group.name}</strong> (${packLabel} — ${dateLabel} — ${storageLabel})${isActive ? ' — actif' : partiallyActive ? ` — partiel ${activeCount}/${packNames.length}` : ''}
             </span>
             <div class="offline-map-actions">
                 <button class="delete-map-btn" onclick="window.deleteMapGroup('${group.name}')">Supprimer</button>
@@ -9251,7 +9376,9 @@ function removeInstalledOfflinePacksLogically(packNames = []) {
 
     if (Array.isArray(activeOfflinePacks) && activeOfflinePacks.some(name => targetSet.has(name))) {
         activeOfflinePacks = activeOfflinePacks.filter(name => !targetSet.has(name));
+        activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
         localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
+        localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(activeOfflinePackDatabases));
         notifyServiceWorkerActivePacks(activeOfflinePacks);
     }
 
@@ -9336,6 +9463,7 @@ window.resetAllOfflineMapsStorage = async function() {
 
         localStorage.removeItem('installedMapPacks');
         localStorage.removeItem(OFFLINE_ACTIVE_PACKS_KEY);
+        localStorage.removeItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY);
         localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, String(DEFAULT_OFFLINE_TILES_ENABLED));
         activeOfflinePacks = [];
 
@@ -9407,7 +9535,7 @@ async function getNpfOfflineDatabaseNamesForReset() {
             const databases = await indexedDB.databases();
             (databases || []).forEach((entry) => {
                 const name = entry && entry.name ? String(entry.name) : '';
-                if (/^OfflineTilesDB/i.test(name)) names.add(name);
+                if (/^OfflineTilesDB/i.test(name) || /^OfflineMap_/i.test(name)) names.add(name);
             });
         }
     } catch (_) {}
@@ -9444,6 +9572,7 @@ window.resetAllOfflineMapsStorage = async function() {
             activeOfflinePacks = [];
             localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false');
             localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([]));
+            localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify([]));
             localStorage.setItem(OFFLINE_ONLINE_FALLBACK_KEY, 'false');
             localStorage.removeItem('installedMapPacks');
             notifyServiceWorkerOfflineTilesPreference(false);
@@ -9492,6 +9621,7 @@ window.resetAllOfflineMapsStorage = async function() {
         try {
             localStorage.removeItem('installedMapPacks');
             localStorage.removeItem(OFFLINE_ACTIVE_PACKS_KEY);
+            localStorage.removeItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY);
             localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false');
             localStorage.setItem(MAP_SOURCE_MODE_KEY, 'online');
             localStorage.setItem('npfOfflineDeepResetAt', String(Date.now()));
@@ -9652,7 +9782,15 @@ async function deleteTilesForPackName(packName, onProgress = null) {
      * - recommencer jusqu'à zéro clé ;
      * - fallback scan complet si l'index ne trouve rien.
      */
-    if (!db || !packName) return 0;
+    if (!packName) return 0;
+    const tileDbNameForDelete = getOfflinePackDatabaseName(packName);
+    let targetDbForDelete = db;
+    let closeTargetDbForDelete = false;
+    if (tileDbNameForDelete && tileDbNameForDelete !== OFFLINE_DB_NAME) {
+        targetDbForDelete = await openOfflineTileDatabaseByName(tileDbNameForDelete, 3);
+        closeTargetDbForDelete = true;
+    }
+    if (!targetDbForDelete) return 0;
 
     const CHUNK_SIZE = 500;
     let totalDeleted = 0;
@@ -9660,7 +9798,7 @@ async function deleteTilesForPackName(packName, onProgress = null) {
 
     const getKeysByIndex = () => new Promise((resolve, reject) => {
         try {
-            const tx = db.transaction('tiles', 'readonly');
+            const tx = targetDbForDelete.transaction('tiles', 'readonly');
             const store = tx.objectStore('tiles');
 
             if (!(store.indexNames && store.indexNames.contains('packName')) || typeof store.index('packName').getAllKeys !== 'function') {
@@ -9685,9 +9823,9 @@ async function deleteTilesForPackName(packName, onProgress = null) {
         try {
             let tx;
             try {
-                tx = db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
+                tx = targetDbForDelete.transaction('tiles', 'readwrite', { durability: 'relaxed' });
             } catch (_) {
-                tx = db.transaction('tiles', 'readwrite');
+                tx = targetDbForDelete.transaction('tiles', 'readwrite');
             }
 
             const store = tx.objectStore('tiles');
@@ -9705,9 +9843,9 @@ async function deleteTilesForPackName(packName, onProgress = null) {
         try {
             let tx;
             try {
-                tx = db.transaction('tiles', 'readwrite', { durability: 'relaxed' });
+                tx = targetDbForDelete.transaction('tiles', 'readwrite', { durability: 'relaxed' });
             } catch (_) {
-                tx = db.transaction('tiles', 'readwrite');
+                tx = targetDbForDelete.transaction('tiles', 'readwrite');
             }
 
             const store = tx.objectStore('tiles');
@@ -9788,6 +9926,7 @@ async function deleteTilesForPackName(packName, onProgress = null) {
         }
     }
 
+    try { if (closeTargetDbForDelete && targetDbForDelete) targetDbForDelete.close(); } catch (_) {}
     return totalDeleted;
 };
 
