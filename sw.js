@@ -1,11 +1,13 @@
-const SW_VERSION = 'sw-v13-72_bloc_depart_oaci_fige';
+const SW_VERSION = 'sw-v13-73_import_cartes_bases_separees';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
+const LEGACY_TILE_DB_NAME = DB_NAME;
 const DB_VERSION = 3;
 
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
 const OFFLINE_ONLINE_FALLBACK_KEY = 'offlineOnlineFallback';
 const OFFLINE_ACTIVE_PACKS_KEY = 'offlineActivePacks';
+const OFFLINE_ACTIVE_PACK_DATABASES_KEY = 'offlineActivePackDatabases';
 
 const APP_SHELL_CACHE = `npf-q400-app-shell-${SW_VERSION}`;
 const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
@@ -60,8 +62,10 @@ const CORE_APP_SHELL_URLS = [
 let offlineTilesEnabled = false;
 let offlineOnlineFallback = false;
 let activeOfflinePacks = [];
+let activeOfflinePackDatabases = [];
 
 let dbPromise = null;
+const tileDbPromises = new Map();
 let offlineSettingsLoadedAt = 0;
 
 const SETTINGS_REFRESH_INTERVAL_MS = 5000;
@@ -162,7 +166,16 @@ async function closeOfflineDBForHeavyWrite() {
     } catch (_) {}
 
     dbPromise = null;
+
+    try {
+        for (const promise of tileDbPromises.values()) {
+            const tileDb = await promise.catch(() => null);
+            if (tileDb && typeof tileDb.close === 'function') tileDb.close();
+        }
+    } catch (_) {}
+    tileDbPromises.clear();
 }
+
 
 self.addEventListener('message', event => {
     const data = event.data || {};
@@ -174,6 +187,7 @@ self.addEventListener('message', event => {
 
     if (data.type === 'OFFLINE_IMPORT_START' || data.type === 'OFFLINE_MASS_DELETE_START' || data.type === 'OFFLINE_FACTORY_RESET') {
         activeOfflinePacks = [];
+        activeOfflinePackDatabases = [];
         offlineTilesEnabled = false;
         offlineSettingsLoadedAt = Date.now();
 
@@ -214,6 +228,7 @@ self.addEventListener('message', event => {
 
     if (data.type === 'OFFLINE_ACTIVE_PACKS_CHANGED') {
         activeOfflinePacks = Array.isArray(data.value) ? data.value.filter(Boolean) : [];
+        activeOfflinePackDatabases = Array.isArray(data.dbNames) ? data.dbNames.filter(Boolean) : [];
         offlineSettingsLoadedAt = Date.now();
         memoryTileCache.clear();
     }
@@ -463,21 +478,34 @@ async function findOfflineTileResponse(tileUrl) {
     }
 
     try {
-        const db = await openOfflineDB();
-        const record = await findTileRecordInDB(db, tileUrl);
+        const dbNames = Array.isArray(activeOfflinePackDatabases) && activeOfflinePackDatabases.length
+            ? activeOfflinePackDatabases
+            : [LEGACY_TILE_DB_NAME];
 
-        if (!record || !record.tile) return null;
+        for (const dbName of dbNames) {
+            try {
+                const tileDb = dbName === LEGACY_TILE_DB_NAME
+                    ? await openOfflineDB()
+                    : await openOfflineDBByName(dbName);
+                const record = await findTileRecordInDB(tileDb, tileUrl);
 
-        const contentType = record.tile.type || guessTileContentType(tileUrl);
-        const response = new Response(record.tile, {
-            headers: {
-                'Content-Type': contentType,
-                'X-Offline-Tile': 'indexeddb'
+                if (!record || !record.tile) continue;
+
+                const contentType = record.tile.type || guessTileContentType(tileUrl);
+                const response = new Response(record.tile, {
+                    headers: {
+                        'Content-Type': contentType,
+                        'X-Offline-Tile': `indexeddb:${dbName}`
+                    }
+                });
+
+                rememberMemoryTile(cacheKey, response.clone());
+                return response;
+            } catch (dbError) {
+                console.warn('[SW] Base tuile offline ignorée:', dbName, dbError);
             }
-        });
-
-        rememberMemoryTile(cacheKey, response.clone());
-        return response;
+        }
+        return null;
     } catch (error) {
         console.warn('[SW] Lecture tuile offline impossible:', error);
         return null;
@@ -500,24 +528,57 @@ function touchMemoryTile(key, response) {
 
 function openOfflineDB() {
     if (dbPromise) return dbPromise;
+    dbPromise = openOfflineDBByName(DB_NAME);
+    return dbPromise;
+}
 
-    dbPromise = new Promise((resolve, reject) => {
+function openOfflineDBByName(dbName = DB_NAME) {
+    const safeName = String(dbName || DB_NAME);
+    if (tileDbPromises.has(safeName)) return tileDbPromises.get(safeName);
+
+    const promise = new Promise((resolve, reject) => {
         if (typeof indexedDB === 'undefined') {
             reject(new Error('IndexedDB indisponible dans le service worker'));
             return;
         }
 
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-        request.onsuccess = event => resolve(event.target.result);
-        request.onerror = event => reject(event.target.error || new Error('Erreur ouverture IndexedDB'));
-        request.onblocked = () => reject(new Error('IndexedDB bloquée'));
+        const request = indexedDB.open(safeName, DB_VERSION);
+        request.onupgradeneeded = event => {
+            const dbInstance = event.target.result;
+            if (!dbInstance.objectStoreNames.contains('tiles')) {
+                const store = dbInstance.createObjectStore('tiles', { keyPath: 'url' });
+                store.createIndex('packName', 'packName', { unique: false });
+                store.createIndex('tileUrl', 'tileUrl', { unique: false });
+            } else {
+                const store = event.target.transaction.objectStore('tiles');
+                if (!store.indexNames.contains('packName')) store.createIndex('packName', 'packName', { unique: false });
+                if (!store.indexNames.contains('tileUrl')) store.createIndex('tileUrl', 'tileUrl', { unique: false });
+            }
+            if (!dbInstance.objectStoreNames.contains('settings')) {
+                dbInstance.createObjectStore('settings', { keyPath: 'key' });
+            }
+        };
+        request.onsuccess = event => {
+            const openedDb = event.target.result;
+            try {
+                openedDb.onversionchange = () => {
+                    try { openedDb.close(); } catch (_) {}
+                    tileDbPromises.delete(safeName);
+                    if (safeName === DB_NAME) dbPromise = null;
+                };
+            } catch (_) {}
+            resolve(openedDb);
+        };
+        request.onerror = event => reject(event.target.error || new Error(`Erreur ouverture IndexedDB ${safeName}`));
+        request.onblocked = () => reject(new Error(`IndexedDB bloquée : ${safeName}`));
     }).catch(error => {
-        dbPromise = null;
+        tileDbPromises.delete(safeName);
+        if (safeName === DB_NAME) dbPromise = null;
         throw error;
     });
 
-    return dbPromise;
+    tileDbPromises.set(safeName, promise);
+    return promise;
 }
 
 function findTileRecordInDB(db, tileUrl) {
@@ -600,6 +661,10 @@ async function refreshOfflineSettingsFromDB({ force = false } = {}) {
             activeOfflinePacks = settings[OFFLINE_ACTIVE_PACKS_KEY].filter(Boolean);
         }
 
+        if (Array.isArray(settings[OFFLINE_ACTIVE_PACK_DATABASES_KEY])) {
+            activeOfflinePackDatabases = settings[OFFLINE_ACTIVE_PACK_DATABASES_KEY].filter(Boolean);
+        }
+
         offlineSettingsLoadedAt = now;
     } catch (error) {
         /*
@@ -614,7 +679,8 @@ function readOfflineSettings(db) {
         const keys = [
             OFFLINE_TILES_ENABLED_KEY,
             OFFLINE_ONLINE_FALLBACK_KEY,
-            OFFLINE_ACTIVE_PACKS_KEY
+            OFFLINE_ACTIVE_PACKS_KEY,
+            OFFLINE_ACTIVE_PACK_DATABASES_KEY
         ];
 
         const tx = db.transaction('settings', 'readonly');
