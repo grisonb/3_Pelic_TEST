@@ -1992,6 +1992,119 @@ function applyMapNoBackgroundStyle() {
     });
 }
 
+
+
+/* v13.74 — échelle nautique dynamique permanente.
+ * Indépendante du fond de carte : fonctionne sur carte NPF, OACI et cartes offline.
+ */
+let nauticalScaleControl = null;
+let nauticalScaleElement = null;
+
+function injectNauticalScaleStyle() {
+    const styleId = 'npf-nautical-scale-style';
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+        .npf-nautical-scale {
+            background: rgba(255, 255, 255, 0.92);
+            border: 2px solid rgba(0, 67, 112, 0.80);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+            padding: 6px 8px 5px 8px;
+            color: #003f6b;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1;
+            pointer-events: none;
+            min-width: 72px;
+        }
+        .npf-nautical-scale-bar-wrap {
+            height: 8px;
+            border-left: 2px solid #003f6b;
+            border-right: 2px solid #003f6b;
+            border-bottom: 3px solid #003f6b;
+            margin-bottom: 4px;
+        }
+        .npf-nautical-scale-label {
+            text-align: center;
+            white-space: nowrap;
+        }
+        @media (max-width: 900px) {
+            .npf-nautical-scale {
+                font-size: 12px;
+                padding: 5px 7px 4px 7px;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+function formatNauticalMiles(value) {
+    if (!Number.isFinite(value) || value <= 0) return '-- NM';
+    if (value < 1) {
+        return `${Number(value.toFixed(1)).toString()} NM`;
+    }
+    if (value < 10) {
+        return `${Number(value.toFixed(value % 1 ? 1 : 0)).toString()} NM`;
+    }
+    return `${Math.round(value)} NM`;
+}
+
+function chooseNiceNauticalScale(maxNm) {
+    const candidates = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
+    let selected = candidates[0];
+    for (const candidate of candidates) {
+        if (candidate <= maxNm) selected = candidate;
+    }
+    return selected;
+}
+
+function updateNauticalScale() {
+    if (!map || !nauticalScaleElement || !map.getSize || !map.containerPointToLatLng || !map.distance) return;
+    const size = map.getSize();
+    if (!size || !size.x || !size.y) return;
+
+    const samplePixels = Math.min(160, Math.max(80, Math.floor(size.x * 0.16)));
+    const y = Math.max(10, Math.floor(size.y / 2));
+    const x1 = Math.max(5, Math.floor((size.x - samplePixels) / 2));
+    const x2 = x1 + samplePixels;
+
+    const ll1 = map.containerPointToLatLng(L.point(x1, y));
+    const ll2 = map.containerPointToLatLng(L.point(x2, y));
+    const meters = map.distance(ll1, ll2);
+    const metersPerPixel = meters / samplePixels;
+    if (!Number.isFinite(metersPerPixel) || metersPerPixel <= 0) return;
+
+    const maxPixels = 110;
+    const maxNm = (metersPerPixel * maxPixels) / 1852;
+    const niceNm = chooseNiceNauticalScale(maxNm);
+    const pixelWidth = Math.max(26, Math.round((niceNm * 1852) / metersPerPixel));
+
+    nauticalScaleElement.innerHTML = `
+        <div class="npf-nautical-scale-bar-wrap" style="width:${pixelWidth}px"></div>
+        <div class="npf-nautical-scale-label">${formatNauticalMiles(niceNm)}</div>
+    `;
+}
+
+function ensureNauticalScaleControl() {
+    if (!map || !window.L || nauticalScaleControl) return;
+    injectNauticalScaleStyle();
+    nauticalScaleControl = L.control({ position: 'bottomleft' });
+    nauticalScaleControl.onAdd = function () {
+        nauticalScaleElement = L.DomUtil.create('div', 'npf-nautical-scale');
+        try { L.DomEvent.disableClickPropagation(nauticalScaleElement); } catch (_) {}
+        try { L.DomEvent.disableScrollPropagation(nauticalScaleElement); } catch (_) {}
+        nauticalScaleElement.innerHTML = '<div class="npf-nautical-scale-label">-- NM</div>';
+        return nauticalScaleElement;
+    };
+    nauticalScaleControl.addTo(map);
+    map.on('zoomend moveend resize viewreset', updateNauticalScale);
+    setTimeout(updateNauticalScale, 0);
+    setTimeout(updateNauticalScale, 350);
+}
+
 function initMap() {
     if (map) return;
     map = L.map('map', {
@@ -2006,6 +2119,7 @@ function initMap() {
 
     map.on('zoomend', enforceOfflineZoomLimit);
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
+    ensureNauticalScaleControl();
     applyMapNoBackgroundStyle();
 
     if (map.createPane && !map.getPane('highVoltageLinesPane')) {
