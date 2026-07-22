@@ -8660,3 +8660,81 @@ body.gaar-point-search-open .gaar-editing-banner {
     line-height: 18px !important;
     font-size: 16px !important;
 }
+
+/* ========================================================================== 
+   v13.79 TEST — bandeaux carte remontés / hauteur optimisée / icônes épurées
+   ========================================================================== */
+
+/* Icônes latérales : suppression des libellés texte HT / OPS pour ne garder
+   que le pictogramme. */
+.high-voltage-map-button .powerline-label,
+.ops-frequencies-map-button .ops-frequency-label {
+    display: none !important;
+}
+
+.high-voltage-map-button .powerline-icon,
+.ops-frequencies-map-button .radio-frequency-icon {
+    margin: 0 auto !important;
+}
+
+/* Bandeau BINGO : positionné au plus haut sur la carte, plus compact en
+   hauteur sans réduire la taille des polices. */
+#bingo-map-display {
+    top: calc(var(--safe-area-top) + 4px) !important;
+    min-height: 56px !important;
+    height: auto !important;
+    padding: 8px 22px !important;
+    border-radius: 18px !important;
+    align-items: center !important;
+    line-height: 1 !important;
+}
+
+/* Bandeau feu / CS / route / rotation : remonté au maximum sous le BINGO,
+   avec une hauteur optimisée. */
+#commune-info-display {
+    top: calc(var(--safe-area-top) + 68px) !important;
+    min-height: 44px !important;
+    height: auto !important;
+    padding: 5px 10px 5px 14px !important;
+    border-radius: 16px !important;
+    align-items: center !important;
+    line-height: 1 !important;
+}
+
+#commune-info-display > .commune-name {
+    line-height: 1.02 !important;
+}
+
+#commune-info-display .sunset-info {
+    line-height: 1 !important;
+}
+
+#commune-info-display .gps-feu-route-info,
+#commune-info-display .gps-feu-rotation-info {
+    padding: 4px 9px !important;
+    line-height: 1 !important;
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #bingo-map-display {
+        top: calc(var(--safe-area-top) + 4px) !important;
+        min-height: 54px !important;
+        padding: 7px 18px !important;
+    }
+
+    #commune-info-display {
+        top: calc(var(--safe-area-top) + 66px) !important;
+        min-height: 42px !important;
+        padding: 4px 8px 4px 12px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    #bingo-map-display {
+        top: calc(var(--safe-area-top) + 4px) !important;
+    }
+
+    #commune-info-display {
+        top: calc(var(--safe-area-top) + 40px) !important;
+    }
+}
