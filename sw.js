@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-74_echelle_nm_cartes';
+const SW_VERSION = 'sw-v13-75_echelle_nm_pelic_tmd';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
