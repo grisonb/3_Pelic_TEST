@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-76_regle_echelle_pelic';
+const SW_VERSION = 'sw-v13-77_regle_2doigts_echelle_nm';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
