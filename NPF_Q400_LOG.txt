@@ -1,19 +1,33 @@
-NPF-Q400 TEST v13.74 — échelle nautique dynamique
+NPF-Q400 TEST v13.75 — échelle visible + pélicandromes + TMD minuit
 
-Base : v13.73 import cartes en bases séparées.
+Base : v13.74 avec import cartes en bases séparées v13.73 conservé.
 
-Ajouts :
-- ajout d'une échelle dynamique en NM en bas à gauche de la carte ;
-- l'échelle est indépendante du fond cartographique ;
-- fonctionnement sur carte NPF ;
-- fonctionnement sur carte OACI ;
-- fonctionnement sur cartes offline en bases séparées ;
-- recalcul automatique au zoom, déplacement, redimensionnement et changement de vue ;
-- valeurs propres : 0.1 / 0.2 / 0.5 / 1 / 2 / 5 / 10 / 20 / 50 / 100 NM selon le zoom ;
-- aucun changement sur l'architecture d'import v13.73 ;
-- conservation des corrections GAAR, PDF, Fréquences OPS, icône parabole et BLOC DÉPART OACI figé.
+Corrections :
+1. Échelle nautique
+- échelle NM sortie des contrôles Leaflet bottom-left ;
+- affichage en overlay fixe bas gauche pour éviter qu'elle soit masquée ;
+- fonctionne avec anciennes cartes, nouvelles cartes, OACI, online et offline ;
+- recalcul automatique au zoom / déplacement / resize.
 
-Contrôles :
-- script.js : syntaxe OK
-- sw.js : syntaxe OK
+2. Pélicandromes
+- icônes pélicandromes grossies ;
+- zone tactile augmentée pour ouvrir plus facilement la popup en vol ;
+- popupAnchor ajusté après grossissement.
+
+3. Étiquette BASE
+- étiquette BASE éloignée de l'icône ;
+- objectif : ne plus masquer l'icône pélicandrome/base sur la carte.
+
+4. Vecteur temps avion
+- points 2' / 5' / 10' grossis ;
+- libellés 2' / 5' / 10' grossis et halo renforcé.
+
+5. TMD après minuit
+- correction de la logique de TMD lorsque l'heure saisie est après minuit ;
+- exemple : heure 20:00 + TMD 00:30 = 4h30 restantes ;
+- plus besoin de saisir 23:59 pour contourner le problème.
+
+Contrôles effectués :
+- node --check script.js : OK
+- node --check sw.js : OK
 - manifest.json : valide
