@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-77_regle_2doigts_echelle_nm';
+const SW_VERSION = 'sw-v13-78_multi_zip_bases_actives';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -625,9 +625,39 @@ function findTileRecordInDB(db, tileUrl) {
     });
 }
 
+function getOfflinePackGroupNameForSw(packName) {
+    const name = String(packName || '').trim();
+    const cleaned = name
+        .replace(/\s*\(\d+\)\s*$/i, '')
+        .replace(/\s+(copy|copie)\s*$/i, '')
+        .trim();
+
+    const match = cleaned.match(/^(.+?)(?:[\s_-]*(?:part|partie|zip)?[\s_-]*)(\d{1,3})$/i);
+    if (match && match[1].trim().length >= 2) {
+        return match[1].replace(/[\s_-]+$/g, '').trim();
+    }
+
+    return cleaned;
+}
+
 function isTileRecordAllowed(record, activeSet) {
     if (!activeSet || activeSet.size === 0) return true;
-    return activeSet.has(record && record.packName);
+
+    const recordPack = record && record.packName ? String(record.packName) : '';
+    if (activeSet.has(recordPack)) return true;
+
+    /*
+     * v13.78 — tolérance multi-ZIP.
+     * Si une carte fractionnée est active mais que la liste exacte des packs a
+     * été partiellement rechargée, on autorise les tuiles dont le groupe est le
+     * même : NPF_..._01 / _02 / _10 restent une seule carte.
+     */
+    const recordGroup = getOfflinePackGroupNameForSw(recordPack);
+    for (const activePack of activeSet) {
+        if (getOfflinePackGroupNameForSw(activePack) === recordGroup) return true;
+    }
+
+    return false;
 }
 
 function getTileUrlFromStoredKey(storedUrl) {
