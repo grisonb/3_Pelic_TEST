@@ -1,18 +1,36 @@
-NPF-Q400 TEST v13.77 — règle 2 doigts corrigée + échelle NM seule
+NPF-Q400 TEST v13.78 — carte v24 multi-ZIP / bases actives
 
-Base : v13.76.
+Base :
+- v13.77 conservée.
 
-Corrections :
-- échelle permanente bas gauche : nautique uniquement, suppression de la ligne kilomètres ;
-- échelle descendue au plus bas possible sur la carte ;
-- règle 2 doigts : zoom tactile Leaflet suspendu dès activation de la règle ;
-- règle 2 doigts : déplacement tactile/zoom empêché tant que la règle est active ;
-- règle 2 doigts : tracé décalé au-dessus des doigts pour rester visible ;
-- règle 2 doigts : étiquette distance également décalée au-dessus de la règle ;
-- règle 2 doigts : double indication conservée NM + km sur la règle mobile ;
-- restauration du comportement normal de la carte au relâchement des doigts.
+Correction principale :
+- corrige l'affichage incomplet des cartes générées en plusieurs ZIP avec la nouvelle architecture de bases séparées.
+- Symptôme corrigé : carte v24 importée avec plusieurs ZIP mais affichage d'une seule tuile ou d'une fraction de carte.
 
-Contrôles :
-- script.js : syntaxe vérifiée ;
-- sw.js : syntaxe vérifiée ;
-- manifest.json : JSON valide.
+Détails techniques :
+- persistance systématique de la liste des bases IndexedDB actives dans la base settings ;
+- au démarrage, si une carte offline est active, réécriture des packs actifs et bases actives pour le service worker ;
+- invalidation des anciens seuils de zoom offline au changement/import de carte ;
+- service worker plus tolérant : les packs d'un même groupe multi-ZIP sont considérés comme une seule carte ;
+- pas de reset profond, pas de désinscription du service worker.
+
+Conservé :
+- import en bases séparées v13.73 ;
+- échelle NM ;
+- règle 2 doigts corrigée ;
+- pélicandromes ajustés ;
+- TMD après minuit ;
+- PDF Pélic / Doc FDF / Fréquences OPS.
+
+Procédure conseillée après installation :
+1. Installer v13.78.
+2. Lancer une fois avec réseau.
+3. Ouvrir Gestion des Cartes.
+4. Désélectionner puis resélectionner le groupe de carte v24.
+5. Relancer l'application.
+6. Tester la carte v24.
+
+Si la carte v24 a été importée avec v13.77 et reste incomplète :
+- supprimer uniquement le groupe v24 depuis Gestion des Cartes ;
+- réimporter les ZIP v24 dans l'ordre ;
+- ne pas supprimer la PWA.
