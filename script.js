@@ -8801,6 +8801,16 @@ async function initializeOfflineTilePreference() {
     const enabled = mapSourceMode === 'offline';
     await setOfflineTilesEnabled(enabled);
     setOfflineOnlineFallbackMode(false);
+
+    /*
+     * v13.78 — au démarrage avec une carte déjà installée, on réécrit les
+     * bases actives dans IndexedDB settings pour que le service worker puisse
+     * lancer la PWA et servir la bonne carte même après relance/offline.
+     */
+    if (Array.isArray(activeOfflinePacks) && activeOfflinePacks.length) {
+        await persistSimpleActiveOfflinePacks(activeOfflinePacks);
+    }
+
     notifyServiceWorkerOfflineTilesPreference(enabled);
     notifyServiceWorkerOfflineOnlineFallback(false);
     notifyServiceWorkerActivePacks(activeOfflinePacks);
@@ -9474,6 +9484,11 @@ async function handleZipImport(file) {
         const importedGroupPacks = getInstalledPackNamesForGroup(importedGroupName);
         await persistSimpleActiveOfflinePacks(importedGroupPacks.length ? importedGroupPacks : [packName]);
 
+        try {
+            localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
+            localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
+        } catch (_) {}
+
         const restoreOfflineAfterImport = previousImportMapSourceMode === 'offline' || previousImportOfflineTilesMode;
         mapSourceMode = restoreOfflineAfterImport ? 'offline' : 'online';
         localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
@@ -9561,15 +9576,28 @@ function parseTilePathFromName(name) {
 
 async function persistSimpleActiveOfflinePacks(packs) {
     /*
-     * v13.73 — affichage carte avec bases séparées.
-     * On persiste à la fois les packs actifs et la/les bases IndexedDB de tuiles
-     * correspondantes. Le service worker peut ainsi lire uniquement la base de la
-     * carte sélectionnée, sans toucher aux autres cartes installées.
+     * v13.78 — cartes multi-ZIP en bases séparées.
+     *
+     * Correction critique :
+     * v13.73 persistait bien la liste des packs actifs, mais pas toujours la
+     * liste des bases IndexedDB isolées dans la base settings. Après relance,
+     * le service worker pouvait donc revenir sur la base héritée et ne lire
+     * qu'une fraction de carte, typiquement une seule tuile visible.
+     *
+     * On persiste maintenant systématiquement :
+     * - les packs actifs ;
+     * - les bases IndexedDB correspondantes ;
+     * - les seuils de zoom sont invalidés au changement de groupe.
      */
     activeOfflinePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
     activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
     localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
     localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(activeOfflinePackDatabases));
+
+    try {
+        localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
+        localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
+    } catch (_) {}
 
     if (!db) {
         try {
@@ -9583,12 +9611,13 @@ async function persistSimpleActiveOfflinePacks(packs) {
                 const tx = db.transaction('settings', 'readwrite');
                 const store = tx.objectStore('settings');
                 store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: activeOfflinePacks });
+                store.put({ key: OFFLINE_ACTIVE_PACK_DATABASES_KEY, value: activeOfflinePackDatabases });
                 tx.oncomplete = resolve;
                 tx.onerror = () => reject(tx.error);
                 tx.onabort = () => reject(tx.error || new Error('Transaction settings annulée'));
             });
         } catch (error) {
-            console.warn('[Offline] Impossible de persister le pack actif dans IndexedDB:', error);
+            console.warn('[Offline] Impossible de persister les packs/bases actifs dans IndexedDB:', error);
         }
     }
 
@@ -9749,6 +9778,11 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
     try {
         await persistSimpleActiveOfflinePacks(nextPacks);
         if (token !== offlineMapSwitchToken) return;
+
+        try {
+            localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
+            localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
+        } catch (_) {}
 
         mapSourceMode = nextMode;
         localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
