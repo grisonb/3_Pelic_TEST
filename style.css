@@ -8610,3 +8610,34 @@ body.gaar-point-search-open .gaar-editing-banner {
     line-height: 1.15;
     white-space: nowrap;
 }
+
+
+/* v13.75 — pélicandromes plus faciles à toucher en vol. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-active,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-water,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    font-size: 17px !important;
+    border-width: 2px !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.92), 0 2px 7px rgba(0,0,0,.45) !important;
+    box-sizing: border-box !important;
+}
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    line-height: 24px !important;
+    font-size: 20px !important;
+}
+
+/* v13.75 — l'étiquette BASE est éloignée de l'icône pour ne plus la masquer. */
+.leaflet-tooltip.route-tooltip-base.route-tooltip-near-icon {
+    margin: 0 !important;
+    padding: 4px 9px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.22) !important;
+}
+
+/* v13.75 — marqueurs 2'/5'/10' du vecteur temps plus lisibles. */
+.own-gps-vector-time-marker {
+    z-index: 1700 !important;
+}
