@@ -1387,7 +1387,7 @@ function getRouteLabelNearAirportOptions(fireLatLng, airportLatLng, kind = 'defa
      * à l'opposé du trait, sans l'éloignement fort appliqué aux pélicandromes.
      */
     const length = Math.sqrt((dx * dx) + (dy * dy));
-    const distanceFromIcon = kind === 'base' ? 54 : 42;
+    const distanceFromIcon = kind === 'base' ? 86 : 42;
     let offsetX = Math.round((-dx / length) * distanceFromIcon);
     let offsetY = Math.round((-dy / length) * distanceFromIcon);
 
@@ -2007,10 +2007,14 @@ function injectNauticalScaleStyle() {
     style.id = styleId;
     style.textContent = `
         .npf-nautical-scale {
-            background: rgba(255, 255, 255, 0.92);
-            border: 2px solid rgba(0, 67, 112, 0.80);
+            position: fixed !important;
+            left: calc(env(safe-area-inset-left, 0px) + 12px) !important;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 78px) !important;
+            z-index: 1350 !important;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(0, 67, 112, 0.86);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
             padding: 6px 8px 5px 8px;
             color: #003f6b;
             font-family: Arial, Helvetica, sans-serif;
@@ -2091,18 +2095,26 @@ function updateNauticalScale() {
 function ensureNauticalScaleControl() {
     if (!map || !window.L || nauticalScaleControl) return;
     injectNauticalScaleStyle();
-    nauticalScaleControl = L.control({ position: 'bottomleft' });
-    nauticalScaleControl.onAdd = function () {
-        nauticalScaleElement = L.DomUtil.create('div', 'npf-nautical-scale');
-        try { L.DomEvent.disableClickPropagation(nauticalScaleElement); } catch (_) {}
-        try { L.DomEvent.disableScrollPropagation(nauticalScaleElement); } catch (_) {}
+
+    /* v13.75 — l'échelle est sortie des contrôles Leaflet.
+     * Sur iPad, les contrôles bottom-left pouvaient être masqués/décalés par le zoom,
+     * la safe-area ou les bandeaux. Un overlay fixe reste visible sur NPF, OACI,
+     * online et offline, y compris avec les anciennes cartes.
+     */
+    nauticalScaleElement = document.getElementById('npf-nautical-scale-fixed');
+    if (!nauticalScaleElement) {
+        nauticalScaleElement = document.createElement('div');
+        nauticalScaleElement.id = 'npf-nautical-scale-fixed';
+        nauticalScaleElement.className = 'npf-nautical-scale';
         nauticalScaleElement.innerHTML = '<div class="npf-nautical-scale-label">-- NM</div>';
-        return nauticalScaleElement;
-    };
-    nauticalScaleControl.addTo(map);
+        document.body.appendChild(nauticalScaleElement);
+    }
+    nauticalScaleControl = { fixedOverlay: true };
+
     map.on('zoomend moveend resize viewreset', updateNauticalScale);
     setTimeout(updateNauticalScale, 0);
     setTimeout(updateNauticalScale, 350);
+    setTimeout(updateNauticalScale, 1200);
 }
 
 function initMap() {
@@ -5160,7 +5172,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -9] }), zIndexOffset: 2500, keyboard: false });
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`);
             marker.addTo(permanentAirportLayer);
             return;
@@ -5210,7 +5222,7 @@ function drawPermanentAirportMarkers() {
         const isWater = waterAirports.has(airport.oaci);
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
-        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -9] });
+        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
@@ -7183,9 +7195,9 @@ function buildOwnGpsVectorLabel(minutes, latLng) {
         interactive: false,
         icon: L.divIcon({
             className: 'own-gps-vector-time-marker',
-            html: `<div style="font-size:12px;font-weight:900;color:#ffea00;text-shadow:-1px -1px 0 #111827,1px -1px 0 #111827,-1px 1px 0 #111827,1px 1px 0 #111827,0 1px 5px rgba(0,0,0,.75);white-space:nowrap;line-height:1;">${minutes}'</div>`,
-            iconSize: [28, 16],
-            iconAnchor: [-6, 8]
+            html: `<div style="font-size:17px;font-weight:1000;color:#ffea00;text-shadow:-2px -2px 0 #111827,2px -2px 0 #111827,-2px 2px 0 #111827,2px 2px 0 #111827,0 2px 7px rgba(0,0,0,.85);white-space:nowrap;line-height:1;">${minutes}'</div>`,
+            iconSize: [42, 22],
+            iconAnchor: [-8, 11]
         })
     });
 }
@@ -7233,9 +7245,9 @@ function updateOwnGpsVector(latitude, longitude, headingDeg, speedMps) {
         const point = calculateDestinationLatLng(latitude, longitude, headingDeg, markDistanceMeters);
 
         L.circleMarker(point, {
-            radius: 5,
+            radius: 8,
             color: '#111827',
-            weight: 3,
+            weight: 4,
             fillColor: '#ffea00',
             fillOpacity: 1,
             interactive: false
@@ -10067,6 +10079,23 @@ let activeFlightId = null;
 let isApplyingFlightState = false;
 const parseTime = (timeString) => { if (!timeString || !timeString.includes(':')) return null; const parts = timeString.split(':'); return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10); };
 const formatTime = (totalMinutes) => { if (totalMinutes === null || isNaN(totalMinutes) || totalMinutes < 0) return ''; const roundedMinutes = Math.round(totalMinutes); const hours = Math.floor(roundedMinutes / 60); const minutes = roundedMinutes % 60; return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`; };
+function normalizeClockLimitAfterReference(limitMinutes, referenceMinutes) {
+    if (limitMinutes === null || !Number.isFinite(limitMinutes)) return limitMinutes;
+    if (referenceMinutes === null || !Number.isFinite(referenceMinutes)) return limitMinutes;
+    let normalized = limitMinutes;
+    while (normalized < referenceMinutes) normalized += 1440;
+    return normalized;
+}
+function formatClockLimitTime(totalMinutes) {
+    if (totalMinutes === null || !Number.isFinite(totalMinutes) || totalMinutes < 0) return '';
+    const roundedMinutes = Math.round(totalMinutes);
+    const dayOffset = Math.floor(roundedMinutes / 1440);
+    const minutesOfDay = ((roundedMinutes % 1440) + 1440) % 1440;
+    const hours = Math.floor(minutesOfDay / 60);
+    const minutes = minutesOfDay % 60;
+    const suffix = dayOffset > 0 ? ` +${dayOffset}j` : '';
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}${suffix}`;
+}
 const parseNumeric = (numericString) => { if (!numericString) return null; const value = parseInt(numericString.replace(/[^0-9]/g, ''), 10); return isNaN(value) ? null : value; };
 
 function updateAndSortRotations(container, current, params) {
@@ -10223,28 +10252,29 @@ function updateAndSortRotations(container, current, params) {
         if (type === 'tmd') {
             const firstDropTime = canCalculateTime ? current.time + FIRST_DROP_FORFAIT_MIN : null;
             const backBaseAfterFirstDropTime = canCalculateTime ? firstDropTime + returnBaseTime : null;
-            const canFirstDropAndReturnBeforeTmd = canCalculateTime && params.tmdTime !== null && Number.isFinite(params.tmdTime) && backBaseAfterFirstDropTime <= params.tmdTime;
-            const remainingForRotations = canFirstDropAndReturnBeforeTmd ? (params.tmdTime - firstDropTime - returnBaseTime) : null;
+            const effectiveTmdTime = normalizeClockLimitAfterReference(params.tmdTime, current.time);
+            const canFirstDropAndReturnBeforeTmd = canCalculateTime && effectiveTmdTime !== null && Number.isFinite(effectiveTmdTime) && backBaseAfterFirstDropTime <= effectiveTmdTime;
+            const remainingForRotations = canFirstDropAndReturnBeforeTmd ? (effectiveTmdTime - firstDropTime - returnBaseTime) : null;
             formulaString = [
                 `TMD`,
                 ``,
                 currentContextDetails(),
-                `Fin TMD = ${timeOrNA(params.tmdTime)}`,
+                `Fin TMD = ${formatClockLimitTime(effectiveTmdTime) || 'N/A'}`,
                 ``,
                 rotationFormulaDetails(),
                 ``,
                 `Validation du +1 :`,
                 `+1 possible uniquement si l'avion peut arriver sur feu, larguer avec le forfait ${FIRST_DROP_FORFAIT_MIN} min, puis revenir base avant la fin TMD.`,
                 `Test : Heure sur feu + ${FIRST_DROP_FORFAIT_MIN} min + retour base ≤ TMD`,
-                `Test : ${timeOrNA(current.time)} + ${FIRST_DROP_FORFAIT_MIN} min + ${minOrNA(returnBaseTime)} = ${timeOrNA(backBaseAfterFirstDropTime)} ≤ ${timeOrNA(params.tmdTime)} → ${canFirstDropAndReturnBeforeTmd ? 'OUI' : 'NON'}`,
+                `Test : ${timeOrNA(current.time)} + ${FIRST_DROP_FORFAIT_MIN} min + ${minOrNA(returnBaseTime)} = ${formatClockLimitTime(backBaseAfterFirstDropTime) || 'N/A'} ≤ ${formatClockLimitTime(effectiveTmdTime) || 'N/A'} → ${canFirstDropAndReturnBeforeTmd ? 'OUI' : 'NON'}`,
                 ``,
                 `Si le +1 est impossible : résultat = 0.`,
                 `Si le +1 est possible :`,
                 `Nbr rotations TMD = 1 + ((TMD - Heure premier largage - Retour base final) / Durée rotation)`,
                 `Heure premier largage = Heure sur feu + ${FIRST_DROP_FORFAIT_MIN} min`,
-                `Calcul = 1 + ((${timeOrNA(params.tmdTime)} - ${timeOrNA(firstDropTime)} - ${minOrNA(returnBaseTime)}) / ${minOrNA(params.rotationTime)})`
+                `Calcul = 1 + ((${formatClockLimitTime(effectiveTmdTime) || 'N/A'} - ${formatClockLimitTime(firstDropTime) || 'N/A'} - ${minOrNA(returnBaseTime)}) / ${minOrNA(params.rotationTime)})`
             ].join('\n');
-            if (canCalculateTime && params.tmdTime !== null && Number.isFinite(params.tmdTime)) {
+            if (canCalculateTime && effectiveTmdTime !== null && Number.isFinite(effectiveTmdTime)) {
                 value = canFirstDropAndReturnBeforeTmd ? 1 + (remainingForRotations / params.rotationTime) : 0;
             }
         }
