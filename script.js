@@ -2009,7 +2009,7 @@ function injectNauticalScaleStyle() {
         .npf-nautical-scale {
             position: fixed !important;
             left: calc(env(safe-area-inset-left, 0px) + 12px) !important;
-            bottom: calc(env(safe-area-inset-bottom, 0px) + 78px) !important;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
             z-index: 1350 !important;
             background: rgba(255, 255, 255, 0.95);
             border: 2px solid rgba(0, 67, 112, 0.86);
@@ -2022,7 +2022,7 @@ function injectNauticalScaleStyle() {
             font-weight: 800;
             line-height: 1;
             pointer-events: none;
-            min-width: 72px;
+            min-width: 82px;
         }
         .npf-nautical-scale-bar-wrap {
             height: 8px;
@@ -2032,8 +2032,51 @@ function injectNauticalScaleStyle() {
             margin-bottom: 4px;
         }
         .npf-nautical-scale-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
             text-align: center;
             white-space: nowrap;
+        }
+        .npf-nautical-scale-label .nm {
+            font-size: 13px;
+            font-weight: 1000;
+            color: #003f6b;
+        }
+        .npf-nautical-scale-label .km {
+            font-size: 11px;
+            font-weight: 900;
+            color: #41556a;
+        }
+        .npf-two-finger-ruler-label {
+            background: rgba(255, 255, 255, 0.96);
+            border: 2px solid rgba(0, 67, 112, 0.90);
+            border-radius: 9px;
+            box-shadow: 0 2px 8px rgba(0,0,0,.30);
+            padding: 5px 8px;
+            color: #003f6b;
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: 1000;
+            line-height: 1.08;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .npf-two-finger-ruler-label .nm { font-size: 15px; }
+        .npf-two-finger-ruler-label .km { font-size: 12px; color:#41556a; margin-top:2px; }
+        .npf-two-finger-ruler-help {
+            position: fixed;
+            left: 50%;
+            top: calc(env(safe-area-inset-top, 0px) + 14px);
+            transform: translateX(-50%);
+            z-index: 1850;
+            background: rgba(0,67,112,.92);
+            color: #fff;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font: 900 13px/1 Arial, Helvetica, sans-serif;
+            box-shadow: 0 2px 9px rgba(0,0,0,.28);
+            pointer-events: none;
         }
         @media (max-width: 900px) {
             .npf-nautical-scale {
@@ -2054,6 +2097,12 @@ function formatNauticalMiles(value) {
         return `${Number(value.toFixed(value % 1 ? 1 : 0)).toString()} NM`;
     }
     return `${Math.round(value)} NM`;
+}
+
+function formatKilometers(value) {
+    if (!Number.isFinite(value) || value <= 0) return '-- km';
+    if (value < 10) return `${Number(value.toFixed(1)).toString()} km`;
+    return `${Math.round(value)} km`;
 }
 
 function chooseNiceNauticalScale(maxNm) {
@@ -2086,9 +2135,10 @@ function updateNauticalScale() {
     const niceNm = chooseNiceNauticalScale(maxNm);
     const pixelWidth = Math.max(26, Math.round((niceNm * 1852) / metersPerPixel));
 
+    const niceKm = niceNm * 1.852;
     nauticalScaleElement.innerHTML = `
         <div class="npf-nautical-scale-bar-wrap" style="width:${pixelWidth}px"></div>
-        <div class="npf-nautical-scale-label">${formatNauticalMiles(niceNm)}</div>
+        <div class="npf-nautical-scale-label"><span class="nm">${formatNauticalMiles(niceNm)}</span><span class="km">${formatKilometers(niceKm)}</span></div>
     `;
 }
 
@@ -2106,7 +2156,7 @@ function ensureNauticalScaleControl() {
         nauticalScaleElement = document.createElement('div');
         nauticalScaleElement.id = 'npf-nautical-scale-fixed';
         nauticalScaleElement.className = 'npf-nautical-scale';
-        nauticalScaleElement.innerHTML = '<div class="npf-nautical-scale-label">-- NM</div>';
+        nauticalScaleElement.innerHTML = '<div class="npf-nautical-scale-label"><span class="nm">-- NM</span><span class="km">-- km</span></div>';
         document.body.appendChild(nauticalScaleElement);
     }
     nauticalScaleControl = { fixedOverlay: true };
@@ -2115,6 +2165,203 @@ function ensureNauticalScaleControl() {
     setTimeout(updateNauticalScale, 0);
     setTimeout(updateNauticalScale, 350);
     setTimeout(updateNauticalScale, 1200);
+}
+
+
+/* v13.76 — règle mobile 2 doigts, graduée en NM/km.
+ * Appui prolongé à 2 doigts : affichage de la règle tant que les doigts restent posés.
+ * Fonctionne avec carte NPF, OACI, online et offline car elle utilise la géométrie Leaflet.
+ */
+let twoFingerRulerLayer = null;
+let twoFingerRulerTimer = null;
+let twoFingerRulerActive = false;
+let twoFingerRulerWasDraggingEnabled = null;
+let twoFingerRulerStartPoints = null;
+let twoFingerRulerHelpEl = null;
+
+function getTouchContainerPoints(event) {
+    if (!map || !map.getContainer || !event || !event.touches || event.touches.length < 2) return null;
+    const rect = map.getContainer().getBoundingClientRect();
+    const t1 = event.touches[0];
+    const t2 = event.touches[1];
+    return [
+        L.point(t1.clientX - rect.left, t1.clientY - rect.top),
+        L.point(t2.clientX - rect.left, t2.clientY - rect.top)
+    ];
+}
+
+function clearTwoFingerRulerLayer() {
+    if (twoFingerRulerLayer) {
+        twoFingerRulerLayer.clearLayers();
+    }
+}
+
+function ensureTwoFingerRulerLayer() {
+    if (!map || !window.L) return null;
+    if (!twoFingerRulerLayer) twoFingerRulerLayer = L.layerGroup().addTo(map);
+    return twoFingerRulerLayer;
+}
+
+function showTwoFingerRulerHelp() {
+    if (twoFingerRulerHelpEl) return;
+    twoFingerRulerHelpEl = document.createElement('div');
+    twoFingerRulerHelpEl.className = 'npf-two-finger-ruler-help';
+    twoFingerRulerHelpEl.textContent = 'Règle mobile — relâcher pour fermer';
+    document.body.appendChild(twoFingerRulerHelpEl);
+}
+
+function hideTwoFingerRulerHelp() {
+    if (twoFingerRulerHelpEl && twoFingerRulerHelpEl.parentNode) {
+        twoFingerRulerHelpEl.parentNode.removeChild(twoFingerRulerHelpEl);
+    }
+    twoFingerRulerHelpEl = null;
+}
+
+function drawTwoFingerRulerFromTouches(event) {
+    const points = getTouchContainerPoints(event);
+    const layer = ensureTwoFingerRulerLayer();
+    if (!points || !layer || !map || !map.containerPointToLatLng || !map.distance) return;
+
+    const [p1, p2] = points;
+    const ll1 = map.containerPointToLatLng(p1);
+    const ll2 = map.containerPointToLatLng(p2);
+    const meters = map.distance(ll1, ll2);
+    if (!Number.isFinite(meters) || meters <= 0) return;
+
+    clearTwoFingerRulerLayer();
+
+    const nm = meters / 1852;
+    const km = meters / 1000;
+    const labelPoint = L.point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    const labelLatLng = map.containerPointToLatLng(labelPoint);
+
+    L.polyline([ll1, ll2], {
+        color: '#111827',
+        weight: 8,
+        opacity: 0.80,
+        interactive: false,
+        lineCap: 'round'
+    }).addTo(layer);
+    L.polyline([ll1, ll2], {
+        color: '#ffffff',
+        weight: 5,
+        opacity: 0.95,
+        interactive: false,
+        lineCap: 'round'
+    }).addTo(layer);
+    L.polyline([ll1, ll2], {
+        color: '#003f6b',
+        weight: 3,
+        opacity: 1,
+        interactive: false,
+        lineCap: 'round'
+    }).addTo(layer);
+
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const tickLength = 16;
+    const fractions = [0, 0.25, 0.5, 0.75, 1];
+    fractions.forEach((fraction) => {
+        const px = p1.x + dx * fraction;
+        const py = p1.y + dy * fraction;
+        const a = L.point(px - nx * tickLength / 2, py - ny * tickLength / 2);
+        const b = L.point(px + nx * tickLength / 2, py + ny * tickLength / 2);
+        L.polyline([map.containerPointToLatLng(a), map.containerPointToLatLng(b)], {
+            color: '#003f6b',
+            weight: fraction === 0 || fraction === 1 || fraction === 0.5 ? 4 : 3,
+            opacity: 1,
+            interactive: false,
+            lineCap: 'round'
+        }).addTo(layer);
+    });
+
+    L.marker(labelLatLng, {
+        interactive: false,
+        icon: L.divIcon({
+            className: 'npf-two-finger-ruler-label',
+            html: `<div class="nm">${formatNauticalMiles(nm)}</div><div class="km">${formatKilometers(km)}</div>`,
+            iconSize: [96, 42],
+            iconAnchor: [48, -8]
+        })
+    }).addTo(layer);
+}
+
+function cancelTwoFingerRulerTimer() {
+    if (twoFingerRulerTimer) {
+        clearTimeout(twoFingerRulerTimer);
+        twoFingerRulerTimer = null;
+    }
+}
+
+function startTwoFingerRuler(event) {
+    cancelTwoFingerRulerTimer();
+    twoFingerRulerActive = true;
+    showTwoFingerRulerHelp();
+    try {
+        twoFingerRulerWasDraggingEnabled = map?.dragging?.enabled ? map.dragging.enabled() : null;
+        if (map?.dragging?.disable) map.dragging.disable();
+    } catch (_) {}
+    drawTwoFingerRulerFromTouches(event);
+}
+
+function endTwoFingerRuler() {
+    cancelTwoFingerRulerTimer();
+    twoFingerRulerStartPoints = null;
+    if (twoFingerRulerActive) {
+        twoFingerRulerActive = false;
+        clearTwoFingerRulerLayer();
+        hideTwoFingerRulerHelp();
+        try {
+            if (twoFingerRulerWasDraggingEnabled && map?.dragging?.enable) map.dragging.enable();
+        } catch (_) {}
+    }
+    twoFingerRulerWasDraggingEnabled = null;
+}
+
+function handleTwoFingerRulerTouchStart(event) {
+    if (!event || !event.touches || event.touches.length !== 2 || !map) {
+        endTwoFingerRuler();
+        return;
+    }
+    injectNauticalScaleStyle();
+    twoFingerRulerStartPoints = getTouchContainerPoints(event);
+    cancelTwoFingerRulerTimer();
+    twoFingerRulerTimer = setTimeout(() => {
+        if (event.touches && event.touches.length === 2) startTwoFingerRuler(event);
+    }, 420);
+}
+
+function handleTwoFingerRulerTouchMove(event) {
+    if (twoFingerRulerActive) {
+        if (event.cancelable) event.preventDefault();
+        drawTwoFingerRulerFromTouches(event);
+        return;
+    }
+    if (!twoFingerRulerTimer || !twoFingerRulerStartPoints || !event.touches || event.touches.length !== 2) return;
+    const currentPoints = getTouchContainerPoints(event);
+    if (!currentPoints) return;
+    const moved = Math.max(
+        Math.hypot(currentPoints[0].x - twoFingerRulerStartPoints[0].x, currentPoints[0].y - twoFingerRulerStartPoints[0].y),
+        Math.hypot(currentPoints[1].x - twoFingerRulerStartPoints[1].x, currentPoints[1].y - twoFingerRulerStartPoints[1].y)
+    );
+    if (moved > 18) cancelTwoFingerRulerTimer();
+}
+
+function handleTwoFingerRulerTouchEnd() {
+    endTwoFingerRuler();
+}
+
+function ensureTwoFingerRulerControl() {
+    if (!map || !map.getContainer || map.__npfTwoFingerRulerReady) return;
+    const container = map.getContainer();
+    container.addEventListener('touchstart', handleTwoFingerRulerTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTwoFingerRulerTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTwoFingerRulerTouchEnd, { passive: false });
+    container.addEventListener('touchcancel', handleTwoFingerRulerTouchEnd, { passive: false });
+    map.__npfTwoFingerRulerReady = true;
 }
 
 function initMap() {
@@ -2132,6 +2379,7 @@ function initMap() {
     map.on('zoomend', enforceOfflineZoomLimit);
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
+    ensureTwoFingerRulerControl();
     applyMapNoBackgroundStyle();
 
     if (map.createPane && !map.getPane('highVoltageLinesPane')) {
@@ -5152,6 +5400,25 @@ function buildPelicPdfButtonsHtml(oaci) {
     return `<div class="popup-buttons popup-pdf-buttons"><button class="pdf-btn" onclick="window.openAirportPdf('${safeOaci}')">PDF Pélic</button><button class="pdf-btn fdf-reduced-pdf-btn" onclick="window.openFdfReducedPdf()">Doc PDF Réduite</button></div>`;
 }
 
+
+function addAirportTouchHitbox(airport, popupHtml) {
+    /* v13.76 — icône visuelle plus compacte, zone tactile conservée en vol. */
+    if (!airport || !Number.isFinite(Number(airport.lat)) || !Number.isFinite(Number(airport.lon)) || !popupHtml) return null;
+    const hitbox = L.circleMarker([airport.lat, airport.lon], {
+        radius: 20,
+        color: 'transparent',
+        weight: 1,
+        opacity: 0,
+        fillColor: 'transparent',
+        fillOpacity: 0,
+        interactive: true,
+        keyboard: false
+    }).bindPopup(popupHtml);
+    hitbox.addTo(permanentAirportLayer);
+    try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
+    return hitbox;
+}
+
 function drawPermanentAirportMarkers() {
     permanentAirportLayer.clearLayers();
 
@@ -5172,9 +5439,11 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18] }), zIndexOffset: 2500, keyboard: false });
-            marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`);
+            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`;
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] }), zIndexOffset: 2500, keyboard: false });
+            marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
+            addAirportTouchHitbox(airport, popupHtml);
             return;
         }
 
@@ -5222,7 +5491,7 @@ function drawPermanentAirportMarkers() {
         const isWater = waterAirports.has(airport.oaci);
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
-        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -18] });
+        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
@@ -5231,8 +5500,10 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        marker.bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`);
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`;
+        marker.bindPopup(popupHtml);
         marker.addTo(permanentAirportLayer);
+        addAirportTouchHitbox(airport, popupHtml);
     });
 }
 
