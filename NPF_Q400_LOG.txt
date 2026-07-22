@@ -1,33 +1,23 @@
-NPF-Q400 TEST v13.75 — échelle visible + pélicandromes + TMD minuit
+NPF-Q400 TEST v13.76 — règle 2 doigts + double échelle + pélicandromes ajustés
 
-Base : v13.74 avec import cartes en bases séparées v13.73 conservé.
+Base : v13.75.
 
-Corrections :
-1. Échelle nautique
-- échelle NM sortie des contrôles Leaflet bottom-left ;
-- affichage en overlay fixe bas gauche pour éviter qu'elle soit masquée ;
-- fonctionne avec anciennes cartes, nouvelles cartes, OACI, online et offline ;
-- recalcul automatique au zoom / déplacement / resize.
+Corrections / ajouts :
+- pélicandromes : icônes visuelles réduites après v13.75 ;
+- pélicandromes : zone tactile conservée par hitbox invisible plus large ;
+- échelle : repositionnée au plus bas en bas à gauche de la carte ;
+- échelle : affichage double NM + kilomètres ;
+- carte NPF / OACI / online / offline : échelle commune, indépendante du fond ;
+- ajout d'une règle mobile type ForeFlight : appui prolongé à deux doigts sur la carte ;
+- règle mobile : distance affichée en NM et en km ;
+- règle mobile : graduations visuelles 0 / 25 / 50 / 75 / 100 % ;
+- règle mobile : suit les deux doigts tant qu'ils restent posés ;
+- relâchement : la règle disparaît ;
+- corrections v13.73 / v13.75 conservées : import cartes en bases séparées, TMD minuit, PDF FDF / Fréquences OPS, OACI BLOC DÉPART figé.
 
-2. Pélicandromes
-- icônes pélicandromes grossies ;
-- zone tactile augmentée pour ouvrir plus facilement la popup en vol ;
-- popupAnchor ajusté après grossissement.
-
-3. Étiquette BASE
-- étiquette BASE éloignée de l'icône ;
-- objectif : ne plus masquer l'icône pélicandrome/base sur la carte.
-
-4. Vecteur temps avion
-- points 2' / 5' / 10' grossis ;
-- libellés 2' / 5' / 10' grossis et halo renforcé.
-
-5. TMD après minuit
-- correction de la logique de TMD lorsque l'heure saisie est après minuit ;
-- exemple : heure 20:00 + TMD 00:30 = 4h30 restantes ;
-- plus besoin de saisir 23:59 pour contourner le problème.
-
-Contrôles effectués :
-- node --check script.js : OK
-- node --check sw.js : OK
-- manifest.json : valide
+Procédure :
+- installer le ZIP BONS_NOMS sur GitHub ;
+- lancer l'app une fois avec réseau ;
+- relancer si message de mise à jour ;
+- tester l'échelle sur ancienne carte, carte OACI et carte online/offline ;
+- tester la règle : appui prolongé à deux doigts, déplacement, relâchement.
