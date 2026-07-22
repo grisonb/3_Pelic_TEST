@@ -1,37 +1,19 @@
-NPF-Q400 TEST v13.73 — import cartes en bases séparées
+NPF-Q400 TEST v13.74 — échelle nautique dynamique
 
-Base : v13.72 — BLOC DÉPART OACI figé.
-Référence fluidité conservée : v13.58 / v13.65.
+Base : v13.73 import cartes en bases séparées.
 
-Objectif : corriger les blocages d’import ZIP sur iPad après utilisation d’une carte offline, sans imposer la suppression de la PWA ni la suppression des cartes déjà installées.
-
-Modifications principales :
-- ajout d’une architecture d’import isolé : une base IndexedDB dédiée par groupe de carte ;
-- nouvelle convention de bases : OfflineMap_<nom_de_carte> ;
-- les anciennes cartes restent compatibles en mode hérité dans OfflineTilesDB_v13_70_clean ;
-- les nouveaux imports n’écrivent plus dans la base commune déjà utilisée par la carte active ;
-- le service worker reçoit maintenant la liste des bases actives en plus des packs actifs ;
-- la lecture des tuiles se fait uniquement dans la base de la carte sélectionnée ;
-- les autres cartes installées ne sont pas parcourues pendant l’affichage ;
-- les ZIP successifs d’un même groupe de carte partagent la même base dédiée ;
-- l’import suspend toujours temporairement l’affichage offline avant écriture ;
-- le service worker conserve le mode hors ligne application : pas de désinscription du service worker ;
-- la liste des cartes indique si une carte est en base séparée ou en base héritée ;
-- suppression compatible avec les nouvelles bases dédiées ;
-- reset profond inclut aussi les bases OfflineMap_ si nécessaire.
-
-Comportement attendu :
-- on peut conserver une carte déjà installée ;
-- une nouvelle carte France peut être importée dans une base séparée ;
-- l’import ne devrait plus se bloquer très tôt à 31 / 171 tuiles à cause de l’ancienne base déjà utilisée ;
-- la fluidité d’affichage ne doit pas baisser, car la carte active lit une seule base.
-
-Limite de test :
-- pour qu’une ancienne carte bénéficie de cette architecture, elle devra être réimportée une fois ;
-- les anciennes cartes restent utilisables en mode héritage tant qu’elles ne sont pas réimportées.
+Ajouts :
+- ajout d'une échelle dynamique en NM en bas à gauche de la carte ;
+- l'échelle est indépendante du fond cartographique ;
+- fonctionnement sur carte NPF ;
+- fonctionnement sur carte OACI ;
+- fonctionnement sur cartes offline en bases séparées ;
+- recalcul automatique au zoom, déplacement, redimensionnement et changement de vue ;
+- valeurs propres : 0.1 / 0.2 / 0.5 / 1 / 2 / 5 / 10 / 20 / 50 / 100 NM selon le zoom ;
+- aucun changement sur l'architecture d'import v13.73 ;
+- conservation des corrections GAAR, PDF, Fréquences OPS, icône parabole et BLOC DÉPART OACI figé.
 
 Contrôles :
-- script.js : syntaxe OK ;
-- sw.js : syntaxe OK ;
-- manifest.json : valide ;
-- ZIP BONS_NOMS : valide.
+- script.js : syntaxe OK
+- sw.js : syntaxe OK
+- manifest.json : valide
