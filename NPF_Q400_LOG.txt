@@ -1,23 +1,18 @@
-NPF-Q400 TEST v13.76 — règle 2 doigts + double échelle + pélicandromes ajustés
+NPF-Q400 TEST v13.77 — règle 2 doigts corrigée + échelle NM seule
 
-Base : v13.75.
+Base : v13.76.
 
-Corrections / ajouts :
-- pélicandromes : icônes visuelles réduites après v13.75 ;
-- pélicandromes : zone tactile conservée par hitbox invisible plus large ;
-- échelle : repositionnée au plus bas en bas à gauche de la carte ;
-- échelle : affichage double NM + kilomètres ;
-- carte NPF / OACI / online / offline : échelle commune, indépendante du fond ;
-- ajout d'une règle mobile type ForeFlight : appui prolongé à deux doigts sur la carte ;
-- règle mobile : distance affichée en NM et en km ;
-- règle mobile : graduations visuelles 0 / 25 / 50 / 75 / 100 % ;
-- règle mobile : suit les deux doigts tant qu'ils restent posés ;
-- relâchement : la règle disparaît ;
-- corrections v13.73 / v13.75 conservées : import cartes en bases séparées, TMD minuit, PDF FDF / Fréquences OPS, OACI BLOC DÉPART figé.
+Corrections :
+- échelle permanente bas gauche : nautique uniquement, suppression de la ligne kilomètres ;
+- échelle descendue au plus bas possible sur la carte ;
+- règle 2 doigts : zoom tactile Leaflet suspendu dès activation de la règle ;
+- règle 2 doigts : déplacement tactile/zoom empêché tant que la règle est active ;
+- règle 2 doigts : tracé décalé au-dessus des doigts pour rester visible ;
+- règle 2 doigts : étiquette distance également décalée au-dessus de la règle ;
+- règle 2 doigts : double indication conservée NM + km sur la règle mobile ;
+- restauration du comportement normal de la carte au relâchement des doigts.
 
-Procédure :
-- installer le ZIP BONS_NOMS sur GitHub ;
-- lancer l'app une fois avec réseau ;
-- relancer si message de mise à jour ;
-- tester l'échelle sur ancienne carte, carte OACI et carte online/offline ;
-- tester la règle : appui prolongé à deux doigts, déplacement, relâchement.
+Contrôles :
+- script.js : syntaxe vérifiée ;
+- sw.js : syntaxe vérifiée ;
+- manifest.json : JSON valide.
