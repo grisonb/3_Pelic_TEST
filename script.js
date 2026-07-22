@@ -1994,8 +1994,9 @@ function applyMapNoBackgroundStyle() {
 
 
 
-/* v13.74 — échelle nautique dynamique permanente.
+/* v13.77 — échelle nautique dynamique permanente.
  * Indépendante du fond de carte : fonctionne sur carte NPF, OACI et cartes offline.
+ * Affichage bas-gauche : nautique uniquement.
  */
 let nauticalScaleControl = null;
 let nauticalScaleElement = null;
@@ -2009,7 +2010,7 @@ function injectNauticalScaleStyle() {
         .npf-nautical-scale {
             position: fixed !important;
             left: calc(env(safe-area-inset-left, 0px) + 12px) !important;
-            bottom: calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
+            bottom: calc(env(safe-area-inset-bottom, 0px) + 0px) !important;
             z-index: 1350 !important;
             background: rgba(255, 255, 255, 0.95);
             border: 2px solid rgba(0, 67, 112, 0.86);
@@ -2022,7 +2023,7 @@ function injectNauticalScaleStyle() {
             font-weight: 800;
             line-height: 1;
             pointer-events: none;
-            min-width: 82px;
+            min-width: 74px;
         }
         .npf-nautical-scale-bar-wrap {
             height: 8px;
@@ -2135,10 +2136,9 @@ function updateNauticalScale() {
     const niceNm = chooseNiceNauticalScale(maxNm);
     const pixelWidth = Math.max(26, Math.round((niceNm * 1852) / metersPerPixel));
 
-    const niceKm = niceNm * 1.852;
     nauticalScaleElement.innerHTML = `
         <div class="npf-nautical-scale-bar-wrap" style="width:${pixelWidth}px"></div>
-        <div class="npf-nautical-scale-label"><span class="nm">${formatNauticalMiles(niceNm)}</span><span class="km">${formatKilometers(niceKm)}</span></div>
+        <div class="npf-nautical-scale-label"><span class="nm">${formatNauticalMiles(niceNm)}</span></div>
     `;
 }
 
@@ -2156,7 +2156,7 @@ function ensureNauticalScaleControl() {
         nauticalScaleElement = document.createElement('div');
         nauticalScaleElement.id = 'npf-nautical-scale-fixed';
         nauticalScaleElement.className = 'npf-nautical-scale';
-        nauticalScaleElement.innerHTML = '<div class="npf-nautical-scale-label"><span class="nm">-- NM</span><span class="km">-- km</span></div>';
+        nauticalScaleElement.innerHTML = '<div class="npf-nautical-scale-label"><span class="nm">-- NM</span></div>';
         document.body.appendChild(nauticalScaleElement);
     }
     nauticalScaleControl = { fixedOverlay: true };
@@ -2168,7 +2168,7 @@ function ensureNauticalScaleControl() {
 }
 
 
-/* v13.76 — règle mobile 2 doigts, graduée en NM/km.
+/* v13.77 — règle mobile 2 doigts, graduée en NM/km.
  * Appui prolongé à 2 doigts : affichage de la règle tant que les doigts restent posés.
  * Fonctionne avec carte NPF, OACI, online et offline car elle utilise la géométrie Leaflet.
  */
@@ -2176,6 +2176,8 @@ let twoFingerRulerLayer = null;
 let twoFingerRulerTimer = null;
 let twoFingerRulerActive = false;
 let twoFingerRulerWasDraggingEnabled = null;
+let twoFingerRulerWasTouchZoomEnabled = null;
+let twoFingerRulerPreviousTouchAction = null;
 let twoFingerRulerStartPoints = null;
 let twoFingerRulerHelpEl = null;
 
@@ -2206,7 +2208,7 @@ function showTwoFingerRulerHelp() {
     if (twoFingerRulerHelpEl) return;
     twoFingerRulerHelpEl = document.createElement('div');
     twoFingerRulerHelpEl.className = 'npf-two-finger-ruler-help';
-    twoFingerRulerHelpEl.textContent = 'Règle mobile — relâcher pour fermer';
+    twoFingerRulerHelpEl.textContent = 'Règle mobile — zoom suspendu';
     document.body.appendChild(twoFingerRulerHelpEl);
 }
 
@@ -2232,24 +2234,34 @@ function drawTwoFingerRulerFromTouches(event) {
 
     const nm = meters / 1852;
     const km = meters / 1000;
-    const labelPoint = L.point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
-    const labelLatLng = map.containerPointToLatLng(labelPoint);
 
-    L.polyline([ll1, ll2], {
+    /* v13.77 — la règle est dessinée au-dessus des doigts, sinon elle est masquée en vol.
+     * La mesure reste basée sur les deux points réellement touchés.
+     */
+    let offsetY = -72;
+    const minTouchY = Math.min(p1.y, p2.y);
+    if (minTouchY + offsetY < 18) offsetY = 18 - minTouchY;
+    const visualOffset = L.point(0, offsetY);
+    const vp1 = p1.add(visualOffset);
+    const vp2 = p2.add(visualOffset);
+    const vll1 = map.containerPointToLatLng(vp1);
+    const vll2 = map.containerPointToLatLng(vp2);
+
+    L.polyline([vll1, vll2], {
         color: '#111827',
         weight: 8,
         opacity: 0.80,
         interactive: false,
         lineCap: 'round'
     }).addTo(layer);
-    L.polyline([ll1, ll2], {
+    L.polyline([vll1, vll2], {
         color: '#ffffff',
         weight: 5,
         opacity: 0.95,
         interactive: false,
         lineCap: 'round'
     }).addTo(layer);
-    L.polyline([ll1, ll2], {
+    L.polyline([vll1, vll2], {
         color: '#003f6b',
         weight: 3,
         opacity: 1,
@@ -2257,16 +2269,16 @@ function drawTwoFingerRulerFromTouches(event) {
         lineCap: 'round'
     }).addTo(layer);
 
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
+    const dx = vp2.x - vp1.x;
+    const dy = vp2.y - vp1.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
     const nx = -dy / len;
     const ny = dx / len;
     const tickLength = 16;
     const fractions = [0, 0.25, 0.5, 0.75, 1];
     fractions.forEach((fraction) => {
-        const px = p1.x + dx * fraction;
-        const py = p1.y + dy * fraction;
+        const px = vp1.x + dx * fraction;
+        const py = vp1.y + dy * fraction;
         const a = L.point(px - nx * tickLength / 2, py - ny * tickLength / 2);
         const b = L.point(px + nx * tickLength / 2, py + ny * tickLength / 2);
         L.polyline([map.containerPointToLatLng(a), map.containerPointToLatLng(b)], {
@@ -2278,13 +2290,17 @@ function drawTwoFingerRulerFromTouches(event) {
         }).addTo(layer);
     });
 
+    let labelPoint = L.point((vp1.x + vp2.x) / 2, (vp1.y + vp2.y) / 2 - 42);
+    if (labelPoint.y < 20) labelPoint = L.point(labelPoint.x, 20);
+    const labelLatLng = map.containerPointToLatLng(labelPoint);
+
     L.marker(labelLatLng, {
         interactive: false,
         icon: L.divIcon({
             className: 'npf-two-finger-ruler-label',
             html: `<div class="nm">${formatNauticalMiles(nm)}</div><div class="km">${formatKilometers(km)}</div>`,
-            iconSize: [96, 42],
-            iconAnchor: [48, -8]
+            iconSize: [112, 44],
+            iconAnchor: [56, 22]
         })
     }).addTo(layer);
 }
@@ -2302,8 +2318,20 @@ function startTwoFingerRuler(event) {
     showTwoFingerRulerHelp();
     try {
         twoFingerRulerWasDraggingEnabled = map?.dragging?.enabled ? map.dragging.enabled() : null;
+        twoFingerRulerWasTouchZoomEnabled = map?.touchZoom?.enabled ? map.touchZoom.enabled() : null;
+        const container = map?.getContainer ? map.getContainer() : null;
+        if (container) {
+            twoFingerRulerPreviousTouchAction = container.style.touchAction || '';
+            container.style.touchAction = 'none';
+        }
         if (map?.dragging?.disable) map.dragging.disable();
+        if (map?.touchZoom?.disable) map.touchZoom.disable();
     } catch (_) {}
+    if (event) {
+        if (event.cancelable) event.preventDefault();
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+    }
     drawTwoFingerRulerFromTouches(event);
 }
 
@@ -2316,9 +2344,14 @@ function endTwoFingerRuler() {
         hideTwoFingerRulerHelp();
         try {
             if (twoFingerRulerWasDraggingEnabled && map?.dragging?.enable) map.dragging.enable();
+            if (twoFingerRulerWasTouchZoomEnabled && map?.touchZoom?.enable) map.touchZoom.enable();
+            const container = map?.getContainer ? map.getContainer() : null;
+            if (container) container.style.touchAction = twoFingerRulerPreviousTouchAction || '';
         } catch (_) {}
     }
     twoFingerRulerWasDraggingEnabled = null;
+    twoFingerRulerWasTouchZoomEnabled = null;
+    twoFingerRulerPreviousTouchAction = null;
 }
 
 function handleTwoFingerRulerTouchStart(event) {
@@ -2337,6 +2370,8 @@ function handleTwoFingerRulerTouchStart(event) {
 function handleTwoFingerRulerTouchMove(event) {
     if (twoFingerRulerActive) {
         if (event.cancelable) event.preventDefault();
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.stopImmediatePropagation) event.stopImmediatePropagation();
         drawTwoFingerRulerFromTouches(event);
         return;
     }
@@ -5402,7 +5437,7 @@ function buildPelicPdfButtonsHtml(oaci) {
 
 
 function addAirportTouchHitbox(airport, popupHtml) {
-    /* v13.76 — icône visuelle plus compacte, zone tactile conservée en vol. */
+    /* v13.77 — icône visuelle plus compacte, zone tactile conservée en vol. */
     if (!airport || !Number.isFinite(Number(airport.lat)) || !Number.isFinite(Number(airport.lon)) || !popupHtml) return null;
     const hitbox = L.circleMarker([airport.lat, airport.lon], {
         radius: 20,
