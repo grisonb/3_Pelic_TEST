@@ -1,36 +1,10 @@
-NPF-Q400 TEST v13.78 — carte v24 multi-ZIP / bases actives
+NPF-Q400 v13.79 TEST — bandeaux carte remontés / hauteur optimisée / icônes épurées
 
-Base :
-- v13.77 conservée.
-
-Correction principale :
-- corrige l'affichage incomplet des cartes générées en plusieurs ZIP avec la nouvelle architecture de bases séparées.
-- Symptôme corrigé : carte v24 importée avec plusieurs ZIP mais affichage d'une seule tuile ou d'une fraction de carte.
-
-Détails techniques :
-- persistance systématique de la liste des bases IndexedDB actives dans la base settings ;
-- au démarrage, si une carte offline est active, réécriture des packs actifs et bases actives pour le service worker ;
-- invalidation des anciens seuils de zoom offline au changement/import de carte ;
-- service worker plus tolérant : les packs d'un même groupe multi-ZIP sont considérés comme une seule carte ;
-- pas de reset profond, pas de désinscription du service worker.
-
-Conservé :
-- import en bases séparées v13.73 ;
-- échelle NM ;
-- règle 2 doigts corrigée ;
-- pélicandromes ajustés ;
-- TMD après minuit ;
-- PDF Pélic / Doc FDF / Fréquences OPS.
-
-Procédure conseillée après installation :
-1. Installer v13.78.
-2. Lancer une fois avec réseau.
-3. Ouvrir Gestion des Cartes.
-4. Désélectionner puis resélectionner le groupe de carte v24.
-5. Relancer l'application.
-6. Tester la carte v24.
-
-Si la carte v24 a été importée avec v13.77 et reste incomplète :
-- supprimer uniquement le groupe v24 depuis Gestion des Cartes ;
-- réimporter les ZIP v24 dans l'ordre ;
-- ne pas supprimer la PWA.
+Corrections apportées :
+- bandeau BINGO carte remonté au plus haut sur la carte ;
+- hauteur du bandeau BINGO optimisée par rapport au texte sans réduire la taille de la police ;
+- bandeau feu / CS / cap-distance-temps / rotation remonté au maximum sous le bandeau BINGO sans contact ;
+- hauteur du bandeau feu optimisée par rapport au texte sans réduire la taille de la police ;
+- icône carte fréquences OPS : suppression du texte « OPS » ;
+- icône Lignes HT : suppression du texte « HT » ;
+- version applicative portée en v13.79.
