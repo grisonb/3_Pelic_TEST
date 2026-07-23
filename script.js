@@ -5437,7 +5437,7 @@ function buildPelicPdfButtonsHtml(oaci) {
 
 
 function addAirportTouchHitbox(airport, popupHtml) {
-    /* v13.77 — icône visuelle plus compacte, zone tactile conservée en vol. */
+    /* v13.80 — icône visuelle ramenée à 20 px ; zone tactile invisible inchangée. */
     if (!airport || !Number.isFinite(Number(airport.lat)) || !Number.isFinite(Number(airport.lon)) || !popupHtml) return null;
     const hitbox = L.circleMarker([airport.lat, airport.lon], {
         radius: 20,
@@ -5475,7 +5475,7 @@ function drawPermanentAirportMarkers() {
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
             const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`;
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] }), zIndexOffset: 2500, keyboard: false });
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [20, 20], iconAnchor: [10, 10], popupAnchor: [0, -12] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
             addAirportTouchHitbox(airport, popupHtml);
@@ -5526,7 +5526,7 @@ function drawPermanentAirportMarkers() {
         const isWater = waterAirports.has(airport.oaci);
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
-        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [24, 24], iconAnchor: [12, 12], popupAnchor: [0, -14] });
+        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [20, 20], iconAnchor: [10, 10], popupAnchor: [0, -12] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
