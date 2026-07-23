@@ -16054,3 +16054,6 @@ document.addEventListener('visibilitychange', () => {
     }, 200);
 });
 
+
+
+// v13.89 TEST — corrections d'affichage RLT/Suivi et alerte post-MAJ gérées par index.html/style.css.
