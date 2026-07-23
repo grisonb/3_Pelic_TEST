@@ -1,9 +1,35 @@
-NPF-Q400 v13.80 TEST — icônes pélicandromes légèrement réduites
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
-Modification apportée :
+v13.81 TEST — icônes de pélicandromes réellement réduites
+
+Modifications apportées :
+- taille visuelle des icônes de pélicandromes réduite de 20 px à 16 px ;
+- diminution nettement perceptible par rapport à la v13.80 ;
+- halo extérieur réduit de 2 px à 1 px afin qu'il ne compense plus visuellement la réduction de l'icône ;
+- taille du pictogramme intérieur réduite proportionnellement ;
+- centrage Leaflet recalé sur 16 × 16 px ;
+- ancrage de la fenêtre contextuelle adapté à la nouvelle taille ;
+- zone tactile invisible conservée à 40 px de diamètre pour garder une sélection facile en vol ;
+- aucune modification des autres marqueurs, bandeaux ou fonctions ;
+- version applicative portée en v13.81 TEST.
+
+v13.80 TEST — icônes pélicandromes légèrement réduites
+
+Modifications apportées :
 - taille visuelle des icônes de pélicandromes réduite de 22 px à 20 px ;
 - centrage Leaflet recalé sur 20 × 20 px pour éviter tout léger décalage ;
 - taille des pictogrammes internes ajustée proportionnellement ;
 - zone tactile invisible conservée à 40 px de diamètre pour garder une sélection facile en vol ;
 - aucun changement sur les autres marqueurs, les bandeaux ou les fonctions de la v13.79 ;
 - version applicative portée en v13.80 TEST.
+
+v13.79 TEST — bandeaux carte remontés / hauteur optimisée / icônes épurées
+
+Modifications apportées :
+- bandeau BINGO carte remonté au plus haut sur la carte ;
+- hauteur du bandeau BINGO optimisée par rapport au texte sans réduire la taille de la police ;
+- bandeau feu / CS / cap-distance-temps / rotation remonté au maximum sous le bandeau BINGO sans contact ;
+- hauteur du bandeau feu optimisée par rapport au texte sans réduire la taille de la police ;
+- icône carte fréquences OPS : suppression du texte « OPS » ;
+- icône Lignes HT : suppression du texte « HT » ;
+- version applicative portée en v13.79.
