@@ -1,5 +1,20 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.89 TEST — corrections RLT / espacement Suivi rotations / alerte post-MAJ immédiate
+
+Modifications apportées :
+- dans l’onglet « BLOC / FUEL », correction du chevauchement entre le premier chiffre de la cellule « RLT » et la croix d’effacement lorsqu’une valeur à quatre chiffres telle que 9000 est saisie ;
+- réservation d’une zone dédiée à la croix dans la cellule RLT par augmentation du padding gauche du champ ;
+- léger rééquilibrage des largeurs des six cellules de l’en-tête BLOC / FUEL afin de donner davantage de largeur utile à RLT sans augmenter la largeur totale ;
+- dans l’onglet « SUIVI ROTATIONS », application explicite et indépendante de la largeur d’écran du même espacement vertical de 16 px que dans la fenêtre droite de « PREVI. NBR ROTATIONS » ;
+- suppression des anciennes marges concurrentes sur les lignes de la fenêtre droite de Suivi rotations afin que la modification soit réellement visible ;
+- conservation des tailles de police, dimensions des champs, valeurs et règles de calcul ;
+- correction de l’alerte « Mise à jour installée » afin qu’elle soit armée dès la lecture du nouvel index et apparaisse au premier affichage de la nouvelle version ;
+- le message ne dépend plus du second lancement manuel de la PWA pour apparaître ;
+- conservation du nombre d’affichages et de tous les autres mécanismes de mise à jour existants ;
+- aucune modification des calculs de rotations, du stockage des vols, de l’export PDF ni des cartes hors ligne ;
+- version applicative portée en v13.89 TEST.
+
 v13.88 TEST — Fuel sur feu Prévi non modifiable / RLT départ / espacements des fenêtres droites
 
 Modifications apportées :
