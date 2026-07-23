@@ -1,5 +1,23 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.87 TEST — aides détaillées Suivi rotations / Dérout. GAAR
+
+Modifications apportées :
+- dans l’onglet « SUIVI ROTATIONS », ajout d’une aide « ? » pour « Durée Transit Pélic↔Feu » ;
+- dans l’onglet « SUIVI ROTATIONS », ajout d’une aide « ? » pour « Fuel sur Feu » ;
+- dans l’onglet « SUIVI ROTATIONS », ajout d’une aide « ? » pour « Durée Rotation » ;
+- dans l’onglet « SUIVI ROTATIONS », ajout d’une aide « ? » pour « Conso Rotation » ;
+- les aides de Suivi rotations détaillent la source retenue, les distances, les forfaits, les vitesses, les consommations, les formules et le mode AUTO/MANUEL lorsqu’il existe ;
+- dans l’onglet « DEROUT. / GAAR », ajout d’une aide « ? » pour « Durée Rotation » ;
+- dans l’onglet « DEROUT. / GAAR », ajout d’une aide « ? » pour « Conso Rotation » ;
+- les aides de Dérout. / GAAR indiquent explicitement si la case « Retour Pélic avant feu » est cochée ou non ;
+- lorsque cette case est cochée, l’aide précise que le trajet initial devient GPS → Pélic → Feu avec 10 min au pélicandrome ;
+- lorsque cette case n’est pas cochée, l’aide précise que le trajet initial reste GPS → Feu direct ;
+- les aides précisent que ce choix modifie le trajet initial, mais pas les valeurs des rotations suivantes Feu ↔ Pélic ;
+- l’état de cette case est également explicité dans les aides existantes « Heure sur Feu » et « Fuel mini » ;
+- aucune formule, valeur, logique de calcul, taille, espacement ou autre fonction modifiée ;
+- version applicative portée en v13.87 TEST.
+
 v13.86 TEST — interlignes augmentés dans les fenêtres de droite
 
 Modifications apportées :
