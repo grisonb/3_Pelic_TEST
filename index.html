@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.90">
-    <link rel="manifest" href="manifest.json?appv=v13.90">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.90">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.90">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.90">
+    <link rel="stylesheet" href="style.css?appv=v13.91">
+    <link rel="manifest" href="manifest.json?appv=v13.91">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.91">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.91">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.91">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.90';
+        const APP_VERSION = 'v13.91';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -76,11 +76,10 @@
 
 
         /*
-         * v13.90 TEST — alerte post-MAJ armée dès la lecture du nouveau index.
-         * Sur iPad/PWA, l'ancien index peut détecter le nouveau service worker puis
-         * recharger très vite. On mémorise ici la nouvelle version avant DOMContentLoaded
-         * afin que la fenêtre de relance apparaisse dès le premier affichage de la MAJ,
-         * et non seulement au lancement manuel suivant.
+         * v13.91 TEST — alerte post-MAJ conservée jusqu'à affichage réellement visible.
+         * Sur iPad/PWA, plusieurs navigations automatiques peuvent se succéder lors de
+         * l'activation du nouveau service worker. Le marqueur n'est plus consommé tant
+         * que la fenêtre n'est pas restée visible sur une page stable.
          */
         try {
             const storedVersionAtBoot = localStorage.getItem(APP_VERSION_STORAGE_KEY);
@@ -303,23 +302,27 @@
                 document.body.appendChild(modal);
 
                 /*
-                 * v13.08 : la fenêtre post-MAJ est rétablie.
-                 * Elle sert d'indication volontaire après bascule de version.
-                 * Le marqueur est effacé dès l'affichage pour ne pas la revoir
-                 * au lancement suivant.
+                 * v13.91 : ne valider l'affichage qu'après 2 secondes de visibilité réelle.
+                 * Si l'activation du service worker provoque une navigation immédiate,
+                 * le marqueur reste intact et la fenêtre réapparaît sur la page stable.
                  */
-                try {
-                    const remainingRaw = Number(localStorage.getItem(POST_UPDATE_NOTICE_REMAINING_KEY) || '1');
-                    const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
-                    if (remaining > 1) {
-                        localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(remaining - 1));
-                        localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
-                    } else {
-                        localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-                        localStorage.removeItem('npfPostUpdateRestartNoticePending');
-                        localStorage.removeItem(POST_UPDATE_NOTICE_REMAINING_KEY);
-                    }
-                } catch (_) {}
+                setTimeout(() => {
+                    try {
+                        if (!document.body || !document.body.contains(modal)) return;
+                        if (document.visibilityState === 'hidden') return;
+
+                        const remainingRaw = Number(localStorage.getItem(POST_UPDATE_NOTICE_REMAINING_KEY) || '1');
+                        const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
+                        if (remaining > 1) {
+                            localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(remaining - 1));
+                            localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+                        } else {
+                            localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
+                            localStorage.removeItem('npfPostUpdateRestartNoticePending');
+                            localStorage.removeItem(POST_UPDATE_NOTICE_REMAINING_KEY);
+                        }
+                    } catch (_) {}
+                }, 2000);
             } catch (_) {}
         }
 
@@ -465,7 +468,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.90"></script>
+    <script src="script.js?appv=v13.91"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -602,6 +605,9 @@
                     <div class="analyse-grid">
                          <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="derout-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
+                            <div class="rotations-group derout-fuel-mini-group">
+                                <h3 class="analyse-col-title">FUEL MINI</h3>
+                            </div>
                             <div class="rotations-group rotation-count-group">
                                 <h3 class="analyse-col-title">Nbr Rotations Possibles</h3>
                                 <div id="derout-rotation-results-container" class="rotation-results-container">
