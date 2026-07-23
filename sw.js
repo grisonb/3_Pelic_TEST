@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-79_bandeaux_icones';
+const SW_VERSION = 'sw-v13-80_pelicandromes_compacts';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
