@@ -10410,7 +10410,7 @@ const calculateRotationTime = (dist) => {
     return (effectiveDist <= 50) ? (20 + (rotationDistance / 3.5)) : (20 + (rotationDistance / 4));
 };
 let masterRecalculate = () => {};
-let isFuelSurFeuManual = false, isSuiviConsoManual = false, isSuiviDureeManual = false;
+let isSuiviConsoManual = false, isSuiviDureeManual = false;
 const MULTI_FLIGHT_STORAGE_KEY = 'calculator_flights_v12_28';
 const ACTIVE_FLIGHT_ID_STORAGE_KEY = 'calculator_active_flight_id_v12_28';
 const DEROUT_EMPTY_RETARDANT_KEY = 'derout_empty_retardant_v12_29';
@@ -10789,7 +10789,7 @@ function recalculateBlocFuel() {
     });
 }
 
-// v13.87 TEST — aides détaillées Suivi rotations / Dérout. GAAR, avec état Retour Pélic avant feu.
+// v13.88 TEST — Fuel sur feu Prévi en lecture seule, RLT départ et espacements ajustés.
 function updatePreviTab() {
     const defaultFormula = "Données insuffisantes pour le calcul.";
     const setHelp = (id, formula) => {
@@ -10804,7 +10804,7 @@ function updatePreviTab() {
         document.getElementById('heure-sur-feu').textContent = '--:--';
         document.getElementById('duree-transit').textContent = '--:--';
         document.getElementById('conso-aller-feu').textContent = '-- kg';
-        document.getElementById('fuel-sur-feu-wrapper').querySelector('.display-input').value = '';
+        const previFuelSurFeuNoCommune = document.getElementById('fuel-sur-feu'); if (previFuelSurFeuNoCommune) previFuelSurFeuNoCommune.textContent = '-- kg';
         document.getElementById('duree-rotation').textContent = '--:--';
         document.getElementById('conso-par-rotation').textContent = '-- kg';
         document.getElementById('cs-sur-feu').textContent = '--:--';
@@ -10847,12 +10847,23 @@ function updatePreviTab() {
     document.getElementById('conso-par-rotation').textContent = consoRotation === 250 ? '-- kg' : `${consoRotation} kg`;
     setHelp('conso-par-rotation-help', `CONSO ROTATION FEU ↔ PÉLIC\n\nFormule : (Distance retenue × conso aller-retour) + forfait largage\n\nDistance retenue :\n- Distance Feu → Pélicandrome mesurée si ≥ 10 Nm\n- 10 Nm minimum si la distance mesurée est < 10 Nm\n\nDistance Feu → Pélic mesurée : ${CALCULATOR_DATA.distPelicFeu} Nm\nDistance retenue : ${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} Nm\n\nRègle consommation aller-retour :\n- Distance retenue ≤ 70 Nm : 10 kg/Nm\n- Distance retenue > 70 Nm : 8 kg/Nm\n\nForfait largage : 250 kg\n\nCalcul : (${Math.max(CALCULATOR_DATA.distPelicFeu, 10)} × ${Math.max(CALCULATOR_DATA.distPelicFeu, 10) <= 70 ? 10 : 8}) + 250 = ${consoRotation} kg`);
 
-    const fuelSurFeuInput = document.getElementById('fuel-sur-feu-wrapper').querySelector('.display-input');
-    const fuelEstime = fuelDepart ? fuelDepart - consoAller : null;
-    if (!isFuelSurFeuManual) { fuelSurFeuInput.value = fuelEstime ? `${fuelEstime} kg` : ''; }
-    setHelp('fuel-sur-feu-help', `FUEL SUR FEU\n\nMode AUTO :\nFormule : FUEL Départ - Conso transit Base → Feu\n\nFUEL Départ : ${fuelDepart || 'N/A'} kg\nConso transit : ${consoAller} kg\n\nCalcul : ${fuelDepart || 'N/A'} - ${consoAller} = ${fuelEstime !== null ? fuelEstime + ' kg' : 'N/A'}\n\nEn mode manuel, cette valeur peut être corrigée directement. Elle sert aux calculs Fuel retour Base/Pélic.`);
+    const fuelSurFeuDisplay = document.getElementById('fuel-sur-feu');
+    const fuelEstime = fuelDepart !== null ? fuelDepart - consoAller : null;
+    if (fuelSurFeuDisplay) fuelSurFeuDisplay.textContent = fuelEstime !== null ? `${fuelEstime} kg` : '-- kg';
+    setHelp('fuel-sur-feu-help', `FUEL SUR FEU
 
-    const fuelSurFeu = parseNumeric(fuelSurFeuInput.value);
+Valeur calculée automatiquement et non modifiable.
+
+Formule : FUEL Départ - Conso transit Base → Feu
+
+FUEL Départ : ${fuelDepart !== null ? fuelDepart : 'N/A'} kg
+Conso transit : ${consoAller} kg
+
+Calcul : ${fuelDepart !== null ? fuelDepart : 'N/A'} - ${consoAller} = ${fuelEstime !== null ? fuelEstime + ' kg' : 'N/A'}
+
+Cette valeur sert aux calculs Fuel retour Base/Pélic.`);
+
+    const fuelSurFeu = fuelEstime;
 
     document.getElementById('cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
     document.getElementById('tmd-display').textContent = formatTime(tmdTime);
@@ -13214,6 +13225,7 @@ function initializeCalculator() {
                 'bloc-depart': '',
                 'bloc-depart-oaci': '',
                 'fuel-depart': '3500 kg',
+                'rlt-depart': '',
                 'previ-bloc-depart': '',
                 'previ-fuel-depart': '3500 kg',
                 'tmd': '21:30',
@@ -13702,6 +13714,7 @@ function initializeCalculator() {
                     <div class="header-grid">
                         <div><b>BLOC DÉPART</b><span>${plainExportHtml(state['bloc-depart'], '--:--')}</span></div>
                         <div class="header-card-fuel-depart"><b>FUEL DÉPART</b><span class="fuel-depart-export-value">${kgExportHtml(state['fuel-depart'])}</span></div>
+                        <div class="header-card-rlt-depart"><b>RLT</b><span>${kgExportHtml(state['rlt-depart'])}</span></div>
                         <div><b>BASE</b><span>${plainExportHtml(state['base-oaci-input'] || selectedBaseOACI || DEFAULT_BASE_OACI)}</span></div>
                         <div><b>TMD</b><span>${plainExportHtml(state['tmd'], '--:--')}</span></div>
                         <div><b>LIMITE HDV</b><span>${plainExportHtml(state['limite-hdv'], '--:--')}</span></div>
@@ -13754,7 +13767,7 @@ function initializeCalculator() {
     .flight-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
     h2 { margin: 0; font-size: 20px; color: #0f172a; }
     .flight-title-row span { font-size: 15px; font-weight: 900; color: #005a9c; white-space: nowrap; }
-    .header-grid { display: grid; grid-template-columns: .95fr 1.25fr .95fr .95fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .header-grid { display: grid; grid-template-columns: .9fr 1.15fr .85fr .85fr .9fr .95fr; gap: 7px; margin-bottom: 10px; }
     .header-grid div { border: 1px solid #d7dee8; background: #fff; border-radius: 10px; padding: 8px 9px; min-height: 76px; overflow: hidden; display: grid; grid-template-rows: 28px 1fr; align-items: stretch; }
     .header-grid b { display: flex; align-items: flex-start; min-height: 28px; margin: 0; font-size: 10.5px; line-height: 1.1; letter-spacing: .04em; color: #64748b; text-transform: uppercase; }
     .header-grid span { display: flex; align-items: center; justify-content: flex-start; width: 100%; min-width: 0; margin: 0; font-size: 19px; line-height: 1; font-weight: 950; color: #111827; white-space: nowrap; overflow: visible; }
@@ -13767,6 +13780,9 @@ function initializeCalculator() {
     .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-number,
     .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-unit { font-size: 1em !important; line-height: 1 !important; }
     .header-grid .header-card-fuel-depart .fuel-depart-export-value .kg-unit { margin-left: 0 !important; }
+    .header-card-rlt-depart .kg-inline { justify-content: flex-start !important; gap: 4px !important; }
+    .header-card-rlt-depart .kg-number { font-size: 1em !important; }
+    .header-card-rlt-depart .kg-unit { font-size: .55em !important; }
     .kg-inline { display: inline-flex !important; align-items: baseline; justify-content: center; gap: 4px; white-space: nowrap; line-height: 1 !important; }
     .kg-number { display: inline-block; line-height: 1 !important; }
     .kg-unit { display: inline-block; font-size: .48em; line-height: 1 !important; font-weight: 900; color: #111827; }
@@ -13929,7 +13945,7 @@ function initializeCalculator() {
                 : `Tps de vol : ${formatDurationForFlightSummary(flightDuration)}`;
             addBlank();
             addLine(`VOL N°${flight.number || exportIndex + 1}${flight.closed ? ' - cloture' : ''}    ${durationText}`);
-            addLine(`BLOC DEPART : ${state['bloc-depart'] || '--:--'}    FUEL Depart : ${state['fuel-depart'] || '-- kg'}    Base : ${state['base-oaci-input'] || selectedBaseOACI || DEFAULT_BASE_OACI}    TMD : ${state['tmd'] || '--:--'}    LIMITE HDV : ${state['limite-hdv'] || '--:--'}`);
+            addLine(`BLOC DEPART : ${state['bloc-depart'] || '--:--'}    FUEL Depart : ${state['fuel-depart'] || '-- kg'}    RLT : ${state['rlt-depart'] || '-- kg'}    Base : ${state['base-oaci-input'] || selectedBaseOACI || DEFAULT_BASE_OACI}    TMD : ${state['tmd'] || '--:--'}    LIMITE HDV : ${state['limite-hdv'] || '--:--'}`);
             addLine('BLOC Arr | FUEL Pelic | OACI | Masse Rlt | Duree Rot | Fuel Rot | Tps Vol | Restant');
             addSeparator();
 
@@ -14141,13 +14157,13 @@ function initializeCalculator() {
                 'bloc-depart': legacyState['bloc-depart'] || '',
                 'bloc-depart-oaci': legacyState['bloc-depart-oaci'] || '',
                 'fuel-depart': legacyState['fuel-depart'] || '3500 kg',
+                'rlt-depart': legacyState['rlt-depart'] || '',
                 'previ-bloc-depart': legacyState['previ-bloc-depart'] || legacyState['bloc-depart'] || '',
                 'previ-fuel-depart': legacyState['previ-fuel-depart'] || legacyState['fuel-depart'] || '3500 kg',
                 'tmd': legacyState['tmd'] || '21:30',
                 'limite-hdv': legacyState['limite-hdv'] || '08:00',
                 'deroutement-heure-wrapper': legacyState['deroutement-heure-wrapper'] || '',
                 'deroutement-fuel-wrapper': legacyState['deroutement-fuel-wrapper'] || '',
-                'fuel-sur-feu-wrapper': legacyState['fuel-sur-feu-wrapper'] || '',
                 'suivi-conso-rotation-wrapper': legacyState['suivi-conso-rotation-wrapper'] || '',
                 'suivi-duree-rotation-wrapper': legacyState['suivi-duree-rotation-wrapper'] || '',
                 calculator_table_data: legacyState.calculator_table_data || []
@@ -14236,6 +14252,7 @@ function initializeCalculator() {
             initializeTimeInput(document.getElementById('bloc-depart'), state['bloc-depart']);
             setBlocDepartAirportOaci(state['bloc-depart-oaci'] || '');
             initializeNumericInput(document.getElementById('fuel-depart'), state['fuel-depart'] || '3500 kg');
+            initializeNumericInput(document.getElementById('rlt-depart'), state['rlt-depart'] || '');
             initializeTimeInput(document.getElementById('tmd'), state['tmd'] || '21:30');
             initializeTimeInput(document.getElementById('limite-hdv'), state['limite-hdv'] || '08:00');
 
@@ -14247,7 +14264,6 @@ function initializeCalculator() {
             refreshSharedHeaderMirrorValues();
             initializeTimeInput(document.getElementById('deroutement-heure-wrapper'), state['deroutement-heure-wrapper']);
             initializeNumericInput(document.getElementById('deroutement-fuel-wrapper'), state['deroutement-fuel-wrapper']);
-            initializeNumericInput(document.getElementById('fuel-sur-feu-wrapper'), state['fuel-sur-feu-wrapper']);
             initializeNumericInput(document.getElementById('suivi-conso-rotation-wrapper'), state['suivi-conso-rotation-wrapper']);
             initializeTimeInput(document.getElementById('suivi-duree-rotation-wrapper'), state['suivi-duree-rotation-wrapper']);
 
@@ -15876,19 +15892,17 @@ function initializeCalculator() {
             masterRecalculate();
         });
     }
-    setupManualButton('fuel-sur-feu-manual-btn', 'fuel-sur-feu-wrapper', () => isFuelSurFeuManual = !isFuelSurFeuManual);
     setupManualButton('suivi-conso-rotation-manual-btn', 'suivi-conso-rotation-wrapper', () => isSuiviConsoManual = !isSuiviConsoManual);
     setupManualButton('suivi-duree-rotation-manual-btn', 'suivi-duree-rotation-wrapper', () => isSuiviDureeManual = !isSuiviDureeManual);
 
-    ['fuel-sur-feu-wrapper', 'suivi-conso-rotation-wrapper'].forEach((wrapperId) => {
+    ['suivi-conso-rotation-wrapper'].forEach((wrapperId) => {
         const wrapper = document.getElementById(wrapperId);
         const input = wrapper?.querySelector('.display-input');
         if (!wrapper || !input || wrapper.dataset.fuelSplitManualBound === '1') return;
         wrapper.dataset.fuelSplitManualBound = '1';
         wrapper.addEventListener('click', (event) => {
             if (event.target && event.target.classList && event.target.classList.contains('clear-btn')) return;
-            const isManualWrapper = (wrapperId === 'fuel-sur-feu-wrapper' && isFuelSurFeuManual)
-                || (wrapperId === 'suivi-conso-rotation-wrapper' && isSuiviConsoManual);
+            const isManualWrapper = wrapperId === 'suivi-conso-rotation-wrapper' && isSuiviConsoManual;
             if (isManualWrapper) {
                 event.preventDefault();
                 event.stopPropagation();
