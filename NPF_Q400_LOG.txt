@@ -1,5 +1,16 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.90 TEST — cellule RLT : unité en fond et effacement direct
+
+Modifications apportées :
+- dans l’onglet « BLOC / FUEL », remplacement du texte de fond « [valeur] » de la cellule « RLT » par « [kg] » ;
+- lorsqu’une masse est saisie, l’affichage reste au format « 9000 kg » ;
+- correction du bouton « × » de la cellule RLT : un seul appui efface désormais immédiatement la valeur complète, unité « kg » comprise ;
+- suppression du comportement nécessitant auparavant un premier appui pour retirer seulement « kg », puis un second pour vider la cellule ;
+- interception de l’appui avant la prise de focus du champ afin de garantir le fonctionnement sur iPad/PWA ;
+- aucune modification des calculs, de l’enregistrement par vol, de l’export PDF, des autres cellules ni de la mise en page ;
+- version applicative portée en v13.90 TEST.
+
 v13.89 TEST — corrections RLT / espacement Suivi rotations / alerte post-MAJ immédiate
 
 Modifications apportées :
