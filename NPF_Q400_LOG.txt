@@ -1,5 +1,6 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+
 v13.82 TEST — suppression du bouton MAJ / commune survolée décalée à droite
 
 Modifications apportées :
