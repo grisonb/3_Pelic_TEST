@@ -1,5 +1,16 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.86 TEST — interlignes augmentés dans les fenêtres de droite
+
+Modifications apportées :
+- dans l’onglet « SUIVI ROTATIONS », augmentation de l’espacement vertical entre toutes les lignes de la fenêtre de droite ;
+- dans l’onglet « DEROUT. / GAAR », augmentation de l’espacement vertical entre toutes les lignes de la fenêtre de droite ;
+- espacement courant porté de 4 px à 10 px entre deux lignes successives ;
+- conservation des espacements renforcés déjà présents entre les groupes fonctionnels spécifiques ;
+- fenêtre « Nbr Rotations » de gauche, zones BINGO, tailles de police, valeurs, calculs et commandes laissés inchangés ;
+- aucune autre fonction modifiée ;
+- version applicative portée en v13.86 TEST.
+
 v13.85 TEST — affichage effectif des espacements / fenêtres rotations harmonisées
 
 Modifications apportées :
