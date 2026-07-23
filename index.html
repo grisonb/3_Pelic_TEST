@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.89">
-    <link rel="manifest" href="manifest.json?appv=v13.89">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.89">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.89">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.89">
+    <link rel="stylesheet" href="style.css?appv=v13.90">
+    <link rel="manifest" href="manifest.json?appv=v13.90">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.90">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.90">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.90">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.89';
+        const APP_VERSION = 'v13.90';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -76,7 +76,7 @@
 
 
         /*
-         * v13.89 TEST — alerte post-MAJ armée dès la lecture du nouveau index.
+         * v13.90 TEST — alerte post-MAJ armée dès la lecture du nouveau index.
          * Sur iPad/PWA, l'ancien index peut détecter le nouveau service worker puis
          * recharger très vite. On mémorise ici la nouvelle version avant DOMContentLoaded
          * afin que la fenêtre de relance apparaisse dès le premier affichage de la MAJ,
@@ -465,7 +465,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.89"></script>
+    <script src="script.js?appv=v13.90"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -547,7 +547,7 @@
                     <div class="header-section">
                         <div class="header-item"><label id="bloc-depart-label">BLOC DÉPART</label><div id="bloc-depart" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly placeholder="--:--"><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                         <div class="header-item"><label>FUEL Départ</label><div id="fuel-depart" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
-                        <div class="header-item rlt-depart-header-item"><label>RLT</label><div id="rlt-depart" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[valeur]"><span class="clear-btn">&times;</span></div></div>
+                        <div class="header-item rlt-depart-header-item"><label>RLT</label><div id="rlt-depart" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input" inputmode="numeric" placeholder="[kg]"><span class="clear-btn">&times;</span></div></div>
                         <div class="header-item base-oaci-header-item"><label id="cs-base-label">Base</label><div class="input-wrapper base-oaci-input-wrapper"><input type="text" id="base-oaci-input" class="display-input base-oaci-input" inputmode="text" maxlength="4" placeholder="OACI" autocomplete="off" autocapitalize="characters" spellcheck="false"><input type="text" id="cs-lftw-display" class="display-input base-sunset-hidden" readonly tabindex="-1" aria-hidden="true"></div></div>
                         <div class="header-item"><label>TMD</label><div id="tmd" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                         <div class="header-item"><label>LIMITE HDV</label><div id="limite-hdv" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
