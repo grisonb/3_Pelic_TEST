@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-84_espacements_harmonises_rotations';
+const SW_VERSION = 'sw-v13-85_affichage_espacements_effectifs';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
