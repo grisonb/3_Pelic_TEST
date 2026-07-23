@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-90_rlt_kg_effacement_direct';
+const SW_VERSION = 'sw-v13-91_alerte_maj_fuel_mini_separe';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -353,10 +353,14 @@ async function handleAppShellRequest(request) {
         const cacheKey = request.mode === 'navigate' ? './index.html' : request;
         const fallbackCached = cached || (request.mode === 'navigate' ? await caches.match('./index.html', { ignoreSearch: true }) : null);
 
+        const requestUrl = new URL(request.url);
+        const isForcedVersionTransition = request.mode === 'navigate' && requestUrl.searchParams.has('swrefresh');
+        const freshTimeoutMs = isForcedVersionTransition ? 5000 : 2200;
+
         const freshPromise = (async () => {
             try {
                 const freshRequest = new Request(request, { cache: 'reload' });
-                const fresh = await swFetchWithTimeout(freshRequest, {}, 2200);
+                const fresh = await swFetchWithTimeout(freshRequest, {}, freshTimeoutMs);
                 if (fresh && fresh.ok) {
                     await cache.put(cacheKey, fresh.clone());
                     return fresh;
@@ -366,12 +370,14 @@ async function handleAppShellRequest(request) {
         })();
 
         /*
-         * v13.20 — réseau dégradé / perte 4G : ne pas laisser l'écran blanc
-         * pendant que Safari attend un réseau qui répond mal. Si un app-shell
-         * existe en cache, on le sert très vite et la mise à jour réseau continue
-         * en arrière-plan. En bon réseau, la réponse fraîche arrive avant le délai.
+         * v13.91 — pendant la navigation forcée qui suit l'activation d'une MAJ,
+         * attendre réellement le nouvel index. Pour les lancements ordinaires,
+         * conserver le secours rapide de 900 ms sur réseau dégradé.
          */
         if (fallbackCached) {
+            if (isForcedVersionTransition) {
+                return await freshPromise || fallbackCached;
+            }
             const freshOrTimeout = await Promise.race([freshPromise, swDelay(900, null)]);
             return freshOrTimeout || fallbackCached;
         }
