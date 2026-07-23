@@ -1,5 +1,18 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.84 TEST — espacements ciblés / fenêtres rotations harmonisées
+
+Modifications apportées :
+- dans l’onglet « SUIVI ROTATIONS », ajout d’un espace visuel plus marqué entre « Fuel sur Feu » et « Durée Rotation » ;
+- dans l’onglet « DEROUT. / GAAR », ajout d’un espace visuel plus marqué entre « Heure actuelle » et « Vide retardant » ;
+- ajout d’un espace visuel plus marqué entre « Vide retardant » et « CS sur Feu » ;
+- ajout d’un espace visuel plus marqué entre « Conso Rotation » et la première ligne « Fuel mini » ;
+- compensation des espacements non prioritaires dans les colonnes de droite afin de conserver l’intégralité du contenu à l’écran sans défilement ;
+- fenêtres « Nbr Rotations » des onglets « SUIVI ROTATIONS » et « DEROUT. / GAAR » harmonisées avec celle de « PREVI. NBR ROTATIONS » ;
+- reprise du même cadre, du même padding, de la même marge sous le titre et du même espacement entre les cinq lignes de résultats ;
+- aucune modification des tailles de police, des valeurs, des calculs, des commandes ou des autres fonctions ;
+- version applicative portée en v13.84 TEST.
+
 v13.83 TEST — BINGO plus compacts / données rotation ajoutées au déroutement
 
 Modifications apportées :
