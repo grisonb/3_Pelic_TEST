@@ -8796,3 +8796,74 @@ body.gaar-point-search-open .gaar-editing-banner {
         max-width: calc(100vw - 20px) !important;
     }
 }
+
+
+/* ========================================================================== 
+   v13.83 TEST — BINGO compacts dans Suivi/Déroutement + données rotation en lecture seule
+   Les tailles de police sont conservées. Seuls les hauteurs, marges et espacements
+   verticaux sont réduits afin d'éviter le défilement sur iPad.
+   ========================================================================== */
+@media (min-width: 761px) {
+    #suivi-rotations .analyse-grid,
+    #deroutement .analyse-grid {
+        gap: 16px 34px !important;
+        padding: 12px 18px 8px !important;
+    }
+
+    #suivi-rotations .bingo-group,
+    #deroutement .bingo-group {
+        margin-bottom: 2px !important;
+    }
+
+    #suivi-rotations .bingo-group .result-line,
+    #deroutement .bingo-group .result-line {
+        margin-bottom: 2px !important;
+        min-height: 0 !important;
+    }
+
+    #suivi-rotations .bingo-group .result-line .value,
+    #deroutement .bingo-group .result-line .value {
+        min-height: 36px !important;
+        margin-top: 0 !important;
+        padding-top: 3px !important;
+        padding-bottom: 3px !important;
+        line-height: 1.05 !important;
+    }
+
+    #suivi-rotations .analyse-separator,
+    #deroutement .analyse-separator {
+        margin-bottom: 6px !important;
+    }
+
+    #suivi-rotations .rotations-group,
+    #deroutement .rotations-group {
+        padding-top: 8px !important;
+        padding-bottom: 4px !important;
+        margin-bottom: 6px !important;
+    }
+
+    #suivi-rotations .rotations-group .analyse-col-title,
+    #deroutement .rotations-group .analyse-col-title {
+        margin-bottom: 8px !important;
+    }
+
+    #suivi-rotations .rotations-group .result-line,
+    #deroutement .rotations-group .result-line {
+        margin-bottom: 8px !important;
+    }
+
+    #suivi-rotations .rotations-group .result-line:last-child,
+    #deroutement .rotations-group .result-line:last-child {
+        margin-bottom: 2px !important;
+    }
+
+    #deroutement .derout-gps-status-row-outside {
+        margin-top: 8px !important;
+        gap: 6px !important;
+    }
+
+    #deroutement .derout-gps-status-row-outside #refresh-gps-btn {
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+    }
+}
