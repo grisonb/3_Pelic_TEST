@@ -14829,7 +14829,49 @@ function initializeCalculator() {
         displayInput.addEventListener('blur', () => { if (displayInput.readOnly) return; shouldClearOnNextInput = false; let v = displayInput.value.replace(/[^0-9]/g, ''); if (v) { displayInput.value = `${v} ${unit}`; } else { displayInput.value = ''; } masterRecalculate(); saveCalculatorState(); });
         displayInput.addEventListener('input', (e) => { if (displayInput.readOnly) return; if (shouldClearOnNextInput && e.data) { displayInput.value = e.data.replace(/[^0-9]/g, ''); shouldClearOnNextInput = false; } else { displayInput.value = displayInput.value.replace(/[^0-9]/g, ''); } masterRecalculate(); });
         displayInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); displayInput.blur(); } });
-        if (clearBtn) { clearBtn.addEventListener('click', () => { displayInput.value = ''; masterRecalculate(); saveCalculatorState(); }); }
+        if (clearBtn) {
+            if (wrapper.id === 'rlt-depart') {
+                /*
+                 * v13.90 — cellule RLT de l'en-tête BLOC / FUEL.
+                 * Sur iPad, le premier appui sur × donnait auparavant le focus au champ :
+                 * le gestionnaire focus retirait seulement le suffixe « kg », puis un second
+                 * appui était nécessaire pour vider la valeur. L'effacement est désormais
+                 * exécuté dès pointerdown, avant toute prise de focus du champ.
+                 */
+                if (clearBtn.dataset.rltDirectClearBound !== '1') {
+                    clearBtn.dataset.rltDirectClearBound = '1';
+
+                    const clearRltDepartImmediately = (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        shouldClearOnNextInput = false;
+                        displayInput.value = '';
+                        if (document.activeElement === displayInput) displayInput.blur();
+                        masterRecalculate();
+                        saveCalculatorState();
+                    };
+
+                    if (window.PointerEvent) {
+                        clearBtn.addEventListener('pointerdown', clearRltDepartImmediately);
+                    } else {
+                        clearBtn.addEventListener('touchstart', clearRltDepartImmediately, { passive: false });
+                        clearBtn.addEventListener('mousedown', clearRltDepartImmediately);
+                    }
+
+                    clearBtn.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (displayInput.value) clearRltDepartImmediately(event);
+                    });
+                }
+            } else {
+                clearBtn.addEventListener('click', () => {
+                    displayInput.value = '';
+                    masterRecalculate();
+                    saveCalculatorState();
+                });
+            }
+        }
     }
 
 
