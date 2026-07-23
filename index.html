@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.83">
-    <link rel="manifest" href="manifest.json?appv=v13.83">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.83">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.83">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.83">
+    <link rel="stylesheet" href="style.css?appv=v13.84">
+    <link rel="manifest" href="manifest.json?appv=v13.84">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.84">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.84">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.84">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.83';
+        const APP_VERSION = 'v13.84';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -448,7 +448,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.83"></script>
+    <script src="script.js?appv=v13.84"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -570,8 +570,8 @@
                                 <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="suivi-cs-sur-feu">--:--</span></div>
                                 <div class="result-line"><span class="label">Heure sur Feu :<span id="suivi-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="suivi-heure-sur-feu">--:--</span></div>
                                 <div class="result-line"><span class="label">Durée Transit Pélic&lt;-&gt;Feu :</span><span class="value" id="suivi-duree-transit">--:--</span></div>
-                                <div class="result-line"><span class="label">Fuel sur Feu :</span><span class="value" id="suivi-fuel-sur-feu">-- kg</span></div>
-                                <div class="result-line"><span class="label">Durée Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-duree-rotation-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input manual-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div><button class="manual-btn" id="suivi-duree-rotation-manual-btn">AUTO</button></div></div>
+                                <div class="result-line suivi-fuel-sur-feu-line"><span class="label">Fuel sur Feu :</span><span class="value" id="suivi-fuel-sur-feu">-- kg</span></div>
+                                <div class="result-line suivi-duree-rotation-line"><span class="label">Durée Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-duree-rotation-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input manual-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div><button class="manual-btn" id="suivi-duree-rotation-manual-btn">AUTO</button></div></div>
                                 <div class="result-line"><span class="label">Conso Rotation :</span><div style="display: flex; align-items: center;"><div id="suivi-conso-rotation-wrapper" class="input-wrapper numeric-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric" readonly><span class="clear-btn">&times;</span></div><button class="manual-btn" id="suivi-conso-rotation-manual-btn">AUTO</button></div></div>
                                 <div class="result-line suivi-hidden-detail" style="display:none;"><span class="label">Fuel Pélic. Actuel :</span><span class="value" id="suivi-fuel-actuel">-- kg</span></div>
                             </div>
@@ -604,13 +604,13 @@
                             <div class="rotations-group">
                                  <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
                                 <div class="result-line"><span class="label">Fuel actuel :</span><div id="deroutement-fuel-wrapper" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric"><span class="clear-btn">&times;</span></div></div>
-                                <div class="result-line"><span class="label">Heure actuelle :</span><div id="deroutement-heure-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
+                                <div class="result-line derout-current-time-line"><span class="label">Heure actuelle :</span><div id="deroutement-heure-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
                                 <div class="result-line derout-empty-retardant-line"><span class="label">Vide retardant :</span><label class="derout-empty-retardant-toggle"><input type="checkbox" id="derout-empty-retardant-checkbox"><span>Retour Pélic avant feu</span></label></div>
-                                <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="derout-cs-sur-feu">--:--</span></div>
+                                <div class="result-line derout-cs-sur-feu-line"><span class="label">CS sur Feu :</span><span class="value" id="derout-cs-sur-feu">--:--</span></div>
                                 <div class="result-line"><span class="label">Heure sur Feu :<span id="derout-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="derout-heure-sur-feu">--:--</span></div>
                                 <div class="result-line derout-readonly-rotation-line"><span class="label">Durée Rotation :</span><span class="value" id="derout-duree-rotation">--:--</span></div>
-                                <div class="result-line derout-readonly-rotation-line"><span class="label">Conso Rotation :</span><span class="value" id="derout-conso-rotation">-- kg</span></div>
-                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 Lrg / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
+                                <div class="result-line derout-readonly-rotation-line derout-conso-rotation-line"><span class="label">Conso Rotation :</span><span class="value" id="derout-conso-rotation">-- kg</span></div>
+                                <div class="result-line derout-fuel-mini-base-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 Lrg / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
                                 <div class="result-line"><span class="label"><span id="derout-fuel-mini-pelic-label">Fuel mini 1 Lrg / Pélic :</span><span id="derout-fuel-mini-pelic-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
                                 
                             </div>
