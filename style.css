@@ -8781,3 +8781,18 @@ body.gaar-point-search-open .gaar-editing-banner {
     font-size: 12px !important;
 }
 
+/* ==========================================================================
+   v13.82 TEST — bouton MAJ retiré / commune survolée décalée à droite
+   Seule la position horizontale du bandeau commune survolée est modifiée.
+   ========================================================================== */
+#nearest-commune-display {
+    right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+    max-width: min(560px, calc(100vw - 32px)) !important;
+}
+
+@media (max-width: 760px) {
+    #nearest-commune-display {
+        right: calc(env(safe-area-inset-right, 0px) + 10px) !important;
+        max-width: calc(100vw - 20px) !important;
+    }
+}
