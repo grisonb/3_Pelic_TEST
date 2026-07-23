@@ -8922,3 +8922,57 @@ body.gaar-point-search-open .gaar-editing-banner {
         margin-bottom: 2px !important;
     }
 }
+
+
+/* ========================================================================== 
+   v13.85 TEST — application effective des espacements demandés
+   Les sélecteurs reposent maintenant sur des classes explicites et ne sont plus
+   limités par la largeur du viewport. Les tailles de police restent inchangées.
+   ========================================================================== */
+
+/* Fenêtres « Nbr Rotations » : présentation strictement calée sur Prévi. */
+#suivi-rotations .rotation-count-group,
+#deroutement .rotation-count-group {
+    border: 2px solid #d9e3ef !important;
+    border-radius: 12px !important;
+    background: #f7fbff !important;
+    padding: 14px 14px 8px !important;
+    margin-bottom: 14px !important;
+}
+
+#suivi-rotations .rotation-count-group .analyse-col-title,
+#deroutement .rotation-count-group .analyse-col-title {
+    margin-top: 0 !important;
+    margin-bottom: 15px !important;
+}
+
+#suivi-rotations .rotation-results-container .result-line,
+#deroutement .rotation-results-container .result-line,
+#suivi-rotations .rotation-results-container .result-line:last-child,
+#deroutement .rotation-results-container .result-line:last-child {
+    margin-bottom: 25px !important;
+}
+
+/* Colonnes de droite : rythme compact, avec séparations fonctionnelles visibles. */
+#suivi-rotations .rotation-details-group .result-line,
+#deroutement .rotation-details-group .result-line {
+    margin-top: 0 !important;
+    margin-bottom: 4px !important;
+}
+
+/* Suivi rotations : espace entre Fuel sur Feu et Durée Rotation. */
+#suivi-rotations .rotation-details-group .suivi-duree-rotation-line {
+    margin-top: 18px !important;
+}
+
+/* Déroutement / GAAR : espaces demandés entre les blocs de données. */
+#deroutement .rotation-details-group .derout-empty-retardant-line,
+#deroutement .rotation-details-group .derout-cs-sur-feu-line,
+#deroutement .rotation-details-group .derout-fuel-mini-base-line {
+    margin-top: 16px !important;
+}
+
+#suivi-rotations .rotation-details-group .result-line:last-child,
+#deroutement .rotation-details-group .result-line:last-child {
+    margin-bottom: 2px !important;
+}
