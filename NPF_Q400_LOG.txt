@@ -1,5 +1,15 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.82 TEST — suppression du bouton MAJ / commune survolée décalée à droite
+
+Modifications apportées :
+- suppression du seul bouton « 🔄 MAJ » visible sous le numéro de version dans la colonne des commandes de carte ;
+- conservation intégrale de la recherche automatique des mises à jour, du service worker, de la fenêtre de rappel, de la fonction de récupération forcée et du bouton de secours masqué ;
+- bandeau « commune survolée » déplacé vers le bord droit de l’écran afin d’utiliser l’espace libéré ;
+- position verticale, dimensions, police, contenu et comportement du bandeau « commune survolée » laissés inchangés ;
+- aucune autre fonction, commande, fenêtre, icône, donnée ou règle d’affichage supprimée ou modifiée ;
+- version applicative portée en v13.82 TEST.
+
 v13.81 TEST — icônes de pélicandromes réellement réduites
 
 Modifications apportées :
