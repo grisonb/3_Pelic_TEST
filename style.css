@@ -8976,3 +8976,15 @@ body.gaar-point-search-open .gaar-editing-banner {
 #deroutement .rotation-details-group .result-line:last-child {
     margin-bottom: 2px !important;
 }
+
+
+/* ========================================================================== 
+   v13.86 TEST — interlignes augmentés dans les fenêtres de droite
+   - Suivi rotations et Dérout. / GAAR uniquement ;
+   - taille de police, calculs, dimensions des contrôles et colonne gauche inchangés ;
+   - les séparations spécifiques de la v13.85 restent conservées.
+   ========================================================================== */
+#suivi-rotations .rotation-details-group .result-line:not(:last-child),
+#deroutement .rotation-details-group .result-line:not(:last-child) {
+    margin-bottom: 10px !important;
+}
