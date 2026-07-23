@@ -1,5 +1,23 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.88 TEST — Fuel sur feu Prévi non modifiable / RLT départ / espacements des fenêtres droites
+
+Modifications apportées :
+- dans l’onglet « PREVI. NBR ROTATIONS », suppression de toute possibilité de modifier « Fuel sur Feu » ;
+- suppression du bouton AUTO/MANUEL et du champ de saisie associé ;
+- « Fuel sur Feu » est désormais une valeur strictement calculée en lecture seule à partir de « FUEL Départ - Conso transit Base → Feu » ;
+- adaptation de l’aide « ? » pour préciser que cette valeur est automatique et non modifiable ;
+- dans l’onglet « BLOC / FUEL », ajout d’une cellule « RLT » entre « FUEL Départ » et « Base » ;
+- cette cellule permet de saisir la masse de retardant présente dans l’avion, en kilogrammes ;
+- valeur RLT enregistrée séparément pour chaque vol et restaurée lors du changement de vol ;
+- ajout de la valeur RLT dans l’en-tête de chaque vol de l’export PDF / aperçu imprimable ;
+- ajout de la valeur RLT dans l’export PDF de secours en texte ;
+- dans l’onglet « SUIVI ROTATIONS », la fenêtre de droite reprend le même espacement entre les lignes que la fenêtre de droite de « PREVI. NBR ROTATIONS » ;
+- dans l’onglet « DEROUT. / GAAR », augmentation automatique de l’espace entre toutes les lignes de la fenêtre de droite en répartissant le contenu sur la hauteur disponible ;
+- cette répartition dynamique évite d’ajouter un défilement vertical ;
+- calculs de rotations, valeurs BINGO, tailles de police et autres fonctions laissés inchangés ;
+- version applicative portée en v13.88 TEST.
+
 v13.87 TEST — aides détaillées Suivi rotations / Dérout. GAAR
 
 Modifications apportées :
