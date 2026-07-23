@@ -1,5 +1,22 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.91 TEST — alerte post-MAJ fiable / fenêtre FUEL MINI séparée en Dérout. / GAAR
+
+Modifications apportées :
+- correction du message « Mise à jour installée » afin qu’une navigation automatique très rapide ne puisse plus consommer l’alerte avant qu’elle ait été réellement visible ;
+- le marqueur de demande de relance n’est désormais validé qu’après 2 secondes de visibilité continue de la fenêtre ;
+- si le service worker recharge la page avant ce délai, le marqueur reste actif et la fenêtre réapparaît sur la page stable ;
+- fenêtre de relance placée au-dessus de l’écran de démarrage afin d’être visible dès son insertion ;
+- lors de la navigation forcée suivant l’activation d’un nouveau service worker, attente prioritaire du nouvel index jusqu’à 5 secondes avant recours au cache ;
+- conservation du secours rapide existant pour les lancements ordinaires et du fonctionnement hors ligne ;
+- dans l’onglet « DEROUT. / GAAR », déplacement des deux lignes « Fuel mini 1 Lrg / BASE » et « Fuel mini 1 Lrg / Pélic » hors de la fenêtre de droite ;
+- création d’une fenêtre indépendante intitulée « FUEL MINI » dans la colonne gauche ;
+- placement de cette fenêtre immédiatement au-dessus de « Nbr Rotations Possibles » ;
+- conservation des valeurs, aides « ? », formules et identifiants existants : seuls leur conteneur et leur position sont modifiés ;
+- adaptation de la colonne gauche pour conserver l’ensemble dans la hauteur disponible sans ajouter de défilement ;
+- aucune modification des calculs, des autres onglets, des tailles de police ou des données enregistrées ;
+- version applicative portée en v13.91 TEST.
+
 v13.90 TEST — cellule RLT : unité en fond et effacement direct
 
 Modifications apportées :
