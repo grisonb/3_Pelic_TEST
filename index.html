@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.84">
-    <link rel="manifest" href="manifest.json?appv=v13.84">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.84">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.84">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.84">
+    <link rel="stylesheet" href="style.css?appv=v13.85">
+    <link rel="manifest" href="manifest.json?appv=v13.85">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.85">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.85">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.85">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.84';
+        const APP_VERSION = 'v13.85';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -448,7 +448,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.84"></script>
+    <script src="script.js?appv=v13.85"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -550,10 +550,10 @@
                     <div class="analyse-grid">
                         <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="suivi-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
+                            <div class="rotations-group rotation-count-group">
                                 <h3 class="analyse-col-title">Nbr Rotations Restantes</h3>
                                     
-<div id="suivi-rotation-results-container">
+<div id="suivi-rotation-results-container" class="rotation-results-container">
                                     <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
                                     <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
                                     <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
@@ -565,7 +565,7 @@
                         </div>
                         <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="suivi-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
+                            <div class="rotations-group rotation-details-group">
                                  <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
                                 <div class="result-line"><span class="label">CS sur Feu :</span><span class="value" id="suivi-cs-sur-feu">--:--</span></div>
                                 <div class="result-line"><span class="label">Heure sur Feu :<span id="suivi-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="suivi-heure-sur-feu">--:--</span></div>
@@ -584,9 +584,9 @@
                     <div class="analyse-grid">
                          <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="derout-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
+                            <div class="rotations-group rotation-count-group">
                                 <h3 class="analyse-col-title">Nbr Rotations Possibles</h3>
-                                <div id="derout-rotation-results-container">
+                                <div id="derout-rotation-results-container" class="rotation-results-container">
                                     <div class="result-line" data-rotation-type="base"><span class="label">FUEL RETOUR BASE :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
                                     <div class="result-line" data-rotation-type="pelic"><span class="label">FUEL RETOUR PELIC :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
                                     <div class="result-line" data-rotation-type="cs"><span class="label">COUCHER SOLEIL :<span class="formula-help-icon">?</span></span><span class="value">--</span></div>
@@ -601,7 +601,7 @@
                         </div>
                         <div class="analyse-col">
                             <div class="bingo-group"><div class="result-line"><span class="label">BINGO PELIC</span><span class="value" id="derout-bingo-pelic">-- kg</span></div></div><hr class="analyse-separator">
-                            <div class="rotations-group">
+                            <div class="rotations-group rotation-details-group">
                                  <h3 class="analyse-col-title" style="visibility: hidden;">&nbsp;</h3>
                                 <div class="result-line"><span class="label">Fuel actuel :</span><div id="deroutement-fuel-wrapper" class="input-wrapper numeric-input-wrapper fuel-split-input-wrapper" data-unit="kg"><input type="text" class="display-input manual-input" inputmode="numeric"><span class="clear-btn">&times;</span></div></div>
                                 <div class="result-line derout-current-time-line"><span class="label">Heure actuelle :</span><div id="deroutement-heure-wrapper" class="input-wrapper time-input-wrapper"><input type="text" class="display-input" readonly><span class="clear-btn">&times;</span><span class="clock-icon">🕒</span><input type="time" class="engine-input"></div></div>
