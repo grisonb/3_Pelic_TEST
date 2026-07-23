@@ -8867,3 +8867,58 @@ body.gaar-point-search-open .gaar-editing-banner {
         padding-bottom: 8px !important;
     }
 }
+
+
+/* ========================================================================== 
+   v13.84 TEST — espacements ciblés et harmonisation des fenêtres rotations
+   - les fenêtres « nombre de rotations » de Suivi et Dérout/GAAR reprennent
+     la mise en page et les espacements verticaux de Prévi. nbr rotations ;
+   - les séparations demandées sont renforcées dans les colonnes de droite,
+     sans augmenter la hauteur globale afin de conserver un affichage sans scroll.
+   ========================================================================== */
+@media (min-width: 761px) {
+    /* Colonne gauche : même cadre, padding, titre et rythme vertical que Prévi. */
+    #suivi-rotations .analyse-col:first-child .rotations-group,
+    #deroutement .analyse-col:first-child .rotations-group {
+        padding: 14px 14px 8px !important;
+        margin-bottom: 14px !important;
+    }
+
+    #suivi-rotations .analyse-col:first-child .rotations-group .analyse-col-title,
+    #deroutement .analyse-col:first-child .rotations-group .analyse-col-title {
+        margin-bottom: 15px !important;
+    }
+
+    #suivi-rotation-results-container .result-line,
+    #derout-rotation-results-container .result-line {
+        margin-bottom: 25px !important;
+    }
+
+    /* Suivi rotations : séparation nette Fuel sur feu / Durée rotation. */
+    #suivi-rotations .analyse-col:nth-child(2) .rotations-group .result-line {
+        margin-bottom: 6px !important;
+    }
+
+    #suivi-rotations .analyse-col:nth-child(2) .suivi-fuel-sur-feu-line {
+        margin-bottom: 16px !important;
+    }
+
+    #suivi-rotations .analyse-col:nth-child(2) .rotations-group .result-line:last-child {
+        margin-bottom: 2px !important;
+    }
+
+    /* Dérout/GAAR : trois séparations fonctionnelles, hauteur totale maîtrisée. */
+    #deroutement .analyse-col:nth-child(2) .rotations-group .result-line {
+        margin-bottom: 5px !important;
+    }
+
+    #deroutement .analyse-col:nth-child(2) .derout-current-time-line,
+    #deroutement .analyse-col:nth-child(2) .derout-empty-retardant-line,
+    #deroutement .analyse-col:nth-child(2) .derout-conso-rotation-line {
+        margin-bottom: 14px !important;
+    }
+
+    #deroutement .analyse-col:nth-child(2) .rotations-group .result-line:last-child {
+        margin-bottom: 2px !important;
+    }
+}
