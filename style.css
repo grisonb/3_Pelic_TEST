@@ -9143,3 +9143,5 @@ body.gaar-point-search-open .gaar-editing-banner {
     padding-top: 6px !important;
     padding-bottom: 6px !important;
 }
+
+/* v13.90 — cellule RLT : placeholder [kg] et effacement direct gérés dans index/script ; mise en page inchangée. */
