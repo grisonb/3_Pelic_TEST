@@ -11090,6 +11090,10 @@ function updateDeroutementTab() {
         document.getElementById('derout-fuel-mini-base').textContent = '-- kg';
         document.getElementById('derout-fuel-mini-pelic').textContent = '-- kg';
         document.getElementById('derout-heure-sur-feu').textContent = '--:--';
+        const deroutDureeRotationEmpty = document.getElementById('derout-duree-rotation');
+        if (deroutDureeRotationEmpty) deroutDureeRotationEmpty.textContent = '--:--';
+        const deroutConsoRotationEmpty = document.getElementById('derout-conso-rotation');
+        if (deroutConsoRotationEmpty) deroutConsoRotationEmpty.textContent = '-- kg';
         document.getElementById('derout-cs-sur-feu').textContent = '--:--';
         setHelp('derout-fuel-mini-base-help'); setHelp('derout-fuel-mini-pelic-help'); setHelp('derout-heure-sur-feu-help');
         return;
@@ -11102,6 +11106,14 @@ function updateDeroutementTab() {
     const bingoPelic = calculateBingo(CALCULATOR_DATA.distPelicFeu);
     const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu));
     const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu);
+    const deroutDureeRotationDisplay = document.getElementById('derout-duree-rotation');
+    if (deroutDureeRotationDisplay) {
+        deroutDureeRotationDisplay.textContent = (rotationTime === 20 || !selectedPelicanOACI) ? '--:--' : formatTime(rotationTime);
+    }
+    const deroutConsoRotationDisplay = document.getElementById('derout-conso-rotation');
+    if (deroutConsoRotationDisplay) {
+        deroutConsoRotationDisplay.textContent = (consoRotation === 250 || !selectedPelicanOACI) ? '-- kg' : `${consoRotation} kg`;
+    }
     const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
     const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
     const limiteHDV = parseTime(document.getElementById('limite-hdv').querySelector('.display-input').value);
