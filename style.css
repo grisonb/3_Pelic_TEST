@@ -9145,3 +9145,59 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* v13.90 — cellule RLT : placeholder [kg] et effacement direct gérés dans index/script ; mise en page inchangée. */
+
+/* ========================================================================== 
+   v13.91 TEST — alerte post-MAJ visible / fenêtre FUEL MINI Dérout.-GAAR
+   ========================================================================== */
+
+/* La demande de relance reste au-dessus de l'écran de démarrage. */
+.post-update-restart-modal {
+    z-index: 100000 !important;
+}
+
+/* Dérout. / GAAR : fenêtre FUEL MINI indépendante, au-dessus des rotations. */
+#deroutement .derout-fuel-mini-group {
+    padding: 10px 14px 8px !important;
+    margin-bottom: 12px !important;
+}
+
+#deroutement .derout-fuel-mini-group .analyse-col-title {
+    display: block !important;
+    margin: 0 0 10px !important;
+}
+
+#deroutement .derout-fuel-mini-group .result-line,
+#deroutement .derout-fuel-mini-group .result-line:not(:last-child) {
+    margin-top: 0 !important;
+    margin-bottom: 10px !important;
+}
+
+#deroutement .derout-fuel-mini-group .result-line:last-child {
+    margin-bottom: 0 !important;
+}
+
+#deroutement .derout-fuel-mini-group .value {
+    min-width: 86px;
+    box-sizing: border-box;
+}
+
+@media (min-width: 761px) {
+    #deroutement .analyse-col:first-child {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    #deroutement .analyse-col:first-child > .bingo-group,
+    #deroutement .analyse-col:first-child > .analyse-separator,
+    #deroutement .analyse-col:first-child > .derout-fuel-mini-group,
+    #deroutement .analyse-col:first-child > .derout-gps-status-row {
+        flex: 0 0 auto;
+    }
+
+    #deroutement .analyse-col:first-child > .rotation-count-group {
+        flex: 1 1 auto;
+        min-height: 0;
+        margin-bottom: 10px !important;
+    }
+}
