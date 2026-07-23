@@ -9074,3 +9074,72 @@ body.gaar-point-search-open .gaar-editing-banner {
         flex: 0 0 auto;
     }
 }
+
+
+/* ========================================================================== 
+   v13.89 TEST — correction RLT / Suivi rotations / première alerte post-MAJ
+   ========================================================================== */
+
+/*
+ * BLOC / FUEL — RLT : réserve une zone réelle au bouton ×.
+ * Le premier chiffre d'une valeur à quatre chiffres (ex. 9000) ne peut plus
+ * passer sous la croix, même lorsque la colonne est étroite sur iPad.
+ */
+@media (min-width: 761px) {
+    #bloc-fuel > .header-section {
+        grid-template-columns: 1.06fr 1.06fr .90fr .84fr 1.02fr 1.02fr !important;
+    }
+
+    #bloc-fuel .rlt-depart-header-item .input-wrapper {
+        width: 100% !important;
+        max-width: 145px !important;
+        min-width: 0 !important;
+    }
+}
+
+#bloc-fuel .rlt-depart-header-item .display-input {
+    padding-left: 42px !important;
+    padding-right: 10px !important;
+    text-align: center !important;
+}
+
+#bloc-fuel .rlt-depart-header-item .clear-btn {
+    left: 8px !important;
+    width: 28px !important;
+    text-align: center !important;
+    font-size: 27px !important;
+    line-height: 1 !important;
+}
+
+/*
+ * SUIVI ROTATIONS — fenêtre droite : même rythme que Prévi. nbr rotations.
+ * Le conteneur devient une colonne explicite et l'espace de 16 px est appliqué
+ * entre chaque ligne, indépendamment des anciennes règles et de la largeur écran.
+ */
+#suivi-rotations .rotation-details-group {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    padding: 14px 14px 8px !important;
+}
+
+#suivi-rotations .rotation-details-group .analyse-col-title {
+    display: none !important;
+}
+
+#suivi-rotations .rotation-details-group > .result-line,
+#suivi-rotations .rotation-details-group > .result-line:not(:last-child),
+#suivi-rotations .rotation-details-group > .result-line:last-child,
+#suivi-rotations .rotation-details-group > .suivi-duree-rotation-line {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+}
+
+#suivi-rotations .rotation-details-group > .result-line + .result-line {
+    margin-top: 16px !important;
+}
+
+#suivi-rotations .rotation-details-group > .result-line .value {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
