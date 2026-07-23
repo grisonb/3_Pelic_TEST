@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-89_corrections_rlt_suivi_alerte_maj';
+const SW_VERSION = 'sw-v13-90_rlt_kg_effacement_direct';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
