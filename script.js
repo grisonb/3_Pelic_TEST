@@ -10789,6 +10789,7 @@ function recalculateBlocFuel() {
     });
 }
 
+// v13.87 TEST — aides détaillées Suivi rotations / Dérout. GAAR, avec état Retour Pélic avant feu.
 function updatePreviTab() {
     const defaultFormula = "Données insuffisantes pour le calcul.";
     const setHelp = (id, formula) => {
@@ -10863,6 +10864,10 @@ function updatePreviTab() {
 function updateSuiviTab() {
     const suiviConsoInput = document.getElementById('suivi-conso-rotation-wrapper').querySelector('.display-input');
     const suiviDureeInput = document.getElementById('suivi-duree-rotation-wrapper').querySelector('.display-input');
+    const setSuiviHelp = (id, formula) => {
+        const icon = document.getElementById(id);
+        if (icon) icon.onclick = () => alert(formula || 'Données insuffisantes pour le calcul.');
+    };
 
     if (!currentCommune) {
         document.getElementById('suivi-bingo-base').innerHTML = '-- kg';
@@ -10874,6 +10879,10 @@ function updateSuiviTab() {
         document.getElementById('suivi-cs-sur-feu').textContent = '--:--';
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
         if (suiviHeureHelpIcon) { suiviHeureHelpIcon.onclick = () => alert('Données insuffisantes pour le calcul.'); }
+        setSuiviHelp('suivi-duree-transit-help');
+        setSuiviHelp('suivi-fuel-sur-feu-help');
+        setSuiviHelp('suivi-duree-rotation-help');
+        setSuiviHelp('suivi-conso-rotation-help');
         suiviConsoInput.value = '';
         suiviDureeInput.value = '';
         return;
@@ -11002,6 +11011,94 @@ function updateSuiviTab() {
     const heureSurFeu = (currentTime !== null && tempsAvantFeu !== null) ? currentTime + tempsAvantFeu : null;
     const fuelSurFeu = (currentFuel !== null && consoTransitVersFeu !== null) ? currentFuel - consoTransitVersFeu : currentFuel;
 
+    const transitSpeedKt = Number.isFinite(transitEffectiveDistanceVersFeu)
+        ? (transitEffectiveDistanceVersFeu <= 70 ? 210 : 240)
+        : null;
+    const transitConsoRate = Number.isFinite(transitConsoDistanceVersFeu)
+        ? (transitConsoDistanceVersFeu <= 70 ? 5 : 4)
+        : null;
+    const rotationDistanceRetained = Number.isFinite(CALCULATOR_DATA.distPelicFeu)
+        ? Math.max(CALCULATOR_DATA.distPelicFeu, 10)
+        : null;
+    const rotationSpeedNmMin = Number.isFinite(rotationDistanceRetained)
+        ? (rotationDistanceRetained <= 50 ? 3.5 : 4)
+        : null;
+    const rotationConsoRate = Number.isFinite(rotationDistanceRetained)
+        ? (rotationDistanceRetained <= 70 ? 10 : 8)
+        : null;
+
+    setSuiviHelp('suivi-duree-transit-help', transitTimeVersFeu !== null
+        ? `DURÉE TRANSIT SOURCE → FEU — SUIVI ROTATIONS
+
+${transitSourceDetail}
+Source utilisée : ${transitSourceLabel}
+
+Distance mesurée : ${Number.isFinite(transitDistanceVersFeu) ? transitDistanceVersFeu : 'N/A'} Nm
+Distance retenue pour la durée : ${Number.isFinite(transitEffectiveDistanceVersFeu) ? transitEffectiveDistanceVersFeu : 'N/A'} Nm
+Règle vitesse : ≤ 70 Nm = 210 kt ; > 70 Nm = 240 kt
+Vitesse retenue : ${transitSpeedKt ?? 'N/A'} kt
+
+Calcul : ${Number.isFinite(transitEffectiveDistanceVersFeu) ? transitEffectiveDistanceVersFeu : 'N/A'} × (60 / ${transitSpeedKt ?? 'N/A'}) = ${formatTime(transitTimeVersFeu)} (${transitTimeVersFeu} min)
+
+La valeur affichée correspond uniquement au temps de vol source → feu.
+Forfait avant transit : ${preTransitForfaitMin} min, intégré à « Heure sur Feu » mais pas à la durée affichée.`
+        : 'Distance vers le feu indisponible. Vérifiez le terrain de départ, le pélicandrome sélectionné et le feu.');
+
+    setSuiviHelp('suivi-fuel-sur-feu-help', fuelSurFeu !== null && currentFuel !== null && consoTransitVersFeu !== null
+        ? `FUEL SUR FEU — SUIVI ROTATIONS
+
+Formule : Fuel retenu au départ du transit - Conso transit vers le feu
+
+${transitSourceDetail}
+Source utilisée : ${transitSourceLabel}
+Fuel retenu au départ du transit : ${currentFuel} kg
+Distance retenue pour la consommation : ${Number.isFinite(transitConsoDistanceVersFeu) ? transitConsoDistanceVersFeu : 'N/A'} Nm
+Règle consommation : ≤ 70 Nm = 5 kg/Nm ; > 70 Nm = 4 kg/Nm
+Taux retenu : ${transitConsoRate ?? 'N/A'} kg/Nm
+Conso transit : ${consoTransitVersFeu} kg
+
+Calcul : ${currentFuel} - ${consoTransitVersFeu} = ${fuelSurFeu} kg
+
+Le forfait avant transit de ${preTransitForfaitMin} min n'ajoute pas de consommation forfaitaire dans ce calcul.`
+        : 'Fuel de départ du transit ou distance vers le feu indisponible.');
+
+    setSuiviHelp('suivi-duree-rotation-help', rotationDistanceRetained !== null && rotationTime !== null
+        ? `DURÉE ROTATION FEU ↔ PÉLIC — SUIVI ROTATIONS
+
+Mode actuel : ${isSuiviDureeManual ? 'MANUEL' : 'AUTO'}
+Valeur utilisée : ${formatTime(rotationTime) || 'N/A'}${rotationTime !== null ? ` (${rotationTime} min)` : ''}
+
+Référence du mode AUTO :
+20 min + ((Distance retenue × 2) / Vitesse)
+
+Pélic sélectionné : ${selectedPelicanOACI || 'N/A'}
+Distance Feu → Pélic mesurée : ${Number.isFinite(CALCULATOR_DATA.distPelicFeu) ? CALCULATOR_DATA.distPelicFeu : 'N/A'} Nm
+Distance retenue : ${rotationDistanceRetained} Nm, avec un minimum de 10 Nm
+Vitesse retenue : ${rotationSpeedNmMin} Nm/min (${rotationSpeedNmMin === 3.5 ? 210 : 240} kt)
+Calcul AUTO : 20 + ((${rotationDistanceRetained} × 2) / ${rotationSpeedNmMin}) = ${formatTime(Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu)))}
+
+${isSuiviDureeManual ? 'La valeur manuelle remplace actuellement le calcul AUTO dans le nombre de rotations.' : 'La valeur AUTO est utilisée dans le nombre de rotations.'}`
+        : 'Sélectionnez un pélicandrome et renseignez une durée de rotation exploitable.');
+
+    setSuiviHelp('suivi-conso-rotation-help', rotationDistanceRetained !== null && consoRotation !== null
+        ? `CONSO ROTATION FEU ↔ PÉLIC — SUIVI ROTATIONS
+
+Mode actuel : ${isSuiviConsoManual ? 'MANUEL' : 'AUTO'}
+Valeur utilisée : ${consoRotation} kg
+
+Référence du mode AUTO :
+(Distance retenue × conso aller-retour) + forfait largage
+
+Pélic sélectionné : ${selectedPelicanOACI || 'N/A'}
+Distance Feu → Pélic mesurée : ${Number.isFinite(CALCULATOR_DATA.distPelicFeu) ? CALCULATOR_DATA.distPelicFeu : 'N/A'} Nm
+Distance retenue : ${rotationDistanceRetained} Nm, avec un minimum de 10 Nm
+Conso aller-retour retenue : ${rotationConsoRate} kg/Nm
+Forfait largage : 250 kg
+Calcul AUTO : (${rotationDistanceRetained} × ${rotationConsoRate}) + 250 = ${calculateConsoRotation(CALCULATOR_DATA.distPelicFeu)} kg
+
+${isSuiviConsoManual ? 'La valeur manuelle remplace actuellement le calcul AUTO dans le nombre de rotations.' : 'La valeur AUTO est utilisée dans le nombre de rotations.'}`
+        : 'Sélectionnez un pélicandrome et renseignez une consommation de rotation exploitable.');
+
     if (currentFuel === null && currentTime === null) {
         document.getElementById('suivi-fuel-actuel').textContent = '-- kg';
         document.getElementById('suivi-heure-sur-feu').textContent = '--:--';
@@ -11009,7 +11106,7 @@ function updateSuiviTab() {
         const suiviDureeTransitEl = document.getElementById('suivi-duree-transit'); if (suiviDureeTransitEl) suiviDureeTransitEl.textContent = '--:--';
         const suiviFuelSurFeuEl = document.getElementById('suivi-fuel-sur-feu'); if (suiviFuelSurFeuEl) suiviFuelSurFeuEl.textContent = '-- kg';
         const suiviHeureHelpIcon = document.getElementById('suivi-heure-sur-feu-help');
-        if (suiviHeureHelpIcon) { suiviHeureHelpIcon.onclick = () => alert('Données insuffisantes pour le calcul.'); }
+        if (suiviHeureHelpIcon) { suiviHeureHelpIcon.onclick = () => alert('Données insuffisantes pour calculer l’heure sur feu.'); }
         document.querySelectorAll('#suivi-rotation-results-container .value').forEach(el => { el.textContent = '--'; el.className = 'value rotation-value-default'; });
     } else {
         document.getElementById('suivi-fuel-actuel').textContent = currentFuel !== null ? `${currentFuel} kg` : '--';
@@ -11075,6 +11172,13 @@ function updateDeroutementTab() {
         const icon = document.getElementById(id);
         if (icon) { icon.onclick = () => alert(formula || "Données insuffisantes pour le calcul."); }
     };
+    const isEmptyRetardant = document.getElementById('derout-empty-retardant-checkbox')?.checked === true;
+    const deroutEmptyModeState = isEmptyRetardant
+        ? 'COCHÉE — trajet initial GPS → Pélic → Feu, avec 10 min au pélicandrome'
+        : 'NON COCHÉE — trajet initial direct GPS → Feu';
+    const deroutModeImpactText = isEmptyRetardant
+        ? 'La case modifie le trajet initial vers le feu. Elle ne modifie pas la durée ni la consommation des rotations suivantes Feu ↔ Pélic.'
+        : 'Le trajet initial est direct vers le feu. La durée et la consommation de rotation concernent ensuite les rotations Feu ↔ Pélic.';
 
     const deroutFuelMiniPelicLabel = document.getElementById('derout-fuel-mini-pelic-label');
     if (deroutFuelMiniPelicLabel) {
@@ -11095,7 +11199,27 @@ function updateDeroutementTab() {
         const deroutConsoRotationEmpty = document.getElementById('derout-conso-rotation');
         if (deroutConsoRotationEmpty) deroutConsoRotationEmpty.textContent = '-- kg';
         document.getElementById('derout-cs-sur-feu').textContent = '--:--';
-        setHelp('derout-fuel-mini-base-help'); setHelp('derout-fuel-mini-pelic-help'); setHelp('derout-heure-sur-feu-help');
+        setHelp('derout-duree-rotation-help', `DURÉE ROTATION — DÉROUT. / GAAR
+
+Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+${deroutModeImpactText}
+
+Sélectionnez un feu pour afficher le calcul détaillé.`);
+        setHelp('derout-conso-rotation-help', `CONSO ROTATION — DÉROUT. / GAAR
+
+Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+${deroutModeImpactText}
+
+Sélectionnez un feu pour afficher le calcul détaillé.`);
+        setHelp('derout-fuel-mini-base-help', `Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+
+Sélectionnez un feu pour afficher le calcul détaillé.`);
+        setHelp('derout-fuel-mini-pelic-help', `Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+
+Sélectionnez un feu pour afficher le calcul détaillé.`);
+        setHelp('derout-heure-sur-feu-help', `Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+
+Sélectionnez un feu pour afficher le calcul détaillé.`);
         return;
     }
 
@@ -11114,6 +11238,59 @@ function updateDeroutementTab() {
     if (deroutConsoRotationDisplay) {
         deroutConsoRotationDisplay.textContent = (consoRotation === 250 || !selectedPelicanOACI) ? '-- kg' : `${consoRotation} kg`;
     }
+
+    const deroutRotationDistance = Number.isFinite(CALCULATOR_DATA.distPelicFeu)
+        ? Math.max(CALCULATOR_DATA.distPelicFeu, 10)
+        : null;
+    const deroutRotationSpeedNmMin = deroutRotationDistance !== null
+        ? (deroutRotationDistance <= 50 ? 3.5 : 4)
+        : null;
+    const deroutRotationConsoRate = deroutRotationDistance !== null
+        ? (deroutRotationDistance <= 70 ? 10 : 8)
+        : null;
+
+    setHelp('derout-duree-rotation-help', selectedPelicanOACI && deroutRotationDistance !== null
+        ? `DURÉE ROTATION FEU ↔ PÉLIC — DÉROUT. / GAAR
+
+Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+${deroutModeImpactText}
+
+Pélic sélectionné : ${selectedPelicanOACI}
+Distance Feu → Pélic mesurée : ${CALCULATOR_DATA.distPelicFeu} Nm
+Distance retenue : ${deroutRotationDistance} Nm, avec un minimum de 10 Nm
+Règle vitesse : ≤ 50 Nm = 3,5 Nm/min (210 kt) ; > 50 Nm = 4 Nm/min (240 kt)
+Vitesse retenue : ${deroutRotationSpeedNmMin} Nm/min
+Forfait rotation : 20 min
+
+Calcul : 20 + ((${deroutRotationDistance} × 2) / ${deroutRotationSpeedNmMin}) = ${formatTime(rotationTime)} (${rotationTime} min)`
+        : `DURÉE ROTATION — DÉROUT. / GAAR
+
+Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+${deroutModeImpactText}
+
+Sélectionnez un pélicandrome pour calculer la durée de rotation.`);
+
+    setHelp('derout-conso-rotation-help', selectedPelicanOACI && deroutRotationDistance !== null
+        ? `CONSO ROTATION FEU ↔ PÉLIC — DÉROUT. / GAAR
+
+Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+${deroutModeImpactText}
+
+Pélic sélectionné : ${selectedPelicanOACI}
+Distance Feu → Pélic mesurée : ${CALCULATOR_DATA.distPelicFeu} Nm
+Distance retenue : ${deroutRotationDistance} Nm, avec un minimum de 10 Nm
+Règle consommation aller-retour : ≤ 70 Nm = 10 kg/Nm ; > 70 Nm = 8 kg/Nm
+Taux retenu : ${deroutRotationConsoRate} kg/Nm
+Forfait largage : 250 kg
+
+Calcul : (${deroutRotationDistance} × ${deroutRotationConsoRate}) + 250 = ${consoRotation} kg`
+        : `CONSO ROTATION — DÉROUT. / GAAR
+
+Case « Retour Pélic avant feu » : ${deroutEmptyModeState}
+${deroutModeImpactText}
+
+Sélectionnez un pélicandrome pour calculer la consommation de rotation.`);
+
     const csFeuTime = parseTime(CALCULATOR_DATA.csFeu);
     const tmdTime = parseTime(document.getElementById('tmd').querySelector('.display-input').value);
     const limiteHDV = parseTime(document.getElementById('limite-hdv').querySelector('.display-input').value);
@@ -11125,8 +11302,6 @@ function updateDeroutementTab() {
         : (Number.isFinite(lastGpsLat) && Number.isFinite(lastGpsLng) ? { lat: lastGpsLat, lng: lastGpsLng } : null);
     const hasGpsPosition = !!userLatLng;
     const selectedPelicForDeroutement = selectedPelicanOACI ? getAirportByOaci(selectedPelicanOACI) : null;
-    const isEmptyRetardant = document.getElementById('derout-empty-retardant-checkbox')?.checked === true;
-
     const distGpsFeu = (hasGpsPosition && currentCommune)
         ? Math.round(calculateDistanceInNm(userLatLng.lat, userLatLng.lng, currentCommune.latitude_mairie, currentCommune.longitude_mairie))
         : null;
@@ -11172,12 +11347,12 @@ function updateDeroutementTab() {
         : `Distance GPS → Feu : ${distGpsFeu ?? 'N/A'} Nm`;
 
     setHelp('derout-fuel-mini-base-help', consoTransitFromGps !== null
-        ? `FUEL MINI 1 LRG / BASE\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Base :\n700 kg + conso Feu → Base = ${bingoBase} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase} = ${fuelMiniBase} kg`
+        ? `FUEL MINI 1 LRG / BASE\n\nCase « Retour Pélic avant feu » : ${deroutEmptyModeState}\n${deroutModeImpactText}\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Base\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Base :\n700 kg + conso Feu → Base = ${bingoBase} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoBase} = ${fuelMiniBase} kg`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
     setHelp('derout-fuel-mini-pelic-help', consoTransitFromGps !== null
-        ? `FUEL MINI 1 LRG / PÉLIC\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Pélic\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Pélic :\n700 kg + conso Feu → Pélic = ${bingoPelic} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic} = ${fuelMiniPelic} kg`
+        ? `FUEL MINI 1 LRG / PÉLIC\n\nCase « Retour Pélic avant feu » : ${deroutEmptyModeState}\n${deroutModeImpactText}\n\nFormule : Conso ${deroutFirstLegLabel} + forfait largage + BINGO Pélic\n\n${deroutFirstLegDetail}\n\nRègle conso transit :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nForfait largage : 250 kg\n\nBINGO Pélic :\n700 kg + conso Feu → Pélic = ${bingoPelic} kg\n\nCalcul : ${consoTransitFromGps} + 250 + ${bingoPelic} = ${fuelMiniPelic} kg`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
@@ -11186,7 +11361,7 @@ function updateDeroutementTab() {
     document.getElementById('derout-heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
     document.getElementById('derout-cs-sur-feu').textContent = CALCULATOR_DATA.csFeu;
     setHelp('derout-heure-sur-feu-help', transitTimeFromGps !== null
-        ? `HEURE SUR FEU — DÉROUTEMENT\n\nFormule : Heure actuelle + Durée ${deroutFirstLegLabel}\n\n${deroutFirstLegDetail}\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nHeure actuelle : ${formatTime(heureActuelle) || 'N/A'}\nDurée ${deroutFirstLegLabel} : ${formatTime(transitTimeFromGps) || 'N/A'} (${transitTimeFromGps} min)\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}`
+        ? `HEURE SUR FEU — DÉROUTEMENT\n\nCase « Retour Pélic avant feu » : ${deroutEmptyModeState}\n${deroutModeImpactText}\n\nFormule : Heure actuelle + Durée ${deroutFirstLegLabel}\n\n${deroutFirstLegDetail}\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nHeure actuelle : ${formatTime(heureActuelle) || 'N/A'}\nDurée ${deroutFirstLegLabel} : ${formatTime(transitTimeFromGps) || 'N/A'} (${transitTimeFromGps} min)\n\nCalcul : ${formatTime(heureActuelle) || 'N/A'} + ${formatTime(transitTimeFromGps) || 'N/A'} = ${formatTime(heureSurFeu) || 'N/A'}`
         : (isEmptyRetardant && !selectedPelicForDeroutement)
             ? 'Sélectionnez un pélicandrome pour le mode “vide retardant”.'
             : 'Distance GPS indisponible. Utilisez “🛰️ Rafraîchir GPS”.');
