@@ -1,5 +1,16 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.83 TEST — BINGO plus compacts / données rotation ajoutées au déroutement
+
+Modifications apportées :
+- dans les onglets « SUIVI ROTATIONS » et « DEROUT. / GAAR », réduction de la hauteur occupée par les zones BINGO sans modifier la taille de leurs polices ;
+- réduction ciblée des marges, paddings et espacements verticaux des deux onglets afin que leur contenu tienne sur l’écran de l’iPad sans défilement ;
+- ajout dans la colonne droite de l’onglet « DEROUT. / GAAR » de la « Durée Rotation » calculée automatiquement ;
+- ajout dans la même colonne de la « Conso Rotation » calculée automatiquement ;
+- ces deux nouvelles valeurs sont affichées en lecture seule, sans champ de saisie, bouton AUTO/MANUEL ni possibilité de modification ;
+- calculs identiques à ceux déjà utilisés par les onglets Prévision et Suivi rotations ;
+- aucune modification des tailles de police, règles de calcul, données enregistrées ou autres fonctions ;
+- version applicative portée en v13.83 TEST.
 
 v13.82 TEST — suppression du bouton MAJ / commune survolée décalée à droite
 
