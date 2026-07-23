@@ -8738,3 +8738,24 @@ body.gaar-point-search-open .gaar-editing-banner {
         top: calc(var(--safe-area-top) + 40px) !important;
     }
 }
+
+/* ==========================================================================
+   v13.80 TEST — pélicandromes légèrement plus compacts
+   Taille visuelle 20 px ; la zone tactile invisible JS reste à 40 px.
+   ========================================================================== */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-active,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-water,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    width: 20px !important;
+    height: 20px !important;
+    line-height: 20px !important;
+    font-size: 13px !important;
+    border-width: 2px !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.88), 0 2px 5px rgba(0,0,0,.38) !important;
+    box-sizing: border-box !important;
+}
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    line-height: 16px !important;
+    font-size: 15px !important;
+}
