@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-88_rlt_depart_lecture_seule_espacements';
+const SW_VERSION = 'sw-v13-89_corrections_rlt_suivi_alerte_maj';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
