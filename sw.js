@@ -1,4 +1,4 @@
-const SW_VERSION = 'sw-v13-82_suppression_bouton_maj_commune_droite';
+const SW_VERSION = 'sw-v13-83_bingo_compacts_derout_rotation';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
