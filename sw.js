@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v13-93_communes_priorite_population_police_nette';
-const APP_VERSION = 'v13.93';
+const SW_VERSION = 'sw-v13-94_derout_interlignes_identiques_suivi';
+const APP_VERSION = 'v13.94';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
