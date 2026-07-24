@@ -7,11 +7,11 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v13.91">
-    <link rel="manifest" href="manifest.json?appv=v13.91">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.91">
-    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.91">
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.91">
+    <link rel="stylesheet" href="style.css?appv=v13.92">
+    <link rel="manifest" href="manifest.json?appv=v13.92">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
     <meta name="theme-color" content="#0b2f6b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v13.91';
+        const APP_VERSION = 'v13.92';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -73,6 +73,43 @@
                 localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(Math.max(1, remaining)));
             } catch (_) {}
         }
+
+
+        /*
+         * v13.92 TEST — signal explicite du nouveau service worker.
+         * Le paramètre npfupdate=v13.92 est ajouté par le SW lors de son activation.
+         * Il ne dépend donc ni de l'ancienne valeur appVersion, ni du moment où Safari
+         * décide de remplacer l'ancien index. Dès que le nouvel index est réellement
+         * chargé, l'alerte est armée avant DOMContentLoaded.
+         */
+        const POST_UPDATE_TRANSITION_PARAM = 'npfupdate';
+        let postUpdateTransitionAtBoot = false;
+        try {
+            const bootUrl = new URL(window.location.href);
+            const transitionVersion = bootUrl.searchParams.get(POST_UPDATE_TRANSITION_PARAM) || '';
+            if (transitionVersion === APP_VERSION) {
+                postUpdateTransitionAtBoot = true;
+                window.NPF_FORCE_POST_UPDATE_NOTICE = true;
+                markPostUpdateRestartNotice(APP_VERSION, 2);
+
+                /*
+                 * Le paramètre reste présent quelques secondes afin qu'une éventuelle
+                 * seconde navigation de sécurisation du SW ne relance pas la page.
+                 */
+                setTimeout(() => {
+                    try {
+                        const cleanUrl = new URL(window.location.href);
+                        cleanUrl.searchParams.delete(POST_UPDATE_TRANSITION_PARAM);
+                        cleanUrl.searchParams.delete('swrefresh');
+                        window.history.replaceState(
+                            null,
+                            '',
+                            `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`
+                        );
+                    } catch (_) {}
+                }, 3500);
+            }
+        } catch (_) {}
 
 
         /*
@@ -290,6 +327,17 @@
                 const modal = document.createElement('div');
                 modal.id = 'post-update-restart-modal';
                 modal.className = 'update-reminder-modal post-update-restart-modal';
+                modal.style.cssText = [
+                    'position:fixed',
+                    'inset:0',
+                    'z-index:2147483647',
+                    'display:flex',
+                    'align-items:center',
+                    'justify-content:center',
+                    'padding:24px',
+                    'box-sizing:border-box',
+                    'background:rgba(0,0,0,.58)'
+                ].join(';');
                 modal.innerHTML = `
                     <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
                         <h3 id="post-update-restart-title">Mise à jour installée</h3>
@@ -299,6 +347,21 @@
                         <p>Si à un moment l’application devient anormalement lente à s’ouvrir ou reste bloquée au démarrage, supprime-la de l’écran d’accueil puis réinstalle-la depuis Safari.</p>
                     </div>
                 `;
+                const modalContent = modal.firstElementChild;
+                if (modalContent) {
+                    modalContent.style.cssText = [
+                        'width:min(620px,calc(100vw - 48px))',
+                        'max-height:calc(100vh - 48px)',
+                        'overflow:auto',
+                        'box-sizing:border-box',
+                        'padding:24px',
+                        'border-radius:16px',
+                        'background:#fff',
+                        'color:#1f2937',
+                        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+                        'box-shadow:0 18px 50px rgba(0,0,0,.35)'
+                    ].join(';');
+                }
                 document.body.appendChild(modal);
 
                 /*
@@ -328,6 +391,10 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             showEarlyPostUpdateRestartNoticeModalIfNeeded();
+            if (postUpdateTransitionAtBoot || window.NPF_FORCE_POST_UPDATE_NOTICE) {
+                setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 50);
+                setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 500);
+            }
             const mainVersionDisplay = document.getElementById('app-version-display');
             if (mainVersionDisplay) {
                 mainVersionDisplay.textContent = APP_VERSION;
@@ -468,7 +535,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v13.91"></script>
+    <script src="script.js?appv=v13.92"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -607,6 +674,8 @@
                             <div class="bingo-group"><div class="result-line"><span class="label base-bingo-label">BINGO BASE</span><span class="value" id="derout-bingo-base">-- kg</span></div></div><hr class="analyse-separator">
                             <div class="rotations-group derout-fuel-mini-group">
                                 <h3 class="analyse-col-title">FUEL MINI</h3>
+                                <div class="result-line derout-fuel-mini-base-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 Lrg / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
+                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-pelic-label">Fuel mini 1 Lrg / Pélic :</span><span id="derout-fuel-mini-pelic-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
                             </div>
                             <div class="rotations-group rotation-count-group">
                                 <h3 class="analyse-col-title">Nbr Rotations Possibles</h3>
@@ -634,8 +703,6 @@
                                 <div class="result-line"><span class="label">Heure sur Feu :<span id="derout-heure-sur-feu-help" class="formula-help-icon">?</span></span><span class="value" id="derout-heure-sur-feu">--:--</span></div>
                                 <div class="result-line derout-readonly-rotation-line"><span class="label">Durée Rotation :<span id="derout-duree-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="derout-duree-rotation">--:--</span></div>
                                 <div class="result-line derout-readonly-rotation-line derout-conso-rotation-line"><span class="label">Conso Rotation :<span id="derout-conso-rotation-help" class="formula-help-icon">?</span></span><span class="value" id="derout-conso-rotation">-- kg</span></div>
-                                <div class="result-line derout-fuel-mini-base-line"><span class="label"><span id="derout-fuel-mini-base-label">Fuel mini 1 Lrg / BASE (LFTW) :</span><span id="derout-fuel-mini-base-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-base">-- kg</span></div>
-                                <div class="result-line"><span class="label"><span id="derout-fuel-mini-pelic-label">Fuel mini 1 Lrg / Pélic :</span><span id="derout-fuel-mini-pelic-help" class="formula-help-icon">?</span></span><span class="value" id="derout-fuel-mini-pelic">-- kg</span></div>
                                 
                             </div>
                         </div>
