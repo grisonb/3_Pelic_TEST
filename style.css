@@ -9247,3 +9247,39 @@ body.gaar-point-search-open .gaar-editing-banner {
     font-synthesis: none !important;
     text-rendering: optimizeLegibility;
 }
+
+
+/* ==========================================================================
+   v13.94 TEST — Dérout. / GAAR : interlignes identiques à Suivi rotations
+   Fenêtre de droite uniquement. Tailles de police et contrôles inchangés.
+   ========================================================================== */
+
+#deroutement .rotation-details-group {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    padding: 14px 14px 8px !important;
+}
+
+#deroutement .rotation-details-group .analyse-col-title {
+    display: none !important;
+}
+
+#deroutement .rotation-details-group > .result-line,
+#deroutement .rotation-details-group > .result-line:not(:last-child),
+#deroutement .rotation-details-group > .result-line:last-child,
+#deroutement .rotation-details-group > .derout-empty-retardant-line,
+#deroutement .rotation-details-group > .derout-cs-sur-feu-line,
+#deroutement .rotation-details-group > .derout-conso-rotation-line {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+}
+
+#deroutement .rotation-details-group > .result-line + .result-line {
+    margin-top: 16px !important;
+}
+
+#deroutement .rotation-details-group > .result-line .value {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
