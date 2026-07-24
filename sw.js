@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v13-92_fuel_mini_transfere_alerte_premier_lancement';
-const APP_VERSION = 'v13.92';
+const SW_VERSION = 'sw-v13-93_communes_priorite_population_police_nette';
+const APP_VERSION = 'v13.93';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
