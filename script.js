@@ -444,6 +444,17 @@ let communesViewportLayerData = [];
 let communesPolygonData = [];
 let communesLayerLoadController = null;
 let communesLayerLoadPromise = null;
+
+/*
+ * v13.93 TEST — priorité des libellés de communes selon la population.
+ * La géométrie Etalab reste la source des contours. La population est chargée
+ * séparément depuis l'API officielle geo.api.gouv.fr et mise en cache localement.
+ */
+const COMMUNES_POPULATION_API_URL = 'https://geo.api.gouv.fr/communes?fields=nom,code,population&format=json';
+const COMMUNES_POPULATION_CACHE_KEY = 'npfCommunesPopulationV1';
+const COMMUNES_POPULATION_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+let communesPopulationByInsee = new Map();
+let communesPopulationLoadPromise = null;
 const DEFAULT_BASE_OACI = 'LFTW';
 let selectedBaseOACI = DEFAULT_BASE_OACI;
 let gaarCircuits = [];
@@ -5843,6 +5854,10 @@ function getCommunesBoundaryStyle() {
 function buildCommuneNameIcon(communeName) {
     const zoom = map && Number.isFinite(map.getZoom()) ? map.getZoom() : 12;
 
+    /*
+     * Tailles strictement inchangées :
+     * 10 px, 11 px à partir du zoom 13, 12 px à partir du zoom 15.
+     */
     let fontSize = 10;
     let maxWidth = 120;
 
@@ -5865,18 +5880,23 @@ function buildCommuneNameIcon(communeName) {
             text-overflow:ellipsis;
             padding:1px 4px;
             border-radius:6px;
-            background:rgba(255,255,255,.78);
-            color:#000;
+            background:rgba(255,255,255,.90);
+            color:#050505;
+            font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Arial,sans-serif;
             font-size:${fontSize}px;
-            font-weight:800;
+            font-weight:700;
+            font-synthesis:none;
+            font-kerning:normal;
+            letter-spacing:0;
             line-height:1.05;
             text-align:center;
-            text-shadow:
-                -1px -1px 0 #fff,
-                1px -1px 0 #fff,
-                -1px 1px 0 #fff,
-                1px 1px 0 #fff;
-            box-shadow:0 1px 3px rgba(0,0,0,.25);
+            text-rendering:optimizeLegibility;
+            -webkit-font-smoothing:auto;
+            -webkit-text-stroke:0 transparent;
+            text-shadow:none;
+            box-shadow:
+                inset 0 0 0 1px rgba(255,255,255,.95),
+                0 1px 2px rgba(0,0,0,.22);
             white-space:nowrap;
         ">${escapeHtml(communeName)}</span>`,
         iconSize: [1, 1],
@@ -5951,6 +5971,137 @@ function renderVisibleCommuneLayers() {
 }
 
 
+
+function normalizeCommuneLabelKey(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+}
+
+function hydrateCommunesPopulationMap(entries) {
+    const nextMap = new Map();
+
+    for (const entry of Array.isArray(entries) ? entries : []) {
+        const code = String(Array.isArray(entry) ? entry[0] : entry?.code || '').trim();
+        const population = Number(Array.isArray(entry) ? entry[1] : entry?.population);
+
+        if (!code || !Number.isFinite(population) || population < 0) continue;
+        nextMap.set(code, population);
+    }
+
+    if (nextMap.size) communesPopulationByInsee = nextMap;
+    return communesPopulationByInsee;
+}
+
+function readCachedCommunesPopulation() {
+    try {
+        const raw = localStorage.getItem(COMMUNES_POPULATION_CACHE_KEY);
+        if (!raw) return false;
+
+        const cached = JSON.parse(raw);
+        const savedAt = Number(cached?.savedAt || 0);
+        const entries = Array.isArray(cached?.entries) ? cached.entries : [];
+
+        hydrateCommunesPopulationMap(entries);
+        return communesPopulationByInsee.size > 0
+            && savedAt > 0
+            && (Date.now() - savedAt) <= COMMUNES_POPULATION_CACHE_MAX_AGE_MS;
+    } catch (_) {
+        return false;
+    }
+}
+
+function applyPopulationToCommuneLabels() {
+    for (const item of communesLabelData) {
+        if (!item) continue;
+        const population = item.inseeCode
+            ? Number(communesPopulationByInsee.get(item.inseeCode))
+            : NaN;
+
+        if (Number.isFinite(population) && population >= 0) {
+            item.population = population;
+        }
+    }
+}
+
+async function loadCommunesPopulationIndex() {
+    if (communesPopulationLoadPromise) return communesPopulationLoadPromise;
+
+    const cacheIsFresh = readCachedCommunesPopulation();
+
+    communesPopulationLoadPromise = (async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+        try {
+            const response = await fetch(COMMUNES_POPULATION_API_URL, {
+                cache: cacheIsFresh ? 'force-cache' : 'default',
+                signal: controller.signal
+            });
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            const entries = [];
+
+            for (const commune of Array.isArray(data) ? data : []) {
+                const code = String(commune?.code || '').trim();
+                const population = Number(commune?.population);
+                if (!code || !Number.isFinite(population) || population < 0) continue;
+                entries.push([code, population]);
+            }
+
+            hydrateCommunesPopulationMap(entries);
+
+            try {
+                localStorage.setItem(COMMUNES_POPULATION_CACHE_KEY, JSON.stringify({
+                    savedAt: Date.now(),
+                    entries
+                }));
+            } catch (_) {}
+        } catch (error) {
+            console.warn('[Communes] Population indisponible, classement de secours conservé :', error);
+        } finally {
+            clearTimeout(timeoutId);
+        }
+
+        applyPopulationToCommuneLabels();
+
+        if (areCommunesVisible && hasLoadedCommunes) {
+            renderVisibleCommuneLabels();
+        }
+
+        return communesPopulationByInsee;
+    })();
+
+    return communesPopulationLoadPromise;
+}
+
+function isCurrentCommuneLabel(item) {
+    if (!item || !currentCommune) return false;
+
+    const itemCode = String(item.inseeCode || '');
+    const currentCode = String(getCommuneInseeCodeFromProperties(currentCommune) || '');
+    if (itemCode && currentCode && itemCode === currentCode) return true;
+
+    const currentName = currentCommune.nom_standard
+        || currentCommune.nom
+        || currentCommune.name
+        || currentCommune.libelle
+        || '';
+
+    return normalizeCommuneLabelKey(item.name) === normalizeCommuneLabelKey(currentName);
+}
+
+function getCommuneLabelDistanceToCenter(item, center) {
+    if (!item?.latLng || !center) return Number.POSITIVE_INFINITY;
+    const latDiff = Number(item.latLng.lat) - Number(center.lat);
+    const lngDiff = Number(item.latLng.lng) - Number(center.lng);
+    return (latDiff * latDiff) + (lngDiff * lngDiff);
+}
+
 function renderVisibleCommuneLabels() {
     if (!map || !communesLabelsLayer || !areCommunesVisible || !hasLoadedCommunes) return;
 
@@ -5960,20 +6111,36 @@ function renderVisibleCommuneLabels() {
     if (zoom < COMMUNES_DISPLAY_MIN_ZOOM) return;
 
     const bounds = map.getBounds().pad(0.05);
+    const center = map.getCenter();
     const maxLabels = zoom >= 14 ? 450 : 220;
-    let count = 0;
 
-    for (const item of communesLabelData) {
-        if (count >= maxLabels) break;
-        if (!bounds.contains(item.latLng)) continue;
+    /*
+     * Priorité :
+     * 1. commune sélectionnée ;
+     * 2. population décroissante ;
+     * 3. proximité du centre à population égale ou inconnue.
+     */
+    const visibleItems = communesLabelData
+        .filter(item => item?.latLng && bounds.contains(item.latLng))
+        .sort((a, b) => {
+            const selectedDifference = Number(isCurrentCommuneLabel(b)) - Number(isCurrentCommuneLabel(a));
+            if (selectedDifference) return selectedDifference;
 
+            const populationA = Number.isFinite(Number(a.population)) ? Number(a.population) : 0;
+            const populationB = Number.isFinite(Number(b.population)) ? Number(b.population) : 0;
+            if (populationA !== populationB) return populationB - populationA;
+
+            return getCommuneLabelDistanceToCenter(a, center)
+                - getCommuneLabelDistanceToCenter(b, center);
+        })
+        .slice(0, maxLabels);
+
+    for (const item of visibleItems) {
         communesLabelsLayer.addLayer(L.marker(item.latLng, {
             icon: buildCommuneNameIcon(item.name),
             interactive: false,
             keyboard: false
         }));
-
-        count += 1;
     }
 }
 
@@ -6287,6 +6454,9 @@ function getCommunesGeojsonUrl() {
 async function loadCommunesLayerData() {
     if (hasLoadedCommunes) return;
 
+    // Chargement en parallèle : la population ne bloque pas la carte.
+    loadCommunesPopulationIndex().catch(() => null);
+
     const communesSource = getCommunesGeojsonUrl();
     const COMMUNES_GEOJSON_URL = communesSource.url;
 
@@ -6329,9 +6499,27 @@ async function loadCommunesLayerData() {
         });
 
         const center = layerBounds.getCenter();
+        const inseeCode = getCommuneInseeCodeFromProperties(properties);
+        const directPopulationCandidates = [
+            properties.population,
+            properties.population_municipale,
+            properties.populationMunicipale,
+            properties.pop
+        ];
+        const directPopulation = directPopulationCandidates
+            .map(value => Number(value))
+            .find(value => Number.isFinite(value) && value >= 0);
+        const indexedPopulation = inseeCode
+            ? Number(communesPopulationByInsee.get(String(inseeCode)))
+            : NaN;
+
         communesLabelData.push({
             name: communeName,
-            latLng: center
+            inseeCode: String(inseeCode || ''),
+            latLng: center,
+            population: Number.isFinite(indexedPopulation)
+                ? indexedPopulation
+                : (Number.isFinite(directPopulation) ? directPopulation : 0)
         });
     });
 
