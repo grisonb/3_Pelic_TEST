@@ -1,5 +1,41 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.93 TEST — priorité des communes par population / noms plus nets à taille inchangée
+
+Modifications apportées :
+- correction de la disparition de communes importantes, notamment Lézignan-Corbières, lorsque la limite de libellés visibles est atteinte ;
+- récupération de la population communale depuis l’API officielle geo.api.gouv.fr ;
+- association des populations aux contours Etalab par code INSEE ;
+- mise en cache locale de l’index des populations pendant 30 jours ;
+- chargement des populations en parallèle afin de ne pas ralentir l’apparition initiale de la carte ;
+- classement des communes visibles dans l’ordre suivant : commune sélectionnée, population décroissante, puis proximité du centre de la carte ;
+- conservation stricte des limites existantes de 220 libellés et 450 libellés à partir du zoom 14 ;
+- conservation stricte du seuil d’affichage actuel des communes ;
+- conservation stricte des tailles de police existantes : 10 px, 11 px et 12 px selon le niveau de zoom ;
+- amélioration de la netteté par utilisation de la police système iPad, suppression des ombres multiples, fond légèrement plus opaque et contour de cellule plus propre ;
+- fonctionnement de secours conservé hors ligne : dernier classement mis en cache, puis proximité du centre si aucune population n’est disponible ;
+- aucune modification des icônes de l’application ou des boutons ;
+- version applicative portée en v13.93 TEST.
+
+v13.92 TEST — transfert effectif FUEL MINI / fenêtre rotations ajustée / alerte au premier lancement
+
+Modifications apportées :
+- dans l’onglet « DEROUT. / GAAR », transfert réel des deux lignes « Fuel mini 1 Lrg / BASE » et « Fuel mini 1 Lrg / Pélic » dans la fenêtre séparée intitulée « FUEL MINI » ;
+- suppression de ces deux lignes de la fenêtre de droite afin d’éviter tout doublon ;
+- conservation stricte des identifiants, valeurs calculées et aides « ? » existants ;
+- ajustement de la fenêtre « Nbr Rotations Possibles » à la hauteur exacte de son titre et de ses cinq lignes ;
+- suppression de son étirement automatique dans l’espace vertical restant ;
+- suppression de la marge vide sous sa dernière ligne ;
+- correction du message « Mise à jour installée » par ajout d’un signal explicite « npfupdate=v13.92 » transmis par le nouveau service worker ;
+- le déclenchement de l’alerte ne dépend plus uniquement de la valeur appVersion enregistrée dans le stockage local ;
+- double navigation de sécurisation du service worker, espacée de 900 ms, afin de couvrir la recharge concurrente provoquée par controllerchange sur iPad/PWA ;
+- armement de l’alerte avant DOMContentLoaded dès que le nouvel index reçoit le signal de transition ;
+- affichage de secours répété à 50 ms et 500 ms si Safari diffère la création du body ;
+- styles essentiels de la fenêtre intégrés directement à la modale pour qu’elle reste visible même si l’ancienne feuille CSS est encore servie pendant la transition ;
+- conservation de l’alerte jusqu’à deux secondes de visibilité réelle ;
+- aucune modification des calculs, des autres onglets, des données enregistrées ni des cartes hors ligne ;
+- version applicative portée en v13.92 TEST.
+
 v13.91 TEST — alerte post-MAJ fiable / fenêtre FUEL MINI séparée en Dérout. / GAAR
 
 Modifications apportées :
