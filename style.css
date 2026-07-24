@@ -9201,3 +9201,31 @@ body.gaar-point-search-open .gaar-editing-banner {
         margin-bottom: 10px !important;
     }
 }
+
+
+/* ==========================================================================
+   v13.92 TEST — transfert FUEL MINI / fenêtre rotations ajustée au contenu
+   ========================================================================== */
+
+/* Les lignes Fuel mini sont maintenant réellement dans cette fenêtre. */
+#deroutement .derout-fuel-mini-group {
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+}
+
+/* La fenêtre Nbr Rotations Possibles ne s'étire plus dans l'espace restant. */
+@media (min-width: 761px) {
+    #deroutement .analyse-col:first-child > .rotation-count-group {
+        flex: 0 0 auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        align-self: stretch;
+        margin-bottom: 10px !important;
+    }
+}
+
+/* La dernière ligne termine la fenêtre sans marge vide supplémentaire. */
+#deroutement .rotation-count-group .rotation-results-container .result-line:last-child {
+    margin-bottom: 0 !important;
+}
