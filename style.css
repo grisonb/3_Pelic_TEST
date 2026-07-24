@@ -9283,3 +9283,31 @@ body.gaar-point-search-open .gaar-editing-banner {
     padding-top: 6px !important;
     padding-bottom: 6px !important;
 }
+
+
+/* ==========================================================================
+   v13.95 TEST — Dérout. / GAAR : fenêtre droite ajustée au contenu
+   Les interlignes v13.94 restent strictement inchangés.
+   ========================================================================== */
+
+@media (min-width: 761px) {
+    /*
+     * L'ancienne règle étirait la seconde colonne sur 100 % de la hauteur de la
+     * grille et donnait flex: 1 à la fenêtre. La colonne et la fenêtre reprennent
+     * maintenant leur hauteur naturelle.
+     */
+    #deroutement .analyse-col:nth-child(2) {
+        align-self: start !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    #deroutement .rotation-details-group {
+        flex: 0 0 auto !important;
+        align-self: stretch !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        margin-bottom: 0 !important;
+    }
+}
