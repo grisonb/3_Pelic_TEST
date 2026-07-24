@@ -1,5 +1,16 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.95 TEST — fenêtre droite Dérout. / GAAR ajustée au contenu
+
+Modifications apportées :
+- suppression de l’étirement vertical résiduel de la seconde colonne de l’onglet Dérout. / GAAR ;
+- suppression du comportement flex extensible de la fenêtre de droite ;
+- hauteur de la fenêtre désormais calculée automatiquement selon son contenu ;
+- fin de la fenêtre immédiatement après la ligne « Conso Rotation » ;
+- interlignes de 16 px validés en v13.94 strictement conservés ;
+- tailles de police, calculs, champs et fenêtre de gauche inchangés ;
+- version applicative portée en v13.95 TEST.
+
 v13.94 TEST — interlignes Dérout. / GAAR identiques à Suivi rotations
 
 Modifications apportées :
