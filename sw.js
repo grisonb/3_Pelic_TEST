@@ -1,4 +1,5 @@
-const SW_VERSION = 'sw-v13-91_alerte_maj_fuel_mini_separe';
+const SW_VERSION = 'sw-v13-92_fuel_mini_transfere_alerte_premier_lancement';
+const APP_VERSION = 'v13.92';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -132,19 +133,31 @@ self.addEventListener('activate', event => {
          * ou styles d'une autre version. Les bases IndexedDB des tuiles offline ne
          * sont pas supprimées.
          */
-        try {
-            const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-            await Promise.all(windowClients.map(async (client) => {
-                try {
-                    if (!client || typeof client.navigate !== 'function') return;
-                    const url = new URL(client.url);
-                    if (url.origin !== self.location.origin) return;
-                    if (url.searchParams.get('swrefresh') === SW_VERSION) return;
-                    url.searchParams.set('swrefresh', SW_VERSION);
-                    await client.navigate(url.toString());
-                } catch (_) {}
-            }));
-        } catch (_) {}
+        /*
+         * v13.92 — la transition de version transporte un signal explicite
+         * npfupdate=v13.92. Deux passages espacés sécurisent le cas iPad où
+         * controllerchange recharge d'abord l'ancien URL avant client.navigate.
+         */
+        const navigateClientsToUpdatedVersion = async () => {
+            try {
+                const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+                await Promise.all(windowClients.map(async (client) => {
+                    try {
+                        if (!client || typeof client.navigate !== 'function') return;
+                        const url = new URL(client.url);
+                        if (url.origin !== self.location.origin) return;
+                        if (url.searchParams.get('npfupdate') === APP_VERSION) return;
+                        url.searchParams.set('swrefresh', SW_VERSION);
+                        url.searchParams.set('npfupdate', APP_VERSION);
+                        await client.navigate(url.toString());
+                    } catch (_) {}
+                }));
+            } catch (_) {}
+        };
+
+        await navigateClientsToUpdatedVersion();
+        await swDelay(900);
+        await navigateClientsToUpdatedVersion();
     })());
 });
 
