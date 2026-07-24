@@ -3390,7 +3390,8 @@ function showPostUpdateRestartNoticeIfNeeded() {
         const pending = localStorage.getItem('npfPostUpdateRestartNoticePending') === '1';
         const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
         const currentVersion = (typeof window.APP_VERSION !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '';
-        if (!pending && !noticeVersion) return;
+        const forcedByTransition = window.NPF_FORCE_POST_UPDATE_NOTICE === true;
+        if (!forcedByTransition && !pending && !noticeVersion) return;
         // v12.92 — si pending=1, afficher même si le marqueur de version vient de l'ancienne version.
         if (!pending && currentVersion && noticeVersion && noticeVersion !== currentVersion) return;
         showPostUpdateRestartNoticeModal();
@@ -3403,6 +3404,17 @@ function showPostUpdateRestartNoticeModal() {
     const modal = document.createElement('div');
     modal.id = 'post-update-restart-modal';
     modal.className = 'update-reminder-modal post-update-restart-modal';
+    modal.style.cssText = [
+        'position:fixed',
+        'inset:0',
+        'z-index:2147483647',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        'padding:24px',
+        'box-sizing:border-box',
+        'background:rgba(0,0,0,.58)'
+    ].join(';');
     modal.innerHTML = `
         <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
             <h3 id="post-update-restart-title">Mise à jour installée</h3>
@@ -3413,18 +3425,46 @@ function showPostUpdateRestartNoticeModal() {
         </div>
     `;
 
+    const modalContent = modal.firstElementChild;
+    if (modalContent) {
+        modalContent.style.cssText = [
+            'width:min(620px,calc(100vw - 48px))',
+            'max-height:calc(100vh - 48px)',
+            'overflow:auto',
+            'box-sizing:border-box',
+            'padding:24px',
+            'border-radius:16px',
+            'background:#fff',
+            'color:#1f2937',
+            'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+            'box-shadow:0 18px 50px rgba(0,0,0,.35)'
+        ].join(';');
+    }
     document.body.appendChild(modal);
 
     /*
-     * v12.82 — fenêtre post-MAJ persistante : pas de bouton OK, pas de
-     * fermeture par clic extérieur. Elle reste affichée jusqu'à fermeture / 
-     * relance de l'app. On efface le marqueur dès l'affichage pour ne pas
-     * la revoir au lancement suivant.
+     * v13.92 — même règle que l'alerte précoce : le marqueur n'est consommé
+     * qu'après deux secondes de visibilité réelle.
      */
-    try {
-        localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-        localStorage.removeItem('npfPostUpdateRestartNoticePending');
-    } catch (_) {}
+    setTimeout(() => {
+        try {
+            if (!document.body || !document.body.contains(modal)) return;
+            if (document.visibilityState === 'hidden') return;
+
+            const remainingKey = 'npfPostUpdateRestartNoticeRemaining';
+            const remainingRaw = Number(localStorage.getItem(remainingKey) || '1');
+            const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
+            if (remaining > 1) {
+                localStorage.setItem(remainingKey, String(remaining - 1));
+                localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
+            } else {
+                localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
+                localStorage.removeItem('npfPostUpdateRestartNoticePending');
+                localStorage.removeItem(remainingKey);
+                window.NPF_FORCE_POST_UPDATE_NOTICE = false;
+            }
+        } catch (_) {}
+    }, 2000);
 }
 
 function showUpdateReminderIfDue() {
