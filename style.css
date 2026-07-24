@@ -9229,3 +9229,21 @@ body.gaar-point-search-open .gaar-editing-banner {
 #deroutement .rotation-count-group .rotation-results-container .result-line:last-child {
     margin-bottom: 0 !important;
 }
+
+
+/* ==========================================================================
+   v13.93 TEST — netteté des noms de communes, tailles inchangées
+   ========================================================================== */
+
+.leaflet-marker-icon.commune-name-label {
+    background: transparent !important;
+    border: 0 !important;
+    filter: none !important;
+    opacity: 1 !important;
+    will-change: auto !important;
+}
+
+.leaflet-marker-icon.commune-name-label > span {
+    font-synthesis: none !important;
+    text-rendering: optimizeLegibility;
+}
