@@ -1,5 +1,16 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.94 TEST — interlignes Dérout. / GAAR identiques à Suivi rotations
+
+Modifications apportées :
+- réduction des espaces verticaux dans la fenêtre de droite de l’onglet Dérout. / GAAR ;
+- suppression de la répartition automatique « space-between » qui étirait les lignes sur toute la hauteur disponible ;
+- application du même rythme vertical que dans la fenêtre de droite de l’onglet Suivi rotations ;
+- espace fixe de 16 px entre deux lignes successives ;
+- padding interne aligné sur Suivi rotations : 14 px en haut, 14 px sur les côtés et 8 px en bas ;
+- tailles de police, dimensions des champs, calculs et colonne de gauche inchangés ;
+- version applicative portée en v13.94 TEST.
+
 v13.93 TEST — priorité des communes par population / noms plus nets à taille inchangée
 
 Modifications apportées :
