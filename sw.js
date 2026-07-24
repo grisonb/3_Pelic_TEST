@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v13-94_derout_interlignes_identiques_suivi';
-const APP_VERSION = 'v13.94';
+const SW_VERSION = 'sw-v13-95_derout_fenetre_ajustee_contenu';
+const APP_VERSION = 'v13.95';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
