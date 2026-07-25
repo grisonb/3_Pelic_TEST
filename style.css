@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.08') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.08') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.09') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.09') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10201,5 +10201,53 @@ body.gaar-point-search-open .gaar-editing-banner {
         width: min(94vw, 430px);
         padding-left: 16px;
         padding-right: 16px;
+    }
+}
+
+
+/* ==========================================================================
+   v14.09 TEST — clavier immédiat et altitude simulation
+   ========================================================================== */
+
+.simulation-motion-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.simulation-motion-input-unit {
+    grid-template-columns: minmax(0, 1fr) 38px !important;
+}
+
+.simulation-motion-input-unit input {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    touch-action: manipulation !important;
+}
+
+.simulation-motion-button-summary {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    max-width: 88px !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    line-height: 1.05 !important;
+}
+
+.simulation-motion-button-summary > span {
+    display: block !important;
+    white-space: nowrap !important;
+}
+
+.simulation-motion-button-summary > span:last-child {
+    margin-top: 2px !important;
+    font-size: 10px !important;
+    opacity: .92 !important;
+}
+
+@media (max-width: 620px) {
+    .simulation-motion-fields {
+        grid-template-columns: 1fr !important;
     }
 }
