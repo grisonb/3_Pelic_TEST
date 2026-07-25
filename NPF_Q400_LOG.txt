@@ -1,5 +1,49 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.97 TEST — trafic actif et menu des filtres accessible
+
+Modifications apportées :
+- réactivation du bouton TRAFIC sur la carte ;
+- réactivation du moteur trafic pour permettre les essais d’affichage ;
+- appui court conservé pour afficher ou masquer les trafics ;
+- appui long conservé pour ouvrir le menu complet des filtres ;
+- conservation et mémorisation de tous les réglages sous trafficLayerSettingsV1 ;
+- rétablissement de la mémorisation de l’état visible ou masqué du trafic entre deux ouvertures ;
+- utilisation automatique des sources ADS-B existantes tant que SAFESKY_PROXY_URL reste vide ;
+- aucun appel SafeSky effectué en l’absence de proxy configuré ;
+- code préparatoire SafeSky v13.96 intégralement conservé ;
+- passage ultérieur à SafeSky limité au renseignement de SAFESKY_PROXY_URL et à la configuration du proxy serveur ;
+- version applicative portée en v13.97 TEST.
+
+v13.96 TEST — code préparatoire pour l’intégration SafeSky
+
+Modifications apportées :
+- ajout d’un adaptateur SafeSky dans le moteur trafic existant ;
+- ajout du calcul d’une zone SafeSky « viewport » à partir du point GPS ou du feu et du rayon réglé en NM ;
+- préparation de l’appel à un proxy serveur SafeSky sans aucune clé dans le code client ou le dépôt GitHub ;
+- ajout d’un emplacement unique SAFESKY_PROXY_URL, laissé vide jusqu’à réception et installation de la clé Sandbox ;
+- SafeSky placé en source prioritaire dès que le proxy sera renseigné, avec conservation des sources ADS-B existantes comme solutions de secours ;
+- conversion automatique de l’altitude SafeSky de mètres AMSL vers pieds ;
+- conversion automatique de la vitesse sol SafeSky de m/s vers nœuds ;
+- conversion de last_update en âge de position pour conserver le filtre de fraîcheur existant ;
+- prise en charge du cap SafeSky « course », de l’indicatif « call_sign », du type « beacon_type » et de la source « transponder_type » ;
+- exclusion des statuts GROUNDED et INACTIVE du calque mobile ;
+- exclusion volontaire des objets SafeSky ADVISORY du symbole avion, car ils décrivent des zones drone et non des positions mobiles ;
+- conservation de tous les filtres trafic existants : rayon, nombre maximal, altitude absolue, tranche relative ± altitude GPS, affichage autour de la position et/ou du feu, étiquette d’altitude ;
+- conservation du rafraîchissement toutes les 5 secondes, du dédoublonnage, du badge, des vecteurs et des fenêtres détaillées ;
+- ajout d’un diagnostic console getSafeSkyIntegrationStatus() ne contenant aucun secret ;
+- bouton TRAFIC toujours masqué et moteur toujours verrouillé jusqu’à validation de la clé Sandbox et du proxy ;
+- aucune modification fonctionnelle des autres onglets ;
+- version applicative portée en v13.96 TEST.
+
+Étapes restant à effectuer à réception de la clé Sandbox :
+- créer ou compléter le proxy serveur avec la clé dans un fichier de configuration non public ;
+- renseigner SAFESKY_PROXY_URL ;
+- tester le endpoint santé puis /v1/beacons ;
+- passer TRAFFIC_DISABLED_FOR_NOW à false ;
+- retirer la règle CSS masquant le bouton TRAFIC ;
+- valider le trafic réel, les filtres et le dédoublonnage avant passage en Production.
+
 v13.95 TEST — fenêtre droite Dérout. / GAAR ajustée au contenu
 
 Modifications apportées :
