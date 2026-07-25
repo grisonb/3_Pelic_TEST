@@ -4777,17 +4777,34 @@ function resolveTrafficVisualType(aircraft) {
     if (emitterMapping[emitterCategory]) return emitterMapping[emitterCategory];
 
     /*
-     * Priorité 3 : quelques familles de désignateurs fréquemment reconnues.
-     * Les désignateurs non sûrs restent volontairement en avion standard.
+     * Priorité 3 : désignateur ICAO de type.
+     *
+     * Cette classification ne prétend pas reproduire la silhouette exacte de
+     * chaque modèle. Elle choisit la bonne grande famille visuelle.
      */
-    if (/^(B74|B75|B76|B77|B78|A33|A34|A35|A38|A3ST|C5M|AN12|AN22|AN72|IL76)/.test(designator)) {
+    const jetDesignatorPattern = /^(?:A18[89]|A19[0-9N]|A20N|A21N|A22[0-9]|A30[06B]|A310|A31[89]|A32[0-9]|A33[0-9]|A34[0-9]|A35[0-9]|A38[08]|A3ST|B70[37]|B71[27]|B72[0-2]|B73[1-9]|B37M|B38M|B39M|B74[1-8RS]|B75[23]|B76[2-4]|B77[2-39LW]|B78[89X]|BCS[13]|CRJ[1-9X]|E17[05]|E19[05]|E29[05]|F70|F100|MD8[0-9]|MD90|DC9|DC10|L101|IL62|IL76|AN12[4-9]|C5M)/;
+    if (jetDesignatorPattern.test(designator)) {
         return 'jet';
     }
-    if (/^(H|EC|AS|SA|R44|R22|B06|B47|S76|AW)/.test(designator)) {
+
+    const turbopropDesignatorPattern = /^(?:AT4[3-6]|AT7[2-6]|DH8[ABCD]|Q400|SF34|E120|F50|F60|D328|C212|C295|CN35|AN2[468]|AN32|L410|BE20|BE30|B350|SW4|JS3[12]|JS41|C130|C160|P3|P8)/;
+    if (turbopropDesignatorPattern.test(designator)) {
+        return 'turboprop';
+    }
+
+    const helicopterDesignatorPattern = /^(?:H[0-9A-Z]{1,3}|EC[0-9A-Z]{2,4}|AS[0-9A-Z]{2,4}|SA[0-9A-Z]{2,4}|R22|R44|R66|B06|B47|S76|AW[0-9A-Z]{2,4}|BK17|H145|H135|H160|H175|H225|NH90|TIGR)/;
+    if (helicopterDesignatorPattern.test(designator)) {
         return 'helicopter';
     }
-    if (/^(GLID|ASW|DG|DUOD|LS|JS|SZD|ASK|ASTR)/.test(designator)) {
+
+    const gliderDesignatorPattern = /^(?:GLID|ASW|DG[0-9A-Z]*|DUOD|LS[0-9A-Z]*|JS[0-9A-Z]*|SZD|ASK|ASTR|VENT|DISC|NIMB|JANU|ARCUS)/;
+    if (gliderDesignatorPattern.test(designator)) {
         return 'glider';
+    }
+
+    const gyrocopterDesignatorPattern = /^(?:GYRO|MTO|CAVAL|MAGN|ELA|XENON)/;
+    if (gyrocopterDesignatorPattern.test(designator)) {
+        return 'gyrocopter';
     }
 
     return 'airplane';
@@ -4874,6 +4891,12 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             label: 'Militaire',
             path: 'M11.1 1.5h1.8l2.3 7.7 7.1 4.1v2.3l-7.3-1.3-1.2 5 2.7 1.8v1.2L12 21.4l-4.5.9v-1.2l2.7-1.8-1.2-5-7.3 1.3v-2.3l7.1-4.1 2.3-7.7Z'
         },
+        turboprop: {
+            className: 'turboprop',
+            directional: true,
+            label: 'Turbopropulseur',
+            path: 'M11.1 2h1.8l1 7 7.5 3.8v2l-7.4-1-.8 5 3 1.8v1.1l-4.2-.8-4.2.8v-1.1l3-1.8-.8-5-7.4 1v-2l7.5-3.8 1-7ZM5.2 8.2h1.4v3H5.2v-3Zm12.2 0h1.4v3h-1.4v-3Z'
+        },
         ultralight: {
             className: 'ultralight',
             directional: true,
@@ -4903,8 +4926,21 @@ function buildTrafficMarkerIcon(aircraft) {
     const altitudeState = getTrafficRelativeAltitudeState(aircraft);
     const visual = getTrafficAircraftVisualDefinition(aircraft);
     const symbolRotation = visual.directional ? track : 0;
+
+    /*
+     * L'étiquette est placée sur le rayon opposé au vecteur :
+     * - route 000° : étiquette sous le rond ;
+     * - route 090° : étiquette à gauche ;
+     * - route 180° : étiquette au-dessus ;
+     * - route 270° : étiquette à droite.
+     */
+    const labelRadiusPx = 27;
+    const trackRadians = track * Math.PI / 180;
+    const altitudeLabelLeft = 18 - Math.sin(trackRadians) * labelRadiusPx;
+    const altitudeLabelTop = 18 + Math.cos(trackRadians) * labelRadiusPx;
+
     const altitudeHtml = settings.showAltitudeLabel && aircraft.altitude && aircraft.altitude !== '--'
-        ? `<span class="traffic-aircraft-altitude-label">${escapeHtml(aircraft.altitude)}</span>`
+        ? `<span class="traffic-aircraft-altitude-label" style="left:${altitudeLabelLeft.toFixed(1)}px;top:${altitudeLabelTop.toFixed(1)}px;transform:translate(-50%,-50%);">${escapeHtml(aircraft.altitude)}</span>`
         : '';
 
     const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path d="${visual.path}"></path></svg>`;
@@ -4915,10 +4951,9 @@ function buildTrafficMarkerIcon(aircraft) {
         iconSize: [36, 36],
         iconAnchor: [18, 18],
         /*
-         * v14.03 — rapproché de 14 px par rapport à v14.02.
-         * Une valeur positive fait descendre la pointe de la fenêtre vers le rond.
+         * v14.04 — la pointe de la fenêtre arrive quasiment au contact du rond.
          */
-        popupAnchor: [0, 4]
+        popupAnchor: [0, 28]
     });
 }
 
@@ -5012,6 +5047,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             closeOnClick: false,
             closeButton: true,
             autoClose: true,
+            offset: L.point(0, 0),
             className: 'traffic-aircraft-popup'
         });
         marker.addTo(trafficLayer);
