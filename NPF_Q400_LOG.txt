@@ -1,5 +1,21 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.01 TEST — trafics plus petits et zone tactile réellement réduite
+
+Modifications apportées :
+- nouvelle réduction du symbole visible des trafics de 20 × 20 px à 15 × 15 px ;
+- réduction de la taille de la flèche et de sa bordure ;
+- réduction de l’étiquette d’altitude et rapprochement du symbole ;
+- réduction de la longueur et de l’épaisseur du vecteur pointillé ;
+- réduction du véritable conteneur Leaflet interactif de 128 × 128 px à 36 × 36 px ;
+- suppression de la vaste zone transparente qui recouvrait les trafics voisins ;
+- le vecteur et l’étiquette peuvent continuer à dépasser visuellement du conteneur grâce à overflow visible, sans agrandir la zone de clic ;
+- tous les éléments internes restent sans interaction afin que seule la petite zone centrale du trafic capte le toucher ;
+- possibilité nettement améliorée de sélectionner successivement deux trafics proches ;
+- persistance de la fenêtre détaillée du trafic sélectionné après rafraîchissement intégralement conservée ;
+- couleurs d’altitude relative, filtres, SafeSky et compteur stable inchangés ;
+- version applicative portée en v14.01 TEST.
+
 v14.00 TEST — fenêtre trafic persistante et symboles réduits
 
 Modifications apportées :
