@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-08_deplacement_mode_simulation_vitesse_route';
-const APP_VERSION = 'v14.08';
+const SW_VERSION = 'sw-v14-09_simulation_clavier_altitude_trafic_position';
+const APP_VERSION = 'v14.09';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
