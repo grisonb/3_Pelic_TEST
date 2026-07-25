@@ -1,5 +1,18 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.10 TEST — étiquette SIM déplacée sous l’avion simulé
+
+Modifications apportées :
+- déplacement du badge « SIM » sous le rond de l’avion simulé ;
+- maintien de l’altitude simulée au-dessus du symbole ;
+- suppression du chevauchement entre le badge SIM et l’étiquette d’altitude ;
+- centrage horizontal du badge sous l’avion ;
+- conservation du badge sans rotation lorsque l’avion change de route ;
+- désactivation des interactions tactiles sur le badge afin qu’il ne gêne pas la carte ;
+- aucune modification du déplacement simulé, du trafic réel, de l’altitude, du chat ou des cartes ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.10 TEST.
+
 v14.09 TEST — clavier immédiat, altitude simulée et trafic live centré sur la simulation
 
 Modifications apportées :
