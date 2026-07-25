@@ -1,5 +1,31 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.09 TEST — clavier immédiat, altitude simulée et trafic live centré sur la simulation
+
+Modifications apportées :
+- remplacement des champs Vitesse et Route par des champs texte à clavier numérique, afin de permettre une sélection fiable sur iPad ;
+- sélection automatique de toute la valeur Vitesse dès l’ouverture de la fenêtre ;
+- ouverture synchrone du clavier Safari iPad avec le clic sur le bouton simulation ;
+- sélection automatique de toute la valeur à chaque toucher sur Vitesse ;
+- sélection automatique de toute la valeur à chaque toucher sur Route ;
+- réouverture du clavier lorsqu’un champ est touché après réduction du clavier ;
+- ajout d’un champ Altitude avec le même comportement de focus et de sélection ;
+- altitude simulée réglable de -1 000 à 60 000 ft ;
+- mémorisation de l’altitude simulée dans localStorage ;
+- affichage de la vitesse, de la route et de l’altitude sur le bouton simulation ;
+- affichage de l’altitude sur le symbole de l’avion simulé ;
+- intégration de l’altitude simulée dans lastPosition comme altitude propre ;
+- utilisation de l’altitude simulée pour les couleurs rouge, verte et bleue des trafics réels ;
+- conservation du dernier trafic reçu afin de le recolorer immédiatement après une modification d’altitude ;
+- actualisation forcée du trafic après application de Vitesse, Route ou Altitude ;
+- interrogation du trafic live autour de la position simulée pendant le déplacement ;
+- actualisation environ toutes les cinq secondes grâce au mécanisme normal de limitation ;
+- désignation « simulation » comme point de référence du trafic ;
+- prévention des requêtes trafic concurrentes déclenchées par les mises à jour de position chaque seconde ;
+- aucune modification des autres fonctions du chat, des cartes, du suivi rotation ou de SafeSky ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.09 TEST.
+
 v14.08 TEST — déplacement continu de l’avion en mode simulation
 
 Modifications apportées :
