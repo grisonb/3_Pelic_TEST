@@ -4782,14 +4782,34 @@ function resolveTrafficVisualType(aircraft) {
      * Cette classification ne prétend pas reproduire la silhouette exacte de
      * chaque modèle. Elle choisit la bonne grande famille visuelle.
      */
-    const jetDesignatorPattern = /^(?:A18[89]|A19[0-9N]|A20N|A21N|A22[0-9]|A30[06B]|A310|A31[89]|A32[0-9]|A33[0-9]|A34[0-9]|A35[0-9]|A38[08]|A3ST|B70[37]|B71[27]|B72[0-2]|B73[1-9]|B37M|B38M|B39M|B74[1-8RS]|B75[23]|B76[2-4]|B77[2-39LW]|B78[89X]|BCS[13]|CRJ[1-9X]|E17[05]|E19[05]|E29[05]|F70|F100|MD8[0-9]|MD90|DC9|DC10|L101|IL62|IL76|AN12[4-9]|C5M)/;
-    if (jetDesignatorPattern.test(designator)) {
-        return 'jet';
+    const widebodyJetPattern = /^(?:A30[06B]|A310|A33[0-9]|A34[0-9]|A35[0-9]|A38[08]|B74[1-8RS]|B76[2-4]|B77[2-39LW]|B78[89X]|DC10|L101|IL96|AN12[4-9]|C5M)/;
+    if (widebodyJetPattern.test(designator)) {
+        return 'widebody-jet';
+    }
+
+    const narrowbodyJetPattern = /^(?:A18[89]|A19[0-9N]|A20N|A21N|A22[0-9]|A31[89]|A32[0-9]|B70[37]|B71[27]|B72[0-2]|B73[1-9]|B37M|B38M|B39M|B75[23]|BCS[13]|F70|F100|MD8[0-9]|MD90|DC9)/;
+    if (narrowbodyJetPattern.test(designator)) {
+        return 'narrowbody-jet';
+    }
+
+    const regionalJetPattern = /^(?:CRJ[1-9X]|E17[05]|E19[05]|E29[05]|E135|E145|E170|E175|E190|E195|ARJ2|RJ1H|RJ70|RJ85|RJ1X)/;
+    if (regionalJetPattern.test(designator)) {
+        return 'regional-jet';
     }
 
     const turbopropDesignatorPattern = /^(?:AT4[3-6]|AT7[2-6]|DH8[ABCD]|Q400|SF34|E120|F50|F60|D328|C212|C295|CN35|AN2[468]|AN32|L410|BE20|BE30|B350|SW4|JS3[12]|JS41|C130|C160|P3|P8)/;
     if (turbopropDesignatorPattern.test(designator)) {
         return 'turboprop';
+    }
+
+    const lightTwinPattern = /^(?:BE5[568]|BE9[59]|BE10|BE18|BE24|BE33|BE35|BE36|BE50|BE55|BE58|BE60|BE65|BE76|BE77|BE80|BE90|C303|C310|C320|C335|C336|C337|C340|C401|C402|C404|C411|C414|C421|C425|C441|DA42|DA62|PA23|PA30|PA31|PA34|PA39|PA44|P68|BN2|AC50|AC56|AC68)/;
+    if (lightTwinPattern.test(designator)) {
+        return 'light-twin';
+    }
+
+    const lightSinglePattern = /^(?:C1[025-9][025-9]|C20[568]|C21[02]|C22[0-9]|C23[0-9]|C24[0-9]|C25[0-9]|C26[0-9]|C27[0-9]|C28[0-9]|C182|C172|C152|C150|C206|C210|PA18|PA20|PA22|PA24|PA28|PA32|PA38|SR20|SR22|DA20|DA40|DR40|DR30|RALL|JAB[24]|VL3|WT9|PIVI|M20[ABCEJMKRS]|BE23|BE24|BE33|BE35|BE36)/;
+    if (lightSinglePattern.test(designator)) {
+        return 'light-single';
     }
 
     const helicopterDesignatorPattern = /^(?:H[0-9A-Z]{1,3}|EC[0-9A-Z]{2,4}|AS[0-9A-Z]{2,4}|SA[0-9A-Z]{2,4}|R22|R44|R66|B06|B47|S76|AW[0-9A-Z]{2,4}|BK17|H145|H135|H160|H175|H225|NH90|TIGR)/;
@@ -4891,11 +4911,41 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             label: 'Militaire',
             path: 'M11.1 1.5h1.8l2.3 7.7 7.1 4.1v2.3l-7.3-1.3-1.2 5 2.7 1.8v1.2L12 21.4l-4.5.9v-1.2l2.7-1.8-1.2-5-7.3 1.3v-2.3l7.1-4.1 2.3-7.7Z'
         },
+        'widebody-jet': {
+            className: 'widebody-jet',
+            directional: true,
+            label: 'Jet gros-porteur',
+            path: 'M10.9 1.6h2.2l1.9 7.1 7.3 4.4v2.4l-7.7-1.6-1.1 4.7 3.7 2.5v1.2l-5.2-1-5.2 1v-1.2l3.7-2.5-1.1-4.7-7.7 1.6v-2.4L9 8.7l1.9-7.1Z'
+        },
+        'narrowbody-jet': {
+            className: 'narrowbody-jet',
+            directional: true,
+            label: 'Jet moyen-courrier',
+            path: 'M11.1 1.8h1.8l1.5 7.3 7.1 4v2.1l-7.4-1.3-.9 4.9 3.3 2.1V22l-4.5-.9-4.5.9v-1.1l3.3-2.1-.9-4.9-7.4 1.3v-2.1l7.1-4 1.5-7.3Z'
+        },
+        'regional-jet': {
+            className: 'regional-jet',
+            directional: true,
+            label: 'Jet régional',
+            path: 'M11.2 2h1.6l1.2 7.5 6.6 3.6v2l-6.8-1-.8 4.8 2.8 1.8v1.1l-3.8-.7-3.8.7v-1.1l2.8-1.8-.8-4.8-6.8 1v-2L10 9.5 11.2 2Z'
+        },
         turboprop: {
             className: 'turboprop',
             directional: true,
             label: 'Turbopropulseur',
             path: 'M11.1 2h1.8l1 7 7.5 3.8v2l-7.4-1-.8 5 3 1.8v1.1l-4.2-.8-4.2.8v-1.1l3-1.8-.8-5-7.4 1v-2l7.5-3.8 1-7ZM5.2 8.2h1.4v3H5.2v-3Zm12.2 0h1.4v3h-1.4v-3Z'
+        },
+        'light-single': {
+            className: 'light-single',
+            directional: true,
+            label: 'Avion léger monomoteur',
+            path: 'M11 2h2v5.2l7 3.4v2L13 12v5.1l2.8 2.2v1.2L12 19.7l-3.8.8v-1.2l2.8-2.2V12l-7 .6v-2l7-3.4V2Zm-2.8 6.1h7.6v1.5H8.2V8.1ZM11 21h2v2h-2v-2Z'
+        },
+        'light-twin': {
+            className: 'light-twin',
+            directional: true,
+            label: 'Avion léger bimoteur',
+            path: 'M11 2h2v5l7.2 3.6v2L13 12v5.2l3 2.1v1.2l-4-.8-4 .8v-1.2l3-2.1V12l-7.2.6v-2L11 7V2ZM6.3 8h2.1v3H6.3V8Zm9.3 0h2.1v3h-2.1V8Z'
         },
         ultralight: {
             className: 'ultralight',
@@ -4940,7 +4990,7 @@ function buildTrafficMarkerIcon(aircraft) {
     const altitudeLabelTop = 18 + Math.cos(trackRadians) * labelRadiusPx;
 
     const altitudeHtml = settings.showAltitudeLabel && aircraft.altitude && aircraft.altitude !== '--'
-        ? `<span class="traffic-aircraft-altitude-label" style="left:${altitudeLabelLeft.toFixed(1)}px;top:${altitudeLabelTop.toFixed(1)}px;transform:translate(-50%,-50%);">${escapeHtml(aircraft.altitude)}</span>`
+        ? `<span class="traffic-aircraft-altitude-label" style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">${escapeHtml(aircraft.altitude)}</span>`
         : '';
 
     const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path d="${visual.path}"></path></svg>`;
@@ -4951,9 +5001,10 @@ function buildTrafficMarkerIcon(aircraft) {
         iconSize: [36, 36],
         iconAnchor: [18, 18],
         /*
-         * v14.04 — la pointe de la fenêtre arrive quasiment au contact du rond.
+         * v14.05 — ancrage relatif au vrai centre Leaflet du trafic.
+         * -8 px place la pointe juste au-dessus du rond de 15 px.
          */
-        popupAnchor: [0, 28]
+        popupAnchor: [0, -8]
     });
 }
 
