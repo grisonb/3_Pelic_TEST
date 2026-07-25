@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.10') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.10') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.12') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.12') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10268,4 +10268,31 @@ body.gaar-point-search-open .gaar-editing-banner {
     transform: translateX(-50%) !important;
     z-index: 4 !important;
     pointer-events: none !important;
+}
+
+
+/* ==========================================================================
+   v14.11 TEST — saisie simulation au doigt uniquement
+   ========================================================================== */
+
+.simulation-finger-only-note {
+    display: block !important;
+    margin-top: 7px !important;
+    color: #7c2d12 !important;
+    font-weight: 900 !important;
+}
+
+.simulation-motion-input-unit input.simulation-stylus-blocked {
+    caret-color: transparent !important;
+    background: #f1f4f7 !important;
+}
+
+
+/* ==========================================================================
+   v14.12 TEST — retour visuel très bref lors d'un appui au stylet
+   ========================================================================== */
+
+.npf-global-stylus-blocked-field {
+    caret-color: transparent !important;
+    background-color: #f1f4f7 !important;
 }
