@@ -4637,6 +4637,12 @@ function normalizeTrafficAircraft(raw) {
     const trackRaw = safeSkyFormat ? raw.course : raw.track;
     const track = Number.isFinite(Number(trackRaw)) ? Number(trackRaw) : null;
     const beaconType = String(raw.beacon_type || '').trim().toUpperCase();
+    const emitterCategory = String(
+        raw.category
+        || raw.emitter_category
+        || raw.emitterCategory
+        || ''
+    ).trim().toUpperCase();
     const type = String(raw.beacon_type || raw.t || raw.aircraft_type || raw.type || '').trim();
     const registration = String(raw.registration || raw.r || '').trim();
     const source = String(raw.transponder_type || raw.source || raw.type || raw.dbFlags || '').trim();
@@ -4658,6 +4664,7 @@ function normalizeTrafficAircraft(raw) {
         track,
         type,
         beaconType,
+        emitterCategory,
         registration,
         source,
         providerFormat: safeSkyFormat ? 'safesky' : 'readsb',
@@ -4709,106 +4716,185 @@ function getTrafficRelativeAltitudeState(aircraft) {
 }
 
 
-function getTrafficAircraftVisualDefinition(aircraft) {
-    const beaconType = String(aircraft?.beaconType || aircraft?.type || '')
-        .trim()
-        .toUpperCase();
+function resolveTrafficVisualType(aircraft) {
+    const safeSkyType = String(aircraft?.beaconType || '').trim().toUpperCase();
+    const emitterCategory = String(aircraft?.emitterCategory || '').trim().toUpperCase();
+    const designator = String(aircraft?.type || '').trim().toUpperCase();
 
+    /*
+     * Priorité 1 : catégorie explicite SafeSky.
+     */
+    const safeSkyMapping = {
+        JET: 'jet',
+        HELICOPTER: 'helicopter',
+        GLIDER: 'glider',
+        UAV: 'uav',
+        BALLOON: 'balloon',
+        AIRSHIP: 'airship',
+        PARACHUTE: 'parachute',
+        PARA_GLIDER: 'paraglider',
+        HAND_GLIDER: 'hangglider',
+        HANG_GLIDER: 'hangglider',
+        GYROCOPTER: 'gyrocopter',
+        MILITARY: 'military',
+        FLEX_WING_TRIKES: 'ultralight',
+        PARA_MOTOR: 'paramotor',
+        THREE_AXES_LIGHT_PLANE: 'airplane',
+        MOTORPLANE: 'airplane',
+        PAV: 'airplane',
+        STATIC_OBJECT: 'static'
+    };
+    if (safeSkyMapping[safeSkyType]) return safeSkyMapping[safeSkyType];
+
+    /*
+     * Priorité 2 : catégorie d'émetteur ADS-B/readsb.
+     * Elle permet déjà d'afficher correctement hélicoptères, planeurs,
+     * ballons, parachutistes, ULM et drones avant l'arrivée de SafeSky.
+     */
+    const emitterMapping = {
+        A0: 'airplane',
+        A1: 'airplane',
+        A2: 'airplane',
+        A3: 'jet',
+        A4: 'jet',
+        A5: 'jet',
+        A6: 'military',
+        A7: 'helicopter',
+        B0: 'airplane',
+        B1: 'glider',
+        B2: 'balloon',
+        B3: 'parachute',
+        B4: 'ultralight',
+        B5: 'airplane',
+        B6: 'uav',
+        B7: 'airplane',
+        C0: 'static',
+        C1: 'static',
+        C2: 'static',
+        C3: 'static',
+        C4: 'static'
+    };
+    if (emitterMapping[emitterCategory]) return emitterMapping[emitterCategory];
+
+    /*
+     * Priorité 3 : quelques familles de désignateurs fréquemment reconnues.
+     * Les désignateurs non sûrs restent volontairement en avion standard.
+     */
+    if (/^(B74|B75|B76|B77|B78|A33|A34|A35|A38|A3ST|C5M|AN12|AN22|AN72|IL76)/.test(designator)) {
+        return 'jet';
+    }
+    if (/^(H|EC|AS|SA|R44|R22|B06|B47|S76|AW)/.test(designator)) {
+        return 'helicopter';
+    }
+    if (/^(GLID|ASW|DG|DUOD|LS|JS|SZD|ASK|ASTR)/.test(designator)) {
+        return 'glider';
+    }
+
+    return 'airplane';
+}
+
+function getTrafficAircraftVisualDefinition(aircraft) {
+    const visualType = resolveTrafficVisualType(aircraft);
+
+    /*
+     * Toutes les silhouettes utilisent le même viewBox 24 × 24 et sont
+     * géométriquement centrées en 12 / 12. Cela évite les pictogrammes décalés
+     * dans le rond, y compris après rotation.
+     */
     const definitions = {
-        JET: {
+        airplane: {
+            className: 'airplane',
+            directional: true,
+            label: 'Avion',
+            path: 'M11.1 2.2h1.8l1.2 7 7.3 3.7v2l-7.3-1.1-.8 5 2.9 1.8v1.1l-4.2-.8-4.2.8v-1.1l2.9-1.8-.8-5-7.3 1.1v-2l7.3-3.7 1.2-7Z'
+        },
+        jet: {
             className: 'jet',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2 14.1 3.5 14.7 9.2 22 13v2l-7.3-1.1-.7 5 3.2 2v1l-5.2-.9-5.2.9v-1l3.2-2-.7-5L2 15v-2l7.3-3.8.6-5.7L12 2.2Z"/></svg>'
+            label: 'Jet',
+            path: 'M11.1 1.8h1.8l1.6 7.1 7.2 4.1v2.2l-7.5-1.4-.9 4.8 3.5 2.2v1.1L12 21l-4.8.9v-1.1l3.5-2.2-.9-4.8-7.5 1.4V13l7.2-4.1 1.6-7.1Z'
         },
-        HELICOPTER: {
+        helicopter: {
             className: 'helicopter',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v1.6h-8v2.1h2.7c2.7 0 4.7 1.7 4.7 4.1v1.3H13l-2.2 2.7H6.4c-2.1 0-3.7-1.4-3.7-3.4 0-2.6 2-4.7 4.8-4.7H11V5.6H3V4Zm4.5 5.7c-1.6 0-2.8 1.1-2.8 2.5 0 .9.7 1.6 1.7 1.6h3.5l1.9-2.4h6.4c-.2-1-1.2-1.7-2.5-1.7H7.5Zm9.8 5.2h4v1.5h-4v-1.5Z"/></svg>'
+            label: 'Hélicoptère',
+            path: 'M11 2h2v6.1c2.1.4 3.7 1.8 4.4 3.7H22v1.8h-4.3c-.4 2.4-2.3 4.3-4.7 4.7V22h-2v-3.7a6.2 6.2 0 0 1-4.4-3.2H2v-1.8h4.1A6.2 6.2 0 0 1 11 8.1V2Zm1 8a3.4 3.4 0 1 0 0 6.8A3.4 3.4 0 0 0 12 10ZM3 5.1h18v1.6H3V5.1Z'
         },
-        GLIDER: {
+        glider: {
             className: 'glider',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.2 3h1.6l.6 7.2L23 12v1.8l-9.6-.7-.5 5.3 3.2 1.6v1l-4.1-.7-4.1.7v-1l3.2-1.6-.5-5.3-9.6.7V12l9.6-1.8.6-7.2Z"/></svg>'
+            label: 'Planeur',
+            path: 'M11.2 2h1.6l.8 7.9L23 11.7v2l-9.4-.6-.6 5.1 3 1.7V21l-4-.7-4 .7v-1.1l3-1.7-.6-5.1-9.4.6v-2l9.4-1.8.8-7.9Z'
         },
-        UAV: {
+        uav: {
             className: 'uav',
             directional: false,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.3a3 3 0 1 1-2.1.9L8.3 9H11V6.8h2V9h2.7l3.4-3.8a3 3 0 1 1 1.4 1.4L17 10.4V13h2.2v2H17v2.7l3.6 3.2a3 3 0 1 1-1.4 1.4L15.5 19H13v2.2h-2V19H8.5l-3.7 3.3a3 3 0 1 1-1.4-1.4L7 17.7V15H4.8v-2H7v-2.6L3.5 6.6A3 3 0 0 1 7 4.3ZM12 10.6A2.4 2.4 0 1 0 12 15.4 2.4 2.4 0 0 0 12 10.6Z"/></svg>'
+            label: 'Drone',
+            path: 'M5 3a2.6 2.6 0 1 1-1.8.8L7.4 8H10V5.5h4V8h2.6l4.2-4.2A2.6 2.6 0 1 1 22 5l-4.2 4.2V12h2.7v4h-2.7l4.2 4.2A2.6 2.6 0 1 1 20.8 22l-4.2-4.2H14v2.7h-4v-2.7H7.4L3.2 22A2.6 2.6 0 1 1 2 20.2L6.2 16H3.5v-4h2.7V9.2L2 5A2.6 2.6 0 0 1 5 3Zm7 7.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z'
         },
-        BALLOON: {
+        balloon: {
             className: 'balloon',
             directional: false,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c4 0 7 3.2 7 7.2 0 3.1-1.7 5.4-4.2 7.2l-.8 2.1h-4l-.8-2.1C6.7 14.6 5 12.3 5 9.2 5 5.2 8 2 12 2Zm0 2c-2.8 0-5 2.3-5 5.2 0 2.3 1.4 4.1 3.7 5.7h2.6c2.3-1.6 3.7-3.4 3.7-5.7C17 6.3 14.8 4 12 4Zm-2 16h4v2h-4v-2Z"/></svg>'
+            label: 'Ballon',
+            path: 'M12 2c4.3 0 7.4 3.2 7.4 7.3 0 3.2-1.8 5.9-4.8 7.8l-.8 2.1h-3.6l-.8-2.1c-3-1.9-4.8-4.6-4.8-7.8C4.6 5.2 7.7 2 12 2Zm0 2c-3.1 0-5.4 2.3-5.4 5.3 0 2.4 1.5 4.5 4 6h2.8c2.5-1.5 4-3.6 4-6C17.4 6.3 15.1 4 12 4Zm-2 16.1h4v1.9h-4v-1.9Z'
         },
-        AIRSHIP: {
+        airship: {
             className: 'airship',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 11.2C2 7.8 5.8 5 11.6 5 17.4 5 21 7.8 21 11.2c0 3.3-3.6 6.1-9.4 6.1C5.8 17.3 2 14.5 2 11.2Zm3.1 0c0 1.6 2.5 3.1 6.5 3.1s6.4-1.5 6.4-3.1C18 9.5 15.6 8 11.6 8S5.1 9.5 5.1 11.2ZM18.2 15.8 23 18v1.4l-5.6-.8.8-2.8Z"/></svg>'
+            label: 'Dirigeable',
+            path: 'M2 11.5C2 7.8 6 5 12 5s10 2.8 10 6.5S18 18 12 18 2 15.2 2 11.5Zm3 0c0 1.8 2.8 3.5 7 3.5s7-1.7 7-3.5S16.2 8 12 8s-7 1.7-7 3.5Zm12.4 5.1 4.6 2v1.6l-5.5-.8.9-2.8Z'
         },
-        PARACHUTE: {
+        parachute: {
             className: 'parachute',
             directional: false,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10a9 9 0 0 1 18 0H3Zm2.5-2h13c-1-2.4-3.5-4-6.5-4S6.5 5.6 5.5 8ZM5 11h2l4 5v2.2l-2 3.3H7.2l1.8-3V17l-4-6Zm12 0h2l-4 6v1.5l1.8 3h-1.8l-2-3.3V16l4-5Z"/></svg>'
+            label: 'Parachutiste',
+            path: 'M2.5 9.6a9.5 9.5 0 0 1 19 0h-19Zm3.1-2h12.8C17 5.6 14.8 4.5 12 4.5S7 5.6 5.6 7.6ZM5 11h2l4 5v2.2l-2 3.5H7.1L9 18.3v-1.2L5 11Zm12 0h2l-4 6.1v1.2l1.9 3.4H15l-2-3.5V16l4-5Z'
         },
-        PARA_GLIDER: {
+        paraglider: {
             className: 'paraglider',
             directional: false,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 10C4 5.4 7.5 3 12 3s8 2.4 10 7H2Zm3.6-2h12.8C16.9 6 14.8 5 12 5S7.1 6 5.6 8ZM5 11h1.8l4.2 5v2.2l-2 3.3H7.2L9 18.5V17l-4-6Zm12.2 0H19l-4 6v1.5l1.8 3H15l-2-3.3V16l4.2-5Z"/></svg>'
+            label: 'Parapente',
+            path: 'M2 9.6C4.2 5.2 7.5 3 12 3s7.8 2.2 10 6.6H2Zm3.8-2h12.4C16.8 5.9 14.8 5 12 5s-4.8.9-6.2 2.6ZM6 11h1.8l4.2 4.8 4.2-4.8H18l-5 6v4h-2v-4l-5-6Z'
         },
-        HAND_GLIDER: {
+        hangglider: {
             className: 'hangglider',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8 12 3l10 5-10 3L2 8Zm9 4h2v3.2l3.5 4.2-1.5 1.2-3-3.6-3 3.6-1.5-1.2 3.5-4.2V12Z"/></svg>'
+            label: 'Deltaplane',
+            path: 'M1.5 8.4 12 3l10.5 5.4L12 11.2 1.5 8.4ZM11 12h2v3.1l3.6 4.3-1.6 1.3-3-3.6-3 3.6-1.6-1.3 3.6-4.3V12Z'
         },
-        HANG_GLIDER: {
-            className: 'hangglider',
-            directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8 12 3l10 5-10 3L2 8Zm9 4h2v3.2l3.5 4.2-1.5 1.2-3-3.6-3 3.6-1.5-1.2 3.5-4.2V12Z"/></svg>'
-        },
-        GYROCOPTER: {
+        gyrocopter: {
             className: 'gyrocopter',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v1.7h-8v3.1h2.6l3.7 3.1v2H12l-2.2 2.5H6.2v-2h2.7l2.1-2.5h5.2l-1.4-1.1H11V5.7H3V4Zm4.5 13.2a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Zm9 0a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2Z"/></svg>'
+            label: 'Gyrocoptère',
+            path: 'M3 3.5h18v1.8h-8v3.4h2.9l3.8 3.2v2.2H12l-2.2 2.5H5.5v-2h3.4l2-2.4h5.3l-1.6-1.5H11V5.3H3V3.5Zm4.3 14.2a2.2 2.2 0 1 1 0 4.3 2.2 2.2 0 0 1 0-4.3Zm9.4 0a2.2 2.2 0 1 1 0 4.3 2.2 2.2 0 0 1 0-4.3Z'
         },
-        MILITARY: {
+        military: {
             className: 'military',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 15 10l7 4v2l-7-1-1.2 6 2.2 1.3V23L12 22l-4 1v-.7L10.2 21 9 15l-7 1v-2l7-4 3-8Z"/></svg>'
+            label: 'Militaire',
+            path: 'M11.1 1.5h1.8l2.3 7.7 7.1 4.1v2.3l-7.3-1.3-1.2 5 2.7 1.8v1.2L12 21.4l-4.5.9v-1.2l2.7-1.8-1.2-5-7.3 1.3v-2.3l7.1-4.1 2.3-7.7Z'
         },
-        FLEX_WING_TRIKES: {
+        ultralight: {
             className: 'ultralight',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 7 12 3l10 4-10 3L2 7Zm9 4h2v4h3l3 5h-2.3l-2.2-3.5H9.5L7.3 20H5l3-5h3v-4Z"/></svg>'
+            label: 'ULM',
+            path: 'M2 7.5 12 3l10 4.5-10 3-10-3ZM11 11h2v3.7h3.1l3 5.3h-2.4l-2.1-3.5H9.4L7.3 20H4.9l3-5.3H11V11Z'
         },
-        PARA_MOTOR: {
-            className: 'ultralight',
+        paramotor: {
+            className: 'paramotor',
             directional: true,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8c2-3.3 5-5 9-5s7 1.7 9 5H3Zm8 2h2v4.2l2.8 2.8-1.4 1.4-2.4-2.4-2.4 2.4L8.2 17l2.8-2.8V10Zm1 7.5a2.3 2.3 0 1 1 0 4.5 2.3 2.3 0 0 1 0-4.5Z"/></svg>'
+            label: 'Paramoteur',
+            path: 'M3 8.5C5 4.8 8 3 12 3s7 1.8 9 5.5H3Zm8 2h2v3.8l2.8 2.8-1.4 1.4-2.4-2.3-2.4 2.3-1.4-1.4 2.8-2.8v-3.8Zm1 7.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z'
         },
-        STATIC_OBJECT: {
+        static: {
             className: 'static',
             directional: false,
-            svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2h2v8h8v2h-8v10h-2V12H3v-2h8V2Zm-5 14h12v2H6v-2Z"/></svg>'
+            label: 'Objet statique',
+            path: 'M11 2h2v8h8v2h-8v10h-2V12H3v-2h8V2Zm-5 14h12v2H6v-2Z'
         }
     };
 
-    const defaultDefinition = {
-        className: 'airplane',
-        directional: true,
-        svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2h2l1 8 8 4v2l-8-1-1 6 3 2v1l-4-1-4 1v-1l3-2-1-6-8 1v-2l8-4 1-8Z"/></svg>'
-    };
-
-    if (
-        beaconType === 'MOTORPLANE'
-        || beaconType === 'THREE_AXES_LIGHT_PLANE'
-        || beaconType === 'PAV'
-        || beaconType === 'UNKNOWN'
-        || !beaconType
-    ) {
-        return defaultDefinition;
-    }
-
-    return definitions[beaconType] || defaultDefinition;
+    return definitions[visualType] || definitions.airplane;
 }
 
 function buildTrafficMarkerIcon(aircraft) {
@@ -4821,12 +4907,18 @@ function buildTrafficMarkerIcon(aircraft) {
         ? `<span class="traffic-aircraft-altitude-label">${escapeHtml(aircraft.altitude)}</span>`
         : '';
 
+    const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path d="${visual.path}"></path></svg>`;
+
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${visual.svg}</span>${altitudeHtml}</span>`,
+        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
-        popupAnchor: [0, -10]
+        /*
+         * v14.03 — rapproché de 14 px par rapport à v14.02.
+         * Une valeur positive fait descendre la pointe de la fenêtre vers le rond.
+         */
+        popupAnchor: [0, 4]
     });
 }
 
