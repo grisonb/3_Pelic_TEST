@@ -1,5 +1,47 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.12 TEST — blocage global du stylet dans toute l’application
+
+Modifications apportées :
+- extension du blocage du stylet à l’ensemble de la PWA ;
+- blocage des événements Apple Pencil et autres stylets sur la carte ;
+- blocage des événements stylet sur tous les boutons et commandes ;
+- blocage du stylet dans tous les champs input, textarea et select ;
+- blocage du stylet dans les éléments contenteditable et les zones ayant le rôle textbox ;
+- protection explicite de la recherche des communes contre l’activation au stylet ;
+- suppression du focus et de la saisie manuscrite iPadOS Scribble dans la recherche des communes ;
+- passage temporaire en lecture seule de tout champ touché au stylet ;
+- restauration automatique du champ 400 ms après l’appui ;
+- interception en phase capture avant Leaflet et avant les gestionnaires propres à NPF ;
+- suppression des pointerdown, pointerup, pointermove et pointercancel provenant d’un stylet ;
+- suppression des clics et événements souris synthétiques générés après l’appui du stylet ;
+- suppression des doubles clics, clics contextuels et appuis prolongés issus du stylet ;
+- garde-fou focusin pour retirer immédiatement un éventuel focus déclenché par Scribble ;
+- conservation intégrale des interactions au doigt ;
+- conservation de l’ouverture du clavier et de la sélection automatique des valeurs au doigt ;
+- conservation de la souris et du clavier physique sur ordinateur ;
+- modification de la mention dans la fenêtre simulation pour préciser que le stylet est désactivé dans toute l’application ;
+- aucune modification du trafic, du déplacement simulé, des cartes, du chat ou du suivi rotation ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.12 TEST.
+
+v14.11 TEST — blocage du stylet dans les champs de simulation
+
+Modifications apportées :
+- détection des événements de type pen dans les champs Vitesse, Route et Altitude ;
+- blocage des appuis Apple Pencil ou autre stylet sur ces trois champs ;
+- passage temporaire du champ en lecture seule lors d’un appui au stylet afin d’empêcher iPadOS Scribble de prendre la main ;
+- suppression du focus et de la saisie manuscrite déclenchés par le stylet ;
+- restauration automatique du champ 350 ms après l’appui ;
+- conservation complète du fonctionnement au doigt ;
+- sélection de toute la valeur au toucher conservée ;
+- ouverture ou réouverture du clavier au toucher conservée ;
+- boutons Appliquer, Quitter mode simulation et fermeture de la fenêtre toujours utilisables normalement ;
+- ajout de la mention « Saisie des valeurs au doigt uniquement » dans la fenêtre ;
+- aucune modification du déplacement, de l’altitude, du trafic réel, du chat ou des cartes ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.11 TEST.
+
 v14.10 TEST — étiquette SIM déplacée sous l’avion simulé
 
 Modifications apportées :
