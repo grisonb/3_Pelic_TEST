@@ -527,13 +527,25 @@ const SAFESKY_PROVIDER = Object.freeze({
     urlFormat: 'viewport',
     dataFormat: 'safesky'
 });
-const TRAFFIC_PROVIDER_LABEL = 'SafeSky / adsb.fi v3 / adsb.lol / airplanes.live';
-const TRAFFIC_API_PROVIDERS = [
-    ...(SAFESKY_PROXY_URL ? [SAFESKY_PROVIDER] : []),
-    { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3', urlFormat: 'latlon', dataFormat: 'readsb' },
-    { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2', urlFormat: 'latlon', dataFormat: 'readsb' },
-    { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point', dataFormat: 'readsb' }
-];
+const TRAFFIC_PROVIDER_LABEL = SAFESKY_PROXY_URL
+    ? 'SafeSky'
+    : 'adsb.fi v3 / adsb.lol / airplanes.live';
+
+/*
+ * v13.98 :
+ * - avant la clé : les anciennes sources permettent de travailler sur l'interface ;
+ * - dès que SAFESKY_PROXY_URL est renseigné : SafeSky devient l'unique source.
+ *
+ * Les anciennes sources ne sont donc jamais fusionnées avec SafeSky et ne peuvent
+ * pas créer de doublons avec les données agrégées SafeSky.
+ */
+const TRAFFIC_API_PROVIDERS = SAFESKY_PROXY_URL
+    ? [SAFESKY_PROVIDER]
+    : [
+        { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3', urlFormat: 'latlon', dataFormat: 'readsb' },
+        { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2', urlFormat: 'latlon', dataFormat: 'readsb' },
+        { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point', dataFormat: 'readsb' }
+    ];
 const TRAFFIC_RADIUS_NM = 50;
 const TRAFFIC_REFRESH_INTERVAL_MS = 5000;
 const TRAFFIC_MAX_AIRCRAFT = 80;
@@ -4651,16 +4663,54 @@ function formatTrafficAge(seconds) {
     return `${Math.round(seconds / 60)} min`;
 }
 
+function getTrafficRelativeAltitudeState(aircraft) {
+    const ownAltitudeFt = getOwnTrafficAltitudeFeet();
+    const trafficAltitudeFt = Number(aircraft?.altitudeFeet);
+
+    if (!Number.isFinite(ownAltitudeFt) || !Number.isFinite(trafficAltitudeFt)) {
+        return {
+            className: 'traffic-altitude-unknown',
+            label: 'Altitude relative inconnue',
+            deltaFt: null
+        };
+    }
+
+    const deltaFt = Math.round(trafficAltitudeFt - ownAltitudeFt);
+
+    if (Math.abs(deltaFt) <= 500) {
+        return {
+            className: 'traffic-altitude-same',
+            label: 'Même tranche d’altitude ±500 ft',
+            deltaFt
+        };
+    }
+
+    if (deltaFt < -500) {
+        return {
+            className: 'traffic-altitude-below',
+            label: 'Trafic en dessous',
+            deltaFt
+        };
+    }
+
+    return {
+        className: 'traffic-altitude-above',
+        label: 'Trafic au-dessus',
+        deltaFt
+    };
+}
+
 function buildTrafficMarkerIcon(aircraft) {
     const track = Number.isFinite(aircraft.track) ? aircraft.track : 0;
     const settings = sanitizeTrafficSettings(trafficSettings);
+    const altitudeState = getTrafficRelativeAltitudeState(aircraft);
     const altitudeHtml = settings.showAltitudeLabel && aircraft.altitude && aircraft.altitude !== '--'
         ? `<span class="traffic-aircraft-altitude-label">${escapeHtml(aircraft.altitude)}</span>`
         : '';
 
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: translate(-50%, -50%) rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
+        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className}" title="${escapeHtml(altitudeState.label)}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: translate(-50%, -50%) rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
         iconSize: [128, 128],
         iconAnchor: [64, 64],
         popupAnchor: [0, -52]
@@ -4712,11 +4762,16 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         const reference = ac._trafficReference;
         const distance = reference ? reference.distance : null;
         const referenceLabel = reference?.point?.label ? escapeHtml(reference.point.label) : '';
+        const altitudeState = getTrafficRelativeAltitudeState(ac);
+        const relativeAltitudeText = Number.isFinite(altitudeState.deltaFt)
+            ? `${altitudeState.deltaFt > 0 ? '+' : ''}${altitudeState.deltaFt} ft`
+            : '--';
         const popup = `
             <div class="traffic-popup">
                 <div class="traffic-popup-title">${title}</div>
                 ${subtitle ? `<div class="traffic-popup-subtitle">${subtitle}</div>` : ''}
                 <div>Altitude : <b>${escapeHtml(ac.altitude)}</b></div>
+                <div>Écart avec moi : <b>${escapeHtml(relativeAltitudeText)}</b> — ${escapeHtml(altitudeState.label)}</div>
                 <div>Vitesse sol : <b>${escapeHtml(ac.gs)}</b></div>
                 <div>Route : <b>${Number.isFinite(ac.track) ? Math.round(ac.track) + '°' : '--'}</b></div>
                 ${Number.isFinite(distance) ? `<div>Distance ${referenceLabel ? `à ${referenceLabel}` : ''} : <b>${Math.round(distance)} Nm</b></div>` : ''}
@@ -4906,6 +4961,8 @@ window.getSafeSkyIntegrationStatus = () => ({
     proxyConfigured: Boolean(SAFESKY_PROXY_URL),
     trafficEnabled: !TRAFFIC_DISABLED_FOR_NOW,
     safeSkyProviderActive: TRAFFIC_API_PROVIDERS.some(provider => provider?.dataFormat === 'safesky'),
+    activeProviders: TRAFFIC_API_PROVIDERS.map(provider => provider?.label).filter(Boolean),
+    safeSkyExclusiveWhenConfigured: true,
     refreshIntervalMs: TRAFFIC_REFRESH_INTERVAL_MS
 });
 
