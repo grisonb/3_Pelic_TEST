@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.09') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.09') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.10') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.10') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10250,4 +10250,22 @@ body.gaar-point-search-open .gaar-editing-banner {
     .simulation-motion-fields {
         grid-template-columns: 1fr !important;
     }
+}
+
+
+/* ==========================================================================
+   v14.10 TEST — badge SIM sous l'avion simulé
+   ========================================================================== */
+
+/*
+ * L'altitude reste au-dessus du symbole.
+ * Le badge SIM est placé sous le rond afin de ne plus masquer l'altitude.
+ */
+.own-gps-simulation-icon .own-gps-sim-badge {
+    top: 49px !important;
+    bottom: auto !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 4 !important;
+    pointer-events: none !important;
 }
