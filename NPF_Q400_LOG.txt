@@ -1,5 +1,32 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.04 TEST — popup au contact, altitude opposée au vecteur et types ICAO élargis
+
+Modifications apportées :
+- déplacement de la fenêtre détaillée vers le trafic par passage du popupAnchor vertical de +4 px à +28 px ;
+- réduction du triangle de pointe de la fenêtre à 5 px de hauteur ;
+- arrivée de la pointe quasiment au contact du rond sélectionné ;
+- conservation de la grande croix de fermeture 44 × 44 px et de la persistance après rafraîchissement ;
+- calcul dynamique de la position de l’étiquette d’altitude selon la route du trafic ;
+- positionnement systématique de l’étiquette à 180° du vecteur ;
+- route 000° : altitude sous le rond ;
+- route 090° : altitude à gauche ;
+- route 180° : altitude au-dessus ;
+- route 270° : altitude à droite ;
+- maintien de l’étiquette à l’endroit, sans rotation avec l’aéronef ;
+- ajout d’une famille visuelle spécifique « turbopropulseur » ;
+- classement des ATR, Dash 8/Q400, Saab 340, Embraer 120 et autres turbopropulseurs courants ;
+- élargissement important de la reconnaissance des désignateurs ICAO de jets commerciaux ;
+- reconnaissance explicite des Boeing 737 MAX, dont B37M, B38M et B39M ;
+- reconnaissance élargie des familles Airbus, Boeing, Embraer, CRJ, Fokker, MD, DC et autres jets ;
+- élargissement des reconnaissances hélicoptère, planeur et gyrocoptère ;
+- catégories SafeSky et catégories d’émetteur ADS-B toujours prioritaires sur le désignateur ICAO ;
+- silhouettes maintenues géométriquement centrées dans le rond ;
+- limitation assumée : l’API fournit une catégorie ou un désignateur, mais pas une silhouette graphique exacte propre à chaque modèle ;
+- couleurs relatives, dimensions, zone tactile, filtres et fonctionnement SafeSky inchangés ;
+- la ressource SafeSky monochrome reste présente uniquement dans l’archive ;
+- version applicative portée en v14.04 TEST.
+
 v14.03 TEST — fenêtre rapprochée et silhouettes trafic corrigées
 
 Modifications apportées :
