@@ -4449,7 +4449,13 @@ function buildTrafficReferenceLabel(points = []) {
 function buildTrafficAircraftKey(ac) {
     if (!ac) return '';
     if (ac.hex) return `hex:${ac.hex}`;
-    return `pos:${ac.callsign}:${Number(ac.lat).toFixed(4)}:${Number(ac.lon).toFixed(4)}`;
+
+    const stableCallsign = String(ac.callsign || '').trim().toUpperCase();
+    if (stableCallsign && stableCallsign !== 'N/A') {
+        return `callsign:${stableCallsign}`;
+    }
+
+    return `pos:${Number(ac.lat).toFixed(4)}:${Number(ac.lon).toFixed(4)}`;
 }
 
 async function fetchTrafficAircraftForPoint(point, providers) {
@@ -4719,6 +4725,26 @@ function buildTrafficMarkerIcon(aircraft) {
 
 function renderTrafficAircraft(aircraftList, meta = {}) {
     if (!trafficLayer) return;
+
+    /*
+     * v14.00 — mémoriser le trafic dont la fenêtre est ouverte avant de
+     * reconstruire les marqueurs. Le même trafic sera rouvert sur sa nouvelle
+     * position à la fin du rafraîchissement.
+     */
+    let openTrafficPopupKey = '';
+    try {
+        trafficLayer.eachLayer(layer => {
+            if (
+                !openTrafficPopupKey
+                && layer
+                && typeof layer.isPopupOpen === 'function'
+                && layer.isPopupOpen()
+            ) {
+                openTrafficPopupKey = String(layer._trafficAircraftKey || '');
+            }
+        });
+    } catch (_) {}
+
     trafficLayer.clearLayers();
 
     const settings = sanitizeTrafficSettings(trafficSettings);
@@ -4748,8 +4774,10 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         });
 
     const aircraft = uniqueAircraft.slice(0, settings.maxAircraft);
+    let popupMarkerToRestore = null;
 
     aircraft.forEach(ac => {
+        const aircraftKey = buildTrafficAircraftKey(ac);
         const marker = L.marker([ac.lat, ac.lon], {
             icon: buildTrafficMarkerIcon(ac),
             pane: 'trafficPane',
@@ -4779,10 +4807,38 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 ${useRelativeAltitude ? `<div>Filtre altitude GPS : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
                 <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
             </div>`;
-        marker.bindPopup(popup);
+        marker._trafficAircraftKey = aircraftKey;
+        marker.bindPopup(popup, {
+            autoPan: false,
+            closeOnClick: false
+        });
         marker.bindTooltip(title, { direction: 'top', offset: [0, -10], className: 'traffic-tooltip' });
         marker.addTo(trafficLayer);
+
+        if (openTrafficPopupKey && aircraftKey === openTrafficPopupKey) {
+            popupMarkerToRestore = marker;
+        }
     });
+
+    if (popupMarkerToRestore) {
+        /*
+         * Attendre que Leaflet ait ajouté le nouveau marqueur au DOM, puis
+         * rouvrir sa fenêtre. Le contenu et la position sont ainsi actualisés.
+         */
+        requestAnimationFrame(() => {
+            try {
+                if (
+                    showTrafficLayer
+                    && map
+                    && trafficLayer
+                    && map.hasLayer(trafficLayer)
+                    && typeof popupMarkerToRestore.openPopup === 'function'
+                ) {
+                    popupMarkerToRestore.openPopup();
+                }
+            } catch (_) {}
+        });
+    }
 
     lastTrafficDisplayedCount = aircraft.length;
     refreshTrafficButtonState(aircraft.length);
