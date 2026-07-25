@@ -1,5 +1,26 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.98 TEST — icône SafeSky, état de connexion et couleurs d’altitude relative
+
+Modifications apportées :
+- remplacement du pictogramme avion du bouton TRAFIC par l’icône SafeSky fournie ;
+- ajout de l’icône dans le dossier icons sous le nom safesky-traffic-icon.png ;
+- contour rouge du bouton lorsque le trafic est arrêté, en chargement initial, déconnecté ou en erreur ;
+- contour vert du bouton après une interrogation trafic réussie ;
+- conservation du badge indiquant le nombre de trafics affichés ;
+- couleur rouge des symboles trafic lorsque leur altitude est comprise dans la tranche de notre altitude ±500 ft ;
+- couleur verte lorsque le trafic se trouve à plus de 500 ft en dessous ;
+- couleur bleue lorsque le trafic se trouve à plus de 500 ft au-dessus ;
+- couleur grise lorsque l’altitude du trafic ou notre altitude est indisponible ;
+- application de la même couleur au symbole, au vecteur pointillé et au contour de l’étiquette d’altitude ;
+- ajout de l’écart d’altitude avec notre position dans la fenêtre détaillée du trafic ;
+- fonctionnement des couleurs indépendant du filtre d’altitude relative : les couleurs restent actives même si le filtre ± altitude est désactivé ;
+- modification de la sélection des fournisseurs : avant la clé SafeSky, les sources ADS-B actuelles restent disponibles pour les essais d’interface ;
+- dès que SAFESKY_PROXY_URL sera renseigné, SafeSky deviendra automatiquement l’unique source de trafic ;
+- aucune fusion entre SafeSky et les anciennes sources ADS-B, évitant les doublons ;
+- ajout de l’icône SafeSky au pré-cache du service worker ;
+- version applicative portée en v13.98 TEST.
+
 v13.97 TEST — trafic actif et menu des filtres accessible
 
 Modifications apportées :
