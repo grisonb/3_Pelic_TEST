@@ -714,8 +714,10 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     minAltitudeFt: 0,
     maxAltitudeFt: null,
     showAltitudeLabel: false,
+    altitudeFilterMode: 'absolute',
     relativeAltitudeEnabled: false,
     relativeAltitudeBandFt: 1500,
+    groundToAboveBandFt: 1500,
     trafficAroundOwnPosition: true,
     trafficAroundFire: true
 });
@@ -4289,8 +4291,36 @@ function sanitizeTrafficSettings(candidate = {}) {
     }
 
     const showAltitudeLabel = asBool(candidate.showAltitudeLabel, fallback.showAltitudeLabel);
-    const relativeAltitudeEnabled = asBool(candidate.relativeAltitudeEnabled, fallback.relativeAltitudeEnabled);
-    const relativeAltitudeBandFt = Math.max(100, Math.min(10000, parseIntOr(candidate.relativeAltitudeBandFt, fallback.relativeAltitudeBandFt)));
+
+    const validAltitudeModes = new Set(['absolute', 'around', 'ground']);
+    let altitudeFilterMode = String(candidate.altitudeFilterMode || '').toLowerCase();
+    if (!validAltitudeModes.has(altitudeFilterMode)) {
+        /*
+         * Migration transparente des versions précédentes :
+         * - ancienne case cochée = mode ± autour de mon altitude ;
+         * - ancienne case décochée = altitude absolue.
+         */
+        altitudeFilterMode = asBool(
+            candidate.relativeAltitudeEnabled,
+            fallback.relativeAltitudeEnabled
+        ) ? 'around' : 'absolute';
+    }
+
+    const relativeAltitudeBandFt = Math.max(
+        100,
+        Math.min(
+            10000,
+            parseIntOr(candidate.relativeAltitudeBandFt, fallback.relativeAltitudeBandFt)
+        )
+    );
+    const groundToAboveBandFt = Math.max(
+        100,
+        Math.min(
+            10000,
+            parseIntOr(candidate.groundToAboveBandFt, fallback.groundToAboveBandFt)
+        )
+    );
+
     let trafficAroundOwnPosition = asBool(candidate.trafficAroundOwnPosition, fallback.trafficAroundOwnPosition);
     let trafficAroundFire = asBool(candidate.trafficAroundFire, fallback.trafficAroundFire);
 
@@ -4304,8 +4334,14 @@ function sanitizeTrafficSettings(candidate = {}) {
         minAltitudeFt,
         maxAltitudeFt,
         showAltitudeLabel,
-        relativeAltitudeEnabled,
+        altitudeFilterMode,
+        /*
+         * Propriété conservée pour compatibilité avec d'anciens réglages ou
+         * modules, vraie pour les deux modes dépendant de l'altitude propre.
+         */
+        relativeAltitudeEnabled: altitudeFilterMode !== 'absolute',
         relativeAltitudeBandFt,
+        groundToAboveBandFt,
         trafficAroundOwnPosition,
         trafficAroundFire
     };
@@ -4333,11 +4369,22 @@ function getTrafficSettingsSummary() {
     const settings = sanitizeTrafficSettings(trafficSettings);
     const altitudeMaxLabel = settings.maxAltitudeFt === null ? 'sans maxi' : `${settings.maxAltitudeFt} ft`;
     const altitudeLabel = settings.showAltitudeLabel ? 'étiquette alt ON' : 'étiquette alt OFF';
-    const relativeLabel = settings.relativeAltitudeEnabled ? `±${settings.relativeAltitudeBandFt} ft autour GPS` : 'altitude absolue';
+
+    let altitudeFilterLabel = 'altitude absolue';
+    if (settings.altitudeFilterMode === 'around') {
+        altitudeFilterLabel = `±${settings.relativeAltitudeBandFt} ft autour de moi`;
+    } else if (settings.altitudeFilterMode === 'ground') {
+        altitudeFilterLabel = `du sol à +${settings.groundToAboveBandFt} ft au-dessus de moi`;
+    }
+
     const referenceLabels = [];
     if (settings.trafficAroundOwnPosition) referenceLabels.push('GPS');
     if (settings.trafficAroundFire) referenceLabels.push('feu');
-    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel} · ${relativeLabel} · ${altitudeLabel} · autour ${referenceLabels.join(' + ')}`;
+    const absoluteRangeLabel = settings.altitudeFilterMode === 'absolute'
+        ? `Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel} · `
+        : '';
+
+    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · ${absoluteRangeLabel}${altitudeFilterLabel} · ${altitudeLabel} · autour ${referenceLabels.join(' + ')}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -4375,6 +4422,13 @@ function ensureTrafficSettingsModal() {
                     </div>
                 </label>
 
+                <label id="traffic-altitude-absolute-mode-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-altitude-mode-line">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-altitude-mode-absolute" type="radio" name="traffic-altitude-mode" value="absolute">
+                        <em>Altitude absolue — mini / maxi</em>
+                    </div>
+                </label>
+
                 <label id="traffic-min-altitude-field" class="traffic-settings-field traffic-absolute-altitude-field">
                     <span>Altitude mini</span>
                     <div class="traffic-settings-input-row">
@@ -4391,13 +4445,23 @@ function ensureTrafficSettingsModal() {
                     </div>
                 </label>
 
-                <label class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
+                <label id="traffic-around-altitude-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
                     <div class="traffic-settings-check-row traffic-settings-inline-band-row">
-                        <input id="traffic-relative-altitude-input" type="checkbox">
-                        <em>Tranche autour de mon altitude</em>
+                        <input id="traffic-altitude-mode-around" type="radio" name="traffic-altitude-mode" value="around">
+                        <em>Autour de mon altitude</em>
                         <span class="traffic-relative-plusminus">±</span>
                         <input id="traffic-relative-band-input" type="number" inputmode="numeric" min="100" max="10000" step="100">
                         <strong>ft</strong>
+                    </div>
+                </label>
+
+                <label id="traffic-ground-altitude-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
+                    <div class="traffic-settings-check-row traffic-settings-ground-band-row">
+                        <input id="traffic-altitude-mode-ground" type="radio" name="traffic-altitude-mode" value="ground">
+                        <em>Du sol à</em>
+                        <span class="traffic-relative-plusminus">+</span>
+                        <input id="traffic-ground-band-input" type="number" inputmode="numeric" min="100" max="10000" step="100">
+                        <strong>ft au-dessus de moi</strong>
                     </div>
                 </label>
 
@@ -4423,7 +4487,7 @@ function ensureTrafficSettingsModal() {
                 </label>
             </div>
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. La tranche autour de mon altitude utilise l'altitude GPS disponible. Rafraîchissement trafic toutes les 5 secondes. Ces filtres ne changent pas la nature indicative et non certifiée des données SafeSky/ADS-B.</div>
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse et affiche les trafics jusqu’à mon altitude augmentée de la valeur choisie. Les deux modes utilisent l’altitude GPS ou l’altitude de simulation disponible. Rafraîchissement trafic toutes les 5 secondes. Ces filtres ne changent pas la nature indicative et non certifiée des données SafeSky/ADS-B.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -4440,20 +4504,44 @@ function ensureTrafficSettingsModal() {
         modal.setAttribute('aria-hidden', 'true');
     };
 
+    const getSelectedAltitudeMode = () => (
+        modal.querySelector('input[name="traffic-altitude-mode"]:checked')?.value
+        || 'absolute'
+    );
+
     const updateAltitudeModeUi = () => {
-        const relativeAltitudeInput = modal.querySelector('#traffic-relative-altitude-input');
+        const mode = getSelectedAltitudeMode();
+
         const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
+        const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
+        const groundBandInput = modal.querySelector('#traffic-ground-band-input');
+
         const minAltitudeField = modal.querySelector('#traffic-min-altitude-field');
         const maxAltitudeField = modal.querySelector('#traffic-max-altitude-field');
-        const disabled = !!relativeAltitudeInput?.checked;
+        const aroundAltitudeField = modal.querySelector('#traffic-around-altitude-field');
+        const groundAltitudeField = modal.querySelector('#traffic-ground-altitude-field');
+
+        const absoluteActive = mode === 'absolute';
+        const aroundActive = mode === 'around';
+        const groundActive = mode === 'ground';
 
         [minAltitudeInput, maxAltitudeInput].forEach(input => {
-            if (input) input.disabled = disabled;
+            if (input) input.disabled = !absoluteActive;
         });
         [minAltitudeField, maxAltitudeField].forEach(field => {
-            if (field) field.classList.toggle('traffic-settings-field-disabled', disabled);
+            if (field) field.classList.toggle('traffic-settings-field-disabled', !absoluteActive);
         });
+
+        if (relativeBandInput) relativeBandInput.disabled = !aroundActive;
+        if (aroundAltitudeField) {
+            aroundAltitudeField.classList.toggle('traffic-settings-field-disabled', !aroundActive);
+        }
+
+        if (groundBandInput) groundBandInput.disabled = !groundActive;
+        if (groundAltitudeField) {
+            groundAltitudeField.classList.toggle('traffic-settings-field-disabled', !groundActive);
+        }
     };
 
     const fillDefaults = () => {
@@ -4464,13 +4552,16 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-max-altitude-input').value = '';
         modal.querySelector('#traffic-around-own-input').checked = !!defaults.trafficAroundOwnPosition;
         modal.querySelector('#traffic-around-fire-input').checked = !!defaults.trafficAroundFire;
-        modal.querySelector('#traffic-relative-altitude-input').checked = !!defaults.relativeAltitudeEnabled;
+        modal.querySelector(`#traffic-altitude-mode-${defaults.altitudeFilterMode}`).checked = true;
         modal.querySelector('#traffic-relative-band-input').value = String(defaults.relativeAltitudeBandFt);
+        modal.querySelector('#traffic-ground-band-input').value = String(defaults.groundToAboveBandFt);
         modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
         updateAltitudeModeUi();
     };
 
-    modal.querySelector('#traffic-relative-altitude-input').addEventListener('change', updateAltitudeModeUi);
+    modal.querySelectorAll('input[name="traffic-altitude-mode"]').forEach(input => {
+        input.addEventListener('change', updateAltitudeModeUi);
+    });
 
     modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-cancel').addEventListener('click', closeModal);
@@ -4487,8 +4578,9 @@ function ensureTrafficSettingsModal() {
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
         const aroundOwnInput = modal.querySelector('#traffic-around-own-input');
         const aroundFireInput = modal.querySelector('#traffic-around-fire-input');
-        const relativeAltitudeInput = modal.querySelector('#traffic-relative-altitude-input');
+        const altitudeModeInput = modal.querySelector('input[name="traffic-altitude-mode"]:checked');
         const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
+        const groundBandInput = modal.querySelector('#traffic-ground-band-input');
         const altitudeLabelInput = modal.querySelector('#traffic-altitude-label-input');
 
         saveTrafficSettings({
@@ -4498,8 +4590,9 @@ function ensureTrafficSettingsModal() {
             maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value,
             trafficAroundOwnPosition: !!aroundOwnInput.checked,
             trafficAroundFire: !!aroundFireInput.checked,
-            relativeAltitudeEnabled: !!relativeAltitudeInput.checked,
+            altitudeFilterMode: altitudeModeInput?.value || 'absolute',
             relativeAltitudeBandFt: relativeBandInput.value,
+            groundToAboveBandFt: groundBandInput.value,
             showAltitudeLabel: !!altitudeLabelInput.checked
         });
 
@@ -4525,19 +4618,43 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-max-altitude-input').value = current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt);
     modal.querySelector('#traffic-around-own-input').checked = !!current.trafficAroundOwnPosition;
     modal.querySelector('#traffic-around-fire-input').checked = !!current.trafficAroundFire;
-    modal.querySelector('#traffic-relative-altitude-input').checked = !!current.relativeAltitudeEnabled;
+    modal.querySelector(`#traffic-altitude-mode-${current.altitudeFilterMode}`).checked = true;
     modal.querySelector('#traffic-relative-band-input').value = String(current.relativeAltitudeBandFt);
+    modal.querySelector('#traffic-ground-band-input').value = String(current.groundToAboveBandFt);
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
 
     try {
-        const relativeAltitudeInput = modal.querySelector('#traffic-relative-altitude-input');
+        const mode = current.altitudeFilterMode;
+        const absoluteActive = mode === 'absolute';
+        const aroundActive = mode === 'around';
+        const groundActive = mode === 'ground';
+
         const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
+        const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
+        const groundBandInput = modal.querySelector('#traffic-ground-band-input');
+
         const minAltitudeField = modal.querySelector('#traffic-min-altitude-field');
         const maxAltitudeField = modal.querySelector('#traffic-max-altitude-field');
-        const disabled = !!relativeAltitudeInput?.checked;
-        [minAltitudeInput, maxAltitudeInput].forEach(input => { if (input) input.disabled = disabled; });
-        [minAltitudeField, maxAltitudeField].forEach(field => { if (field) field.classList.toggle('traffic-settings-field-disabled', disabled); });
+        const aroundAltitudeField = modal.querySelector('#traffic-around-altitude-field');
+        const groundAltitudeField = modal.querySelector('#traffic-ground-altitude-field');
+
+        [minAltitudeInput, maxAltitudeInput].forEach(input => {
+            if (input) input.disabled = !absoluteActive;
+        });
+        [minAltitudeField, maxAltitudeField].forEach(field => {
+            if (field) field.classList.toggle('traffic-settings-field-disabled', !absoluteActive);
+        });
+
+        if (relativeBandInput) relativeBandInput.disabled = !aroundActive;
+        if (aroundAltitudeField) {
+            aroundAltitudeField.classList.toggle('traffic-settings-field-disabled', !aroundActive);
+        }
+
+        if (groundBandInput) groundBandInput.disabled = !groundActive;
+        if (groundAltitudeField) {
+            groundAltitudeField.classList.toggle('traffic-settings-field-disabled', !groundActive);
+        }
     } catch (_) {}
 
     modal.classList.add('open');
@@ -5354,9 +5471,26 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     const settings = sanitizeTrafficSettings(trafficSettings);
     const points = Array.isArray(meta.points) && meta.points.length ? meta.points : (meta.point ? [meta.point] : []);
     const ownAltitudeFt = getOwnTrafficAltitudeFeet();
-    const useRelativeAltitude = settings.relativeAltitudeEnabled && Number.isFinite(ownAltitudeFt);
-    const relativeMinAltitudeFt = useRelativeAltitude ? ownAltitudeFt - settings.relativeAltitudeBandFt : null;
-    const relativeMaxAltitudeFt = useRelativeAltitude ? ownAltitudeFt + settings.relativeAltitudeBandFt : null;
+
+    const useAroundAltitude = (
+        settings.altitudeFilterMode === 'around'
+        && Number.isFinite(ownAltitudeFt)
+    );
+    const useGroundToAboveAltitude = (
+        settings.altitudeFilterMode === 'ground'
+        && Number.isFinite(ownAltitudeFt)
+    );
+
+    const relativeMinAltitudeFt = useAroundAltitude
+        ? ownAltitudeFt - settings.relativeAltitudeBandFt
+        : null;
+    const relativeMaxAltitudeFt = useAroundAltitude
+        ? ownAltitudeFt + settings.relativeAltitudeBandFt
+        : null;
+    const groundToAboveMaxAltitudeFt = useGroundToAboveAltitude
+        ? ownAltitudeFt + settings.groundToAboveBandFt
+        : null;
+
     const uniqueAircraft = [];
     const seenAircraft = new Set();
 
@@ -5364,9 +5498,10 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
         .filter(ac => !Number.isFinite(ac.seenPos) || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS)
-        .filter(ac => settings.relativeAltitudeEnabled || ac.altitudeFeet === null || ac.altitudeFeet >= settings.minAltitudeFt)
-        .filter(ac => settings.relativeAltitudeEnabled || settings.maxAltitudeFt === null || ac.altitudeFeet === null || ac.altitudeFeet <= settings.maxAltitudeFt)
-        .filter(ac => !useRelativeAltitude || ac.altitudeFeet === null || (ac.altitudeFeet >= relativeMinAltitudeFt && ac.altitudeFeet <= relativeMaxAltitudeFt))
+        .filter(ac => settings.altitudeFilterMode !== 'absolute' || ac.altitudeFeet === null || ac.altitudeFeet >= settings.minAltitudeFt)
+        .filter(ac => settings.altitudeFilterMode !== 'absolute' || settings.maxAltitudeFt === null || ac.altitudeFeet === null || ac.altitudeFeet <= settings.maxAltitudeFt)
+        .filter(ac => !useAroundAltitude || ac.altitudeFeet === null || (ac.altitudeFeet >= relativeMinAltitudeFt && ac.altitudeFeet <= relativeMaxAltitudeFt))
+        .filter(ac => !useGroundToAboveAltitude || ac.altitudeFeet === null || ac.altitudeFeet <= groundToAboveMaxAltitudeFt)
         .forEach(ac => {
             const reference = getNearestTrafficReference(ac, points);
             if (points.length && (!reference || reference.distance > settings.radiusNm + 0.5)) return;
