@@ -9478,3 +9478,87 @@ body.gaar-point-search-open .gaar-editing-banner {
     border-color: #2563eb !important;
     color: #1e40af !important;
 }
+
+
+/* ==========================================================================
+   v13.99 TEST — icône SafeSky monochrome et parfaitement stable
+   ========================================================================== */
+
+#traffic-layer-button {
+    color: var(--primary-color) !important;
+}
+
+#traffic-layer-button.active,
+#traffic-layer-button.loading,
+#traffic-layer-button.traffic-state-idle,
+#traffic-layer-button.traffic-state-loading,
+#traffic-layer-button.traffic-state-error,
+#traffic-layer-button.traffic-state-ok {
+    opacity: 1 !important;
+}
+
+#traffic-layer-button .traffic-safesky-icon {
+    display: block !important;
+    width: 62px !important;
+    height: 62px !important;
+    flex: 0 0 62px !important;
+    background-color: currentColor !important;
+    background-image: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    animation: none !important;
+    transition: none !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v13.99') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v13.99') !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    -webkit-mask-size: contain !important;
+    mask-size: contain !important;
+    pointer-events: none !important;
+}
+
+#traffic-layer-button.loading .traffic-safesky-icon,
+#traffic-layer-button.traffic-state-loading .traffic-safesky-icon,
+.traffic-map-button.loading .traffic-icon {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+#traffic-layer-button.traffic-state-idle .traffic-safesky-icon,
+#traffic-layer-button.traffic-state-loading .traffic-safesky-icon,
+#traffic-layer-button.traffic-state-error .traffic-safesky-icon,
+#traffic-layer-button.traffic-state-ok .traffic-safesky-icon {
+    color: var(--primary-color) !important;
+    background-color: currentColor !important;
+}
+
+/*
+ * La bulle du nombre conserve en permanence le même aspect.
+ * Aucun orange, bleu ou animation pendant l'actualisation.
+ */
+#traffic-layer-button .traffic-button-count,
+#traffic-layer-button.loading .traffic-button-count,
+#traffic-layer-button.traffic-state-loading .traffic-button-count,
+#traffic-layer-button.traffic-state-ok .traffic-button-count,
+#traffic-layer-button.traffic-state-error .traffic-button-count {
+    background: #e9002f !important;
+    color: #ffffff !important;
+    border-color: rgba(255,255,255,.92) !important;
+    opacity: 1 !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+@media (max-width: 760px) {
+    #traffic-layer-button .traffic-safesky-icon {
+        width: 36px !important;
+        height: 36px !important;
+        flex-basis: 36px !important;
+    }
+}
