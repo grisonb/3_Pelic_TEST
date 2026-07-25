@@ -507,20 +507,46 @@ let showHighVoltageLinesLayer = localStorage.getItem(HIGH_VOLTAGE_LINES_LAYER_KE
 let hasLoadedHighVoltageLines = false;
 let isHighVoltageLinesLoading = false;
 const TRAFFIC_LAYER_KEY = 'showTrafficLayer';
-const TRAFFIC_PROVIDER_LABEL = 'adsb.fi v3 / adsb.lol / airplanes.live';
+
+/*
+ * v13.96 TEST — intégration SafeSky préparée sans exposer la clé.
+ *
+ * La clé SafeSky ne devra jamais apparaître ici ni dans GitHub.
+ * SAFESKY_PROXY_URL recevra plus tard l'adresse du proxy serveur chargé :
+ * - d'ajouter l'en-tête x-api-key ;
+ * - d'appeler /v1/beacons ;
+ * - de renvoyer le JSON SafeSky sans modification.
+ *
+ * Exemple de contrat attendu côté NPF :
+ * GET <proxy>?viewport=lat_min,lng_min,lat_max,lng_max&show_grounded=false
+ */
+const SAFESKY_PROXY_URL = '';
+const SAFESKY_PROVIDER = Object.freeze({
+    label: 'SafeSky',
+    baseUrl: SAFESKY_PROXY_URL,
+    urlFormat: 'viewport',
+    dataFormat: 'safesky'
+});
+const TRAFFIC_PROVIDER_LABEL = 'SafeSky / adsb.fi v3 / adsb.lol / airplanes.live';
 const TRAFFIC_API_PROVIDERS = [
-    { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3', urlFormat: 'latlon' },
-    { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2', urlFormat: 'latlon' },
-    { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point' }
+    ...(SAFESKY_PROXY_URL ? [SAFESKY_PROVIDER] : []),
+    { label: 'adsb.fi v3', baseUrl: 'https://opendata.adsb.fi/api/v3', urlFormat: 'latlon', dataFormat: 'readsb' },
+    { label: 'adsb.lol v2', baseUrl: 'https://api.adsb.lol/v2', urlFormat: 'latlon', dataFormat: 'readsb' },
+    { label: 'airplanes.live v2', baseUrl: 'https://api.airplanes.live/v2', urlFormat: 'point', dataFormat: 'readsb' }
 ];
 const TRAFFIC_RADIUS_NM = 50;
 const TRAFFIC_REFRESH_INTERVAL_MS = 5000;
 const TRAFFIC_MAX_AIRCRAFT = 80;
 const TRAFFIC_MAX_SEEN_SECONDS = 90;
-const TRAFFIC_DISABLED_FOR_NOW = true;
+
+/*
+ * v13.97 TEST — moteur trafic réactivé pour travailler sur l'interface et
+ * les filtres. Tant que SAFESKY_PROXY_URL est vide, SafeSky n'est pas appelé :
+ * les sources ADS-B existantes restent utilisées automatiquement.
+ */
+const TRAFFIC_DISABLED_FOR_NOW = false;
 let trafficLayer = null;
-let showTrafficLayer = false;
-try { localStorage.setItem(TRAFFIC_LAYER_KEY, 'false'); } catch (_) {}
+let showTrafficLayer = localStorage.getItem(TRAFFIC_LAYER_KEY) === 'true';
 let isTrafficLoading = false;
 let trafficRefreshTimer = null;
 let lastTrafficRefreshAt = 0;
@@ -4045,7 +4071,7 @@ function ensureTrafficSettingsModal() {
         <div class="traffic-settings-card" role="dialog" aria-modal="true" aria-labelledby="traffic-settings-title">
             <div class="traffic-settings-header">
                 <div>
-                    <div id="traffic-settings-title" class="traffic-settings-title">Filtres ADS-B</div>
+                    <div id="traffic-settings-title" class="traffic-settings-title">Filtres trafic</div>
                     <div class="traffic-settings-subtitle">Réglages du calque trafic indicatif</div>
                 </div>
                 <button type="button" id="traffic-settings-close" class="traffic-settings-close" aria-label="Fermer">×</button>
@@ -4116,7 +4142,7 @@ function ensureTrafficSettingsModal() {
                 </label>
             </div>
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. La tranche autour de mon altitude utilise l'altitude GPS disponible. Rafraîchissement ADS-B toutes les 5 secondes. Ces filtres ne changent pas la nature indicative/non certifiée de l'ADS-B.</div>
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. La tranche autour de mon altitude utilise l'altitude GPS disponible. Rafraîchissement trafic toutes les 5 secondes. Ces filtres ne changent pas la nature indicative et non certifiée des données SafeSky/ADS-B.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -4439,11 +4465,51 @@ function getTrafficQueryPoint() {
     return points.length ? points[0] : null;
 }
 
+
+function buildSafeSkyViewport(point, radiusNm = getTrafficRadiusNm()) {
+    const lat = Number(point?.lat);
+    const lon = Number(point?.lon);
+    const radius = Math.max(5, Math.min(250, Number(radiusNm) || TRAFFIC_RADIUS_NM));
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        throw new Error('Point SafeSky invalide');
+    }
+
+    /*
+     * 1 degré de latitude ≈ 60 NM.
+     * La longitude est corrigée par le cosinus de la latitude.
+     * Une petite marge évite de couper un trafic placé exactement sur la limite.
+     */
+    const marginFactor = 1.03;
+    const latDelta = (radius / 60) * marginFactor;
+    const cosLatitude = Math.max(0.08, Math.cos(lat * Math.PI / 180));
+    const lonDelta = (radius / (60 * cosLatitude)) * marginFactor;
+
+    const latMin = Math.max(-90, lat - latDelta);
+    const latMax = Math.min(90, lat + latDelta);
+    const lonMin = Math.max(-180, lon - lonDelta);
+    const lonMax = Math.min(180, lon + lonDelta);
+
+    return [latMin, lonMin, latMax, lonMax]
+        .map(value => Number(value).toFixed(4))
+        .join(',');
+}
+
 function buildTrafficApiUrl(point, provider = null) {
     const activeProvider = provider || TRAFFIC_API_PROVIDERS[0];
     const lat = Number(point.lat).toFixed(4);
     const lon = Number(point.lon).toFixed(4);
     const radius = Math.max(5, Math.min(250, getTrafficRadiusNm()));
+
+    if (!activeProvider?.baseUrl) {
+        throw new Error(`${activeProvider?.label || 'Source trafic'} non configurée`);
+    }
+
+    if (activeProvider.urlFormat === 'viewport') {
+        const viewport = buildSafeSkyViewport(point, radius);
+        const separator = activeProvider.baseUrl.includes('?') ? '&' : '?';
+        return `${activeProvider.baseUrl}${separator}viewport=${encodeURIComponent(viewport)}&show_grounded=false`;
+    }
 
     if (activeProvider.urlFormat === 'point') {
         return `${activeProvider.baseUrl}/point/${lat}/${lon}/${radius}`;
@@ -4479,23 +4545,104 @@ async function fetchTrafficAircraftFromProvider(point, provider) {
 }
 
 function normalizeTrafficAircraft(raw) {
-    if (!raw || !Number.isFinite(Number(raw.lat)) || !Number.isFinite(Number(raw.lon))) return null;
+    if (!raw) return null;
 
-    const callsign = String(raw.flight || raw.callsign || raw.r || raw.hex || '').trim() || 'N/A';
-    const hex = String(raw.hex || '').trim().toUpperCase();
-    const lat = Number(raw.lat);
-    const lon = Number(raw.lon);
-    const seenPos = Number.isFinite(Number(raw.seen_pos)) ? Number(raw.seen_pos) : (Number.isFinite(Number(raw.seen)) ? Number(raw.seen) : null);
-    const altitudeRaw = raw.alt_baro ?? raw.alt_geom ?? raw.altitude;
-    const altitudeFeet = parseTrafficAltitudeFeet(raw);
-    const altitude = altitudeRaw === 'ground' ? 'GND' : (Number.isFinite(Number(altitudeRaw)) ? `${Math.round(Number(altitudeRaw))} ft` : '--');
-    const gs = Number.isFinite(Number(raw.gs)) ? `${Math.round(Number(raw.gs))} kt` : '--';
-    const track = Number.isFinite(Number(raw.track)) ? Number(raw.track) : null;
-    const type = String(raw.t || raw.type || '').trim();
-    const registration = String(raw.r || '').trim();
-    const source = String(raw.type || raw.dbFlags || '').trim();
+    const safeSkyFormat = (
+        raw.latitude !== undefined
+        || raw.longitude !== undefined
+        || raw.beacon_type !== undefined
+        || raw.transponder_type !== undefined
+        || raw.call_sign !== undefined
+    );
 
-    return { callsign, hex, lat, lon, seenPos, altitude, altitudeFeet, gs, track, type, registration, source, raw };
+    /*
+     * SafeSky ADVISORY décrit une zone déclarée d'activité drone.
+     * Ce n'est pas une position mobile : elle ne doit pas utiliser le symbole avion.
+     * Le support cartographique des zones ADVISORY pourra être ajouté séparément.
+     */
+    if (String(raw.transponder_type || '').toUpperCase() === 'ADVISORY') {
+        return null;
+    }
+
+    const latitudeRaw = raw.lat ?? raw.latitude;
+    const longitudeRaw = raw.lon ?? raw.longitude;
+    if (!Number.isFinite(Number(latitudeRaw)) || !Number.isFinite(Number(longitudeRaw))) {
+        return null;
+    }
+
+    const callsign = String(
+        raw.flight
+        || raw.callsign
+        || raw.call_sign
+        || raw.registration
+        || raw.r
+        || raw.id
+        || raw.hex
+        || ''
+    ).trim() || 'N/A';
+
+    const trafficId = String(raw.hex || raw.id || '').trim().toUpperCase();
+    const lat = Number(latitudeRaw);
+    const lon = Number(longitudeRaw);
+
+    let seenPos = null;
+    if (safeSkyFormat && Number.isFinite(Number(raw.last_update))) {
+        const eventTimestampSeconds = Number(raw.last_update);
+        seenPos = Math.max(0, (Date.now() / 1000) - eventTimestampSeconds);
+    } else if (Number.isFinite(Number(raw.seen_pos))) {
+        seenPos = Number(raw.seen_pos);
+    } else if (Number.isFinite(Number(raw.seen))) {
+        seenPos = Number(raw.seen);
+    }
+
+    let altitudeFeet = null;
+    let altitude = '--';
+    if (safeSkyFormat && Number.isFinite(Number(raw.altitude))) {
+        altitudeFeet = Math.round(Number(raw.altitude) * 3.280839895);
+        altitude = `${altitudeFeet} ft`;
+    } else {
+        const altitudeRaw = raw.alt_baro ?? raw.alt_geom ?? raw.altitude;
+        altitudeFeet = parseTrafficAltitudeFeet(raw);
+        altitude = altitudeRaw === 'ground'
+            ? 'GND'
+            : (Number.isFinite(Number(altitudeRaw)) ? `${Math.round(Number(altitudeRaw))} ft` : '--');
+    }
+
+    let groundSpeedKnots = null;
+    if (safeSkyFormat && Number.isFinite(Number(raw.ground_speed))) {
+        groundSpeedKnots = Number(raw.ground_speed) * 1.943844492;
+    } else if (Number.isFinite(Number(raw.gs))) {
+        groundSpeedKnots = Number(raw.gs);
+    }
+    const gs = Number.isFinite(groundSpeedKnots) ? `${Math.round(groundSpeedKnots)} kt` : '--';
+
+    const trackRaw = safeSkyFormat ? raw.course : raw.track;
+    const track = Number.isFinite(Number(trackRaw)) ? Number(trackRaw) : null;
+    const type = String(raw.beacon_type || raw.t || raw.aircraft_type || raw.type || '').trim();
+    const registration = String(raw.registration || raw.r || '').trim();
+    const source = String(raw.transponder_type || raw.source || raw.type || raw.dbFlags || '').trim();
+    const status = String(raw.status || '').trim().toUpperCase();
+
+    if (status === 'GROUNDED' || status === 'INACTIVE') {
+        return null;
+    }
+
+    return {
+        callsign,
+        hex: trafficId,
+        lat,
+        lon,
+        seenPos,
+        altitude,
+        altitudeFeet,
+        gs,
+        track,
+        type,
+        registration,
+        source,
+        providerFormat: safeSkyFormat ? 'safesky' : 'readsb',
+        raw
+    };
 }
 
 function formatTrafficAge(seconds) {
@@ -4561,7 +4708,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         });
 
         const title = escapeHtml(ac.callsign);
-        const subtitle = [ac.type, ac.registration, ac.hex].filter(Boolean).map(escapeHtml).join(' · ');
+        const subtitle = [ac.type, ac.source, ac.registration, ac.hex].filter(Boolean).map(escapeHtml).join(' · ');
         const reference = ac._trafficReference;
         const distance = reference ? reference.distance : null;
         const referenceLabel = reference?.point?.label ? escapeHtml(reference.point.label) : '';
@@ -4575,7 +4722,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 ${Number.isFinite(distance) ? `<div>Distance ${referenceLabel ? `à ${referenceLabel}` : ''} : <b>${Math.round(distance)} Nm</b></div>` : ''}
                 <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
                 ${useRelativeAltitude ? `<div>Filtre altitude GPS : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
-                <div class="traffic-popup-warning">ADS-B indicatif — non certifié</div>
+                <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
             </div>`;
         marker.bindPopup(popup);
         marker.bindTooltip(title, { direction: 'top', offset: [0, -10], className: 'traffic-tooltip' });
@@ -4623,8 +4770,8 @@ function refreshTrafficButtonState(count = null) {
     button.classList.toggle('traffic-state-idle', !showTrafficLayer);
     button.disabled = false;
     button.title = isTrafficLoading
-        ? `Chargement du trafic ADS-B… — ${getTrafficSettingsSummary()}`
-        : `Afficher/Masquer le trafic ADS-B indicatif — appui long: filtres — ${getTrafficSettingsSummary()}`;
+        ? `Chargement du trafic aérien… — ${getTrafficSettingsSummary()}`
+        : `Afficher/Masquer le trafic aérien indicatif — appui long: filtres — ${getTrafficSettingsSummary()}`;
 
     if (countEl) {
         if (showTrafficLayer) {
@@ -4655,7 +4802,7 @@ async function refreshTrafficLayer(options = {}) {
         lastTrafficError = 'Aucun point de référence';
         lastTrafficDisplayedCount = 0;
         refreshTrafficButtonState(0);
-        updateTrafficStatus({ state: 'error', message: 'Trafic ADS-B : aucun point de référence', visible: true });
+        updateTrafficStatus({ state: 'error', message: 'Trafic : aucun point de référence', visible: true });
         return;
     }
 
@@ -4698,10 +4845,10 @@ async function refreshTrafficLayer(options = {}) {
     } catch (error) {
         lastTrafficError = error && error.message ? error.message : String(error);
         lastTrafficDisplayedCount = 0;
-        console.warn('Trafic ADS-B temporairement indisponible:', error);
+        console.warn('Trafic temporairement indisponible:', error);
         if (trafficLayer) trafficLayer.clearLayers();
         refreshTrafficButtonState(0);
-        updateTrafficStatus({ state: 'error', visible: true, message: 'Trafic ADS-B temporairement indisponible — nouvelle tentative automatique' });
+        updateTrafficStatus({ state: 'error', visible: true, message: 'Trafic temporairement indisponible — nouvelle tentative automatique' });
     } finally {
         isTrafficLoading = false;
         refreshTrafficButtonState();
@@ -4754,6 +4901,13 @@ function toggleTrafficLayer(forceState = null) {
 
 window.toggleTrafficLayer = toggleTrafficLayer;
 window.refreshTrafficLayer = refreshTrafficLayer;
+window.getSafeSkyIntegrationStatus = () => ({
+    codeReady: true,
+    proxyConfigured: Boolean(SAFESKY_PROXY_URL),
+    trafficEnabled: !TRAFFIC_DISABLED_FOR_NOW,
+    safeSkyProviderActive: TRAFFIC_API_PROVIDERS.some(provider => provider?.dataFormat === 'safesky'),
+    refreshIntervalMs: TRAFFIC_REFRESH_INTERVAL_MS
+});
 
 function updateMapBingoDisplay() {
     const bingoDisplay = document.getElementById('bingo-map-display');
