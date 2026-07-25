@@ -1,5 +1,28 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.02 TEST — fenêtre trafic unique, rapprochée, croix agrandie et silhouettes par catégorie
+
+Modifications apportées :
+- suppression complète de la petite étiquette Leaflet qui s’affichait en même temps que la fenêtre détaillée ;
+- suppression du tooltip trafic et de son déclenchement au toucher ou au survol ;
+- conservation exclusive de la grande fenêtre détaillée ;
+- rapprochement de la grande fenêtre du symbole trafic par réduction du décalage vertical du popup ;
+- ajout d’une classe dédiée traffic-aircraft-popup ;
+- augmentation de la zone tactile de la croix de fermeture à 44 × 44 px ;
+- augmentation du caractère de fermeture à 34 px ;
+- ajout d’un fond clair et d’un contraste renforcé sur la zone de fermeture ;
+- ajustement des marges du contenu afin que la grande croix ne masque aucune information ;
+- conservation de la persistance de la fenêtre après rafraîchissement de la position ;
+- ajout de silhouettes distinctes selon le champ SafeSky beacon_type ;
+- silhouettes spécifiques pour avion, jet, hélicoptère, planeur, drone, ballon, dirigeable, parachutiste, parapente, deltaplane, gyrocoptère, militaire, ULM/paramoteur et objet statique ;
+- les catégories MOTORPLANE, THREE_AXES_LIGHT_PLANE, PAV, UNKNOWN et les trafics ADS-B sans catégorie SafeSky utilisent le symbole avion standard ;
+- rotation selon la route conservée pour les aéronefs directionnels ;
+- ballon, drone, parachute, parapente et objet statique restent sans rotation visuelle ;
+- couleurs rouge / verte / bleue selon l’altitude relative intégralement conservées ;
+- dimensions du symbole et zone tactile 36 × 36 px de la v14.01 conservées ;
+- la ressource SafeSky monochrome reste incluse dans l’archive mais ne sera plus fournie séparément ;
+- version applicative portée en v14.02 TEST.
+
 v14.01 TEST — trafics plus petits et zone tactile réellement réduite
 
 Modifications apportées :
