@@ -4717,9 +4717,14 @@ function buildTrafficMarkerIcon(aircraft) {
     return L.divIcon({
         className: 'traffic-aircraft-icon',
         html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className}" title="${escapeHtml(altitudeState.label)}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" style="transform: translate(-50%, -50%) rotate(${track}deg);">▲</span>${altitudeHtml}</span>`,
-        iconSize: [128, 128],
-        iconAnchor: [64, 64],
-        popupAnchor: [0, -52]
+        /*
+         * v14.01 — vraie zone interactive réduite.
+         * Le vecteur et l'étiquette peuvent dépasser visuellement grâce à
+         * overflow: visible, mais seul le carré central 36 × 36 px capte le clic.
+         */
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -20]
     });
 }
 
