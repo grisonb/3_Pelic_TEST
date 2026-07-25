@@ -1,6 +1,147 @@
 //  =========================================================================
 // INITIALISATION DE L'APPLICATION
 // =========================================================================
+
+/*
+ * v14.12 — blocage global du stylet.
+ *
+ * Apple Pencil et les autres stylets sont ignorés dans toute la PWA :
+ * carte, boutons, listes, fenêtres, recherche de communes et autres champs.
+ * Les interactions au doigt, à la souris et au clavier restent disponibles.
+ */
+function installGlobalStylusBlocker() {
+    if (window.__npfGlobalStylusBlockerInstalled) return;
+    window.__npfGlobalStylusBlockerInstalled = true;
+
+    let lastBlockedPenAt = 0;
+    let lastBlockedPenTarget = null;
+
+    const isPenEvent = (event) => (
+        String(event?.pointerType || '').toLowerCase() === 'pen'
+    );
+
+    const isEditableElement = (element) => {
+        if (!(element instanceof Element)) return false;
+        return Boolean(
+            element.closest(
+                'input, textarea, select, [contenteditable=""], '
+                + '[contenteditable="true"], [role="textbox"]'
+            )
+        );
+    };
+
+    const releaseTemporaryReadOnly = (element) => {
+        if (!element || !element.dataset?.npfPenTemporaryReadonly) return;
+
+        window.setTimeout(() => {
+            try {
+                element.readOnly = false;
+                delete element.dataset.npfPenTemporaryReadonly;
+                element.classList.remove('npf-global-stylus-blocked-field');
+            } catch (_) {}
+        }, 400);
+    };
+
+    const blurEditableTarget = (target) => {
+        if (!(target instanceof Element)) return;
+
+        const editable = target.closest(
+            'input, textarea, select, [contenteditable=""], '
+            + '[contenteditable="true"], [role="textbox"]'
+        );
+        if (!editable) return;
+
+        try {
+            /*
+             * readOnly empêche iPadOS Scribble d'activer le champ. Cette
+             * propriété est restaurée immédiatement pour l'utilisation au doigt.
+             */
+            if ('readOnly' in editable && editable.readOnly !== true) {
+                editable.readOnly = true;
+                editable.dataset.npfPenTemporaryReadonly = 'true';
+                editable.classList.add('npf-global-stylus-blocked-field');
+                releaseTemporaryReadOnly(editable);
+            }
+
+            editable.blur();
+        } catch (_) {}
+    };
+
+    const blockPenEvent = (event) => {
+        if (!isPenEvent(event)) return;
+
+        lastBlockedPenAt = performance.now();
+        lastBlockedPenTarget = event.target;
+
+        blurEditableTarget(event.target);
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+    };
+
+    /*
+     * Capture avant Leaflet et avant tous les gestionnaires de l'application.
+     */
+    ['pointerdown', 'pointerup', 'pointermove', 'pointercancel'].forEach((type) => {
+        document.addEventListener(type, blockPenEvent, {
+            capture: true,
+            passive: false
+        });
+    });
+
+    /*
+     * Certains Safari génèrent ensuite un clic ou un événement souris sans
+     * conserver pointerType. Le clic synthétique qui suit le stylet est donc
+     * supprimé lui aussi.
+     */
+    const blockSyntheticPenMouseEvent = (event) => {
+        const elapsed = performance.now() - lastBlockedPenAt;
+        const sameTarget = (
+            event.target === lastBlockedPenTarget
+            || (
+                lastBlockedPenTarget instanceof Element
+                && event.target instanceof Element
+                && (
+                    lastBlockedPenTarget.contains(event.target)
+                    || event.target.contains(lastBlockedPenTarget)
+                )
+            )
+        );
+
+        if (isPenEvent(event) || (elapsed >= 0 && elapsed < 700 && sameTarget)) {
+            blurEditableTarget(event.target);
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+        }
+    };
+
+    ['click', 'dblclick', 'mousedown', 'mouseup', 'contextmenu'].forEach((type) => {
+        document.addEventListener(type, blockSyntheticPenMouseEvent, {
+            capture: true,
+            passive: false
+        });
+    });
+
+    /*
+     * Dernier garde-fou : si Scribble a malgré tout tenté de focaliser un
+     * champ juste après un événement stylet, le focus est immédiatement retiré.
+     */
+    document.addEventListener('focusin', (event) => {
+        const elapsed = performance.now() - lastBlockedPenAt;
+        if (elapsed < 0 || elapsed >= 900 || !isEditableElement(event.target)) {
+            return;
+        }
+
+        blurEditableTarget(event.target);
+        event.preventDefault();
+        event.stopPropagation();
+    }, true);
+}
+
+installGlobalStylusBlocker();
+
 document.addEventListener('DOMContentLoaded', () => {
     const markAppReady = () => {
         if (document.body) {
@@ -3368,16 +3509,53 @@ function setupEventListeners() {
     }
 
     [simulationSpeedInput, simulationRouteInput, simulationAltitudeInput].filter(Boolean).forEach((input) => {
-        input.addEventListener('focus', () => {
-            selectWholeSimulationInputValue(input);
+        /*
+         * v14.11 — bloquer le stylet sur les champs de saisie.
+         * Le passage temporaire en readOnly empêche iPadOS Scribble de prendre
+         * la main ; le champ redevient immédiatement disponible pour le doigt.
+         */
+        input.addEventListener('pointerdown', (event) => {
+            if (!isSimulationPenPointer(event)) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            input.readOnly = true;
+            input.blur();
+            input.classList.add('simulation-stylus-blocked');
+
+            window.setTimeout(() => {
+                input.readOnly = false;
+                input.classList.remove('simulation-stylus-blocked');
+            }, 350);
+        }, true);
+
+        input.addEventListener('pointerup', (event) => {
+            if (!isSimulationPenPointer(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+        }, true);
+
+        input.addEventListener('click', (event) => {
+            if (isSimulationPenPointer(event)) {
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+            focusAndSelectSimulationInput(input);
         });
 
-        input.addEventListener('click', () => {
-            focusAndSelectSimulationInput(input);
+        input.addEventListener('focus', () => {
+            if (!input.readOnly) {
+                selectWholeSimulationInputValue(input);
+            }
         });
 
         input.addEventListener('touchend', () => {
-            focusAndSelectSimulationInput(input);
+            if (!input.readOnly) {
+                focusAndSelectSimulationInput(input);
+            }
         }, { passive: true });
 
         input.addEventListener('keydown', (event) => {
@@ -8670,6 +8848,10 @@ function normalizeSimulationAltitude(value) {
     const numericValue = Number(String(value ?? '').replace(',', '.'));
     if (!Number.isFinite(numericValue)) return 0;
     return Math.min(60000, Math.max(-1000, numericValue));
+}
+
+function isSimulationPenPointer(event) {
+    return String(event?.pointerType || '').toLowerCase() === 'pen';
 }
 
 function selectWholeSimulationInputValue(input) {
