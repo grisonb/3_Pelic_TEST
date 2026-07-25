@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.02') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.02') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.03') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.03') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -9747,4 +9747,87 @@ body.gaar-point-search-open .gaar-editing-banner {
 /* Le cercle reste coloré selon l'altitude relative ; la silhouette reste blanche. */
 .traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
     color: #ffffff !important;
+}
+
+
+/* ==========================================================================
+   v14.03 TEST — popup réellement rapproché du trafic
+   ========================================================================== */
+
+/*
+ * La pointe Leaflet standard mesure près de 20 px de haut. Elle est ici
+ * compactée afin que le bas de la fenêtre arrive pratiquement au contact du rond.
+ */
+.traffic-aircraft-popup .leaflet-popup-tip-container {
+    width: 22px !important;
+    height: 9px !important;
+    margin-top: -1px !important;
+    overflow: hidden !important;
+}
+
+.traffic-aircraft-popup .leaflet-popup-tip {
+    width: 12px !important;
+    height: 12px !important;
+    margin: -7px auto 0 !important;
+}
+
+.traffic-aircraft-popup .leaflet-popup-content-wrapper {
+    margin-bottom: 0 !important;
+}
+
+
+/* ==========================================================================
+   v14.03 TEST — silhouettes uniformisées et exactement centrées dans le rond
+   ========================================================================== */
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    position: absolute !important;
+    left: 18px !important;
+    top: 18px !important;
+    width: 15px !important;
+    height: 15px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    transform-origin: 50% 50% !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow svg {
+    display: block !important;
+    width: 11px !important;
+    height: 11px !important;
+    min-width: 11px !important;
+    min-height: 11px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    fill: currentColor !important;
+    stroke: none !important;
+    transform: none !important;
+    transform-origin: 50% 50% !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow svg path {
+    transform: none !important;
+    transform-origin: 12px 12px !important;
+}
+
+/* Catégories larges : très légère réduction pour rester dans le rond. */
+.traffic-type-helicopter .traffic-aircraft-arrow svg,
+.traffic-type-uav .traffic-aircraft-arrow svg,
+.traffic-type-airship .traffic-aircraft-arrow svg,
+.traffic-type-parachute .traffic-aircraft-arrow svg,
+.traffic-type-paraglider .traffic-aircraft-arrow svg,
+.traffic-type-hangglider .traffic-aircraft-arrow svg,
+.traffic-type-gyrocopter .traffic-aircraft-arrow svg,
+.traffic-type-ultralight .traffic-aircraft-arrow svg,
+.traffic-type-paramotor .traffic-aircraft-arrow svg {
+    width: 10px !important;
+    height: 10px !important;
+    min-width: 10px !important;
+    min-height: 10px !important;
 }
