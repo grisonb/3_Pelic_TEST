@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v13-99_icone_safesky_monochrome_compteur_stable';
-const APP_VERSION = 'v13.99';
+const SW_VERSION = 'sw-v14-00_popup_trafic_persistant_icones_reduites';
+const APP_VERSION = 'v14.00';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
