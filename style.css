@@ -9311,3 +9311,23 @@ body.gaar-point-search-open .gaar-editing-banner {
         margin-bottom: 0 !important;
     }
 }
+
+
+/* ==========================================================================
+   v13.96 TEST — SafeSky préparé, activation volontairement différée
+   Le bouton reste masqué jusqu'à validation de la clé Sandbox et du proxy.
+   ========================================================================== */
+
+/*
+ * Ne pas supprimer cette règle avant validation de l'accès SafeSky :
+ * #traffic-layer-button { display: none !important; }
+ */
+
+
+/* ==========================================================================
+   v13.97 TEST — bouton TRAFIC réactivé pour travailler sur les filtres
+   ========================================================================== */
+
+#traffic-layer-button {
+    display: flex !important;
+}
