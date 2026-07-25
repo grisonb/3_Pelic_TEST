@@ -1,5 +1,20 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.00 TEST — fenêtre trafic persistante et symboles réduits
+
+Modifications apportées :
+- mémorisation du trafic dont la fenêtre détaillée est ouverte avant chaque rafraîchissement ;
+- réouverture automatique de cette fenêtre sur la nouvelle position du même trafic après actualisation ;
+- contenu de la fenêtre mis à jour avec les nouvelles altitude, vitesse, route, distance et ancienneté de position ;
+- suppression du recentrage automatique de la carte lors de la réouverture de la fenêtre ;
+- maintien de la fenêtre tant que le trafic reste présent dans les données reçues et respecte les filtres actifs ;
+- amélioration de l’identification des rares trafics sans identifiant technique grâce à l’indicatif stable ;
+- réduction du symbole visible des trafics de 26 × 26 px à 20 × 20 px, soit environ 23 % ;
+- réduction proportionnelle de la flèche et de sa bordure ;
+- léger repositionnement de l’étiquette d’altitude pour rester proche du symbole réduit ;
+- conservation du conteneur tactile Leaflet de 128 × 128 px afin de maintenir une sélection confortable sur iPad ;
+- vecteur pointillé, couleurs d’altitude relative, filtres et fonctionnement SafeSky inchangés ;
+- version applicative portée en v14.00 TEST.
 
 v13.99 TEST — icône SafeSky monochrome et compteur stable
 
