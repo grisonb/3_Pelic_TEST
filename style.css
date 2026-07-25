@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.01') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.01') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.02') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.02') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -9653,4 +9653,98 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 .traffic-aircraft-icon * {
     pointer-events: none !important;
+}
+
+
+/* ==========================================================================
+   v14.02 TEST — une seule fenêtre trafic, rapprochée, fermeture facilitée
+   ========================================================================== */
+
+/* Sécurité : aucun ancien tooltip trafic ne doit apparaître. */
+.traffic-tooltip,
+.leaflet-tooltip.traffic-tooltip {
+    display: none !important;
+}
+
+/*
+ * Fenêtre rapprochée par le popupAnchor JavaScript (-10 px).
+ * Marges compactes pour que la pointe se situe près du symbole.
+ */
+.traffic-aircraft-popup .leaflet-popup-content-wrapper {
+    border-radius: 10px !important;
+}
+
+.traffic-aircraft-popup .leaflet-popup-content {
+    margin: 10px 48px 10px 12px !important;
+    min-width: 190px !important;
+}
+
+.traffic-aircraft-popup .leaflet-popup-tip-container {
+    margin-top: -1px !important;
+}
+
+/*
+ * Croix de fermeture : vraie cible tactile 44 × 44 px, visible et indépendante
+ * du petit caractère « × » Leaflet d'origine.
+ */
+.traffic-aircraft-popup .leaflet-popup-close-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 44px !important;
+    height: 44px !important;
+    top: 0 !important;
+    right: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 10px 0 10px !important;
+    background: rgba(238, 242, 246, .98) !important;
+    color: #8b1025 !important;
+    font-size: 34px !important;
+    line-height: 40px !important;
+    font-weight: 900 !important;
+    text-decoration: none !important;
+    z-index: 5 !important;
+}
+
+.traffic-aircraft-popup .leaflet-popup-close-button:hover,
+.traffic-aircraft-popup .leaflet-popup-close-button:active {
+    background: #ffe5ea !important;
+    color: #b00020 !important;
+}
+
+
+/* ==========================================================================
+   v14.02 TEST — silhouettes selon la catégorie SafeSky
+   ========================================================================== */
+
+.traffic-aircraft-arrow {
+    overflow: hidden !important;
+}
+
+.traffic-aircraft-arrow svg {
+    display: block !important;
+    width: 10px !important;
+    height: 10px !important;
+    fill: currentColor !important;
+    stroke: none !important;
+    transform-origin: center !important;
+    pointer-events: none !important;
+}
+
+.traffic-type-helicopter .traffic-aircraft-arrow svg,
+.traffic-type-uav .traffic-aircraft-arrow svg,
+.traffic-type-balloon .traffic-aircraft-arrow svg,
+.traffic-type-parachute .traffic-aircraft-arrow svg,
+.traffic-type-paraglider .traffic-aircraft-arrow svg,
+.traffic-type-hangglider .traffic-aircraft-arrow svg,
+.traffic-type-gyrocopter .traffic-aircraft-arrow svg,
+.traffic-type-ultralight .traffic-aircraft-arrow svg,
+.traffic-type-static .traffic-aircraft-arrow svg {
+    width: 11px !important;
+    height: 11px !important;
+}
+
+/* Le cercle reste coloré selon l'altitude relative ; la silhouette reste blanche. */
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    color: #ffffff !important;
 }
