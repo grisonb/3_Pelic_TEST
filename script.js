@@ -4970,6 +4970,32 @@ function getTrafficAircraftVisualDefinition(aircraft) {
     return definitions[visualType] || definitions.airplane;
 }
 
+function getTrafficCompactIdentifier(aircraft) {
+    const callsign = String(aircraft?.callsign || '').trim().toUpperCase();
+    const registration = String(aircraft?.registration || '').trim().toUpperCase();
+    const trafficId = String(aircraft?.hex || '').trim().toUpperCase();
+
+    const invalidValues = new Set(['', 'N/A', 'UNKNOWN', '--']);
+
+    /*
+     * L'indicatif opérationnel est prioritaire lorsqu'il est réellement fourni.
+     * S'il n'est pas exploitable, utiliser l'immatriculation puis l'identifiant.
+     */
+    if (!invalidValues.has(callsign)) {
+        return callsign;
+    }
+
+    if (!invalidValues.has(registration)) {
+        return registration;
+    }
+
+    if (!invalidValues.has(trafficId)) {
+        return trafficId;
+    }
+
+    return '';
+}
+
 function buildTrafficMarkerIcon(aircraft) {
     const track = Number.isFinite(aircraft.track) ? aircraft.track : 0;
     const settings = sanitizeTrafficSettings(trafficSettings);
@@ -4984,13 +5010,23 @@ function buildTrafficMarkerIcon(aircraft) {
      * - route 180° : étiquette au-dessus ;
      * - route 270° : étiquette à droite.
      */
-    const labelRadiusPx = 27;
+    /*
+     * Le libellé est désormais plus large car il contient aussi l'identifiant.
+     * Rayon légèrement augmenté pour éviter tout contact avec le rond.
+     */
+    const labelRadiusPx = 31;
     const trackRadians = track * Math.PI / 180;
     const altitudeLabelLeft = 18 - Math.sin(trackRadians) * labelRadiusPx;
     const altitudeLabelTop = 18 + Math.cos(trackRadians) * labelRadiusPx;
 
-    const altitudeHtml = settings.showAltitudeLabel && aircraft.altitude && aircraft.altitude !== '--'
-        ? `<span class="traffic-aircraft-altitude-label" style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">${escapeHtml(aircraft.altitude)}</span>`
+    const compactIdentifier = getTrafficCompactIdentifier(aircraft);
+    const compactLabelParts = [
+        compactIdentifier,
+        aircraft.altitude && aircraft.altitude !== '--' ? aircraft.altitude : ''
+    ].filter(Boolean);
+
+    const altitudeHtml = settings.showAltitudeLabel && compactLabelParts.length
+        ? `<span class="traffic-aircraft-altitude-label" style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">${compactLabelParts.map(escapeHtml).join('<span class="traffic-label-separator"> · </span>')}</span>`
         : '';
 
     const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path d="${visual.path}"></path></svg>`;
