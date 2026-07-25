@@ -7,8 +7,8 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.08">
-    <link rel="manifest" href="manifest.json?appv=v14.08">
+    <link rel="stylesheet" href="style.css?appv=v14.09">
+    <link rel="manifest" href="manifest.json?appv=v14.09">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.08';
+        const APP_VERSION = 'v14.09';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -464,7 +464,8 @@
                 <label class="simulation-motion-field" for="simulation-speed-input">
                     <span>Vitesse</span>
                     <div class="simulation-motion-input-unit">
-                        <input id="simulation-speed-input" type="number" inputmode="decimal" min="0" max="700" step="1" value="0">
+                        <input id="simulation-speed-input" type="text" inputmode="decimal" autocomplete="off"
+                               autocapitalize="off" spellcheck="false" maxlength="6" value="0">
                         <span>kt</span>
                     </div>
                 </label>
@@ -472,14 +473,24 @@
                 <label class="simulation-motion-field" for="simulation-route-input">
                     <span>Route</span>
                     <div class="simulation-motion-input-unit">
-                        <input id="simulation-route-input" type="number" inputmode="decimal" min="0" max="359" step="1" value="0">
+                        <input id="simulation-route-input" type="text" inputmode="numeric" autocomplete="off"
+                               autocapitalize="off" spellcheck="false" maxlength="3" value="0">
                         <span>°</span>
+                    </div>
+                </label>
+
+                <label class="simulation-motion-field" for="simulation-altitude-input">
+                    <span>Altitude</span>
+                    <div class="simulation-motion-input-unit">
+                        <input id="simulation-altitude-input" type="text" inputmode="decimal" autocomplete="off"
+                               autocapitalize="off" spellcheck="false" maxlength="6" value="0">
+                        <span>ft</span>
                     </div>
                 </label>
             </div>
 
             <p class="simulation-motion-help">
-                Le déplacement commence dès que l’avion est positionné sur la carte. Une vitesse de 0 kt maintient l’avion immobile.
+                Le déplacement commence dès que l’avion est positionné sur la carte. Une vitesse de 0 kt maintient l’avion immobile. L’altitude simulée sert de référence pour la couleur des trafics réels.
             </p>
 
             <div class="simulation-motion-actions">
@@ -575,7 +586,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.08"></script>
+    <script src="script.js?appv=v14.09"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
