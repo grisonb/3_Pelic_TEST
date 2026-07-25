@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v13.99 TEST — icône SafeSky monochrome et compteur stable
+
+Modifications apportées :
+- transformation de l’icône SafeSky fournie en pictogramme monochrome transparent ;
+- conservation exacte du logo SafeSky et du texte « SafeSky » ;
+- suppression du carré bleu foncé et des couleurs cyan de l’image d’origine ;
+- rendu de l’icône avec le même principe monochrome « currentColor » que les boutons Lignes HT et Carte fréquences ;
+- ajout de la nouvelle ressource icons/safesky-traffic-monochrome.png ;
+- suppression de toute animation, pulsation, zoom, rotation, baisse d’opacité ou filtre pendant le rafraîchissement du trafic ;
+- maintien strict du même aspect de l’icône pendant toute l’utilisation ;
+- maintien du contour vert pendant les rafraîchissements périodiques dès qu’une première connexion a réussi ;
+- contour rouge conservé lors de la première attente de connexion ou en cas d’erreur réelle ;
+- suppression de l’affichage « … » dans la bulle du nombre pendant le rafraîchissement ;
+- conservation du dernier nombre affiché jusqu’à réception du nouveau nombre ;
+- passage direct de l’ancienne valeur à la nouvelle valeur ;
+- couleur de la bulle figée en rouge, sans passage orange, bleu ou autre changement d’aspect ;
+- couleurs relatives des symboles trafic rouge / vert / bleu de la v13.98 intégralement conservées ;
+- fonctionnement SafeSky seul après configuration du proxy intégralement conservé ;
+- version applicative portée en v13.99 TEST.
+
 v13.98 TEST — icône SafeSky, état de connexion et couleurs d’altitude relative
 
 Modifications apportées :
