@@ -1,5 +1,23 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.06 TEST — indicatif ou immatriculation dans l’étiquette trafic
+
+Modifications apportées :
+- ajout d’un identifiant compact dans l’étiquette associée à l’altitude ;
+- format affiché : « INDICATIF · ALTITUDE » ;
+- priorité donnée à l’indicatif opérationnel lorsqu’il est disponible ;
+- utilisation de l’immatriculation lorsque l’indicatif est absent ou inexploitable ;
+- utilisation de l’identifiant technique du trafic en dernier recours ;
+- suppression des valeurs non significatives telles que N/A, UNKNOWN ou -- ;
+- conservation de l’étiquette sur une seule ligne avec largeur maximale de 118 px ;
+- ajout d’une ellipse automatique si un identifiant est exceptionnellement long ;
+- légère augmentation du rayon de positionnement de 27 à 31 px pour éviter le contact entre le libellé élargi et le rond ;
+- positionnement à 180° du vecteur intégralement conservé ;
+- couleurs de bordure selon l’altitude relative intégralement conservées ;
+- aucune modification du popup détaillé, des filtres, des symboles ou de SafeSky ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.06 TEST.
+
 v14.05 TEST — correction de l’ancrage Leaflet, altitude opposée et familles d’aéronefs affinées
 
 Modifications apportées :
