@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-12_blocage_global_stylet';
-const APP_VERSION = 'v14.12';
+const SW_VERSION = 'sw-v14-13_filtres_altitude_autour_ou_sol';
+const APP_VERSION = 'v14.13';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
