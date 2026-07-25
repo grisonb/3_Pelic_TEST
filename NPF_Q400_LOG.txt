@@ -1,5 +1,29 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.13 TEST — filtres trafic altitude absolue, ± autour de moi ou du sol à + au-dessus de moi
+
+Modifications apportées :
+- remplacement de l’ancienne case « Tranche autour de mon altitude » par trois choix exclusifs à boutons radio ;
+- ajout du mode « Altitude absolue — mini / maxi » ;
+- maintien des champs Altitude mini et Altitude maxi pour le mode absolu ;
+- ajout du mode « Autour de mon altitude ± … ft » ;
+- ajout du mode « Du sol à + … ft au-dessus de moi » ;
+- un seul des trois modes peut être actif à la fois ;
+- désactivation visuelle et fonctionnelle des champs qui ne correspondent pas au mode sélectionné ;
+- mémorisation séparée de la valeur ± autour de mon altitude ;
+- mémorisation séparée de la valeur du sol à + au-dessus de moi ;
+- migration automatique des anciens réglages : ancienne case cochée vers le mode ±, ancienne case décochée vers le mode absolu ;
+- en mode ±, affichage des trafics compris entre mon altitude moins la valeur et mon altitude plus la valeur ;
+- en mode « Du sol à + », absence de limite basse et limite haute égale à mon altitude plus la valeur choisie ;
+- exemple : à 3 000 ft avec +1 500 ft, affichage des trafics jusqu’à 4 500 ft ;
+- utilisation de l’altitude GPS réelle ou de l’altitude de simulation comme référence ;
+- maintien des trafics dont l’altitude n’est pas fournie par la source, comme dans les versions précédentes ;
+- résumé des réglages adapté au mode sélectionné ;
+- note explicative mise à jour dans la fenêtre Filtres trafic ;
+- aucune modification du rayon, du nombre maximal d’avions, des couleurs, de SafeSky ou des autres fonctions de l’application ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.13 TEST.
+
 v14.12 TEST — blocage global du stylet dans toute l’application
 
 Modifications apportées :
