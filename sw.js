@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-10_etiquette_sim_sous_avion';
-const APP_VERSION = 'v14.10';
+const SW_VERSION = 'sw-v14-12_blocage_global_stylet';
+const APP_VERSION = 'v14.12';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
