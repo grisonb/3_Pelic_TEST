@@ -9562,3 +9562,25 @@ body.gaar-point-search-open .gaar-editing-banner {
         flex-basis: 36px !important;
     }
 }
+
+
+/* ==========================================================================
+   v14.00 TEST — symboles trafic réduits, zone tactile conservée
+   ========================================================================== */
+
+/*
+ * Le conteneur Leaflet reste à 128 × 128 px pour conserver une sélection
+ * facile sur iPad. Seul le disque/symbole visible passe de 26 à 20 px.
+ */
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    width: 20px !important;
+    height: 20px !important;
+    border-width: 1.5px !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
+}
+
+.traffic-aircraft-altitude-label {
+    left: 76px !important;
+    top: 53px !important;
+}
