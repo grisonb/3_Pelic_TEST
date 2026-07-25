@@ -1,5 +1,28 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.03 TEST — fenêtre rapprochée et silhouettes trafic corrigées
+
+Modifications apportées :
+- rapprochement vertical de la fenêtre détaillée de 14 px par rapport à la v14.02 ;
+- passage du popupAnchor de -10 px à +4 px afin que la pointe descende vers le rond du trafic ;
+- réduction de la hauteur du triangle de pointe Leaflet d’environ 20 px à 9 px ;
+- suppression de l’espace visuel résiduel entre la pointe de la fenêtre et le trafic ;
+- conservation de la grande croix de fermeture 44 × 44 px ;
+- ajout de la catégorie d’émetteur ADS-B/readsb dans le modèle trafic normalisé ;
+- utilisation immédiate des catégories ADS-B A0 à A7, B0 à B7 et C0 à C4 pour choisir la silhouette, avant même l’arrivée de la clé SafeSky ;
+- reconnaissance des hélicoptères, planeurs, ballons, parachutistes, ULM et drones à partir de la catégorie d’émetteur disponible dans les sources actuelles ;
+- priorité conservée aux catégories explicites SafeSky lorsque SafeSky sera activé ;
+- ajout d’un classement de secours limité pour certaines familles de désignateurs d’aéronefs ;
+- remplacement des anciens SVG hétérogènes par des silhouettes utilisant toutes le même viewBox 24 × 24 ;
+- recentrage géométrique de chaque silhouette autour du point 12 / 12 ;
+- centrage CSS strict de la silhouette dans le rond par flexbox ;
+- dimensions uniformes de 11 × 11 px, réduites à 10 × 10 px pour les formes naturellement plus larges ;
+- suppression des décalages propres aux anciens tracés SVG ;
+- rotation conservée autour du centre exact du rond pour les aéronefs directionnels ;
+- dimensions du rond, zone tactile 36 × 36 px, couleurs d’altitude relative et persistance de la fenêtre inchangées ;
+- la ressource SafeSky monochrome reste présente uniquement dans l’archive ;
+- version applicative portée en v14.03 TEST.
+
 v14.02 TEST — fenêtre trafic unique, rapprochée, croix agrandie et silhouettes par catégorie
 
 Modifications apportées :
