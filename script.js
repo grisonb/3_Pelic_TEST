@@ -624,6 +624,21 @@ let simulationSuppressNextClickUntil = 0;
 let simulationActionPopup = null;
 let simulationWasLiveGpsActiveBeforeSimulation = false;
 
+const SIMULATION_SPEED_STORAGE_KEY = 'npfSimulationSpeedKt';
+const SIMULATION_ROUTE_STORAGE_KEY = 'npfSimulationRouteDeg';
+const storedSimulationSpeedKt = Number(localStorage.getItem(SIMULATION_SPEED_STORAGE_KEY));
+const storedSimulationRouteDeg = Number(localStorage.getItem(SIMULATION_ROUTE_STORAGE_KEY));
+
+let simulationSpeedKt = Number.isFinite(storedSimulationSpeedKt)
+    ? Math.min(700, Math.max(0, storedSimulationSpeedKt))
+    : 0;
+let simulationRouteDeg = Number.isFinite(storedSimulationRouteDeg)
+    ? ((storedSimulationRouteDeg % 360) + 360) % 360
+    : 0;
+let simulationMotionTimer = null;
+let simulationMotionLastTickMs = 0;
+let simulationAircraftPositionReady = false;
+
 // v12.22 — sécurité : un import interrompu ne doit pas bloquer les suppressions suivantes.
 try {
     sessionStorage.removeItem('npfZipImportRunning');
@@ -2871,6 +2886,13 @@ function setupEventListeners() {
     const purgeInactivePacksBtn = document.getElementById('purge-inactive-packs-btn');
     const refreshOfflineTilesBtn = document.getElementById('refresh-offline-tiles-btn');
     const simulationModeButton = document.getElementById('simulation-mode-button');
+    const simulationMotionButton = document.getElementById('simulation-motion-button');
+    const simulationMotionModal = document.getElementById('simulation-motion-modal');
+    const closeSimulationMotionModalButton = document.getElementById('close-simulation-motion-modal');
+    const applySimulationMotionButton = document.getElementById('apply-simulation-motion');
+    const quitSimulationModeButton = document.getElementById('quit-simulation-mode');
+    const simulationSpeedInput = document.getElementById('simulation-speed-input');
+    const simulationRouteInput = document.getElementById('simulation-route-input');
     
     if (mainActionButtons) {
         const versionDisplay = document.getElementById('app-version-display');
@@ -3302,6 +3324,55 @@ function setupEventListeners() {
             toggleSimulationMode();
         });
     }
+
+    if (simulationMotionButton) {
+        simulationMotionButton.addEventListener('click', () => {
+            openSimulationMotionModal();
+        });
+    }
+
+    if (closeSimulationMotionModalButton) {
+        closeSimulationMotionModalButton.addEventListener('click', closeSimulationMotionModal);
+    }
+
+    if (applySimulationMotionButton) {
+        applySimulationMotionButton.addEventListener('click', () => {
+            applySimulationMotionSettingsFromModal();
+        });
+    }
+
+    if (quitSimulationModeButton) {
+        quitSimulationModeButton.addEventListener('click', () => {
+            /*
+             * Même fonction et mêmes paramètres que le bouton présent dans
+             * Gestion des Cartes.
+             */
+            disableSimulationMode({ restoreGps: true });
+        });
+    }
+
+    if (simulationMotionModal) {
+        simulationMotionModal.addEventListener('click', (event) => {
+            if (event.target === simulationMotionModal) {
+                closeSimulationMotionModal();
+            }
+        });
+    }
+
+    [simulationSpeedInput, simulationRouteInput].filter(Boolean).forEach((input) => {
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                applySimulationMotionSettingsFromModal();
+            }
+        });
+    });
+
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && simulationMotionModal?.style.display === 'flex') {
+            closeSimulationMotionModal();
+        }
+    });
 
     setupBaseOaciInputs();
     updateBaseLabels();
@@ -8422,15 +8493,28 @@ function updateUserPosition(pos) {
     const motionSpeed = Number.isFinite(rawSpeed) ? rawSpeed : estimatedMotion.speed;
 
     if (isSimulationPosition) {
-        clearOwnGpsVector();
+        const simulatedSpeedMps = Number.isFinite(motionSpeed) ? Math.max(0, motionSpeed) : 0;
+        const simulatedHeading = Number.isFinite(motionHeading)
+            ? ((motionHeading % 360) + 360) % 360
+            : simulationRouteDeg;
+
+        if (simulatedSpeedMps >= 1) {
+            updateOwnGpsVector(latitude, longitude, simulatedHeading, simulatedSpeedMps);
+        } else {
+            clearOwnGpsVector();
+        }
+
         lastPosition = {
             lat: latitude,
             lng: longitude,
             latitude,
             longitude,
             timestamp: gpsTimestampMs,
-            speedMps: null,
-            speedKt: null,
+            heading: simulatedHeading,
+            speedMps: simulatedSpeedMps,
+            speedKt: simulatedSpeedMps * 1.9438444924406,
+            altitudeFt: null,
+            altitudeTimeMs: null,
             simulation: true
         };
     } else {
@@ -8496,6 +8580,178 @@ function updateUserPosition(pos) {
 }
 
 
+
+
+function normalizeSimulationRoute(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return ((numericValue % 360) + 360) % 360;
+}
+
+function normalizeSimulationSpeed(value) {
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.min(700, Math.max(0, numericValue));
+}
+
+function formatSimulationRoute(value) {
+    return String(Math.round(normalizeSimulationRoute(value)) % 360).padStart(3, '0');
+}
+
+function refreshSimulationMotionButtonState() {
+    const button = document.getElementById('simulation-motion-button');
+    const summary = document.getElementById('simulation-motion-button-summary');
+
+    if (button) {
+        button.hidden = !isSimulationMode;
+        button.classList.toggle('active', isSimulationMode);
+    }
+
+    if (summary) {
+        const displayedSpeed = Number.isInteger(simulationSpeedKt)
+            ? String(simulationSpeedKt)
+            : simulationSpeedKt.toFixed(1);
+        summary.textContent = `${displayedSpeed} kt · ${formatSimulationRoute(simulationRouteDeg)}°`;
+    }
+}
+
+function closeSimulationMotionModal() {
+    const modal = document.getElementById('simulation-motion-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function openSimulationMotionModal() {
+    if (!isSimulationMode) return;
+
+    const modal = document.getElementById('simulation-motion-modal');
+    const speedInput = document.getElementById('simulation-speed-input');
+    const routeInput = document.getElementById('simulation-route-input');
+    if (!modal) return;
+
+    if (speedInput) {
+        speedInput.value = Number.isInteger(simulationSpeedKt)
+            ? String(simulationSpeedKt)
+            : simulationSpeedKt.toFixed(1);
+    }
+    if (routeInput) {
+        routeInput.value = String(Math.round(simulationRouteDeg) % 360);
+    }
+
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+
+    setTimeout(() => {
+        try {
+            speedInput?.focus({ preventScroll: true });
+            speedInput?.select();
+        } catch (_) {}
+    }, 60);
+}
+
+function applySimulationMotionSettings(speedKt, routeDeg) {
+    simulationSpeedKt = normalizeSimulationSpeed(speedKt);
+    simulationRouteDeg = normalizeSimulationRoute(routeDeg);
+
+    localStorage.setItem(SIMULATION_SPEED_STORAGE_KEY, String(simulationSpeedKt));
+    localStorage.setItem(SIMULATION_ROUTE_STORAGE_KEY, String(simulationRouteDeg));
+
+    simulationMotionLastTickMs = performance.now();
+    refreshSimulationMotionButtonState();
+
+    /*
+     * Mettre à jour immédiatement l'orientation, la vitesse et le vecteur à la
+     * position courante sans attendre le prochain déplacement.
+     */
+    if (
+        isSimulationMode
+        && simulationAircraftPositionReady
+        && lastPosition?.simulation === true
+        && Number.isFinite(Number(lastPosition.latitude))
+        && Number.isFinite(Number(lastPosition.longitude))
+    ) {
+        applySimulatedUserPosition(
+            Number(lastPosition.latitude),
+            Number(lastPosition.longitude),
+            { fromMotionTimer: true }
+        );
+    }
+}
+
+function applySimulationMotionSettingsFromModal() {
+    const speedInput = document.getElementById('simulation-speed-input');
+    const routeInput = document.getElementById('simulation-route-input');
+
+    applySimulationMotionSettings(
+        speedInput ? speedInput.value : simulationSpeedKt,
+        routeInput ? routeInput.value : simulationRouteDeg
+    );
+
+    closeSimulationMotionModal();
+}
+
+function stopSimulationMotionTimer() {
+    if (simulationMotionTimer) {
+        clearInterval(simulationMotionTimer);
+        simulationMotionTimer = null;
+    }
+    simulationMotionLastTickMs = 0;
+}
+
+function runSimulationMotionStep() {
+    const nowMs = performance.now();
+
+    if (!isSimulationMode || !simulationAircraftPositionReady || document.hidden) {
+        simulationMotionLastTickMs = nowMs;
+        return;
+    }
+
+    if (!lastPosition || lastPosition.simulation !== true) {
+        simulationMotionLastTickMs = nowMs;
+        return;
+    }
+
+    const latitude = Number(lastPosition.latitude ?? lastPosition.lat);
+    const longitude = Number(lastPosition.longitude ?? lastPosition.lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        simulationMotionLastTickMs = nowMs;
+        return;
+    }
+
+    let elapsedSeconds = simulationMotionLastTickMs > 0
+        ? (nowMs - simulationMotionLastTickMs) / 1000
+        : 1;
+    simulationMotionLastTickMs = nowMs;
+
+    /*
+     * Éviter un bond important lorsque Safari reprend après suspension.
+     * La simulation reprend depuis la dernière position affichée.
+     */
+    elapsedSeconds = Math.min(2.5, Math.max(0, elapsedSeconds));
+
+    if (simulationSpeedKt <= 0 || elapsedSeconds <= 0) {
+        return;
+    }
+
+    const distanceMeters = simulationSpeedKt * 1852 * elapsedSeconds / 3600;
+    const destination = calculateDestinationLatLng(
+        latitude,
+        longitude,
+        simulationRouteDeg,
+        distanceMeters
+    );
+
+    applySimulatedUserPosition(destination[0], destination[1], {
+        fromMotionTimer: true
+    });
+}
+
+function startSimulationMotionTimer() {
+    stopSimulationMotionTimer();
+    simulationMotionLastTickMs = performance.now();
+    simulationMotionTimer = setInterval(runSimulationMotionStep, 1000);
+}
 
 function closeSimulationActionPopup() {
     try {
@@ -8588,23 +8844,36 @@ function refreshSimulationModeButtonState() {
     if (document.body) {
         document.body.classList.toggle('simulation-mode-active', isSimulationMode);
     }
-    if (!button) return;
-    button.classList.toggle('active', isSimulationMode);
-    button.textContent = isSimulationMode ? 'Quitter le mode simulation avion' : 'Mode simulation avion';
+
+    if (button) {
+        button.classList.toggle('active', isSimulationMode);
+        button.textContent = isSimulationMode ? 'Quitter le mode simulation avion' : 'Mode simulation avion';
+    }
+
+    refreshSimulationMotionButtonState();
+
+    if (!isSimulationMode) {
+        closeSimulationMotionModal();
+    }
 }
 
-function applySimulatedUserPosition(lat, lng) {
+function applySimulatedUserPosition(lat, lng, { fromMotionTimer = false } = {}) {
     const numericLat = Number(lat);
     const numericLng = Number(lng);
     if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return;
+
+    simulationAircraftPositionReady = true;
+    if (!fromMotionTimer) {
+        simulationMotionLastTickMs = performance.now();
+    }
 
     updateUserPosition({
         coords: {
             latitude: numericLat,
             longitude: numericLng,
             altitude: null,
-            heading: null,
-            speed: null,
+            heading: simulationRouteDeg,
+            speed: simulationSpeedKt * 0.5144444444444445,
             accuracy: null
         },
         timestamp: Date.now(),
@@ -8626,6 +8895,8 @@ function enableSimulationMode() {
     }
 
     simulationMapClickHandler = null;
+    simulationAircraftPositionReady = false;
+    startSimulationMotionTimer();
     refreshSimulationModeButtonState();
 
     const offlineMapModal = document.getElementById('offline-map-modal');
@@ -8642,7 +8913,10 @@ function disableSimulationMode({ restoreGps = true } = {}) {
     }
     simulationMapClickHandler = null;
     simulationSuppressNextClickUntil = 0;
+    stopSimulationMotionTimer();
+    simulationAircraftPositionReady = false;
     closeSimulationActionPopup();
+    closeSimulationMotionModal();
     isSimulationMode = false;
     refreshSimulationModeButtonState();
 
@@ -8661,6 +8935,12 @@ function toggleSimulationMode() {
         enableSimulationMode();
     }
 }
+
+document.addEventListener('visibilitychange', () => {
+    if (isSimulationMode && !document.hidden) {
+        simulationMotionLastTickMs = performance.now();
+    }
+});
 
 function findClosestCommuneName(lat, lon) {
     const closestCommune = findClosestCommune(lat, lon, 27);
