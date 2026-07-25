@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v13.99') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v13.99') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.01') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.01') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -9583,4 +9583,74 @@ body.gaar-point-search-open .gaar-editing-banner {
 .traffic-aircraft-altitude-label {
     left: 76px !important;
     top: 53px !important;
+}
+
+
+/* ==========================================================================
+   v14.01 TEST — trafics encore réduits et vraie zone tactile 36 × 36 px
+   ========================================================================== */
+
+.traffic-aircraft-icon {
+    width: 36px !important;
+    height: 36px !important;
+    margin-left: 0 !important;
+    margin-top: 0 !important;
+    overflow: visible !important;
+}
+
+.traffic-aircraft-symbol-wrap {
+    display: block !important;
+    position: relative !important;
+    width: 36px !important;
+    height: 36px !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+}
+
+.traffic-aircraft-vector-wrap {
+    left: 18px !important;
+    top: 18px !important;
+    transform-origin: 0 0 !important;
+}
+
+.traffic-aircraft-dotted-vector {
+    left: -1.5px !important;
+    top: -58px !important;
+    width: 3px !important;
+    height: 58px !important;
+    background-size: 3px 8px !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
+    left: 18px !important;
+    top: 18px !important;
+    width: 15px !important;
+    height: 15px !important;
+    border-width: 1px !important;
+    font-size: 8px !important;
+    line-height: 1 !important;
+}
+
+.traffic-aircraft-altitude-label {
+    left: 27px !important;
+    top: 10px !important;
+    padding: 1px 3px !important;
+    border-radius: 5px !important;
+    font-size: 9px !important;
+    line-height: 1 !important;
+    pointer-events: none !important;
+}
+
+/*
+ * Seul l'élément Leaflet de 36 × 36 px reste cliquable.
+ * Le vecteur, la flèche interne et l'étiquette ne créent aucune surface
+ * interactive supplémentaire au-dessus des trafics voisins.
+ */
+.traffic-aircraft-icon,
+.leaflet-marker-icon.traffic-aircraft-icon {
+    pointer-events: auto !important;
+}
+
+.traffic-aircraft-icon * {
+    pointer-events: none !important;
 }
