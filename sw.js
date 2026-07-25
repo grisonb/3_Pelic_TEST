@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v13-98_icone_safesky_couleurs_altitude_source_unique';
-const APP_VERSION = 'v13.98';
+const SW_VERSION = 'sw-v13-99_icone_safesky_monochrome_compteur_stable';
+const APP_VERSION = 'v13.99';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -17,7 +17,7 @@ const APP_SHELL_URLS = [
     './',
     './index.html',
     './style.css',
-    './icons/safesky-traffic-icon.png',
+    './icons/safesky-traffic-monochrome.png',
     './script.js',
     './manifest.json',
     './leaflet.css',
