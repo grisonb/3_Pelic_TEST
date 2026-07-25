@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-00_popup_trafic_persistant_icones_reduites';
-const APP_VERSION = 'v14.00';
+const SW_VERSION = 'sw-v14-01_trafics_plus_petits_zone_tactile_reduite';
+const APP_VERSION = 'v14.01';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
