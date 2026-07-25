@@ -4817,11 +4817,28 @@ function refreshTrafficButtonState(count = null) {
         }
     }
 
+    const hasSuccessfulTrafficConnection = (
+        Number.isFinite(Number(lastTrafficRefreshAt))
+        && Number(lastTrafficRefreshAt) > 0
+        && !lastTrafficError
+    );
+
     button.classList.toggle('active', showTrafficLayer);
     button.classList.toggle('loading', isTrafficLoading);
-    button.classList.toggle('traffic-state-loading', !!showTrafficLayer && isTrafficLoading);
-    button.classList.toggle('traffic-state-error', !!showTrafficLayer && !isTrafficLoading && !!lastTrafficError);
-    button.classList.toggle('traffic-state-ok', !!showTrafficLayer && !isTrafficLoading && !lastTrafficError);
+    button.classList.toggle(
+        'traffic-state-loading',
+        !!showTrafficLayer && isTrafficLoading && !hasSuccessfulTrafficConnection
+    );
+    button.classList.toggle(
+        'traffic-state-error',
+        !!showTrafficLayer && !isTrafficLoading && !!lastTrafficError
+    );
+    button.classList.toggle(
+        'traffic-state-ok',
+        !!showTrafficLayer
+            && !lastTrafficError
+            && (!isTrafficLoading || hasSuccessfulTrafficConnection)
+    );
     button.classList.toggle('traffic-state-idle', !showTrafficLayer);
     button.disabled = false;
     button.title = isTrafficLoading
@@ -4830,10 +4847,13 @@ function refreshTrafficButtonState(count = null) {
 
     if (countEl) {
         if (showTrafficLayer) {
-            if (lastTrafficError) {
+            /*
+             * v13.99 — le nombre reste stable pendant l'interrogation suivante.
+             * Il passe directement de l'ancienne valeur à la nouvelle valeur
+             * lorsque les données ont été reçues, sans étape « … ».
+             */
+            if (lastTrafficError && !isTrafficLoading) {
                 countEl.textContent = '!';
-            } else if (isTrafficLoading) {
-                countEl.textContent = '…';
             } else {
                 countEl.textContent = String(lastTrafficDisplayedCount);
             }
