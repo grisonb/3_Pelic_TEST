@@ -1,5 +1,34 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.08 TEST — déplacement continu de l’avion en mode simulation
+
+Modifications apportées :
+- ajout d’un moteur de déplacement continu de l’avion simulé ;
+- saisie de la vitesse en nœuds, de 0 à 700 kt ;
+- saisie de la route entre 0° et 359° ;
+- calcul géodésique de la nouvelle position toutes les secondes ;
+- conversion automatique des nœuds en distance parcourue ;
+- déplacement selon la route vraie renseignée ;
+- mise à jour continue du symbole avion, de son orientation, de la commune survolée, des routes et des calculs dépendant de la position ;
+- affichage du vecteur prévisionnel 2 / 5 / 10 minutes lorsque la vitesse simulée est suffisante ;
+- vitesse de 0 kt maintenant l’avion immobile ;
+- ajout d’un bouton dédié sous SafeSky, visible uniquement lorsque le mode simulation est actif ;
+- affichage permanent de la vitesse et de la route actuelles sur ce bouton ;
+- ajout d’une fenêtre « Déplacement simulation » ;
+- champs Vitesse et Route adaptés à l’utilisation tactile sur iPad ;
+- bouton « Appliquer » pour prendre en compte immédiatement les nouvelles valeurs ;
+- bouton « Quitter mode simulation » utilisant exactement la même fonction que le bouton présent dans Gestion des Cartes ;
+- fermeture de la fenêtre par la croix, par un clic sur l’arrière-plan ou par la touche Échap ;
+- mémorisation de la dernière vitesse et de la dernière route dans localStorage ;
+- réutilisation de ces valeurs lors d’une prochaine activation du mode simulation ;
+- déplacement démarrant uniquement après positionnement de l’avion par appui long sur la carte ;
+- suspension du déplacement lorsque la PWA est en arrière-plan ;
+- reprise sans saut important lors du retour au premier plan ;
+- arrêt complet du moteur et restauration du GPS réel à la sortie du mode simulation ;
+- aucune modification du trafic SafeSky, du chat, des cartes offline ou du positionnement du feu simulé ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.08 TEST.
+
 v14.07 TEST — mémorisation du dernier état de connexion du chat
 
 Modifications apportées :
