@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-04_popup_contact_etiquette_opposee_types_icao';
-const APP_VERSION = 'v14.04';
+const SW_VERSION = 'sw-v14-05_ancrage_leaflet_altitude_opposee_types_affines';
+const APP_VERSION = 'v14.05';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
