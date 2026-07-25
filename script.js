@@ -564,6 +564,8 @@ let trafficRefreshTimer = null;
 let lastTrafficRefreshAt = 0;
 let lastTrafficError = '';
 let lastTrafficDisplayedCount = 0;
+let lastTrafficAircraftSnapshot = [];
+let lastTrafficRenderMeta = null;
 const TRAFFIC_SETTINGS_STORAGE_KEY = 'trafficLayerSettingsV1';
 const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     radiusNm: TRAFFIC_RADIUS_NM,
@@ -626,14 +628,19 @@ let simulationWasLiveGpsActiveBeforeSimulation = false;
 
 const SIMULATION_SPEED_STORAGE_KEY = 'npfSimulationSpeedKt';
 const SIMULATION_ROUTE_STORAGE_KEY = 'npfSimulationRouteDeg';
+const SIMULATION_ALTITUDE_STORAGE_KEY = 'npfSimulationAltitudeFt';
 const storedSimulationSpeedKt = Number(localStorage.getItem(SIMULATION_SPEED_STORAGE_KEY));
 const storedSimulationRouteDeg = Number(localStorage.getItem(SIMULATION_ROUTE_STORAGE_KEY));
+const storedSimulationAltitudeFt = Number(localStorage.getItem(SIMULATION_ALTITUDE_STORAGE_KEY));
 
 let simulationSpeedKt = Number.isFinite(storedSimulationSpeedKt)
     ? Math.min(700, Math.max(0, storedSimulationSpeedKt))
     : 0;
 let simulationRouteDeg = Number.isFinite(storedSimulationRouteDeg)
     ? ((storedSimulationRouteDeg % 360) + 360) % 360
+    : 0;
+let simulationAltitudeFt = Number.isFinite(storedSimulationAltitudeFt)
+    ? Math.min(60000, Math.max(-1000, storedSimulationAltitudeFt))
     : 0;
 let simulationMotionTimer = null;
 let simulationMotionLastTickMs = 0;
@@ -2893,6 +2900,7 @@ function setupEventListeners() {
     const quitSimulationModeButton = document.getElementById('quit-simulation-mode');
     const simulationSpeedInput = document.getElementById('simulation-speed-input');
     const simulationRouteInput = document.getElementById('simulation-route-input');
+    const simulationAltitudeInput = document.getElementById('simulation-altitude-input');
     
     if (mainActionButtons) {
         const versionDisplay = document.getElementById('app-version-display');
@@ -3359,7 +3367,19 @@ function setupEventListeners() {
         });
     }
 
-    [simulationSpeedInput, simulationRouteInput].filter(Boolean).forEach((input) => {
+    [simulationSpeedInput, simulationRouteInput, simulationAltitudeInput].filter(Boolean).forEach((input) => {
+        input.addEventListener('focus', () => {
+            selectWholeSimulationInputValue(input);
+        });
+
+        input.addEventListener('click', () => {
+            focusAndSelectSimulationInput(input);
+        });
+
+        input.addEventListener('touchend', () => {
+            focusAndSelectSimulationInput(input);
+        }, { passive: true });
+
         input.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -4419,7 +4439,8 @@ function getOwnTrafficPoint() {
     if (userMarker && typeof userMarker.getLatLng === 'function') {
         const ll = userMarker.getLatLng();
         if (ll && Number.isFinite(ll.lat) && Number.isFinite(ll.lng)) {
-            return { lat: ll.lat, lon: ll.lng, label: 'GPS', kind: 'own' };
+            const simulationPoint = isSimulationMode || lastPosition?.simulation === true;
+            return { lat: ll.lat, lon: ll.lng, label: simulationPoint ? 'simulation' : 'GPS', kind: 'own' };
         }
     }
 
@@ -4427,7 +4448,8 @@ function getOwnTrafficPoint() {
         const lat = Number(lastPosition.lat ?? lastPosition.latitude);
         const lon = Number(lastPosition.lng ?? lastPosition.longitude);
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            return { lat, lon, label: 'GPS', kind: 'own' };
+            const simulationPoint = isSimulationMode || lastPosition?.simulation === true;
+            return { lat, lon, label: simulationPoint ? 'simulation' : 'GPS', kind: 'own' };
         }
     }
 
@@ -5118,6 +5140,18 @@ function buildTrafficMarkerIcon(aircraft) {
 function renderTrafficAircraft(aircraftList, meta = {}) {
     if (!trafficLayer) return;
 
+    if (meta?.skipSnapshot !== true) {
+        lastTrafficAircraftSnapshot = Array.isArray(aircraftList)
+            ? aircraftList.slice()
+            : [];
+        lastTrafficRenderMeta = {
+            ...meta,
+            points: Array.isArray(meta?.points)
+                ? meta.points.map(point => ({ ...point }))
+                : meta?.points
+        };
+    }
+
     /*
      * v14.00 — mémoriser le trafic dont la fenêtre est ouverte avant de
      * reconstruire les marqueurs. Le même trafic sera rouvert sur sa nouvelle
@@ -5246,6 +5280,27 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     });
 }
 
+function redrawTrafficLayerFromSnapshot() {
+    if (
+        !showTrafficLayer
+        || !trafficLayer
+        || !Array.isArray(lastTrafficAircraftSnapshot)
+        || !lastTrafficAircraftSnapshot.length
+    ) {
+        return;
+    }
+
+    const currentPoints = getTrafficQueryPoints();
+    renderTrafficAircraft(lastTrafficAircraftSnapshot, {
+        ...(lastTrafficRenderMeta || {}),
+        points: currentPoints.length
+            ? currentPoints
+            : (lastTrafficRenderMeta?.points || []),
+        now: Date.now(),
+        skipSnapshot: true
+    });
+}
+
 function updateTrafficStatus({ visible = showTrafficLayer, state = 'idle', count = null, pointLabel = '', message = '', now = Date.now() } = {}) {
     /* v13.03 : plus de fenêtre/bandeau d'alerte ADS-B sur la carte.
        L'état est porté uniquement par le bouton TRAFIC : rouge = erreur, bleu = chargement, vert = OK. */
@@ -5319,6 +5374,7 @@ function refreshTrafficButtonState(count = null) {
 async function refreshTrafficLayer(options = {}) {
     const { force = false } = options;
     if (!showTrafficLayer || !trafficLayer) return;
+    if (isTrafficLoading && !force) return;
 
     const now = Date.now();
     if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 4500) return;
@@ -8484,7 +8540,9 @@ function updateUserPosition(pos) {
     const { latitude, longitude } = pos.coords;
     if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return;
 
-    const ownAltitudeLabel = (!isSimulationPosition && shouldShowOwnGpsAltitude()) ? formatGpsAltitudeFtFromCoords(pos.coords) : '';
+    const ownAltitudeLabel = isSimulationPosition
+        ? `${Math.round(simulationAltitudeFt)} ft`
+        : (shouldShowOwnGpsAltitude() ? formatGpsAltitudeFtFromCoords(pos.coords) : '');
     const gpsTimestampMs = Number(pos.timestamp) || Date.now();
     const estimatedMotion = isSimulationPosition ? { heading: null, speed: null } : estimateMotionFromLastPosition(latitude, longitude, gpsTimestampMs);
     const rawHeading = Number(pos.coords.heading);
@@ -8504,6 +8562,11 @@ function updateUserPosition(pos) {
             clearOwnGpsVector();
         }
 
+        const simulatedAltitudeMeters = Number(pos.coords.altitude);
+        const simulatedAltitudeFeet = Number.isFinite(simulatedAltitudeMeters)
+            ? Math.round(simulatedAltitudeMeters * 3.28084)
+            : Math.round(simulationAltitudeFt);
+
         lastPosition = {
             lat: latitude,
             lng: longitude,
@@ -8513,8 +8576,9 @@ function updateUserPosition(pos) {
             heading: simulatedHeading,
             speedMps: simulatedSpeedMps,
             speedKt: simulatedSpeedMps * 1.9438444924406,
-            altitudeFt: null,
-            altitudeTimeMs: null,
+            altitudeFt: simulatedAltitudeFeet,
+            altitudeFeet: simulatedAltitudeFeet,
+            altitudeTimeMs: gpsTimestampMs,
             simulation: true
         };
     } else {
@@ -8577,6 +8641,14 @@ function updateUserPosition(pos) {
 
     // On appelle toujours la fonction qui redessine la route
     drawUserToTargetRoute();
+
+    /*
+     * Le trafic live suit explicitement la position de simulation.
+     * Le garde-fou de refreshTrafficLayer limite les appels à environ 5 s.
+     */
+    if (isSimulationPosition && showTrafficLayer) {
+        refreshTrafficLayer({ force: false, reason: 'simulation-position' });
+    }
 }
 
 
@@ -8589,9 +8661,39 @@ function normalizeSimulationRoute(value) {
 }
 
 function normalizeSimulationSpeed(value) {
-    const numericValue = Number(value);
+    const numericValue = Number(String(value ?? '').replace(',', '.'));
     if (!Number.isFinite(numericValue)) return 0;
     return Math.min(700, Math.max(0, numericValue));
+}
+
+function normalizeSimulationAltitude(value) {
+    const numericValue = Number(String(value ?? '').replace(',', '.'));
+    if (!Number.isFinite(numericValue)) return 0;
+    return Math.min(60000, Math.max(-1000, numericValue));
+}
+
+function selectWholeSimulationInputValue(input) {
+    if (!input) return;
+
+    try { input.select(); } catch (_) {}
+    try { input.setSelectionRange(0, String(input.value || '').length); } catch (_) {}
+}
+
+function focusAndSelectSimulationInput(input) {
+    if (!input) return;
+
+    try {
+        input.focus({ preventScroll: true });
+    } catch (_) {
+        try { input.focus(); } catch (_) {}
+    }
+
+    /*
+     * L'appel immédiat reste dans le geste utilisateur : Safari iPad ouvre le
+     * clavier. Une seconde sélection stabilise le surlignage après le rendu.
+     */
+    selectWholeSimulationInputValue(input);
+    requestAnimationFrame(() => selectWholeSimulationInputValue(input));
 }
 
 function formatSimulationRoute(value) {
@@ -8611,7 +8713,8 @@ function refreshSimulationMotionButtonState() {
         const displayedSpeed = Number.isInteger(simulationSpeedKt)
             ? String(simulationSpeedKt)
             : simulationSpeedKt.toFixed(1);
-        summary.textContent = `${displayedSpeed} kt · ${formatSimulationRoute(simulationRouteDeg)}°`;
+        const displayedAltitude = Math.round(simulationAltitudeFt);
+        summary.innerHTML = `<span>${displayedSpeed} kt · ${formatSimulationRoute(simulationRouteDeg)}°</span><span>${displayedAltitude} ft</span>`;
     }
 }
 
@@ -8628,6 +8731,7 @@ function openSimulationMotionModal() {
     const modal = document.getElementById('simulation-motion-modal');
     const speedInput = document.getElementById('simulation-speed-input');
     const routeInput = document.getElementById('simulation-route-input');
+    const altitudeInput = document.getElementById('simulation-altitude-input');
     if (!modal) return;
 
     if (speedInput) {
@@ -8638,32 +8742,31 @@ function openSimulationMotionModal() {
     if (routeInput) {
         routeInput.value = String(Math.round(simulationRouteDeg) % 360);
     }
+    if (altitudeInput) {
+        altitudeInput.value = String(Math.round(simulationAltitudeFt));
+    }
 
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
 
-    setTimeout(() => {
-        try {
-            speedInput?.focus({ preventScroll: true });
-            speedInput?.select();
-        } catch (_) {}
-    }, 60);
+    /*
+     * Focus synchrone dans le clic d'ouverture, indispensable sur Safari iPad.
+     */
+    focusAndSelectSimulationInput(speedInput);
 }
 
-function applySimulationMotionSettings(speedKt, routeDeg) {
+function applySimulationMotionSettings(speedKt, routeDeg, altitudeFt) {
     simulationSpeedKt = normalizeSimulationSpeed(speedKt);
     simulationRouteDeg = normalizeSimulationRoute(routeDeg);
+    simulationAltitudeFt = normalizeSimulationAltitude(altitudeFt);
 
     localStorage.setItem(SIMULATION_SPEED_STORAGE_KEY, String(simulationSpeedKt));
     localStorage.setItem(SIMULATION_ROUTE_STORAGE_KEY, String(simulationRouteDeg));
+    localStorage.setItem(SIMULATION_ALTITUDE_STORAGE_KEY, String(simulationAltitudeFt));
 
     simulationMotionLastTickMs = performance.now();
     refreshSimulationMotionButtonState();
 
-    /*
-     * Mettre à jour immédiatement l'orientation, la vitesse et le vecteur à la
-     * position courante sans attendre le prochain déplacement.
-     */
     if (
         isSimulationMode
         && simulationAircraftPositionReady
@@ -8677,15 +8780,26 @@ function applySimulationMotionSettings(speedKt, routeDeg) {
             { fromMotionTimer: true }
         );
     }
+
+    /*
+     * Recoloration locale immédiate, puis actualisation live autour de la
+     * position simulée.
+     */
+    redrawTrafficLayerFromSnapshot();
+    if (showTrafficLayer) {
+        refreshTrafficLayer({ force: true, reason: 'simulation-settings' });
+    }
 }
 
 function applySimulationMotionSettingsFromModal() {
     const speedInput = document.getElementById('simulation-speed-input');
     const routeInput = document.getElementById('simulation-route-input');
+    const altitudeInput = document.getElementById('simulation-altitude-input');
 
     applySimulationMotionSettings(
         speedInput ? speedInput.value : simulationSpeedKt,
-        routeInput ? routeInput.value : simulationRouteDeg
+        routeInput ? routeInput.value : simulationRouteDeg,
+        altitudeInput ? altitudeInput.value : simulationAltitudeFt
     );
 
     closeSimulationMotionModal();
@@ -8871,7 +8985,7 @@ function applySimulatedUserPosition(lat, lng, { fromMotionTimer = false } = {}) 
         coords: {
             latitude: numericLat,
             longitude: numericLng,
-            altitude: null,
+            altitude: simulationAltitudeFt / 3.28084,
             heading: simulationRouteDeg,
             speed: simulationSpeedKt * 0.5144444444444445,
             accuracy: null
