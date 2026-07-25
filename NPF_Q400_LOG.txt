@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.07 TEST — mémorisation du dernier état de connexion du chat
+
+Modifications apportées :
+- ajout d’une préférence persistante teamChatConnectionDesired dans localStorage ;
+- distinction entre l’état réseau réel du client MQTT et l’intention de connexion choisie par l’utilisateur ;
+- mémorisation immédiate d’un clic sur Connexion ;
+- mémorisation immédiate d’un clic sur Déconnexion ;
+- maintien du chat déconnecté après passage de la PWA en arrière-plan lorsque l’utilisateur l’avait volontairement déconnecté ;
+- suppression de la reconnexion automatique non désirée au retour au premier plan ;
+- suppression de la reconnexion automatique non désirée lors du retour du réseau ;
+- restauration automatique de la connexion après reprise uniquement lorsque le dernier état choisi était connecté ;
+- restauration du dernier état après fermeture complète puis nouvelle ouverture de la PWA ;
+- possibilité de désactiver une future reconnexion même lorsque le réseau est momentanément indisponible ;
+- bouton Connexion / Déconnexion désormais fondé sur l’intention mémorisée et pas uniquement sur l’état MQTT instantané ;
+- conservation de l’état connecté en cas de coupure réseau temporaire afin de permettre la reconnexion dès le retour du réseau ;
+- validation d’un changement de canal ou de pseudo sans perdre l’intention de connexion ;
+- aucune modification des messages, de l’historique, du partage de position, des notifications ou du trafic aérien ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.07 TEST.
+
 v14.06 TEST — indicatif ou immatriculation dans l’étiquette trafic
 
 Modifications apportées :
