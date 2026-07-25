@@ -1,5 +1,31 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.05 TEST — correction de l’ancrage Leaflet, altitude opposée et familles d’aéronefs affinées
+
+Modifications apportées :
+- identification de la cause réelle du décalage entre la fenêtre et le trafic ;
+- correction de la règle v14.01 qui imposait margin-left: 0 et margin-top: 0 sur les marqueurs ;
+- rétablissement des marges Leaflet de -18 px correspondant à iconAnchor [18,18] ;
+- recentrage du rond, du symbole, du vecteur et de la fenêtre sur la même coordonnée géographique ;
+- suppression du décalage de 18 px vers la droite et vers le bas du symbole visible ;
+- restauration d’un popupAnchor vertical de -8 px, désormais calculé depuis le vrai centre du trafic ;
+- centrage explicite du triangle de pointe avec left: 50 % et margin-left: -9 px ;
+- maintien d’un espace minimal entre la pointe et le rond, sans recouvrement ;
+- correction du positionnement dynamique de l’étiquette d’altitude ;
+- remplacement des propriétés inline left/top inefficaces par les variables CSS --traffic-alt-left et --traffic-alt-top ;
+- priorité finale donnée à ces variables malgré les anciennes règles CSS left/top !important ;
+- positionnement effectif de l’altitude à 180° du vecteur pour toutes les routes ;
+- ajout de familles visuelles distinctes : jet gros-porteur, jet moyen-courrier, jet régional, turbopropulseur, avion léger monomoteur et avion léger bimoteur ;
+- B38M classé en jet moyen-courrier ;
+- C182 classé en avion léger monomoteur ;
+- amélioration de la reconnaissance des familles Boeing, Airbus, Embraer, CRJ, ATR, Dash 8, avions légers Cessna, Piper, Cirrus, Diamond et bimoteurs légers ;
+- catégories SafeSky et catégories d’émetteur ADS-B toujours prioritaires lorsqu’elles sont disponibles ;
+- conservation des catégories hélicoptère, planeur, drone, ballon, parachute, ULM, militaire et autres ;
+- limitation maintenue : les silhouettes représentent une famille d’aéronefs et non le dessin exact de chaque modèle ;
+- grande croix, persistance du popup, couleurs relatives, filtres et source SafeSky inchangés ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.05 TEST.
+
 v14.04 TEST — popup au contact, altitude opposée au vecteur et types ICAO élargis
 
 Modifications apportées :
