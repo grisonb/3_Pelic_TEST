@@ -12409,6 +12409,8 @@ function initializeTeamChat() {
     const CHAT_CLIENT_ID_KEY = 'teamChatClientId';
     const CHAT_OUTBOX_KEY = 'teamChatOutbox';
     const CHAT_SEEN_IDS_KEY = 'teamChatSeenIds';
+    const CHAT_CONNECTION_DESIRED_KEY = 'teamChatConnectionDesired';
+    let chatConnectionDesired = localStorage.getItem(CHAT_CONNECTION_DESIRED_KEY) === 'true';
     let unreadCount = 0;
     let reconnectAfterOnlineTimeout = null;
     let isChatConnecting = false;
@@ -12449,6 +12451,14 @@ function initializeTeamChat() {
         appendChatMessage(item.user, item.text, item.time, item.system === true, item);
     });
 
+    const setChatConnectionDesired = (desired) => {
+        chatConnectionDesired = desired === true;
+        localStorage.setItem(
+            CHAT_CONNECTION_DESIRED_KEY,
+            chatConnectionDesired ? 'true' : 'false'
+        );
+    };
+
     const setConnectionState = (isOnline, label = null) => {
         chatConnected = isOnline;
         const effectiveLabel = label || (isOnline ? 'Connecté' : 'Hors ligne');
@@ -12458,8 +12468,11 @@ function initializeTeamChat() {
         offlineBadge.style.display = isOnline ? 'none' : 'flex';
 
         if (connectButton) {
-            connectButton.disabled = effectiveLabel === 'Connexion...';
-            connectButton.textContent = isOnline ? 'Déconnexion' : (effectiveLabel === 'Connexion...' ? 'Connexion...' : 'Connexion');
+            const connecting = effectiveLabel === 'Connexion...' || effectiveLabel === 'Reconnexion...';
+            connectButton.disabled = connecting;
+            connectButton.textContent = isOnline
+                ? 'Déconnexion'
+                : (connecting ? 'Connexion...' : (chatConnectionDesired ? 'Déconnexion' : 'Connexion'));
         }
     };
     setConnectionState(false);
@@ -13205,6 +13218,15 @@ function initializeTeamChat() {
     };
 
     const reconnectIfNeeded = (reasonLabel = 'Reconnexion...') => {
+        /*
+         * v14.07 — la reprise réseau / premier plan ne doit jamais annuler
+         * une déconnexion volontaire de l'utilisateur.
+         */
+        if (!chatConnectionDesired) {
+            console.info('[Chat] Reconnexion ignorée : état utilisateur = déconnecté.');
+            return;
+        }
+
         const roomName = (roomInput.value || '').trim().replace(/[^a-zA-Z0-9-_]/g, '');
         const userName = (userInput.value || '').trim();
         if (!roomName || !userName) return;
@@ -13578,9 +13600,17 @@ function initializeTeamChat() {
     updateChatValidateButtonState();
 
     connectButton.addEventListener('click', () => {
-        if (chatConnected || isChatConnecting) {
+        /*
+         * L'intention mémorisée prime sur le seul état MQTT instantané.
+         * Ainsi, même hors réseau, le bouton permet d'annuler une future
+         * reconnexion automatique.
+         */
+        if (chatConnectionDesired || chatConnected || isChatConnecting) {
+            setChatConnectionDesired(false);
             disconnectFromChat();
         } else {
+            setChatConnectionDesired(true);
+            setConnectionState(false, 'Connexion...');
             connectToChat();
         }
     });
@@ -13622,6 +13652,20 @@ function initializeTeamChat() {
             }, 200);
         }
     });
+
+    /*
+     * Restauration de l'état lors d'un démarrage complet :
+     * - préférence connectée : tentative de connexion ;
+     * - préférence déconnectée : maintien hors ligne.
+     */
+    if (chatConnectionDesired) {
+        setConnectionState(false, 'Connexion...');
+        setTimeout(() => {
+            reconnectIfNeeded('Restauration du dernier état du chat.');
+        }, 350);
+    } else {
+        setConnectionState(false, 'Hors ligne');
+    }
 
     window.addEventListener('beforeunload', () => {
         publishOwnLocationClear();
