@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-13_filtres_altitude_autour_ou_sol';
-const APP_VERSION = 'v14.13';
+const SW_VERSION = 'sw-v14-14_menu_filtres_trafic_compact_tous_trafics';
+const APP_VERSION = 'v14.14';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
