@@ -689,7 +689,6 @@ const TRAFFIC_API_PROVIDERS = SAFESKY_PROXY_URL
     ];
 const TRAFFIC_RADIUS_NM = 50;
 const TRAFFIC_REFRESH_INTERVAL_MS = 5000;
-const TRAFFIC_MAX_AIRCRAFT = 80;
 const TRAFFIC_MAX_SEEN_SECONDS = 90;
 
 /*
@@ -710,7 +709,6 @@ let lastTrafficRenderMeta = null;
 const TRAFFIC_SETTINGS_STORAGE_KEY = 'trafficLayerSettingsV1';
 const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     radiusNm: TRAFFIC_RADIUS_NM,
-    maxAircraft: TRAFFIC_MAX_AIRCRAFT,
     minAltitudeFt: 0,
     maxAltitudeFt: null,
     showAltitudeLabel: false,
@@ -4276,7 +4274,6 @@ function sanitizeTrafficSettings(candidate = {}) {
     };
 
     const radiusNm = Math.max(5, Math.min(250, parseIntOr(candidate.radiusNm, fallback.radiusNm)));
-    const maxAircraft = Math.max(1, Math.min(150, parseIntOr(candidate.maxAircraft, fallback.maxAircraft)));
     const minAltitudeFt = Math.max(0, Math.min(60000, parseIntOr(candidate.minAltitudeFt, fallback.minAltitudeFt)));
 
     let maxAltitudeFt = candidate.maxAltitudeFt;
@@ -4321,16 +4318,17 @@ function sanitizeTrafficSettings(candidate = {}) {
         )
     );
 
-    let trafficAroundOwnPosition = asBool(candidate.trafficAroundOwnPosition, fallback.trafficAroundOwnPosition);
-    let trafficAroundFire = asBool(candidate.trafficAroundFire, fallback.trafficAroundFire);
-
-    if (!trafficAroundOwnPosition && !trafficAroundFire) {
-        trafficAroundOwnPosition = true;
-    }
+    const trafficAroundOwnPosition = asBool(
+        candidate.trafficAroundOwnPosition,
+        fallback.trafficAroundOwnPosition
+    );
+    const trafficAroundFire = asBool(
+        candidate.trafficAroundFire,
+        fallback.trafficAroundFire
+    );
 
     return {
         radiusNm,
-        maxAircraft,
         minAltitudeFt,
         maxAltitudeFt,
         showAltitudeLabel,
@@ -4367,10 +4365,14 @@ function saveTrafficSettings(settings) {
 
 function getTrafficSettingsSummary() {
     const settings = sanitizeTrafficSettings(trafficSettings);
-    const altitudeMaxLabel = settings.maxAltitudeFt === null ? 'sans maxi' : `${settings.maxAltitudeFt} ft`;
-    const altitudeLabel = settings.showAltitudeLabel ? 'étiquette alt ON' : 'étiquette alt OFF';
+    const altitudeMaxLabel = settings.maxAltitudeFt === null
+        ? 'sans maxi'
+        : `${settings.maxAltitudeFt} ft`;
+    const altitudeLabel = settings.showAltitudeLabel
+        ? 'étiquette alt ON'
+        : 'étiquette alt OFF';
 
-    let altitudeFilterLabel = 'altitude absolue';
+    let altitudeFilterLabel = `Alt. ${settings.minAltitudeFt} ft / ${altitudeMaxLabel}`;
     if (settings.altitudeFilterMode === 'around') {
         altitudeFilterLabel = `±${settings.relativeAltitudeBandFt} ft autour de moi`;
     } else if (settings.altitudeFilterMode === 'ground') {
@@ -4380,11 +4382,12 @@ function getTrafficSettingsSummary() {
     const referenceLabels = [];
     if (settings.trafficAroundOwnPosition) referenceLabels.push('GPS');
     if (settings.trafficAroundFire) referenceLabels.push('feu');
-    const absoluteRangeLabel = settings.altitudeFilterMode === 'absolute'
-        ? `Alt ${settings.minAltitudeFt} ft à ${altitudeMaxLabel} · `
-        : '';
 
-    return `Rayon ${settings.radiusNm} Nm · Max ${settings.maxAircraft} avions · ${absoluteRangeLabel}${altitudeFilterLabel} · ${altitudeLabel} · autour ${referenceLabels.join(' + ')}`;
+    const referenceLabel = referenceLabels.length
+        ? referenceLabels.join(' + ')
+        : 'tous les trafics — centre carte';
+
+    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -4406,47 +4409,27 @@ function ensureTrafficSettingsModal() {
             </div>
 
             <div class="traffic-settings-grid">
-                <label class="traffic-settings-field">
-                    <span>Rayon d'affichage</span>
-                    <div class="traffic-settings-input-row">
+                <label class="traffic-settings-field traffic-settings-relative-line traffic-settings-radius-field">
+                    <div class="traffic-settings-check-row traffic-settings-radius-inline-row">
+                        <em>Rayon d'affichage</em>
                         <input id="traffic-radius-input" type="number" inputmode="numeric" min="5" max="250" step="1">
-                        <em>Nm</em>
+                        <strong>Nm</strong>
                     </div>
                 </label>
 
-                <label class="traffic-settings-field">
-                    <span>Nombre maximal d'avions</span>
-                    <div class="traffic-settings-input-row">
-                        <input id="traffic-max-aircraft-input" type="number" inputmode="numeric" min="1" max="150" step="1">
-                        <em>avions</em>
-                    </div>
-                </label>
-
-                <label id="traffic-altitude-absolute-mode-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-altitude-mode-line">
-                    <div class="traffic-settings-check-row">
+                <label id="traffic-altitude-absolute-mode-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
+                    <div class="traffic-settings-check-row traffic-settings-altitude-row traffic-settings-absolute-band-row">
                         <input id="traffic-altitude-mode-absolute" type="radio" name="traffic-altitude-mode" value="absolute">
-                        <em>Altitude absolue — mini / maxi</em>
-                    </div>
-                </label>
-
-                <label id="traffic-min-altitude-field" class="traffic-settings-field traffic-absolute-altitude-field">
-                    <span>Altitude mini</span>
-                    <div class="traffic-settings-input-row">
-                        <input id="traffic-min-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100">
-                        <em>ft</em>
-                    </div>
-                </label>
-
-                <label id="traffic-max-altitude-field" class="traffic-settings-field traffic-absolute-altitude-field">
-                    <span>Altitude maxi</span>
-                    <div class="traffic-settings-input-row">
-                        <input id="traffic-max-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100" placeholder="vide">
-                        <em>ft</em>
+                        <em>Alt. mini / maxi</em>
+                        <input id="traffic-min-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100" placeholder="mini">
+                        <span class="traffic-altitude-separator">/</span>
+                        <input id="traffic-max-altitude-input" type="number" inputmode="numeric" min="0" max="60000" step="100" placeholder="maxi">
+                        <strong>ft</strong>
                     </div>
                 </label>
 
                 <label id="traffic-around-altitude-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
-                    <div class="traffic-settings-check-row traffic-settings-inline-band-row">
+                    <div class="traffic-settings-check-row traffic-settings-altitude-row traffic-settings-around-band-row">
                         <input id="traffic-altitude-mode-around" type="radio" name="traffic-altitude-mode" value="around">
                         <em>Autour de mon altitude</em>
                         <span class="traffic-relative-plusminus">±</span>
@@ -4456,7 +4439,7 @@ function ensureTrafficSettingsModal() {
                 </label>
 
                 <label id="traffic-ground-altitude-field" class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
-                    <div class="traffic-settings-check-row traffic-settings-ground-band-row">
+                    <div class="traffic-settings-check-row traffic-settings-altitude-row traffic-settings-ground-band-row">
                         <input id="traffic-altitude-mode-ground" type="radio" name="traffic-altitude-mode" value="ground">
                         <em>Du sol à</em>
                         <span class="traffic-relative-plusminus">+</span>
@@ -4487,7 +4470,7 @@ function ensureTrafficSettingsModal() {
                 </label>
             </div>
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse et affiche les trafics jusqu’à mon altitude augmentée de la valeur choisie. Les deux modes utilisent l’altitude GPS ou l’altitude de simulation disponible. Rafraîchissement trafic toutes les 5 secondes. Ces filtres ne changent pas la nature indicative et non certifiée des données SafeSky/ADS-B.</div>
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse. Si « Trafic autour de ma position » et « Trafic autour du feu » sont décochés, tous les trafics reçus dans le rayon choisi autour du centre de la carte sont affichés. Rafraîchissement toutes les 5 secondes. Données SafeSky/ADS-B indicatives et non certifiées.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -4517,8 +4500,7 @@ function ensureTrafficSettingsModal() {
         const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
         const groundBandInput = modal.querySelector('#traffic-ground-band-input');
 
-        const minAltitudeField = modal.querySelector('#traffic-min-altitude-field');
-        const maxAltitudeField = modal.querySelector('#traffic-max-altitude-field');
+        const absoluteAltitudeField = modal.querySelector('#traffic-altitude-absolute-mode-field');
         const aroundAltitudeField = modal.querySelector('#traffic-around-altitude-field');
         const groundAltitudeField = modal.querySelector('#traffic-ground-altitude-field');
 
@@ -4529,9 +4511,12 @@ function ensureTrafficSettingsModal() {
         [minAltitudeInput, maxAltitudeInput].forEach(input => {
             if (input) input.disabled = !absoluteActive;
         });
-        [minAltitudeField, maxAltitudeField].forEach(field => {
-            if (field) field.classList.toggle('traffic-settings-field-disabled', !absoluteActive);
-        });
+        if (absoluteAltitudeField) {
+            absoluteAltitudeField.classList.toggle(
+                'traffic-settings-field-disabled',
+                !absoluteActive
+            );
+        }
 
         if (relativeBandInput) relativeBandInput.disabled = !aroundActive;
         if (aroundAltitudeField) {
@@ -4547,7 +4532,6 @@ function ensureTrafficSettingsModal() {
     const fillDefaults = () => {
         const defaults = sanitizeTrafficSettings(DEFAULT_TRAFFIC_SETTINGS);
         modal.querySelector('#traffic-radius-input').value = String(defaults.radiusNm);
-        modal.querySelector('#traffic-max-aircraft-input').value = String(defaults.maxAircraft);
         modal.querySelector('#traffic-min-altitude-input').value = String(defaults.minAltitudeFt);
         modal.querySelector('#traffic-max-altitude-input').value = '';
         modal.querySelector('#traffic-around-own-input').checked = !!defaults.trafficAroundOwnPosition;
@@ -4573,7 +4557,6 @@ function ensureTrafficSettingsModal() {
 
     modal.querySelector('#traffic-settings-apply').addEventListener('click', () => {
         const radiusInput = modal.querySelector('#traffic-radius-input');
-        const maxAircraftInput = modal.querySelector('#traffic-max-aircraft-input');
         const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
         const aroundOwnInput = modal.querySelector('#traffic-around-own-input');
@@ -4585,7 +4568,6 @@ function ensureTrafficSettingsModal() {
 
         saveTrafficSettings({
             radiusNm: radiusInput.value,
-            maxAircraft: maxAircraftInput.value,
             minAltitudeFt: minAltitudeInput.value,
             maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value,
             trafficAroundOwnPosition: !!aroundOwnInput.checked,
@@ -4613,7 +4595,6 @@ function openTrafficSettingsDialog() {
     const modal = ensureTrafficSettingsModal();
 
     modal.querySelector('#traffic-radius-input').value = String(current.radiusNm);
-    modal.querySelector('#traffic-max-aircraft-input').value = String(current.maxAircraft);
     modal.querySelector('#traffic-min-altitude-input').value = String(current.minAltitudeFt);
     modal.querySelector('#traffic-max-altitude-input').value = current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt);
     modal.querySelector('#traffic-around-own-input').checked = !!current.trafficAroundOwnPosition;
@@ -4634,17 +4615,19 @@ function openTrafficSettingsDialog() {
         const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
         const groundBandInput = modal.querySelector('#traffic-ground-band-input');
 
-        const minAltitudeField = modal.querySelector('#traffic-min-altitude-field');
-        const maxAltitudeField = modal.querySelector('#traffic-max-altitude-field');
+        const absoluteAltitudeField = modal.querySelector('#traffic-altitude-absolute-mode-field');
         const aroundAltitudeField = modal.querySelector('#traffic-around-altitude-field');
         const groundAltitudeField = modal.querySelector('#traffic-ground-altitude-field');
 
         [minAltitudeInput, maxAltitudeInput].forEach(input => {
             if (input) input.disabled = !absoluteActive;
         });
-        [minAltitudeField, maxAltitudeField].forEach(field => {
-            if (field) field.classList.toggle('traffic-settings-field-disabled', !absoluteActive);
-        });
+        if (absoluteAltitudeField) {
+            absoluteAltitudeField.classList.toggle(
+                'traffic-settings-field-disabled',
+                !absoluteActive
+            );
+        }
 
         if (relativeBandInput) relativeBandInput.disabled = !aroundActive;
         if (aroundAltitudeField) {
@@ -4762,6 +4745,22 @@ function getFireTrafficPoint() {
 function getTrafficQueryPoints() {
     const settings = sanitizeTrafficSettings(trafficSettings);
     const points = [];
+    const showAllTraffic = (
+        !settings.trafficAroundOwnPosition
+        && !settings.trafficAroundFire
+    );
+
+    if (showAllTraffic && map && typeof map.getCenter === 'function') {
+        const center = map.getCenter();
+        if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
+            points.push({
+                lat: center.lat,
+                lon: center.lng,
+                label: 'tous trafics — centre carte',
+                kind: 'all'
+            });
+        }
+    }
 
     if (settings.trafficAroundOwnPosition) {
         const ownPoint = getOwnTrafficPoint();
@@ -4773,20 +4772,30 @@ function getTrafficQueryPoints() {
         if (firePoint) points.push(firePoint);
     }
 
+    /*
+     * Secours uniquement si le centre de carte n'est pas encore disponible.
+     * Le mode reste « tous les trafics » : aucun filtre de distance
+     * supplémentaire ne sera appliqué au rendu.
+     */
     if (!points.length) {
         const ownPoint = getOwnTrafficPoint();
-        if (ownPoint) points.push(ownPoint);
+        if (ownPoint) {
+            points.push({
+                ...ownPoint,
+                label: showAllTraffic ? 'tous trafics' : ownPoint.label,
+                kind: showAllTraffic ? 'all' : ownPoint.kind
+            });
+        }
     }
 
     if (!points.length) {
         const firePoint = getFireTrafficPoint();
-        if (firePoint) points.push(firePoint);
-    }
-
-    if (!points.length && map && typeof map.getCenter === 'function') {
-        const center = map.getCenter();
-        if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
-            points.push({ lat: center.lat, lon: center.lng, label: 'centre carte', kind: 'map' });
+        if (firePoint) {
+            points.push({
+                ...firePoint,
+                label: showAllTraffic ? 'tous trafics' : firePoint.label,
+                kind: showAllTraffic ? 'all' : firePoint.kind
+            });
         }
     }
 
@@ -5469,7 +5478,13 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     trafficLayer.clearLayers();
 
     const settings = sanitizeTrafficSettings(trafficSettings);
-    const points = Array.isArray(meta.points) && meta.points.length ? meta.points : (meta.point ? [meta.point] : []);
+    const points = Array.isArray(meta.points) && meta.points.length
+        ? meta.points
+        : (meta.point ? [meta.point] : []);
+    const showAllTraffic = (
+        !settings.trafficAroundOwnPosition
+        && !settings.trafficAroundFire
+    );
     const ownAltitudeFt = getOwnTrafficAltitudeFeet();
 
     const useAroundAltitude = (
@@ -5504,15 +5519,27 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         .filter(ac => !useGroundToAboveAltitude || ac.altitudeFeet === null || ac.altitudeFeet <= groundToAboveMaxAltitudeFt)
         .forEach(ac => {
             const reference = getNearestTrafficReference(ac, points);
-            if (points.length && (!reference || reference.distance > settings.radiusNm + 0.5)) return;
-            ac._trafficReference = reference;
+
+            /*
+             * Quand aucune des deux références n'est cochée, afficher tous
+             * les trafics retournés par la source dans la zone de requête.
+             */
+            if (
+                !showAllTraffic
+                && points.length
+                && (!reference || reference.distance > settings.radiusNm + 0.5)
+            ) {
+                return;
+            }
+
+            ac._trafficReference = showAllTraffic ? null : reference;
             const key = buildTrafficAircraftKey(ac);
             if (seenAircraft.has(key)) return;
             seenAircraft.add(key);
             uniqueAircraft.push(ac);
         });
 
-    const aircraft = uniqueAircraft.slice(0, settings.maxAircraft);
+    const aircraft = uniqueAircraft;
     let popupMarkerToRestore = null;
 
     aircraft.forEach(ac => {
@@ -5543,7 +5570,8 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 <div>Route : <b>${Number.isFinite(ac.track) ? Math.round(ac.track) + '°' : '--'}</b></div>
                 ${Number.isFinite(distance) ? `<div>Distance ${referenceLabel ? `à ${referenceLabel}` : ''} : <b>${Math.round(distance)} Nm</b></div>` : ''}
                 <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
-                ${useRelativeAltitude ? `<div>Filtre altitude GPS : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
+                ${useAroundAltitude ? `<div>Filtre altitude : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
+                ${useGroundToAboveAltitude ? `<div>Filtre altitude : <b>sol / ${Math.round(groundToAboveMaxAltitudeFt)} ft</b></div>` : ''}
                 <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
             </div>`;
         marker._trafficAircraftKey = aircraftKey;
