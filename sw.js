@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-14_menu_filtres_trafic_compact_tous_trafics';
-const APP_VERSION = 'v14.14';
+const SW_VERSION = 'sw-v14-15_calque_routier_vectoriel_offline';
+const APP_VERSION = 'v14.15';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
