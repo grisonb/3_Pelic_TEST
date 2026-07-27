@@ -7,8 +7,8 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.14">
-    <link rel="manifest" href="manifest.json?appv=v14.14">
+    <link rel="stylesheet" href="style.css?appv=v14.15">
+    <link rel="manifest" href="manifest.json?appv=v14.15">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.14';
+        const APP_VERSION = 'v14.15';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -428,6 +428,21 @@
                 </svg>
             </span>
         </button>
+        <button id="road-overlay-button" class="left-map-action-button road-overlay-map-button"
+                title="Afficher/Masquer le calque routier A / N / D"
+                aria-label="Afficher/Masquer le calque routier autoroutes, nationales et départementales">
+            <span class="road-overlay-icon" aria-hidden="true">
+                <svg viewBox="0 0 72 72" focusable="false" role="img">
+                    <path class="road-overlay-road-casing" d="M12 63 C20 50 20 35 31 23 C39 14 48 12 60 8"/>
+                    <path class="road-overlay-road-line" d="M12 63 C20 50 20 35 31 23 C39 14 48 12 60 8"/>
+                    <rect class="road-overlay-shield road-overlay-shield-a" x="35" y="39" width="28" height="17" rx="5"/>
+                    <text class="road-overlay-shield-text" x="49" y="51">A7</text>
+                    <rect class="road-overlay-shield road-overlay-shield-d" x="7" y="10" width="36" height="17" rx="5"/>
+                    <text class="road-overlay-shield-text road-overlay-shield-text-dark" x="25" y="22">D559</text>
+                </svg>
+            </span>
+            <span id="road-overlay-button-status" class="road-overlay-button-status">—</span>
+        </button>
         <button id="ops-frequencies-pdf-button" class="left-map-action-button ops-frequencies-map-button" title="Ouvrir la carte fréquences OPS" aria-label="Ouvrir la carte fréquences OPS">
             <span class="radio-frequency-icon" aria-hidden="true">
                 <svg viewBox="0 0 64 64" focusable="false" role="img">
@@ -587,7 +602,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.14"></script>
+    <script src="script.js?appv=v14.15"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -824,6 +839,23 @@
                     <button id="simulation-mode-button" type="button" class="simulation-mode-button">Mode simulation avion</button>
                     <label for="zip-importer-input" class="import-button">Importer un pack de tuiles (.zip)</label>
                     <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
+
+                    <div class="road-overlay-import-block">
+                        <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
+                            Importer le calque routier A / N / D
+                        </label>
+                        <input type="file" id="road-overlay-importer-input"
+                               accept=".zip,.geojson,.json,application/geo+json,application/json"
+                               style="display: none;">
+                        <div id="road-overlay-installed-status" class="road-overlay-installed-status">
+                            Aucun pack routier installé.
+                        </div>
+                        <button id="delete-road-overlay-button" type="button"
+                                class="danger-inline-btn road-overlay-delete-button"
+                                style="display: none;">
+                            Supprimer le calque routier
+                        </button>
+                    </div>
                 </div>
 
                 <div id="import-progress-section" style="display: none;">
