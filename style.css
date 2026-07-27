@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.14') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.14') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.15') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.15') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10526,4 +10526,181 @@ body.gaar-point-search-open .gaar-editing-banner {
     .traffic-settings-ground-band-row strong {
         font-size: 13px !important;
     }
+}
+
+
+/* ==========================================================================
+   v14.15 TEST — calque routier vectoriel offline A / N / D
+   ========================================================================== */
+
+#road-overlay-button.active {
+    background: #0b6e4f !important;
+    border-color: #0b6e4f !important;
+    color: #ffffff !important;
+}
+
+#road-overlay-button.loading {
+    opacity: .68 !important;
+    cursor: wait !important;
+}
+
+#road-overlay-button.missing-data {
+    border-color: #d97706 !important;
+}
+
+.road-overlay-map-button .road-overlay-icon,
+.road-overlay-map-button svg {
+    width: 66px !important;
+    height: 66px !important;
+    overflow: visible !important;
+}
+
+.road-overlay-road-casing {
+    fill: none;
+    stroke: #ffffff;
+    stroke-width: 11;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.road-overlay-road-line {
+    fill: none;
+    stroke: #e85d04;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.road-overlay-shield {
+    stroke: rgba(0, 0, 0, .38);
+    stroke-width: 1.5;
+}
+
+.road-overlay-shield-a {
+    fill: #e85d04;
+}
+
+.road-overlay-shield-d {
+    fill: #f0c419;
+}
+
+.road-overlay-shield-text {
+    fill: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: 1000;
+    text-anchor: middle;
+}
+
+.road-overlay-shield-text-dark {
+    fill: #17212b;
+    font-size: 10px;
+}
+
+.road-overlay-button-status {
+    position: absolute !important;
+    right: 5px !important;
+    bottom: 4px !important;
+    min-width: 29px !important;
+    height: 18px !important;
+    padding: 0 4px !important;
+    box-sizing: border-box !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, .95) !important;
+    border: 1px solid rgba(0, 0, 0, .22) !important;
+    color: #0b6e4f !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 9px !important;
+    font-weight: 1000 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+}
+
+#road-overlay-button.missing-data .road-overlay-button-status {
+    color: #b45309 !important;
+}
+
+.leaflet-pane.roadOverlayCasingPane,
+.leaflet-pane.roadOverlayLinePane,
+.leaflet-pane.roadOverlayLabelPane {
+    pointer-events: none !important;
+}
+
+.road-overlay-label-marker {
+    background: transparent !important;
+    border: 0 !important;
+    pointer-events: none !important;
+}
+
+.road-overlay-ref {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 31px !important;
+    height: 20px !important;
+    padding: 0 6px !important;
+    transform: translate(-50%, -50%) !important;
+    border: 2px solid rgba(255, 255, 255, .98) !important;
+    border-radius: 6px !important;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, .58),
+        0 0 0 1px rgba(0, 0, 0, .25) !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 1000 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    pointer-events: none !important;
+}
+
+.road-overlay-ref-a {
+    background: #e85d04 !important;
+    color: #ffffff !important;
+}
+
+.road-overlay-ref-n {
+    background: #d62828 !important;
+    color: #ffffff !important;
+}
+
+.road-overlay-ref-d {
+    background: #f0c419 !important;
+    color: #17212b !important;
+}
+
+.road-overlay-import-block {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-top: 6px !important;
+    padding-top: 10px !important;
+    border-top: 1px solid rgba(0, 80, 130, .18) !important;
+}
+
+.road-overlay-import-button {
+    background: #0b6e4f !important;
+    border-color: #0b6e4f !important;
+    color: #ffffff !important;
+}
+
+.road-overlay-installed-status {
+    padding: 8px 10px !important;
+    border: 1px solid #bfd6cc !important;
+    border-radius: 10px !important;
+    background: #f1faf6 !important;
+    color: #174b3a !important;
+    font-size: 13px !important;
+    font-weight: 850 !important;
+    line-height: 1.25 !important;
+    text-align: left !important;
+}
+
+.road-overlay-delete-button {
+    align-self: flex-start !important;
 }
