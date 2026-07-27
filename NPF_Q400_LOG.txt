@@ -1,5 +1,51 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.15 TEST — moteur du calque routier vectoriel offline A / N / D
+
+Modifications apportées :
+- ajout d’un bouton ROUTES dans la colonne gauche de la carte ;
+- bouton placé immédiatement sous le bouton des lignes haute tension ;
+- icône routière intégrant des références A et D ;
+- badge A/N/D lorsque le pack routier est installé ;
+- badge d’avertissement lorsque les données routières ne sont pas encore importées ;
+- ajout d’un calque vectoriel indépendant du fond de carte ;
+- fonctionnement sur carte online, carte offline raster, carte OACI et autres fonds existants ;
+- création de trois panes Leaflet dédiés : entourage blanc, lignes routières et libellés ;
+- entourage blanc des routes pour maintenir la lisibilité sur tous les fonds ;
+- style orange pour les autoroutes ;
+- style rouge pour les nationales ;
+- style jaune pour les départementales ;
+- affichage de références routières sous forme de cartouches contrastés ;
+- affichage progressif selon le zoom : autoroutes, puis nationales, puis départementales ;
+- labels positionnés au milieu géométrique du tronçon principal ;
+- dédoublonnage spatial des cartouches pour limiter la surcharge visuelle ;
+- mise à jour des labels et de l’épaisseur des routes après déplacement ou changement de zoom ;
+- ajout d’un import « Calque routier A / N / D » dans Gestion des Cartes ;
+- prise en charge d’un fichier GeoJSON seul ;
+- prise en charge d’un ZIP contenant plusieurs fichiers GeoJSON ou JSON ;
+- validation du type FeatureCollection ;
+- prise en charge des géométries LineString et MultiLineString ;
+- reconnaissance de plusieurs noms de champs usuels pour la référence routière ;
+- conservation exclusive des références A, N et D ;
+- normalisation des propriétés vers ref, roadClass et name ;
+- calcul automatique de la boîte géographique de chaque partie ;
+- stockage persistant dans le cache npf-road-overlay-data-v1 ;
+- remplacement propre de l’ancien pack lors d’un nouvel import ;
+- manifeste persistant avec nom, date, nombre de parties et nombre de tronçons ;
+- affichage du statut du pack routier dans Gestion des Cartes ;
+- bouton de suppression complète du calque routier ;
+- chargement uniquement des parties recouvrant la zone visible de la carte ;
+- déchargement des parties qui sortent de la zone affichée ;
+- maintien des données routières lors d’une mise à jour normale de NPF ;
+- ouverture automatique de Gestion des Cartes si le bouton ROUTES est utilisé sans pack installé ;
+- activation automatique du calque après import réussi ;
+- ajout d’un guide séparé décrivant le format de données attendu ;
+- aucune donnée routière nationale volumineuse intégrée directement à l’application ;
+- le pack France restera un fichier séparé afin de ne pas alourdir les mises à jour de NPF ;
+- maintien du blocage global du stylet, du trafic, de la simulation et des cartes offline ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.15 TEST.
+
 v14.14 TEST — menu filtres trafic compact, homogène et sans limite d’avions
 
 Modifications apportées :
