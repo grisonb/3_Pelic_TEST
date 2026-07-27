@@ -1,5 +1,33 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.14 TEST — menu filtres trafic compact, homogène et sans limite d’avions
+
+Modifications apportées :
+- suppression de la ligne « Nombre maximal d’avions » dans le menu des filtres ;
+- suppression de la limite logicielle du nombre de trafics affichés ;
+- affichage de tous les trafics uniques reçus après application des autres filtres ;
+- remplacement du libellé « Altitude absolue — mini / maxi » par « Alt. mini / maxi » ;
+- regroupement du bouton radio, de l’altitude mini, du séparateur, de l’altitude maxi et de l’unité ft sur une seule ligne ;
+- suppression des deux anciennes cellules séparées Altitude mini et Altitude maxi ;
+- harmonisation de la hauteur, de la largeur, de la police et des marges des cellules d’altitude ;
+- largeur identique des cellules d’altitude pour « Autour de mon altitude » et « Du sol à + » ;
+- maintien intégral de la ligne « Du sol à + … ft au-dessus de moi » sur une seule ligne ;
+- agrandissement modéré de la fenêtre Filtres trafic pour conserver les lignes sans retour à la ligne sur iPad ;
+- présentation du rayon d’affichage sur une seule ligne compacte ;
+- autorisation de décocher simultanément « Trafic autour de ma position » et « Trafic autour du feu » ;
+- suppression de la réactivation automatique de la case « autour de ma position » ;
+- lorsque les deux cases sont décochées, interrogation du trafic autour du centre actuel de la carte ;
+- dans ce mode, affichage de tous les trafics retournés par la source dans le rayon sélectionné ;
+- suivi du centre de la carte lors des rafraîchissements périodiques ;
+- adaptation du résumé des filtres au mode « tous les trafics — centre carte » ;
+- mise à jour de la note explicative du menu ;
+- correction du texte de filtre altitude dans la fenêtre d’information d’un trafic ;
+- correction d’une référence obsolète au précédent mode relatif dans cette fenêtre ;
+- maintien des filtres altitude absolu, ± autour de moi et du sol à + au-dessus de moi ;
+- maintien du blocage global du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.14 TEST.
+
 v14.13 TEST — filtres trafic altitude absolue, ± autour de moi ou du sol à + au-dessus de moi
 
 Modifications apportées :
