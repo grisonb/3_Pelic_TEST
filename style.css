@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.12') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.12') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.14') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.14') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10295,4 +10295,235 @@ body.gaar-point-search-open .gaar-editing-banner {
 .npf-global-stylus-blocked-field {
     caret-color: transparent !important;
     background-color: #f1f4f7 !important;
+}
+
+
+/* ==========================================================================
+   v14.13 TEST — choix exclusifs des filtres altitude trafic
+   ========================================================================== */
+
+.traffic-settings-altitude-mode-line {
+    grid-column: 1 / -1 !important;
+    padding-bottom: 2px !important;
+}
+
+.traffic-settings-check-row input[type="radio"] {
+    width: 28px !important;
+    height: 28px !important;
+    flex: 0 0 auto !important;
+    accent-color: var(--primary-color) !important;
+}
+
+.traffic-settings-ground-band-row {
+    display: grid !important;
+    grid-template-columns: auto minmax(90px, 1fr) auto minmax(110px, 150px) minmax(145px, auto) !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-height: 46px !important;
+}
+
+.traffic-settings-ground-band-row input[type="number"] {
+    width: 100% !important;
+    height: 42px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    padding: 0 10px !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 20px !important;
+    font-weight: 900 !important;
+}
+
+.traffic-settings-ground-band-row strong {
+    color: #334155 !important;
+    font-size: 14px !important;
+    font-weight: 950 !important;
+    white-space: nowrap !important;
+}
+
+.traffic-settings-field-disabled input[type="radio"] {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+.traffic-settings-field-disabled:has(input[type="radio"]:checked) {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+@media (max-width: 760px) {
+    .traffic-settings-ground-band-row {
+        grid-template-columns: auto 1fr auto minmax(96px, 130px) !important;
+    }
+
+    .traffic-settings-ground-band-row strong {
+        grid-column: 2 / -1 !important;
+        margin-left: 0 !important;
+        white-space: normal !important;
+    }
+}
+
+
+/* ==========================================================================
+   v14.14 TEST — menu filtres trafic compact et homogène
+   ========================================================================== */
+
+.traffic-settings-card {
+    width: min(700px, calc(100vw - 36px)) !important;
+}
+
+.traffic-settings-radius-field,
+#traffic-altitude-absolute-mode-field,
+#traffic-around-altitude-field,
+#traffic-ground-altitude-field {
+    grid-column: 1 / -1 !important;
+}
+
+.traffic-settings-radius-inline-row {
+    display: grid !important;
+    grid-template-columns: minmax(190px, 1fr) 120px 32px !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-height: 46px !important;
+}
+
+.traffic-settings-radius-inline-row input,
+.traffic-settings-altitude-row input[type="number"] {
+    width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    padding: 0 10px !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 20px !important;
+    font-weight: 900 !important;
+    line-height: 44px !important;
+}
+
+.traffic-settings-radius-inline-row em,
+.traffic-settings-altitude-row em {
+    min-width: 0 !important;
+    font-style: normal !important;
+    color: #475569 !important;
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    white-space: nowrap !important;
+}
+
+.traffic-settings-radius-inline-row strong,
+.traffic-settings-altitude-row strong,
+.traffic-altitude-separator,
+.traffic-relative-plusminus {
+    color: #334155 !important;
+    font-size: 16px !important;
+    font-weight: 950 !important;
+    white-space: nowrap !important;
+}
+
+.traffic-settings-altitude-row {
+    display: grid !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-height: 46px !important;
+}
+
+.traffic-settings-absolute-band-row {
+    grid-template-columns:
+        28px
+        minmax(135px, 1fr)
+        minmax(90px, 112px)
+        14px
+        minmax(90px, 112px)
+        24px !important;
+}
+
+.traffic-settings-around-band-row {
+    grid-template-columns:
+        28px
+        minmax(190px, 1fr)
+        20px
+        120px
+        24px !important;
+}
+
+.traffic-settings-ground-band-row {
+    grid-template-columns:
+        28px
+        minmax(190px, 1fr)
+        20px
+        120px
+        minmax(145px, auto) !important;
+}
+
+.traffic-settings-around-band-row input[type="number"],
+.traffic-settings-ground-band-row input[type="number"] {
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+}
+
+.traffic-settings-field-disabled .traffic-settings-altitude-row input[type="number"] {
+    background: #e2e8f0 !important;
+    color: #64748b !important;
+}
+
+@media (max-width: 680px) {
+    .traffic-settings-card {
+        width: min(660px, calc(100vw - 20px)) !important;
+        padding: 14px !important;
+    }
+
+    .traffic-settings-radius-inline-row {
+        grid-template-columns: minmax(145px, 1fr) 100px 28px !important;
+        gap: 7px !important;
+    }
+
+    .traffic-settings-altitude-row {
+        gap: 7px !important;
+    }
+
+    .traffic-settings-absolute-band-row {
+        grid-template-columns:
+            28px
+            minmax(115px, 1fr)
+            minmax(78px, 96px)
+            12px
+            minmax(78px, 96px)
+            22px !important;
+    }
+
+    .traffic-settings-around-band-row {
+        grid-template-columns:
+            28px
+            minmax(150px, 1fr)
+            18px
+            104px
+            22px !important;
+    }
+
+    .traffic-settings-ground-band-row {
+        grid-template-columns:
+            28px
+            minmax(125px, 1fr)
+            18px
+            104px
+            minmax(125px, auto) !important;
+    }
+
+    .traffic-settings-around-band-row input[type="number"],
+    .traffic-settings-ground-band-row input[type="number"] {
+        width: 104px !important;
+        min-width: 104px !important;
+        max-width: 104px !important;
+    }
+
+    .traffic-settings-radius-inline-row em,
+    .traffic-settings-altitude-row em,
+    .traffic-settings-ground-band-row strong {
+        font-size: 13px !important;
+    }
 }
