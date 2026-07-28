@@ -6487,7 +6487,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'AVION',
             svg: `
-                <path class="ss-fill" d="M29 4h6l2 19 19 8v6l-19-3-1 14 8 7v4l-12-3-12 3v-4l8-7-1-14-19 3v-6l19-8 2-19Z"/>
+                <path class="ss-fill" d="M29 5h6l1.7 20.5 18.8 6.7v5.6l-18.6-2.5-.9 11.9 8.4 6.5v4.2L32 54.8l-12.4 3.1v-4.2l8.4-6.5-.9-11.9-18.6 2.5v-5.6l18.8-6.7L29 5Z"/>
             `
         },
         jet: {
@@ -6495,7 +6495,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'JET',
             svg: `
-                <path class="ss-fill" d="M29 3h6l4 20 17 9v7l-19-5-2 12 10 9v4l-13-4-13 4v-4l10-9-2-12-19 5v-7l17-9 4-20Z"/>
+                <path class="ss-fill" d="M30 3h4l4.5 21.2 17.9 10.4v6.6l-18.5-5.4-1.7 10.4 10.4 8.8v4.4L32 55.6l-14.6 3.8V55l10.4-8.8-1.7-10.4-18.5 5.4v-6.6l17.9-10.4L30 3Z"/>
             `
         },
         helicopter: {
@@ -6520,7 +6520,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'PLANEUR',
             svg: `
-                <path class="ss-fill" d="M30 6h4l2 23 25 3v5l-25-1-1 13 8 6v3l-11-2-11 2v-3l8-6-1-13-25 1v-5l25-3 2-23Z"/>
+                <path class="ss-fill" d="M30.7 4h2.6l1.2 24.2 27 2.6v4.4l-27-1-1 14.4 7.6 5.8v3.2L32 55.4l-9.1 2.2v-3.2l7.6-5.8-1-14.4-27 1v-4.4l27-2.6L30.7 4Z"/>
             `
         },
         uav: {
@@ -6597,13 +6597,9 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: false,
             label: 'PARAPENTE',
             svg: `
-                <path class="ss-fill" d="M6 26C14 12 23 7 32 7s18 5 26 19c-10-5-18-7-26-7S16 21 6 26Z"/>
-                <path class="ss-cut" d="M15 22c6-8 11-11 17-11s11 3 17 11"/>
-                <g class="ss-line">
-                    <path d="M11 26l18 21M53 26 35 47M23 22l8 25M41 22l-8 25"/>
-                    <path d="M32 47v8M27 60l5-5 5 5"/>
-                </g>
-                <circle class="ss-fill" cx="32" cy="48" r="3.2"/>
+                <path class="ss-fill" d="M5 28.5C10.8 15 20.2 8 32 8s21.2 7 27 20.5c-8.8-4.2-17.8-6.2-27-6.2S13.8 24.3 5 28.5Z"/>
+                <path class="ss-cut" d="M13 24.9c3.2-7.1 7-11.2 11.2-13.6M24.2 22.8c1.3-7 3.8-11.7 7.8-14.8M40 22.8c-1.3-7-3.8-11.7-8-14.8M51 24.9c-3.2-7.1-7-11.2-11.2-13.6"/>
+                <path class="ss-cut" d="M8.8 27.1c7.9-2.8 15.6-4.1 23.2-4.1s15.3 1.3 23.2 4.1"/>
             `
         },
         hangglider: {
@@ -6611,12 +6607,8 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'DELTAPLANE',
             svg: `
-                <path class="ss-fill" d="M4 22 32 7l28 15-28 8L4 22Z"/>
-                <path class="ss-cut" d="M32 8v21M8 22h48"/>
-                <g class="ss-line">
-                    <path d="M32 29v17M20 55l12-9 12 9"/>
-                </g>
-                <circle class="ss-fill" cx="32" cy="43" r="3.5"/>
+                <path class="ss-fill" d="M4 31.5 32 12l28 19.5-28-7.7-28 7.7Z"/>
+                <path class="ss-cut" d="M32 12v11.8"/>
             `
         },
         gyrocopter: {
@@ -6705,8 +6697,8 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'ULM',
             svg: `
-                <path class="ss-fill" d="M30 7h4l2 17 20 8v6l-20-3-1 12 8 7v4l-11-3-11 3v-4l8-7-1-12-20 3v-6l20-8 2-17Z"/>
-                <path class="ss-cut" d="M22 25h20"/>
+                <path class="ss-fill" d="M28.5 6h7l1.2 20.2 18.8 5.4v5.2L36.7 35l-.8 11.2 8.6 5.8v4.4L32 53.5l-12.5 2.9V52l8.6-5.8-.8-11.2-18.8 1.8v-5.2l18.8-5.4L28.5 6Z"/>
+                <rect class="ss-fill" x="20.5" y="45.5" width="23" height="4.2" rx="1.2"/>
             `
         },
         pendular: {
