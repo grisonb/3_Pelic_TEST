@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-29_icones_safesky_base_validee';
-const APP_VERSION = 'v14.29';
+const SW_VERSION = 'sw-v14-30_couleurs_paramoteur_parachute_pendulaire';
+const APP_VERSION = 'v14.30';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
