@@ -1,5 +1,57 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.17 TEST — routes stables et commandes distinctes du bouton de position
+
+Modifications apportées :
+- conservation intégrale des corrections v14.16 sur les départementales intermittentes ;
+- clic court sur le bouton de position : recentrage ponctuel sur l’avion ;
+- le clic court n’active plus et ne désactive plus le mode suivi ;
+- le clic court conserve l’état actuel du suivi s’il est déjà actif ;
+- priorité à la dernière position connue pour obtenir un recentrage immédiat ;
+- demande ponctuelle de position GPS seulement si aucune position n’est disponible ;
+- maintien du niveau de zoom actuel lors du recentrage ;
+- appui long de 650 ms sur le bouton : activation du mode suivi ;
+- nouvel appui long lorsque le suivi est actif : désactivation du suivi ;
+- suppression du clic synthétique Safari après l’appui long ;
+- suppression du menu contextuel pouvant apparaître après un appui prolongé ;
+- annulation de l’appui long si le doigt se déplace de plus de 14 pixels ;
+- prise en charge des événements Pointer sur iPad, tactile et souris ;
+- maintien du blocage global du stylet ;
+- retour visuel pendant l’appui long ;
+- retour visuel de confirmation lorsque le seuil d’appui long est atteint ;
+- maintien de l’indicateur SUIVI sur le bouton lorsque le suivi est actif ;
+- mise à jour des titres et libellés d’accessibilité selon l’état du suivi ;
+- touche Entrée ou Espace : recentrage ponctuel uniquement ;
+- aucune modification du pack routier déjà importé ;
+- le ZIP France Sud + Corse reste compatible ;
+- aucune modification du trafic, de la simulation ou des cartes offline ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.17 TEST.
+
+v14.16 TEST — stabilité d’affichage des routes départementales
+
+Modifications apportées :
+- correction du cas où une départementale pouvait afficher son étiquette sans son tracé ;
+- suppression du filtrage A/N/D dépendant du zoom lors du chargement d’une partie GeoJSON ;
+- chargement permanent de tous les tracés A, N et D présents dans chaque partie visible ;
+- gestion de la visibilité uniquement par le style Leaflet dynamique ;
+- lorsqu’une route est sous son seuil de zoom, son opacité et son épaisseur passent à zéro sans suppression de la couche ;
+- réapparition garantie du tracé lors d’un zoom avant, sans devoir quitter puis revenir sur la zone ;
+- recalcul de l’épaisseur et de l’opacité de tous les tracés à chaque déplacement ou changement de zoom ;
+- conservation du mécanisme indépendant de reconstruction des étiquettes ;
+- création d’un renderer Canvas distinct pour l’entourage blanc ;
+- création d’un renderer Canvas distinct pour la ligne colorée ;
+- suppression du partage d’un même renderer entre deux panes Leaflet ;
+- augmentation légère du padding Canvas afin de réduire les coupures en bord d’écran ;
+- demande explicite de redessin des deux canvases après chaque actualisation ;
+- amélioration de la stabilité sur Safari et iPadOS lors de zooms rapides ;
+- maintien des seuils d’affichage actuels pour autoroutes, nationales et départementales ;
+- aucune modification du pack routier déjà importé ;
+- le ZIP France Sud + Corse existant reste compatible et n’a pas besoin d’être régénéré ;
+- aucune modification du trafic, de la simulation, des cartes offline ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.16 TEST.
+
 v14.15 TEST — moteur du calque routier vectoriel offline A / N / D
 
 Modifications apportées :
