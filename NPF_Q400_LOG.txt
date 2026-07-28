@@ -1,5 +1,44 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.26 TEST — pictogrammes trafic rapprochés de la référence visuelle SafeSky
+
+Modifications apportées :
+- remplacement intégral des pictogrammes introduits en v14.25 ;
+- abandon des silhouettes trop épaisses et trop éloignées de la référence fournie ;
+- création d’un nouveau jeu original de pictogrammes reprenant le langage graphique montré dans SafeSky ;
+- utilisation d’un viewBox homogène 64 × 64 pour toutes les catégories ;
+- maintien d’un rendu monochrome noir ;
+- suppression du disque et du petit témoin coloré accolés aux aéronefs ;
+- conservation du code couleur d’altitude relative sur le vecteur et la bordure du libellé ;
+- ajout d’un halo blanc discret autour de l’ensemble du pictogramme ;
+- réduction légère de la zone Leaflet de 44 × 44 px à 42 × 42 px ;
+- taille visible homogène de 28 px ;
+- avion standard représenté par une silhouette simple vue de dessus ;
+- jet représenté par une silhouette à ailes plus fortement en flèche ;
+- hélicoptère représenté avec fuselage vertical, rotor principal et empennage ;
+- planeur représenté avec une envergure nettement supérieure ;
+- drone représenté avec quatre rotors circulaires ;
+- PAV représenté comme un multicoptère à six rotors ;
+- ballon représenté avec enveloppe, panneaux et nacelle ;
+- dirigeable représenté en vue latérale avec empennage et nacelle ;
+- parachutiste représenté avec voilure, panneaux, suspentes et personne ;
+- parapente représenté avec voilure arquée, suspentes et pilote ;
+- deltaplane représenté avec aile delta et pilote suspendu ;
+- autogire représenté avec rotor, mât, cellule et roues ;
+- aéronef militaire représenté par une silhouette de chasseur ;
+- turbopropulseur représenté avec deux hélices visibles ;
+- avion léger bimoteur représenté avec deux moteurs distincts ;
+- ULM trois axes représenté comme un avion léger simplifié ;
+- pendulaire représenté avec aile delta, chariot et roues ;
+- paramoteur représenté avec voilure, pilote et cage d’hélice ;
+- conservation de pictogrammes distincts pour gros-porteur, moyen-courrier et jet régional ;
+- conservation de SafeSky comme source unique du trafic ;
+- maintien de l’appel direct SafeSky et de la clé temporaire intégrée ;
+- conservation des corrections routières, de l’optimisation mémoire et du comportement du bouton de position ;
+- aucune modification des cartes offline, de la simulation ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.26 TEST.
+
 v14.25 TEST — icônes trafic renforcées dans le style visuel SafeSky
 
 Modifications apportées :
