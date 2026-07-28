@@ -4858,7 +4858,12 @@ function shouldDisplayRoadOverlayFeature(feature) {
 
     if (roadClass === 'A') return zoom >= 7;
     if (roadClass === 'N') return zoom >= 8;
-    if (roadClass === 'D') return zoom >= 10;
+
+    /*
+     * v14.18 — les départementales n'apparaissent qu'à partir d'un niveau
+     * correspondant à l'échelle 1 NM environ, et pas avant.
+     */
+    if (roadClass === 'D') return zoom >= 12;
     return false;
 }
 
@@ -4935,13 +4940,13 @@ function addRoadOverlayLabelsForGeojson(geojson, partKey) {
     const zoom = map.getZoom();
     const bounds = map.getBounds().pad(0.18);
     const seenGridKeys = new Set();
-    const gridSize = zoom >= 13 ? 0.035 : (zoom >= 11 ? 0.075 : 0.18);
+    const gridSize = zoom >= 13 ? 0.035 : (zoom >= 12 ? 0.075 : 0.18);
 
     (geojson?.features || []).forEach(feature => {
         if (!shouldDisplayRoadOverlayFeature(feature)) return;
 
         const roadClass = String(feature?.properties?.roadClass || '').toUpperCase();
-        if (roadClass === 'D' && zoom < 11) return;
+        if (roadClass === 'D' && zoom < 12) return;
 
         const ref = String(feature?.properties?.ref || '').trim();
         if (!ref) return;
