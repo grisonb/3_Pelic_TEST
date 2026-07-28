@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.22') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.22') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.24') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.24') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10748,4 +10748,16 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 #center-gps-button.center-follow-active::after {
     content: "SUIVI" !important;
+}
+
+
+/* ==========================================================================
+   v14.23 TEST — SafeSky Production via proxy NAS
+   ========================================================================== */
+
+/* La connexion SafeSky active conserve le contour vert déjà utilisé. */
+#traffic-layer-button.traffic-state-ok {
+    box-shadow:
+        0 0 0 2px rgba(16, 185, 129, .42),
+        var(--shadow) !important;
 }
