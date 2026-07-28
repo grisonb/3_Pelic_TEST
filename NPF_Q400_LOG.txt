@@ -1,5 +1,22 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.18 TEST — départementales affichées à partir du zoom 1 NM
+
+Modifications apportées :
+- décalage du seuil d’affichage des routes départementales ;
+- les tracés de classes D n’apparaissent plus avant le niveau de zoom correspondant à 1 NM environ ;
+- les étiquettes des départementales suivent le même seuil et n’apparaissent plus avant ce niveau ;
+- suppression de l’affichage des départementales aux échelles plus larges (2 NM, 5 NM, 10 NM, etc.) ;
+- conservation des seuils actuels pour les autoroutes et nationales ;
+- conservation des corrections v14.16 sur la stabilité d’affichage des tracés routiers ;
+- conservation du comportement v14.17 du bouton de position : clic court = centrage, appui long = suivi ;
+- légère adaptation de la grille d’espacement des étiquettes routières pour cohérence avec le nouveau seuil des D ;
+- aucune modification du pack routier déjà importé ;
+- le ZIP France Sud + Corse reste compatible et n’a pas besoin d’être réimporté ;
+- aucune modification du trafic, de la simulation, des cartes offline ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.18 TEST.
+
 v14.17 TEST — routes stables et commandes distinctes du bouton de position
 
 Modifications apportées :
