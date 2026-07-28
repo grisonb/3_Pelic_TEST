@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-15_calque_routier_vectoriel_offline';
-const APP_VERSION = 'v14.15';
+const SW_VERSION = 'sw-v14-17_routes_stables_clic_centrage_appui_long_suivi';
+const APP_VERSION = 'v14.17';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
