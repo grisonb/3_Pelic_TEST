@@ -4857,16 +4857,16 @@ function shouldDisplayRoadOverlayFeature(feature) {
     const zoom = map?.getZoom?.() ?? 10;
 
     /*
-     * v14.19 — autoroutes et nationales à partir de l'échelle 2 NM environ.
+     * v14.20 — autoroutes à partir de l'échelle 2 NM environ.
      * Sur la carte actuelle, cela correspond au niveau de zoom 11.
      */
     if (roadClass === 'A') return zoom >= 11;
-    if (roadClass === 'N') return zoom >= 11;
 
     /*
-     * Les départementales restent affichées à partir de l'échelle 1 NM
+     * v14.20 — nationales et départementales à partir de l'échelle 1 NM
      * environ, correspondant au niveau de zoom 12.
      */
+    if (roadClass === 'N') return zoom >= 12;
     if (roadClass === 'D') return zoom >= 12;
     return false;
 }
