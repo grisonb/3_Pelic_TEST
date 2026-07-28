@@ -1,5 +1,23 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.30 TEST — harmonisation des couleurs paramoteur, parachutiste et pendulaire
+
+Modifications apportées :
+- paramoteur affiché dans la même famille magenta que le parapente ;
+- voilure, suspentes, pilote, cage et hélice du paramoteur recolorés en magenta #FF00A8 ;
+- parachutiste affiché dans la même famille cyan que le deltaplane ;
+- voilure, suspentes et parachutiste recolorés en cyan #00CFFF ;
+- pendulaire affiché dans la même famille cyan que le deltaplane ;
+- aile, structure, chariot et contours de roues du pendulaire recolorés en cyan #00CFFF ;
+- conservation des détails internes blancs des voilures ;
+- ajout de contours de roues magenta ou cyan adaptés aux catégories ;
+- renforcement du halo blanc autour des trois nouvelles catégories colorées ;
+- aucune modification des formes, dimensions ou correspondances SafeSky ;
+- maintien des vecteurs proportionnels à la vitesse ;
+- SafeSky reste l’unique source de trafic ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.30 TEST.
+
 v14.29 TEST — intégration de la base d’icônes SafeSky validée
 
 Modifications apportées :
