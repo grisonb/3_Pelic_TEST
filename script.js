@@ -6487,7 +6487,9 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'AVION',
             svg: `
-                <path class="ss-fill" d="M29 5h6l1.7 20.5 18.8 6.7v5.6l-18.6-2.5-.9 11.9 8.4 6.5v4.2L32 54.8l-12.4 3.1v-4.2l8.4-6.5-.9-11.9-18.6 2.5v-5.6l18.8-6.7L29 5Z"/>
+                <!-- Avion léger : aile droite et empennage droit -->
+                <path class="ss-fill" d="M29 4h6l1.2 21H58v7H36.5l-.8 14H47v6H35.4L34.7 59h-5.4l-.7-7H17v-6h11.3l-.8-14H6v-7h21.8L29 4Z"/>
+                <rect class="ss-fill" x="27" y="1.8" width="10" height="4.4" rx="1"/>
             `
         },
         jet: {
@@ -6495,7 +6497,8 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'JET',
             svg: `
-                <path class="ss-fill" d="M30 3h4l4.5 21.2 17.9 10.4v6.6l-18.5-5.4-1.7 10.4 10.4 8.8v4.4L32 55.6l-14.6 3.8V55l10.4-8.8-1.7-10.4-18.5 5.4v-6.6l17.9-10.4L30 3Z"/>
+                <!-- Jet : ailes et empennage volontairement en flèche -->
+                <path class="ss-fill" d="M30 2h4l4.7 21.5 18 10.7v6.5l-18.9-5.6-1.7 10.7 10.8 8.8v4.2L32 55l-14.9 3.8v-4.2l10.8-8.8-1.7-10.7-18.9 5.6v-6.5l18-10.7L30 2Z"/>
             `
         },
         helicopter: {
@@ -6520,7 +6523,9 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'PLANEUR',
             svg: `
-                <path class="ss-fill" d="M30.7 4h2.6l1.2 24.2 27 2.6v4.4l-27-1-1 14.4 7.6 5.8v3.2L32 55.4l-9.1 2.2v-3.2l7.6-5.8-1-14.4-27 1v-4.4l27-2.6L30.7 4Z"/>
+                <!-- Planeur : grande aile droite et empennage sans flèche -->
+                <path class="ss-fill" d="M30.5 3h3l1.1 26H62v4.8H34.8l-.7 16.2h8.4v4.5h-8.6L33.5 61h-3l-.4-6.5h-8.6V50h8.4l-.7-16.2H2V29h27.4l1.1-26Z"/>
+                <path class="ss-cut" d="M31.2 7h1.6v14h-1.6Z"/>
             `
         },
         uav: {
@@ -6597,9 +6602,11 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: false,
             label: 'PARAPENTE',
             svg: `
-                <path class="ss-fill" d="M5 28.5C10.8 15 20.2 8 32 8s21.2 7 27 20.5c-8.8-4.2-17.8-6.2-27-6.2S13.8 24.3 5 28.5Z"/>
-                <path class="ss-cut" d="M13 24.9c3.2-7.1 7-11.2 11.2-13.6M24.2 22.8c1.3-7 3.8-11.7 7.8-14.8M40 22.8c-1.3-7-3.8-11.7-8-14.8M51 24.9c-3.2-7.1-7-11.2-11.2-13.6"/>
-                <path class="ss-cut" d="M8.8 27.1c7.9-2.8 15.6-4.1 23.2-4.1s15.3 1.3 23.2 4.1"/>
+                <!-- Parapente : voilure segmentée et petit pilote -->
+                <path class="ss-fill ss-paraglider-color" d="M4 30C9 16 19 8 32 8s23 8 28 22c-9-4.7-18.3-7-28-7S13 25.3 4 30Z"/>
+                <path class="ss-cut" d="M12 26.8c3.1-8 7.1-13 12-16M23.5 24.2c1.5-7.7 4.3-13 8.5-16.2M40.5 24.2c-1.5-7.7-4.3-13-8.5-16.2M52 26.8c-3.1-8-7.1-13-12-16"/>
+                <rect class="ss-fill ss-paraglider-color" x="27" y="38.5" width="10" height="5.5" rx="2"/>
+                <path class="ss-line ss-paraglider-line" d="M10 28.5 29 39M54 28.5 35 39M22 24.5 31 39M42 24.5 33 39"/>
             `
         },
         hangglider: {
@@ -6607,8 +6614,9 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'DELTAPLANE',
             svg: `
-                <path class="ss-fill" d="M4 31.5 32 12l28 19.5-28-7.7-28 7.7Z"/>
-                <path class="ss-cut" d="M32 12v11.8"/>
+                <!-- Deltaplane : chevron simple et barre/pilote sous l'aile -->
+                <path class="ss-fill ss-hangglider-color" d="M7 37 32 17l25 20-25-9.2L7 37Z"/>
+                <rect class="ss-fill ss-hangglider-color" x="26.5" y="42.5" width="11" height="4.5" rx="1.6"/>
             `
         },
         gyrocopter: {
@@ -6697,8 +6705,9 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'ULM',
             svg: `
-                <path class="ss-fill" d="M28.5 6h7l1.2 20.2 18.8 5.4v5.2L36.7 35l-.8 11.2 8.6 5.8v4.4L32 53.5l-12.5 2.9V52l8.6-5.8-.8-11.2-18.8 1.8v-5.2l18.8-5.4L28.5 6Z"/>
-                <rect class="ss-fill" x="20.5" y="45.5" width="23" height="4.2" rx="1.2"/>
+                <!-- ULM 3 axes : aile droite et empennage rectangulaire -->
+                <path class="ss-fill" d="M29 5h6l1.1 20H57v7H36.3l-.8 14.5h10v6H35.2L34.5 59h-5l-.7-6.5H18.5v-6h10l-.8-14.5H7v-7h20.9L29 5Z"/>
+                <rect class="ss-fill" x="27" y="2.5" width="10" height="4.5" rx="1.2"/>
             `
         },
         pendular: {
