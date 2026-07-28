@@ -1,5 +1,22 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.28 TEST — six pictogrammes recalés sur les références SafeSky fournies
+
+Modifications apportées :
+- remplacement ciblé des pictogrammes AVION, JET, PLANEUR, ULM, PARAPENTE et DELTAPLANE ;
+- pictogramme AVION redessiné avec aile droite compacte et empennage horizontal marqué ;
+- pictogramme JET redessiné avec fuselage fin et ailes fortement en flèche ;
+- pictogramme PLANEUR redessiné avec très grande envergure et fuselage très fin ;
+- pictogramme ULM redessiné dans le style « ULM 3 axes » montré en référence ;
+- pictogramme PARAPENTE redessiné avec voilure arquée noire et segmentation interne blanche ;
+- pictogramme DELTAPLANE simplifié en aile delta noire ;
+- maintien du rendu monochrome noir et du halo blanc discret ;
+- maintien des vecteurs proportionnels à la vitesse et des libellés français de la v14.27 ;
+- aucune modification des autres catégories de trafic ;
+- SafeSky reste l’unique source de trafic ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.28 TEST.
+
 v14.27 TEST — libellés français des catégories SafeSky et vecteurs proportionnels à la vitesse
 
 Modifications apportées :
