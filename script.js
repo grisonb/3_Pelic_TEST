@@ -592,6 +592,7 @@ let roadOverlayCasingRenderer = null;
 let roadOverlayLineRenderer = null;
 let roadOverlayRefreshTimer = null;
 let roadOverlayRefreshToken = 0;
+let roadOverlayLoadedZoomTier = -1;
 const loadedRoadOverlayParts = new Map();
 let areDepartmentsVisible = false;
 let hasLoadedDepartments = false;
@@ -4805,6 +4806,49 @@ function roadOverlayBboxIntersectsBounds(bbox, bounds) {
     );
 }
 
+function getRoadOverlayZoomTier() {
+    const zoom = map?.getZoom?.() ?? 0;
+
+    /*
+     * Niveau 0 : rien avant 2 NM.
+     * Niveau 1 : autoroutes uniquement à partir de 2 NM.
+     * Niveau 2 : A + N + D à partir de 1 NM.
+     */
+    if (zoom >= 12) return 2;
+    if (zoom >= 11) return 1;
+    return 0;
+}
+
+function shouldLoadRoadOverlayFeatureForTier(feature, tier) {
+    const roadClass = String(
+        feature?.properties?.roadClass || ''
+    ).toUpperCase();
+
+    if (tier >= 2) {
+        return roadClass === 'A' || roadClass === 'N' || roadClass === 'D';
+    }
+
+    if (tier === 1) {
+        return roadClass === 'A';
+    }
+
+    return false;
+}
+
+function buildRoadOverlayGeojsonForTier(geojson, tier) {
+    const features = Array.isArray(geojson?.features)
+        ? geojson.features.filter(
+            feature => shouldLoadRoadOverlayFeatureForTier(feature, tier)
+        )
+        : [];
+
+    return {
+        type: 'FeatureCollection',
+        bbox: Array.isArray(geojson?.bbox) ? geojson.bbox : undefined,
+        features
+    };
+}
+
 function getRoadOverlayLineStyle(feature, casing = false) {
     const roadClass = getRoadOverlayClassFromRef(
         feature?.properties?.ref || feature?.properties?.roadClass
@@ -4979,28 +5023,63 @@ function addRoadOverlayLabelsForGeojson(geojson, partKey) {
     });
 }
 
-function clearRoadOverlayRenderedParts() {
+function clearRoadOverlayRenderedParts(options = {}) {
     loadedRoadOverlayParts.clear();
+
     try { roadOverlayCasingLayer?.clearLayers(); } catch (_) {}
     try { roadOverlayLineLayer?.clearLayers(); } catch (_) {}
     try { roadOverlayLabelsLayer?.clearLayers(); } catch (_) {}
+
+    /*
+     * Libérer immédiatement les géométries et les commandes Canvas. Cette
+     * opération est essentielle sur iPad lorsque l'on revient à un zoom où
+     * aucune route ne doit être affichée.
+     */
+    try { roadOverlayCasingRenderer?._redraw?.(); } catch (_) {}
+    try { roadOverlayLineRenderer?._redraw?.(); } catch (_) {}
+
+    if (options.resetTier !== false) {
+        roadOverlayLoadedZoomTier = -1;
+    }
 }
 
-async function loadRoadOverlayPart(part, token) {
+async function loadRoadOverlayPart(part, token, tier) {
     const cache = await caches.open(ROAD_OVERLAY_CACHE_NAME);
     const response = await cache.match(buildRoadOverlayCacheRequest(part.key));
     if (!response || !response.ok) {
         throw new Error(`Partie routière absente : ${part.name}`);
     }
 
-    const geojson = await response.json();
-    if (token !== roadOverlayRefreshToken || !showRoadOverlayLayer) return null;
+    const storedGeojson = await response.json();
+    if (
+        token !== roadOverlayRefreshToken
+        || !showRoadOverlayLayer
+        || tier !== roadOverlayLoadedZoomTier
+    ) {
+        return null;
+    }
 
     /*
-     * Ne jamais filtrer A/N/D au chargement selon le zoom.
-     * Le filtrage de la v14.15 pouvait laisser une étiquette sans tracé après
-     * un zoom avant, car l'étiquette était reconstruite mais pas la géométrie.
+     * Ne créer dans Leaflet que les classes utiles au niveau courant :
+     * - niveau 1 : A seulement ;
+     * - niveau 2 : A, N et D.
+     * Le changement de niveau détruit puis reconstruit entièrement les couches,
+     * ce qui évite à la fois les étiquettes seules et les géométries invisibles
+     * conservées en mémoire.
      */
+    const geojson = buildRoadOverlayGeojsonForTier(storedGeojson, tier);
+
+    if (!geojson.features.length) {
+        const emptyRecord = {
+            casing: null,
+            lines: null,
+            geojson,
+            tier
+        };
+        loadedRoadOverlayParts.set(part.key, emptyRecord);
+        return emptyRecord;
+    }
+
     const casing = L.geoJSON(geojson, {
         pane: 'roadOverlayCasingPane',
         renderer: roadOverlayCasingRenderer || undefined,
@@ -5018,7 +5097,7 @@ async function loadRoadOverlayPart(part, token) {
     lines.addTo(roadOverlayLineLayer);
     addRoadOverlayLabelsForGeojson(geojson, part.key);
 
-    const record = { casing, lines, geojson };
+    const record = { casing, lines, geojson, tier };
     loadedRoadOverlayParts.set(part.key, record);
     return record;
 }
@@ -5026,7 +5105,14 @@ async function loadRoadOverlayPart(part, token) {
 function rebuildRoadOverlayLabels() {
     if (!roadOverlayLabelsLayer) return;
     roadOverlayLabelsLayer.clearLayers();
+
     loadedRoadOverlayParts.forEach((record, partKey) => {
+        if (
+            record?.tier !== roadOverlayLoadedZoomTier
+            || !record?.geojson?.features?.length
+        ) {
+            return;
+        }
         addRoadOverlayLabelsForGeojson(record.geojson, partKey);
     });
 }
@@ -5041,50 +5127,105 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
     }
 
     const token = ++roadOverlayRefreshToken;
+    const currentTier = getRoadOverlayZoomTier();
+
     isRoadOverlayLoading = true;
     refreshRoadOverlayButtonState();
 
     try {
-        const bounds = map.getBounds().pad(0.28);
+        /*
+         * Au-dessous de 2 NM, aucune route n'est visible : ne lire aucun
+         * GeoJSON, ne conserver aucune géométrie et ne solliciter aucun Canvas.
+         */
+        if (currentTier === 0) {
+            clearRoadOverlayRenderedParts({ resetTier: false });
+            roadOverlayLoadedZoomTier = 0;
+            return;
+        }
+
+        /*
+         * Lors du passage 2 NM ↔ 1 NM, détruire réellement les anciennes
+         * couches. On évite ainsi de conserver N/D invisibles à 2 NM ou de
+         * réutiliser une partie chargée avec une autre sélection de classes.
+         */
+        if (roadOverlayLoadedZoomTier !== currentTier) {
+            clearRoadOverlayRenderedParts({ resetTier: false });
+            roadOverlayLoadedZoomTier = currentTier;
+        }
+
+        const bounds = map.getBounds().pad(currentTier === 1 ? 0.18 : 0.22);
         const visibleParts = manifest.parts.filter(part => (
             roadOverlayBboxIntersectsBounds(part.bbox, bounds)
         ));
         const visibleKeys = new Set(visibleParts.map(part => part.key));
 
         loadedRoadOverlayParts.forEach((record, key) => {
-            if (visibleKeys.has(key)) return;
-            try { roadOverlayCasingLayer.removeLayer(record.casing); } catch (_) {}
-            try { roadOverlayLineLayer.removeLayer(record.lines); } catch (_) {}
+            if (
+                visibleKeys.has(key)
+                && record?.tier === currentTier
+            ) {
+                return;
+            }
+
+            try {
+                if (record?.casing) {
+                    roadOverlayCasingLayer.removeLayer(record.casing);
+                }
+            } catch (_) {}
+
+            try {
+                if (record?.lines) {
+                    roadOverlayLineLayer.removeLayer(record.lines);
+                }
+            } catch (_) {}
+
             loadedRoadOverlayParts.delete(key);
         });
 
         for (const part of visibleParts) {
-            if (token !== roadOverlayRefreshToken || !showRoadOverlayLayer) return;
-            if (loadedRoadOverlayParts.has(part.key)) continue;
+            if (
+                token !== roadOverlayRefreshToken
+                || !showRoadOverlayLayer
+                || currentTier !== roadOverlayLoadedZoomTier
+            ) {
+                return;
+            }
+
+            const existing = loadedRoadOverlayParts.get(part.key);
+            if (existing?.tier === currentTier) continue;
+
             try {
-                await loadRoadOverlayPart(part, token);
+                await loadRoadOverlayPart(part, token, currentTier);
             } catch (error) {
-                console.warn('Partie du calque routier ignorée:', part.name, error);
+                console.warn(
+                    'Partie du calque routier ignorée:',
+                    part.name,
+                    error
+                );
             }
         }
 
-        if (token !== roadOverlayRefreshToken || !showRoadOverlayLayer) return;
+        if (
+            token !== roadOverlayRefreshToken
+            || !showRoadOverlayLayer
+            || currentTier !== roadOverlayLoadedZoomTier
+        ) {
+            return;
+        }
 
         loadedRoadOverlayParts.forEach(record => {
+            if (record?.tier !== currentTier) return;
+
             try {
-                record.casing.setStyle(
+                record.casing?.setStyle(
                     feature => getRoadOverlayLineStyle(feature, true)
                 );
-                record.lines.setStyle(
+                record.lines?.setStyle(
                     feature => getRoadOverlayLineStyle(feature, false)
                 );
             } catch (_) {}
         });
 
-        /*
-         * Safari/iPadOS peut conserver une frame Canvas incomplète après un
-         * déplacement ou un zoom rapide. Forcer le redraw stabilise le tracé.
-         */
         try { roadOverlayCasingRenderer?._redraw?.(); } catch (_) {}
         try { roadOverlayLineRenderer?._redraw?.(); } catch (_) {}
 
@@ -5103,7 +5244,7 @@ function scheduleRoadOverlayRefresh(source = 'scheduled') {
         refreshRoadOverlayVisibleParts(source).catch(error => {
             console.warn('Actualisation du calque routier impossible:', source, error);
         });
-    }, 140);
+    }, 220);
 }
 
 async function toggleRoadOverlayLayer(forceState = null, options = {}) {
