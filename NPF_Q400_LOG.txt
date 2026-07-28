@@ -1,5 +1,24 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.19 TEST — autoroutes et nationales affichées à partir de 2 NM
+
+Modifications apportées :
+- décalage du seuil d’affichage des autoroutes ;
+- les tracés et étiquettes A n’apparaissent plus avant l’échelle 2 NM environ ;
+- décalage du seuil d’affichage des routes nationales ;
+- les tracés et étiquettes N n’apparaissent plus avant l’échelle 2 NM environ ;
+- correspondance retenue : zoom Leaflet 11 pour l’échelle 2 NM actuelle ;
+- maintien du seuil des départementales à partir de 1 NM environ ;
+- correspondance conservée : zoom Leaflet 12 pour les routes D ;
+- disparition simultanée des tracés et de leurs étiquettes sous les seuils retenus ;
+- conservation des corrections de stabilité du calque routier introduites en v14.16 ;
+- conservation du comportement du bouton de position : clic court = centrage, appui long = suivi ;
+- aucune modification du pack routier déjà importé ;
+- le ZIP France Sud + Corse reste compatible et n’a pas besoin d’être réimporté ;
+- aucune modification du trafic, de la simulation, des cartes offline ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.19 TEST.
+
 v14.18 TEST — départementales affichées à partir du zoom 1 NM
 
 Modifications apportées :
