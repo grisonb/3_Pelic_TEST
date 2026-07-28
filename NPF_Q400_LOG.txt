@@ -1,5 +1,84 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.24 TEST — SafeSky direct avec clé intégrée, sans NAS
+
+Modifications apportées :
+- suppression complète de la dépendance au proxy SafeSky du NAS ;
+- suppression de l’URL grisonb.synology.me pour les requêtes trafic ;
+- appel direct de l’API SafeSky Production depuis NPF ;
+- endpoint utilisé : https://public-api.safesky.app/v1/beacons/ ;
+- intégration volontaire de la clé API temporaire dans script.js ;
+- envoi de la clé dans l’en-tête HTTP x-api-key ;
+- ajout de Content-Type application/json aux requêtes directes ;
+- maintien du mode CORS et de l’absence de cookies ;
+- maintien de la politique referrer no-referrer ;
+- SafeSky reste l’unique source de trafic ;
+- maintien du rafraîchissement toutes les cinq secondes ;
+- maintien de l’arrêt des appels lorsque NPF passe en arrière-plan ;
+- maintien de la reprise immédiate au retour au premier plan ;
+- maintien des filtres d’altitude transmis en mètres ;
+- maintien des conversions mètres vers pieds, m/s vers nœuds et m/s vers ft/min ;
+- maintien de l’exclusion des objets ADVISORY ;
+- maintien de l’exclusion des statuts GROUNDED et INACTIVE ;
+- remplacement de testSafeSkyProxy() par testSafeSkyApi() ;
+- test direct sur un petit viewport autour de Marseille ;
+- ajout d’un diagnostic explicite en cas de blocage réseau ou CORS ;
+- mise à jour de getSafeSkyIntegrationStatus() avec le mode direct et l’état de la clé intégrée ;
+- suppression de toute nécessité d’installer des fichiers PHP sur le NAS ;
+- conservation des corrections routières v14.22 ;
+- conservation de l’optimisation mémoire du calque routier v14.21 ;
+- conservation du comportement du bouton de position : clic court = centrage, appui long = suivi ;
+- aucune modification des cartes offline, de la simulation ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.24 TEST.
+
+v14.23 TEST — activation SafeSky Production via proxy sécurisé du NAS
+
+Modifications apportées :
+- activation réelle de SafeSky comme source de trafic dans NPF-Q400 ;
+- configuration du proxy public NPF à l’adresse https://grisonb.synology.me/npf-api/safesky-traffic.php ;
+- conservation intégrale de la clé SafeSky côté serveur ;
+- aucune clé présente dans index.html, script.js, GitHub Pages ou le stockage de l’iPad ;
+- SafeSky devient l’unique source de trafic lorsque le bouton trafic est actif ;
+- suppression du repli automatique vers les sources ADS-B publiques ;
+- prévention des doublons entre SafeSky et les anciennes sources ADS-B ;
+- utilisation de l’endpoint Beacon par viewport ;
+- envoi systématique de show_grounded=false ;
+- transmission au proxy des filtres d’altitude SafeSky en mètres ;
+- conversion des filtres absolus pieds vers mètres ;
+- conversion du filtre ± autour de l’altitude propre vers mètres ;
+- conversion du filtre sol à altitude propre + bande vers mètres ;
+- conservation du filtrage final dans NPF pour sécuriser l’affichage ;
+- prise en charge des réponses brutes SafeSky ;
+- prise en charge de la réponse enveloppée du proxy dans aircraft, beacons ou data ;
+- délai maximal de réponse porté par une constante dédiée de 7 secondes ;
+- message spécifique en cas de dépassement du délai SafeSky ;
+- requêtes CORS sans cookies ni identifiants de navigateur ;
+- politique referrer no-referrer pour les appels au proxy ;
+- interprétation détaillée des messages d’erreur JSON du proxy ;
+- maintien du rafraîchissement à 5 secondes conformément à la recommandation SafeSky ;
+- arrêt complet du minuteur trafic lorsque NPF passe en arrière-plan ;
+- reprise immédiate du trafic lorsque NPF revient au premier plan ;
+- ajout de la fonction de test console testSafeSkyProxy() ;
+- enrichissement de getSafeSkyIntegrationStatus() avec l’URL du proxy et l’état du polling ;
+- conversion de l’altitude SafeSky mètres AMSL vers pieds ;
+- gestion d’une altitude SafeSky inconnue ou invalide ;
+- conversion de la vitesse sol SafeSky m/s vers nœuds ;
+- conversion de la vitesse verticale SafeSky m/s vers ft/min ;
+- ajout de la vitesse verticale dans la fenêtre d’information trafic ;
+- ajout du champ remarks SafeSky dans la fenêtre d’information lorsqu’il est présent ;
+- exclusion des beacons ADVISORY du symbole avion ;
+- exclusion des statuts GROUNDED et INACTIVE ;
+- maintien des silhouettes par catégorie beacon_type ;
+- libellé du bouton mis à jour avec la source SafeSky ;
+- contour bleu pendant le premier chargement ;
+- contour vert lorsque la connexion SafeSky est opérationnelle ;
+- contour rouge et badge « ! » en cas d’erreur ;
+- ajout d’un guide complet d’installation du proxy NAS ;
+- aucune modification du pack routier, des cartes offline, de la simulation ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.23 TEST.
+
 v14.22 TEST — correction de l’import des références DN, RD, RN et CD
 
 Modifications apportées :
