@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.25') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.25') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.26') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.26') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10952,3 +10952,132 @@ body.gaar-point-search-open .gaar-editing-banner {
 .traffic-aircraft-symbol-wrap.traffic-altitude-unknown .traffic-aircraft-altitude-label {
     color: #111827 !important;
 }
+
+
+/* ==========================================================================
+   v14.26 TEST — pictogrammes proches de la référence visuelle SafeSky
+   ========================================================================== */
+
+.traffic-aircraft-icon,
+.leaflet-marker-icon.traffic-aircraft-icon {
+    width: 42px !important;
+    height: 42px !important;
+    margin-left: -21px !important;
+    margin-top: -21px !important;
+}
+
+.traffic-aircraft-symbol-wrap {
+    width: 42px !important;
+    height: 42px !important;
+}
+
+.traffic-aircraft-vector-wrap {
+    left: 21px !important;
+    top: 21px !important;
+}
+
+.traffic-aircraft-dotted-vector {
+    top: -62px !important;
+    height: 62px !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow,
+.traffic-aircraft-symbol-wrap.traffic-altitude-same .traffic-aircraft-arrow,
+.traffic-aircraft-symbol-wrap.traffic-altitude-below .traffic-aircraft-arrow,
+.traffic-aircraft-symbol-wrap.traffic-altitude-above .traffic-aircraft-arrow,
+.traffic-aircraft-symbol-wrap.traffic-altitude-unknown .traffic-aircraft-arrow {
+    left: 21px !important;
+    top: 21px !important;
+    width: 29px !important;
+    height: 29px !important;
+    color: #090d14 !important;
+}
+
+/* Le point coloré de la v14.25 est supprimé pour se rapprocher de SafeSky. */
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow::after {
+    content: none !important;
+    display: none !important;
+}
+
+.traffic-aircraft-symbol-wrap .traffic-aircraft-arrow svg,
+.traffic-type-helicopter .traffic-aircraft-arrow svg,
+.traffic-type-uav .traffic-aircraft-arrow svg,
+.traffic-type-pav .traffic-aircraft-arrow svg,
+.traffic-type-airship .traffic-aircraft-arrow svg,
+.traffic-type-parachute .traffic-aircraft-arrow svg,
+.traffic-type-paraglider .traffic-aircraft-arrow svg,
+.traffic-type-hangglider .traffic-aircraft-arrow svg,
+.traffic-type-gyrocopter .traffic-aircraft-arrow svg,
+.traffic-type-ultralight .traffic-aircraft-arrow svg,
+.traffic-type-pendular .traffic-aircraft-arrow svg,
+.traffic-type-paramotor .traffic-aircraft-arrow svg,
+.traffic-type-jet .traffic-aircraft-arrow svg,
+.traffic-type-widebody-jet .traffic-aircraft-arrow svg,
+.traffic-type-narrowbody-jet .traffic-aircraft-arrow svg,
+.traffic-type-regional-jet .traffic-aircraft-arrow svg,
+.traffic-type-military .traffic-aircraft-arrow svg {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    overflow: visible !important;
+    filter:
+        drop-shadow(1px 0 0 rgba(255, 255, 255, .98))
+        drop-shadow(-1px 0 0 rgba(255, 255, 255, .98))
+        drop-shadow(0 1px 0 rgba(255, 255, 255, .98))
+        drop-shadow(0 -1px 0 rgba(255, 255, 255, .98))
+        drop-shadow(0 1px 1px rgba(15, 23, 42, .28)) !important;
+}
+
+/*
+ * Grammaire graphique commune :
+ * - traits noirs simples ;
+ * - remplissages noirs ;
+ * - détails blancs internes pour les catégories qui en ont besoin.
+ */
+.traffic-aircraft-arrow svg .ss-line,
+.traffic-aircraft-arrow svg .ss-line * {
+    fill: none !important;
+    stroke: #080c13 !important;
+    stroke-width: 3.2px !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    vector-effect: non-scaling-stroke !important;
+}
+
+.traffic-aircraft-arrow svg .ss-fill {
+    fill: #080c13 !important;
+    stroke: #080c13 !important;
+    stroke-width: 1px !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    vector-effect: non-scaling-stroke !important;
+}
+
+.traffic-aircraft-arrow svg .ss-ring {
+    fill: #ffffff !important;
+    stroke: #080c13 !important;
+    stroke-width: 3px !important;
+    vector-effect: non-scaling-stroke !important;
+}
+
+.traffic-aircraft-arrow svg .ss-cut {
+    fill: none !important;
+    stroke: #ffffff !important;
+    stroke-width: 1.8px !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    vector-effect: non-scaling-stroke !important;
+}
+
+/* Les libellés restent compacts ; seule l'icône est modifiée. */
+.traffic-aircraft-altitude-label {
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
+    padding: 2px 5px !important;
+}
+
+/*
+ * Le code couleur d'altitude relative reste porté par le vecteur et la bordure
+ * du libellé, sans modifier la silhouette noire.
+ */
