@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-18_departementales_a_partir_1nm';
-const APP_VERSION = 'v14.18';
+const SW_VERSION = 'sw-v14-19_autoroutes_nationales_a_partir_2nm';
+const APP_VERSION = 'v14.19';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
