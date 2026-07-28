@@ -6427,148 +6427,283 @@ function getTrafficAircraftVisualDefinition(aircraft) {
     const visualType = resolveTrafficVisualType(aircraft);
 
     /*
-     * Toutes les silhouettes utilisent le même viewBox 24 × 24 et sont
-     * géométriquement centrées en 12 / 12. Cela évite les pictogrammes décalés
-     * dans le rond, y compris après rotation.
+     * v14.26 — pictogrammes originaux volontairement rapprochés du langage
+     * graphique SafeSky montré en référence :
+     * - silhouettes simples et monochromes ;
+     * - vues de dessus pour les aéronefs directionnels ;
+     * - pictogrammes filaires pour hélicoptère, drones et voilures légères ;
+     * - proportions homogènes dans un viewBox 64 × 64.
      */
     const definitions = {
         airplane: {
             className: 'airplane',
             directional: true,
             label: 'Avion',
-            path: 'M11.1 2.2h1.8l1.2 7 7.3 3.7v2l-7.3-1.1-.8 5 2.9 1.8v1.1l-4.2-.8-4.2.8v-1.1l2.9-1.8-.8-5-7.3 1.1v-2l7.3-3.7 1.2-7Z'
+            svg: `
+                <path class="ss-fill" d="M29 4h6l2 19 19 8v6l-19-3-1 14 8 7v4l-12-3-12 3v-4l8-7-1-14-19 3v-6l19-8 2-19Z"/>
+            `
         },
         jet: {
             className: 'jet',
             directional: true,
             label: 'Jet',
-            path: 'M11.1 1.8h1.8l1.6 7.1 7.2 4.1v2.2l-7.5-1.4-.9 4.8 3.5 2.2v1.1L12 21l-4.8.9v-1.1l3.5-2.2-.9-4.8-7.5 1.4V13l7.2-4.1 1.6-7.1Z'
+            svg: `
+                <path class="ss-fill" d="M29 3h6l4 20 17 9v7l-19-5-2 12 10 9v4l-13-4-13 4v-4l10-9-2-12-19 5v-7l17-9 4-20Z"/>
+            `
         },
         helicopter: {
             className: 'helicopter',
             directional: true,
             label: 'Hélicoptère',
-            path: 'M11 2h2v6.1c2.1.4 3.7 1.8 4.4 3.7H22v1.8h-4.3c-.4 2.4-2.3 4.3-4.7 4.7V22h-2v-3.7a6.2 6.2 0 0 1-4.4-3.2H2v-1.8h4.1A6.2 6.2 0 0 1 11 8.1V2Zm1 8a3.4 3.4 0 1 0 0 6.8A3.4 3.4 0 0 0 12 10ZM3 5.1h18v1.6H3V5.1Z'
+            svg: `
+                <g class="ss-line">
+                    <path d="M32 8v39"/>
+                    <path d="M13 13l38 38"/>
+                    <path d="M51 13 13 51"/>
+                    <path d="M23 30h18"/>
+                    <path d="M32 47v10"/>
+                    <path d="M26 57h12"/>
+                </g>
+                <ellipse class="ss-fill" cx="32" cy="32" rx="6.5" ry="13"/>
+                <circle class="ss-ring" cx="32" cy="18" r="3.3"/>
+            `
         },
         glider: {
             className: 'glider',
             directional: true,
             label: 'Planeur',
-            path: 'M11.2 2h1.6l.8 7.9L23 11.7v2l-9.4-.6-.6 5.1 3 1.7V21l-4-.7-4 .7v-1.1l3-1.7-.6-5.1-9.4.6v-2l9.4-1.8.8-7.9Z'
+            svg: `
+                <path class="ss-fill" d="M30 6h4l2 23 25 3v5l-25-1-1 13 8 6v3l-11-2-11 2v-3l8-6-1-13-25 1v-5l25-3 2-23Z"/>
+            `
         },
         uav: {
             className: 'uav',
             directional: false,
             label: 'Drone',
-            path: 'M5 3a2.6 2.6 0 1 1-1.8.8L7.4 8H10V5.5h4V8h2.6l4.2-4.2A2.6 2.6 0 1 1 22 5l-4.2 4.2V12h2.7v4h-2.7l4.2 4.2A2.6 2.6 0 1 1 20.8 22l-4.2-4.2H14v2.7h-4v-2.7H7.4L3.2 22A2.6 2.6 0 1 1 2 20.2L6.2 16H3.5v-4h2.7V9.2L2 5A2.6 2.6 0 0 1 5 3Zm7 7.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z'
+            svg: `
+                <g class="ss-line">
+                    <path d="M22 22l20 20M42 22 22 42"/>
+                    <path d="M32 25v14M25 32h14"/>
+                </g>
+                <circle class="ss-ring" cx="17" cy="17" r="8"/>
+                <circle class="ss-ring" cx="47" cy="17" r="8"/>
+                <circle class="ss-ring" cx="17" cy="47" r="8"/>
+                <circle class="ss-ring" cx="47" cy="47" r="8"/>
+                <rect class="ss-fill" x="26" y="26" width="12" height="12" rx="3"/>
+            `
         },
         pav: {
             className: 'pav',
-            directional: true,
+            directional: false,
             label: 'PAV',
-            path: 'M12 2.2 14 6l4.1-1.1 1.2 1.8-3.2 2.8 4.3 2.2v2.2l-5.2-.8-1.1 3.6 2.7 2.5-.8 1.7-4-1.9-4 1.9-.8-1.7 2.7-2.5-1.1-3.6-5.2.8v-2.2l4.3-2.2-3.2-2.8 1.2-1.8L10 6l2-3.8Zm0 5.4a3.1 3.1 0 1 0 0 6.2 3.1 3.1 0 0 0 0-6.2Z'
+            svg: `
+                <g class="ss-line">
+                    <path d="M32 11v10M32 43v10M14 21l9 6M41 37l9 6M14 43l9-6M41 27l9-6"/>
+                </g>
+                <circle class="ss-ring" cx="32" cy="8" r="6"/>
+                <circle class="ss-ring" cx="54" cy="20" r="6"/>
+                <circle class="ss-ring" cx="54" cy="44" r="6"/>
+                <circle class="ss-ring" cx="32" cy="56" r="6"/>
+                <circle class="ss-ring" cx="10" cy="44" r="6"/>
+                <circle class="ss-ring" cx="10" cy="20" r="6"/>
+                <circle class="ss-ring" cx="32" cy="32" r="11"/>
+                <circle class="ss-fill" cx="32" cy="32" r="4"/>
+            `
         },
         balloon: {
             className: 'balloon',
             directional: false,
             label: 'Ballon',
-            path: 'M12 2c4.3 0 7.4 3.2 7.4 7.3 0 3.2-1.8 5.9-4.8 7.8l-.8 2.1h-3.6l-.8-2.1c-3-1.9-4.8-4.6-4.8-7.8C4.6 5.2 7.7 2 12 2Zm0 2c-3.1 0-5.4 2.3-5.4 5.3 0 2.4 1.5 4.5 4 6h2.8c2.5-1.5 4-3.6 4-6C17.4 6.3 15.1 4 12 4Zm-2 16.1h4v1.9h-4v-1.9Z'
+            svg: `
+                <path class="ss-fill" d="M32 5c13 0 21 9 21 21 0 11-7 19-16 25h-10C18 45 11 37 11 26 11 14 19 5 32 5Z"/>
+                <path class="ss-cut" d="M22 10c-2 11-1 26 7 39M42 10c2 11 1 26-7 39M12 26h40"/>
+                <rect class="ss-fill" x="27" y="53" width="10" height="7" rx="1.5"/>
+            `
         },
         airship: {
             className: 'airship',
             directional: true,
             label: 'Dirigeable',
-            path: 'M2 11.5C2 7.8 6 5 12 5s10 2.8 10 6.5S18 18 12 18 2 15.2 2 11.5Zm3 0c0 1.8 2.8 3.5 7 3.5s7-1.7 7-3.5S16.2 8 12 8s-7 1.7-7 3.5Zm12.4 5.1 4.6 2v1.6l-5.5-.8.9-2.8Z'
+            svg: `
+                <ellipse class="ss-fill" cx="30" cy="31" rx="25" ry="14"/>
+                <path class="ss-fill" d="M51 25l10-7v10l-5 3 5 3v10l-10-7Z"/>
+                <path class="ss-cut" d="M10 31h40"/>
+                <path class="ss-fill" d="M26 45h12l-2 7h-8l-2-7Z"/>
+            `
         },
         parachute: {
             className: 'parachute',
             directional: false,
             label: 'Parachutiste',
-            path: 'M2.5 9.6a9.5 9.5 0 0 1 19 0h-19Zm3.1-2h12.8C17 5.6 14.8 4.5 12 4.5S7 5.6 5.6 7.6ZM5 11h2l4 5v2.2l-2 3.5H7.1L9 18.3v-1.2L5 11Zm12 0h2l-4 6.1v1.2l1.9 3.4H15l-2-3.5V16l4-5Z'
+            svg: `
+                <path class="ss-fill" d="M7 29C9 15 19 7 32 7s23 8 25 22H7Z"/>
+                <path class="ss-cut" d="M17 28c2-9 7-15 15-20M47 28C45 19 40 13 32 8M32 8v20"/>
+                <g class="ss-line">
+                    <path d="M12 29l17 18M52 29 35 47M24 29l7 18M40 29l-7 18"/>
+                    <path d="M32 47v8M26 60l6-5 6 5"/>
+                </g>
+                <circle class="ss-fill" cx="32" cy="48" r="3.5"/>
+            `
         },
         paraglider: {
             className: 'paraglider',
             directional: false,
             label: 'Parapente',
-            path: 'M2 9.6C4.2 5.2 7.5 3 12 3s7.8 2.2 10 6.6H2Zm3.8-2h12.4C16.8 5.9 14.8 5 12 5s-4.8.9-6.2 2.6ZM6 11h1.8l4.2 4.8 4.2-4.8H18l-5 6v4h-2v-4l-5-6Z'
+            svg: `
+                <path class="ss-fill" d="M6 26C14 12 23 7 32 7s18 5 26 19c-10-5-18-7-26-7S16 21 6 26Z"/>
+                <path class="ss-cut" d="M15 22c6-8 11-11 17-11s11 3 17 11"/>
+                <g class="ss-line">
+                    <path d="M11 26l18 21M53 26 35 47M23 22l8 25M41 22l-8 25"/>
+                    <path d="M32 47v8M27 60l5-5 5 5"/>
+                </g>
+                <circle class="ss-fill" cx="32" cy="48" r="3.2"/>
+            `
         },
         hangglider: {
             className: 'hangglider',
             directional: true,
             label: 'Deltaplane',
-            path: 'M1.5 8.4 12 3l10.5 5.4L12 11.2 1.5 8.4ZM11 12h2v3.1l3.6 4.3-1.6 1.3-3-3.6-3 3.6-1.6-1.3 3.6-4.3V12Z'
+            svg: `
+                <path class="ss-fill" d="M4 22 32 7l28 15-28 8L4 22Z"/>
+                <path class="ss-cut" d="M32 8v21M8 22h48"/>
+                <g class="ss-line">
+                    <path d="M32 29v17M20 55l12-9 12 9"/>
+                </g>
+                <circle class="ss-fill" cx="32" cy="43" r="3.5"/>
+            `
         },
         gyrocopter: {
             className: 'gyrocopter',
             directional: true,
-            label: 'Gyrocoptère',
-            path: 'M3 3.5h18v1.8h-8v3.4h2.9l3.8 3.2v2.2H12l-2.2 2.5H5.5v-2h3.4l2-2.4h5.3l-1.6-1.5H11V5.3H3V3.5Zm4.3 14.2a2.2 2.2 0 1 1 0 4.3 2.2 2.2 0 0 1 0-4.3Zm9.4 0a2.2 2.2 0 1 1 0 4.3 2.2 2.2 0 0 1 0-4.3Z'
+            label: 'Autogire',
+            svg: `
+                <g class="ss-line">
+                    <path d="M6 10h52"/>
+                    <path d="M32 10v24"/>
+                    <path d="M21 35h26l10 9H31l-8 8H10"/>
+                    <path d="M44 34l8-11"/>
+                </g>
+                <circle class="ss-ring" cx="18" cy="53" r="6"/>
+                <circle class="ss-ring" cx="47" cy="53" r="6"/>
+                <circle class="ss-fill" cx="32" cy="31" r="5"/>
+            `
         },
         military: {
             className: 'military',
             directional: true,
             label: 'Militaire',
-            path: 'M11.1 1.5h1.8l2.3 7.7 7.1 4.1v2.3l-7.3-1.3-1.2 5 2.7 1.8v1.2L12 21.4l-4.5.9v-1.2l2.7-1.8-1.2-5-7.3 1.3v-2.3l7.1-4.1 2.3-7.7Z'
+            svg: `
+                <path class="ss-fill" d="M30 3h4l5 20 17 10v7l-18-4-2 10 10 9v5l-14-5-14 5v-5l10-9-2-10-18 4v-7l17-10 5-20Z"/>
+                <path class="ss-cut" d="M32 9v42"/>
+            `
         },
         'widebody-jet': {
             className: 'widebody-jet',
             directional: true,
             label: 'Jet gros-porteur',
-            path: 'M10.9 1.6h2.2l1.9 7.1 7.3 4.4v2.4l-7.7-1.6-1.1 4.7 3.7 2.5v1.2l-5.2-1-5.2 1v-1.2l3.7-2.5-1.1-4.7-7.7 1.6v-2.4L9 8.7l1.9-7.1Z'
+            svg: `
+                <path class="ss-fill" d="M28 3h8l5 20 18 10v8l-20-5-2 11 11 9v4l-16-4-16 4v-4l11-9-2-11-20 5v-8l18-10 5-20Z"/>
+            `
         },
         'narrowbody-jet': {
             className: 'narrowbody-jet',
             directional: true,
             label: 'Jet moyen-courrier',
-            path: 'M11.1 1.8h1.8l1.5 7.3 7.1 4v2.1l-7.4-1.3-.9 4.9 3.3 2.1V22l-4.5-.9-4.5.9v-1.1l3.3-2.1-.9-4.9-7.4 1.3v-2.1l7.1-4 1.5-7.3Z'
+            svg: `
+                <path class="ss-fill" d="M29 3h6l4 21 18 9v7l-19-4-2 11 10 8v4l-14-3-14 3v-4l10-8-2-11-19 4v-7l18-9 4-21Z"/>
+            `
         },
         'regional-jet': {
             className: 'regional-jet',
             directional: true,
             label: 'Jet régional',
-            path: 'M11.2 2h1.6l1.2 7.5 6.6 3.6v2l-6.8-1-.8 4.8 2.8 1.8v1.1l-3.8-.7-3.8.7v-1.1l2.8-1.8-.8-4.8-6.8 1v-2L10 9.5 11.2 2Z'
+            svg: `
+                <path class="ss-fill" d="M29 5h6l3 20 16 8v6l-17-3-2 12 8 7v4l-11-3-11 3v-4l8-7-2-12-17 3v-6l16-8 3-20Z"/>
+            `
         },
         turboprop: {
             className: 'turboprop',
             directional: true,
             label: 'Turbopropulseur',
-            path: 'M11.1 2h1.8l1 7 7.5 3.8v2l-7.4-1-.8 5 3 1.8v1.1l-4.2-.8-4.2.8v-1.1l3-1.8-.8-5-7.4 1v-2l7.5-3.8 1-7ZM5.2 8.2h1.4v3H5.2v-3Zm12.2 0h1.4v3h-1.4v-3Z'
+            svg: `
+                <path class="ss-fill" d="M29 4h6l2 20 20 8v6l-20-3-1 13 8 7v4l-12-3-12 3v-4l8-7-1-13-20 3v-6l20-8 2-20Z"/>
+                <g class="ss-line">
+                    <circle cx="16" cy="31" r="5"/>
+                    <circle cx="48" cy="31" r="5"/>
+                    <path d="M16 23v16M8 31h16M48 23v16M40 31h16"/>
+                </g>
+            `
         },
         'light-single': {
             className: 'light-single',
             directional: true,
             label: 'Avion léger monomoteur',
-            path: 'M11 2h2v5.2l7 3.4v2L13 12v5.1l2.8 2.2v1.2L12 19.7l-3.8.8v-1.2l2.8-2.2V12l-7 .6v-2l7-3.4V2Zm-2.8 6.1h7.6v1.5H8.2V8.1ZM11 21h2v2h-2v-2Z'
+            svg: `
+                <path class="ss-fill" d="M29 5h6l1 18 18 8v6l-18-3v14l8 7v4l-12-3-12 3v-4l8-7V34l-18 3v-6l18-8 1-18Z"/>
+                <path class="ss-cut" d="M25 18h14"/>
+            `
         },
         'light-twin': {
             className: 'light-twin',
             directional: true,
             label: 'Avion léger bimoteur',
-            path: 'M11 2h2v5l7.2 3.6v2L13 12v5.2l3 2.1v1.2l-4-.8-4 .8v-1.2l3-2.1V12l-7.2.6v-2L11 7V2ZM6.3 8h2.1v3H6.3V8Zm9.3 0h2.1v3h-2.1V8Z'
+            svg: `
+                <path class="ss-fill" d="M29 5h6l1 18 19 8v6l-19-3v14l8 7v4l-12-3-12 3v-4l8-7V34L9 37v-6l19-8 1-18Z"/>
+                <circle class="ss-ring" cx="18" cy="29" r="4"/>
+                <circle class="ss-ring" cx="46" cy="29" r="4"/>
+            `
         },
         ultralight: {
             className: 'ultralight',
             directional: true,
             label: 'ULM',
-            path: 'M2 7.5 12 3l10 4.5-10 3-10-3ZM11 11h2v3.7h3.1l3 5.3h-2.4l-2.1-3.5H9.4L7.3 20H4.9l3-5.3H11V11Z'
+            svg: `
+                <path class="ss-fill" d="M30 7h4l2 17 20 8v6l-20-3-1 12 8 7v4l-11-3-11 3v-4l8-7-1-12-20 3v-6l20-8 2-17Z"/>
+                <path class="ss-cut" d="M22 25h20"/>
+            `
         },
         pendular: {
             className: 'pendular',
             directional: true,
             label: 'Pendulaire',
-            path: 'M1.4 8.2 12 3l10.6 5.2L12 11.1 1.4 8.2Zm9.5 3.9h2.2v2.6l4.1 4.4-1.6 1.5-3.6-3.8-3.6 3.8-1.6-1.5 4.1-4.4v-2.6Zm-1.6 8.2h5.4v1.7H9.3v-1.7Z'
+            svg: `
+                <path class="ss-fill" d="M4 22 32 7l28 15-28 8L4 22Z"/>
+                <path class="ss-cut" d="M32 8v21M8 22h48"/>
+                <g class="ss-line">
+                    <path d="M32 29v14M23 50l9-7 9 7"/>
+                    <path d="M25 54h14"/>
+                </g>
+                <circle class="ss-ring" cx="24" cy="55" r="4"/>
+                <circle class="ss-ring" cx="40" cy="55" r="4"/>
+                <circle class="ss-fill" cx="32" cy="42" r="3"/>
+            `
         },
         paramotor: {
             className: 'paramotor',
-            directional: true,
+            directional: false,
             label: 'Paramoteur',
-            path: 'M3 8.5C5 4.8 8 3 12 3s7 1.8 9 5.5H3Zm8 2h2v3.8l2.8 2.8-1.4 1.4-2.4-2.3-2.4 2.3-1.4-1.4 2.8-2.8v-3.8Zm1 7.2a2.3 2.3 0 1 1 0 4.6 2.3 2.3 0 0 1 0-4.6Z'
+            svg: `
+                <path class="ss-fill" d="M7 22C15 11 23 7 32 7s17 4 25 15c-9-4-17-6-25-6S16 18 7 22Z"/>
+                <g class="ss-line">
+                    <path d="M12 22l17 21M52 22 35 43M23 19l8 24M41 19l-8 24"/>
+                    <path d="M32 43v10M27 59l5-6 5 6"/>
+                </g>
+                <circle class="ss-fill" cx="32" cy="44" r="3.5"/>
+                <circle class="ss-ring" cx="42" cy="47" r="8"/>
+                <path class="ss-line" d="M42 39v16M34 47h16"/>
+            `
         },
         static: {
             className: 'static',
             directional: false,
             label: 'Objet statique',
-            path: 'M11 2h2v8h8v2h-8v10h-2V12H3v-2h8V2Zm-5 14h12v2H6v-2Z'
+            svg: `
+                <g class="ss-line">
+                    <path d="M32 8v48M8 32h48"/>
+                    <circle cx="32" cy="32" r="13"/>
+                </g>
+                <circle class="ss-fill" cx="32" cy="32" r="5"/>
+            `
         }
     };
 
@@ -6619,8 +6754,8 @@ function buildTrafficMarkerIcon(aircraft) {
      * Le libellé est désormais plus large car il contient aussi l'identifiant.
      * Rayon légèrement augmenté pour éviter tout contact avec le rond.
      */
-    const markerCenterPx = 22;
-    const labelRadiusPx = 39;
+    const markerCenterPx = 21;
+    const labelRadiusPx = 37;
     const trackRadians = track * Math.PI / 180;
     const altitudeLabelLeft = markerCenterPx
         - Math.sin(trackRadians) * labelRadiusPx;
@@ -6638,17 +6773,17 @@ function buildTrafficMarkerIcon(aircraft) {
         : '';
 
     /*
-     * v14.25 — silhouette noire inspirée de la lisibilité SafeSky, avec un
-     * contour blanc distinct pour rester visible sur tous les fonds de carte.
+     * v14.26 — chaque catégorie fournit son propre pictogramme SVG, composé de
+     * formes simples proches du langage graphique montré dans SafeSky.
      */
-    const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path class="traffic-symbol-outline" d="${visual.path}"></path><path class="traffic-symbol-fill" d="${visual.path}"></path></svg>`;
+    const symbolSvg = `<svg viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true">${visual.svg}</svg>`;
 
     return L.divIcon({
         className: 'traffic-aircraft-icon',
         html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
-        popupAnchor: [0, -14]
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
+        popupAnchor: [0, -13]
     });
 }
 
