@@ -2637,6 +2637,11 @@ function initMap() {
     }).setView([46.6, 2.2], 5.5);
 
     map.on('zoomend', enforceOfflineZoomLimit);
+    map.on('zoomend', () => {
+        if (showTrafficLayer) {
+            redrawTrafficLayerFromSnapshot();
+        }
+    });
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
     ensureTwoFingerRulerControl();
@@ -6251,6 +6256,7 @@ function normalizeTrafficAircraft(raw) {
         altitude,
         altitudeFeet,
         gs,
+        groundSpeedKnots,
         track,
         type,
         beaconType,
@@ -6423,6 +6429,47 @@ function resolveTrafficVisualType(aircraft) {
     return 'airplane';
 }
 
+function getTrafficTypeDisplayLabel(aircraft) {
+    const safeSkyType = String(
+        aircraft?.beaconType
+        || aircraft?.type
+        || ''
+    ).trim().toUpperCase();
+
+    const labels = {
+        JET: 'JET',
+        MOTORPLANE: 'AVION',
+        THREE_AXES_LIGHT_PLANE: 'ULM',
+        HELICOPTER: 'HÉLICOPTÈRE',
+        GLIDER: 'PLANEUR',
+        UAV: 'DRONE',
+        BALLOON: 'BALLON',
+        AIRSHIP: 'DIRIGEABLE',
+        PARACHUTE: 'PARACHUTISTE',
+        PARA_GLIDER: 'PARAPENTE',
+        HAND_GLIDER: 'DELTAPLANE',
+        HANG_GLIDER: 'DELTAPLANE',
+        GYROCOPTER: 'AUTOGIRE',
+        MILITARY: 'MILITAIRE',
+        FLEX_WING_TRIKES: 'PENDULAIRE',
+        PARA_MOTOR: 'PARAMOTEUR',
+        PAV: 'PAV',
+        STATIC_OBJECT: 'OBJET STATIQUE'
+    };
+
+    if (labels[safeSkyType]) {
+        return labels[safeSkyType];
+    }
+
+    /*
+     * Repli sur la catégorie visuelle lorsque SafeSky ne fournit pas de type
+     * exploitable. Les désignations techniques ne sont jamais montrées.
+     */
+    const visual = getTrafficAircraftVisualDefinition(aircraft);
+    return String(visual?.label || 'AVION').toUpperCase();
+}
+
+
 function getTrafficAircraftVisualDefinition(aircraft) {
     const visualType = resolveTrafficVisualType(aircraft);
 
@@ -6438,7 +6485,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         airplane: {
             className: 'airplane',
             directional: true,
-            label: 'Avion',
+            label: 'AVION',
             svg: `
                 <path class="ss-fill" d="M29 4h6l2 19 19 8v6l-19-3-1 14 8 7v4l-12-3-12 3v-4l8-7-1-14-19 3v-6l19-8 2-19Z"/>
             `
@@ -6446,7 +6493,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         jet: {
             className: 'jet',
             directional: true,
-            label: 'Jet',
+            label: 'JET',
             svg: `
                 <path class="ss-fill" d="M29 3h6l4 20 17 9v7l-19-5-2 12 10 9v4l-13-4-13 4v-4l10-9-2-12-19 5v-7l17-9 4-20Z"/>
             `
@@ -6454,7 +6501,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         helicopter: {
             className: 'helicopter',
             directional: true,
-            label: 'Hélicoptère',
+            label: 'HÉLICOPTÈRE',
             svg: `
                 <g class="ss-line">
                     <path d="M32 8v39"/>
@@ -6471,7 +6518,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         glider: {
             className: 'glider',
             directional: true,
-            label: 'Planeur',
+            label: 'PLANEUR',
             svg: `
                 <path class="ss-fill" d="M30 6h4l2 23 25 3v5l-25-1-1 13 8 6v3l-11-2-11 2v-3l8-6-1-13-25 1v-5l25-3 2-23Z"/>
             `
@@ -6479,7 +6526,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         uav: {
             className: 'uav',
             directional: false,
-            label: 'Drone',
+            label: 'DRONE',
             svg: `
                 <g class="ss-line">
                     <path d="M22 22l20 20M42 22 22 42"/>
@@ -6513,7 +6560,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         balloon: {
             className: 'balloon',
             directional: false,
-            label: 'Ballon',
+            label: 'BALLON',
             svg: `
                 <path class="ss-fill" d="M32 5c13 0 21 9 21 21 0 11-7 19-16 25h-10C18 45 11 37 11 26 11 14 19 5 32 5Z"/>
                 <path class="ss-cut" d="M22 10c-2 11-1 26 7 39M42 10c2 11 1 26-7 39M12 26h40"/>
@@ -6523,7 +6570,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         airship: {
             className: 'airship',
             directional: true,
-            label: 'Dirigeable',
+            label: 'DIRIGEABLE',
             svg: `
                 <ellipse class="ss-fill" cx="30" cy="31" rx="25" ry="14"/>
                 <path class="ss-fill" d="M51 25l10-7v10l-5 3 5 3v10l-10-7Z"/>
@@ -6534,7 +6581,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         parachute: {
             className: 'parachute',
             directional: false,
-            label: 'Parachutiste',
+            label: 'PARACHUTISTE',
             svg: `
                 <path class="ss-fill" d="M7 29C9 15 19 7 32 7s23 8 25 22H7Z"/>
                 <path class="ss-cut" d="M17 28c2-9 7-15 15-20M47 28C45 19 40 13 32 8M32 8v20"/>
@@ -6548,7 +6595,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         paraglider: {
             className: 'paraglider',
             directional: false,
-            label: 'Parapente',
+            label: 'PARAPENTE',
             svg: `
                 <path class="ss-fill" d="M6 26C14 12 23 7 32 7s18 5 26 19c-10-5-18-7-26-7S16 21 6 26Z"/>
                 <path class="ss-cut" d="M15 22c6-8 11-11 17-11s11 3 17 11"/>
@@ -6562,7 +6609,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         hangglider: {
             className: 'hangglider',
             directional: true,
-            label: 'Deltaplane',
+            label: 'DELTAPLANE',
             svg: `
                 <path class="ss-fill" d="M4 22 32 7l28 15-28 8L4 22Z"/>
                 <path class="ss-cut" d="M32 8v21M8 22h48"/>
@@ -6575,7 +6622,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         gyrocopter: {
             className: 'gyrocopter',
             directional: true,
-            label: 'Autogire',
+            label: 'AUTOGIRE',
             svg: `
                 <g class="ss-line">
                     <path d="M6 10h52"/>
@@ -6591,7 +6638,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         military: {
             className: 'military',
             directional: true,
-            label: 'Militaire',
+            label: 'MILITAIRE',
             svg: `
                 <path class="ss-fill" d="M30 3h4l5 20 17 10v7l-18-4-2 10 10 9v5l-14-5-14 5v-5l10-9-2-10-18 4v-7l17-10 5-20Z"/>
                 <path class="ss-cut" d="M32 9v42"/>
@@ -6600,7 +6647,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         'widebody-jet': {
             className: 'widebody-jet',
             directional: true,
-            label: 'Jet gros-porteur',
+            label: 'JET',
             svg: `
                 <path class="ss-fill" d="M28 3h8l5 20 18 10v8l-20-5-2 11 11 9v4l-16-4-16 4v-4l11-9-2-11-20 5v-8l18-10 5-20Z"/>
             `
@@ -6608,7 +6655,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         'narrowbody-jet': {
             className: 'narrowbody-jet',
             directional: true,
-            label: 'Jet moyen-courrier',
+            label: 'JET',
             svg: `
                 <path class="ss-fill" d="M29 3h6l4 21 18 9v7l-19-4-2 11 10 8v4l-14-3-14 3v-4l10-8-2-11-19 4v-7l18-9 4-21Z"/>
             `
@@ -6616,7 +6663,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         'regional-jet': {
             className: 'regional-jet',
             directional: true,
-            label: 'Jet régional',
+            label: 'JET',
             svg: `
                 <path class="ss-fill" d="M29 5h6l3 20 16 8v6l-17-3-2 12 8 7v4l-11-3-11 3v-4l8-7-2-12-17 3v-6l16-8 3-20Z"/>
             `
@@ -6624,7 +6671,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         turboprop: {
             className: 'turboprop',
             directional: true,
-            label: 'Turbopropulseur',
+            label: 'AVION',
             svg: `
                 <path class="ss-fill" d="M29 4h6l2 20 20 8v6l-20-3-1 13 8 7v4l-12-3-12 3v-4l8-7-1-13-20 3v-6l20-8 2-20Z"/>
                 <g class="ss-line">
@@ -6637,7 +6684,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         'light-single': {
             className: 'light-single',
             directional: true,
-            label: 'Avion léger monomoteur',
+            label: 'AVION',
             svg: `
                 <path class="ss-fill" d="M29 5h6l1 18 18 8v6l-18-3v14l8 7v4l-12-3-12 3v-4l8-7V34l-18 3v-6l18-8 1-18Z"/>
                 <path class="ss-cut" d="M25 18h14"/>
@@ -6646,7 +6693,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         'light-twin': {
             className: 'light-twin',
             directional: true,
-            label: 'Avion léger bimoteur',
+            label: 'AVION',
             svg: `
                 <path class="ss-fill" d="M29 5h6l1 18 19 8v6l-19-3v14l8 7v4l-12-3-12 3v-4l8-7V34L9 37v-6l19-8 1-18Z"/>
                 <circle class="ss-ring" cx="18" cy="29" r="4"/>
@@ -6665,7 +6712,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         pendular: {
             className: 'pendular',
             directional: true,
-            label: 'Pendulaire',
+            label: 'PENDULAIRE',
             svg: `
                 <path class="ss-fill" d="M4 22 32 7l28 15-28 8L4 22Z"/>
                 <path class="ss-cut" d="M32 8v21M8 22h48"/>
@@ -6681,7 +6728,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         paramotor: {
             className: 'paramotor',
             directional: false,
-            label: 'Paramoteur',
+            label: 'PARAMOTEUR',
             svg: `
                 <path class="ss-fill" d="M7 22C15 11 23 7 32 7s17 4 25 15c-9-4-17-6-25-6S16 18 7 22Z"/>
                 <g class="ss-line">
@@ -6696,7 +6743,7 @@ function getTrafficAircraftVisualDefinition(aircraft) {
         static: {
             className: 'static',
             directional: false,
-            label: 'Objet statique',
+            label: 'OBJET STATIQUE',
             svg: `
                 <g class="ss-line">
                     <path d="M32 8v48M8 32h48"/>
@@ -6736,12 +6783,51 @@ function getTrafficCompactIdentifier(aircraft) {
     return '';
 }
 
+const TRAFFIC_VECTOR_MIN_LENGTH_PX = 12;
+const TRAFFIC_VECTOR_MAX_LENGTH_PX = 92;
+const TRAFFIC_VECTOR_BASE_LENGTH_PX = 10;
+const TRAFFIC_VECTOR_PX_PER_KNOT = 0.20;
+
+function getTrafficSpeedVectorLengthPx(aircraft) {
+    const speedKnots = Number(aircraft?.groundSpeedKnots);
+
+    if (!Number.isFinite(speedKnots) || speedKnots < 1) {
+        return 0;
+    }
+
+    /*
+     * Longueur purement visuelle et proportionnelle à la vitesse sol :
+     *  30 kt ≈ 16 px
+     * 100 kt ≈ 30 px
+     * 200 kt ≈ 50 px
+     * 300 kt ≈ 70 px
+     * 410 kt et plus = 92 px maximum
+     */
+    const calculatedLength = (
+        TRAFFIC_VECTOR_BASE_LENGTH_PX
+        + speedKnots * TRAFFIC_VECTOR_PX_PER_KNOT
+    );
+
+    return Math.round(Math.max(
+        TRAFFIC_VECTOR_MIN_LENGTH_PX,
+        Math.min(
+            TRAFFIC_VECTOR_MAX_LENGTH_PX,
+            calculatedLength
+        )
+    ));
+}
+
+
 function buildTrafficMarkerIcon(aircraft) {
-    const track = Number.isFinite(aircraft.track) ? aircraft.track : 0;
+    const hasTrack = Number.isFinite(aircraft.track);
+    const track = hasTrack ? aircraft.track : 0;
     const settings = sanitizeTrafficSettings(trafficSettings);
     const altitudeState = getTrafficRelativeAltitudeState(aircraft);
     const visual = getTrafficAircraftVisualDefinition(aircraft);
-    const symbolRotation = visual.directional ? track : 0;
+    const symbolRotation = visual.directional && hasTrack ? track : 0;
+    const vectorLengthPx = hasTrack
+        ? getTrafficSpeedVectorLengthPx(aircraft)
+        : 0;
 
     /*
      * L'étiquette est placée sur le rayon opposé au vecteur :
@@ -6778,9 +6864,13 @@ function buildTrafficMarkerIcon(aircraft) {
      */
     const symbolSvg = `<svg viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true">${visual.svg}</svg>`;
 
+    const vectorHtml = vectorLengthPx > 0
+        ? `<span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);--traffic-vector-length:${vectorLengthPx}px;"><span class="traffic-aircraft-dotted-vector"></span></span>`
+        : '';
+
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
+        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}">${vectorHtml}<span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
         iconSize: [42, 42],
         iconAnchor: [21, 21],
         popupAnchor: [0, -13]
@@ -6898,7 +6988,13 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         });
 
         const title = escapeHtml(ac.callsign);
-        const subtitle = [ac.type, ac.source, ac.registration, ac.hex].filter(Boolean).map(escapeHtml).join(' · ');
+        const displayType = getTrafficTypeDisplayLabel(ac);
+        const subtitle = [
+            displayType,
+            ac.source,
+            ac.registration,
+            ac.hex
+        ].filter(Boolean).map(escapeHtml).join(' · ');
         const reference = ac._trafficReference;
         const distance = reference ? reference.distance : null;
         const referenceLabel = reference?.point?.label ? escapeHtml(reference.point.label) : '';
