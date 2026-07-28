@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.26') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.26') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.27') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.27') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11081,3 +11081,24 @@ body.gaar-point-search-open .gaar-editing-banner {
  * Le code couleur d'altitude relative reste porté par le vecteur et la bordure
  * du libellé, sans modifier la silhouette noire.
  */
+
+
+/* ==========================================================================
+   v14.27 TEST — longueur du vecteur proportionnelle à la vitesse sol
+   ========================================================================== */
+
+.traffic-aircraft-vector-wrap {
+    --traffic-vector-length: 0px;
+}
+
+/*
+ * La longueur est injectée individuellement pour chaque trafic. Les anciennes
+ * valeurs fixes de 62 px sont écrasées ici.
+ */
+.traffic-aircraft-dotted-vector {
+    top: calc(-1 * var(--traffic-vector-length)) !important;
+    height: var(--traffic-vector-length) !important;
+    transition:
+        height .18s linear,
+        top .18s linear !important;
+}
