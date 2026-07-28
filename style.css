@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.28') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.28') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.29') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.29') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11101,4 +11101,61 @@ body.gaar-point-search-open .gaar-editing-banner {
     transition:
         height .18s linear,
         top .18s linear !important;
+}
+
+
+/* ==========================================================================
+   v14.29 TEST — base d'icônes SafeSky validée par l'utilisateur
+   ========================================================================== */
+
+/* Toutes les catégories conservent le noir par défaut. */
+.traffic-aircraft-arrow svg .ss-fill {
+    fill: #080c13 !important;
+    stroke: #080c13 !important;
+}
+
+/* Parapente : magenta vif, légèrement plus grand que les autres catégories. */
+.traffic-type-paraglider .traffic-aircraft-arrow svg {
+    width: 31px !important;
+    height: 31px !important;
+    min-width: 31px !important;
+    min-height: 31px !important;
+}
+
+.traffic-type-paraglider .traffic-aircraft-arrow svg .ss-paraglider-color {
+    fill: #FF00A8 !important;
+    stroke: #FF00A8 !important;
+}
+
+.traffic-type-paraglider .traffic-aircraft-arrow svg .ss-paraglider-line {
+    fill: none !important;
+    stroke: #FF00A8 !important;
+    stroke-width: 2.4px !important;
+}
+
+/* Deltaplane : cyan vif, légèrement plus petit que le parapente. */
+.traffic-type-hangglider .traffic-aircraft-arrow svg {
+    width: 29px !important;
+    height: 29px !important;
+    min-width: 29px !important;
+    min-height: 29px !important;
+}
+
+.traffic-type-hangglider .traffic-aircraft-arrow svg .ss-hangglider-color {
+    fill: #00CFFF !important;
+    stroke: #00CFFF !important;
+}
+
+/*
+ * Le halo blanc est volontairement renforcé pour les deux voilures légères,
+ * afin qu'elles restent visibles sur les routes, reliefs et zones urbaines.
+ */
+.traffic-type-paraglider .traffic-aircraft-arrow svg,
+.traffic-type-hangglider .traffic-aircraft-arrow svg {
+    filter:
+        drop-shadow(1.4px 0 0 rgba(255,255,255,.99))
+        drop-shadow(-1.4px 0 0 rgba(255,255,255,.99))
+        drop-shadow(0 1.4px 0 rgba(255,255,255,.99))
+        drop-shadow(0 -1.4px 0 rgba(255,255,255,.99))
+        drop-shadow(0 1px 2px rgba(15,23,42,.32)) !important;
 }
