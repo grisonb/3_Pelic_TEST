@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-22_import_references_dn_rd_rn_cd';
-const APP_VERSION = 'v14.22';
+const SW_VERSION = 'sw-v14-24_safesky_direct_cle_integree_sans_nas';
+const APP_VERSION = 'v14.24';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
