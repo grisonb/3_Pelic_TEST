@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-26_icones_trafic_proches_reference_safesky';
-const APP_VERSION = 'v14.26';
+const SW_VERSION = 'sw-v14-27_libelles_types_et_vecteurs_selon_vitesse';
+const APP_VERSION = 'v14.27';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
