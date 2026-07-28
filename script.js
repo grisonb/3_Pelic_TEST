@@ -6588,13 +6588,13 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: false,
             label: 'PARACHUTISTE',
             svg: `
-                <path class="ss-fill" d="M7 29C9 15 19 7 32 7s23 8 25 22H7Z"/>
+                <path class="ss-fill ss-hangglider-color" d="M7 29C9 15 19 7 32 7s23 8 25 22H7Z"/>
                 <path class="ss-cut" d="M17 28c2-9 7-15 15-20M47 28C45 19 40 13 32 8M32 8v20"/>
-                <g class="ss-line">
+                <g class="ss-line ss-hangglider-line">
                     <path d="M12 29l17 18M52 29 35 47M24 29l7 18M40 29l-7 18"/>
                     <path d="M32 47v8M26 60l6-5 6 5"/>
                 </g>
-                <circle class="ss-fill" cx="32" cy="48" r="3.5"/>
+                <circle class="ss-fill ss-hangglider-color" cx="32" cy="48" r="3.5"/>
             `
         },
         paraglider: {
@@ -6715,15 +6715,15 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: true,
             label: 'PENDULAIRE',
             svg: `
-                <path class="ss-fill" d="M4 22 32 7l28 15-28 8L4 22Z"/>
+                <path class="ss-fill ss-hangglider-color" d="M4 22 32 7l28 15-28 8L4 22Z"/>
                 <path class="ss-cut" d="M32 8v21M8 22h48"/>
-                <g class="ss-line">
+                <g class="ss-line ss-hangglider-line">
                     <path d="M32 29v14M23 50l9-7 9 7"/>
                     <path d="M25 54h14"/>
                 </g>
-                <circle class="ss-ring" cx="24" cy="55" r="4"/>
-                <circle class="ss-ring" cx="40" cy="55" r="4"/>
-                <circle class="ss-fill" cx="32" cy="42" r="3"/>
+                <circle class="ss-ring ss-hangglider-ring" cx="24" cy="55" r="4"/>
+                <circle class="ss-ring ss-hangglider-ring" cx="40" cy="55" r="4"/>
+                <circle class="ss-fill ss-hangglider-color" cx="32" cy="42" r="3"/>
             `
         },
         paramotor: {
@@ -6731,14 +6731,14 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             directional: false,
             label: 'PARAMOTEUR',
             svg: `
-                <path class="ss-fill" d="M7 22C15 11 23 7 32 7s17 4 25 15c-9-4-17-6-25-6S16 18 7 22Z"/>
-                <g class="ss-line">
+                <path class="ss-fill ss-paraglider-color" d="M7 22C15 11 23 7 32 7s17 4 25 15c-9-4-17-6-25-6S16 18 7 22Z"/>
+                <g class="ss-line ss-paraglider-line">
                     <path d="M12 22l17 21M52 22 35 43M23 19l8 24M41 19l-8 24"/>
                     <path d="M32 43v10M27 59l5-6 5 6"/>
                 </g>
-                <circle class="ss-fill" cx="32" cy="44" r="3.5"/>
-                <circle class="ss-ring" cx="42" cy="47" r="8"/>
-                <path class="ss-line" d="M42 39v16M34 47h16"/>
+                <circle class="ss-fill ss-paraglider-color" cx="32" cy="44" r="3.5"/>
+                <circle class="ss-ring ss-paraglider-ring" cx="42" cy="47" r="8"/>
+                <path class="ss-line ss-paraglider-line" d="M42 39v16M34 47h16"/>
             `
         },
         static: {
