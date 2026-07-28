@@ -1,5 +1,41 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.27 TEST — libellés français des catégories SafeSky et vecteurs proportionnels à la vitesse
+
+Modifications apportées :
+- distinction explicite entre les catégories SafeSky JET, MOTORPLANE et THREE_AXES_LIGHT_PLANE ;
+- affichage de JET sous le libellé « JET » ;
+- affichage de MOTORPLANE sous le libellé « AVION » ;
+- suppression de l’affichage du terme technique « MOTORPLANE » dans les fenêtres trafic ;
+- affichage de THREE_AXES_LIGHT_PLANE sous le libellé « ULM » ;
+- affichage de HELICOPTER sous le libellé « HÉLICOPTÈRE » ;
+- affichage de HANG_GLIDER et HAND_GLIDER sous le libellé « DELTAPLANE » ;
+- affichage de PARA_GLIDER sous le libellé « PARAPENTE » ;
+- normalisation française complémentaire des catégories planeur, drone, ballon, dirigeable, parachutiste, autogire, militaire, pendulaire et paramoteur ;
+- remplacement du type SafeSky brut par le libellé français dans la fenêtre d’information trafic ;
+- conservation de silhouettes distinctes pour JET, AVION et ULM ;
+- conservation de la catégorie SafeSky originale en interne pour le choix du pictogramme ;
+- ajout de la vitesse sol numérique en nœuds dans l’objet trafic normalisé ;
+- remplacement de la longueur fixe des vecteurs par une longueur propre à chaque trafic ;
+- longueur du vecteur proportionnelle à la vitesse sol ;
+- formule visuelle : 10 px + 0,20 px par nœud ;
+- longueur minimale fixée à 12 px pour un trafic en mouvement ;
+- longueur maximale fixée à 92 px pour éviter un encombrement excessif ;
+- exemples : environ 16 px à 30 kt, 30 px à 100 kt, 50 px à 200 kt et 70 px à 300 kt ;
+- absence de vecteur lorsque la vitesse est nulle, inconnue ou lorsque la route n’est pas disponible ;
+- recalcul des vecteurs après chaque rafraîchissement SafeSky ;
+- recalcul immédiat des vecteurs après un changement de niveau de zoom ;
+- transition courte de la longueur du vecteur entre deux mises à jour ;
+- maintien de la direction du vecteur selon la route vraie SafeSky ;
+- maintien du code couleur du vecteur selon l’altitude relative ;
+- conservation de SafeSky comme source unique du trafic ;
+- maintien de l’appel direct SafeSky et de la clé temporaire intégrée ;
+- conservation des corrections routières, de l’optimisation mémoire et du comportement du bouton de position ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni avec cette version ;
+- aucune modification des cartes offline, de la simulation ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.27 TEST.
+
 v14.26 TEST — pictogrammes trafic rapprochés de la référence visuelle SafeSky
 
 Modifications apportées :
