@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.29') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.29') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.30') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.30') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11152,6 +11152,51 @@ body.gaar-point-search-open .gaar-editing-banner {
  */
 .traffic-type-paraglider .traffic-aircraft-arrow svg,
 .traffic-type-hangglider .traffic-aircraft-arrow svg {
+    filter:
+        drop-shadow(1.4px 0 0 rgba(255,255,255,.99))
+        drop-shadow(-1.4px 0 0 rgba(255,255,255,.99))
+        drop-shadow(0 1.4px 0 rgba(255,255,255,.99))
+        drop-shadow(0 -1.4px 0 rgba(255,255,255,.99))
+        drop-shadow(0 1px 2px rgba(15,23,42,.32)) !important;
+}
+
+
+/* ==========================================================================
+   v14.30 TEST — familles de couleurs des voilures légères
+   ========================================================================== */
+
+/* Famille parapente : parapente et paramoteur en magenta vif. */
+.traffic-aircraft-arrow svg .ss-paraglider-line,
+.traffic-aircraft-arrow svg .ss-paraglider-line * {
+    fill: none !important;
+    stroke: #FF00A8 !important;
+    stroke-width: 2.4px !important;
+}
+
+.traffic-aircraft-arrow svg .ss-paraglider-ring {
+    fill: #ffffff !important;
+    stroke: #FF00A8 !important;
+    stroke-width: 3px !important;
+}
+
+/* Famille deltaplane : deltaplane, parachutiste et pendulaire en cyan vif. */
+.traffic-aircraft-arrow svg .ss-hangglider-line,
+.traffic-aircraft-arrow svg .ss-hangglider-line * {
+    fill: none !important;
+    stroke: #00CFFF !important;
+    stroke-width: 2.8px !important;
+}
+
+.traffic-aircraft-arrow svg .ss-hangglider-ring {
+    fill: #ffffff !important;
+    stroke: #00CFFF !important;
+    stroke-width: 3px !important;
+}
+
+/* Halo blanc renforcé pour les quatre catégories colorées ajoutées. */
+.traffic-type-paramotor .traffic-aircraft-arrow svg,
+.traffic-type-parachute .traffic-aircraft-arrow svg,
+.traffic-type-pendular .traffic-aircraft-arrow svg {
     filter:
         drop-shadow(1.4px 0 0 rgba(255,255,255,.99))
         drop-shadow(-1.4px 0 0 rgba(255,255,255,.99))
