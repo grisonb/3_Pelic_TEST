@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-20_nationales_1nm_autoroutes_2nm';
-const APP_VERSION = 'v14.20';
+const SW_VERSION = 'sw-v14-21_optimisation_memorire_calque_routier_par_zoom';
+const APP_VERSION = 'v14.21';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
