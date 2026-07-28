@@ -4856,12 +4856,16 @@ function shouldDisplayRoadOverlayFeature(feature) {
     const roadClass = String(feature?.properties?.roadClass || '').toUpperCase();
     const zoom = map?.getZoom?.() ?? 10;
 
-    if (roadClass === 'A') return zoom >= 7;
-    if (roadClass === 'N') return zoom >= 8;
+    /*
+     * v14.19 — autoroutes et nationales à partir de l'échelle 2 NM environ.
+     * Sur la carte actuelle, cela correspond au niveau de zoom 11.
+     */
+    if (roadClass === 'A') return zoom >= 11;
+    if (roadClass === 'N') return zoom >= 11;
 
     /*
-     * v14.18 — les départementales n'apparaissent qu'à partir d'un niveau
-     * correspondant à l'échelle 1 NM environ, et pas avant.
+     * Les départementales restent affichées à partir de l'échelle 1 NM
+     * environ, correspondant au niveau de zoom 12.
      */
     if (roadClass === 'D') return zoom >= 12;
     return false;
