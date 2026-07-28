@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.18') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.18') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.19') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.19') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
