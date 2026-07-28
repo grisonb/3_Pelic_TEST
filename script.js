@@ -564,7 +564,15 @@ let centerGpsFollowStartedLiveGps = false;
 let centerGpsFollowHandlersInstalled = false;
 let centerGpsFollowUserGestureActive = false;
 let centerGpsFollowLastUserGestureAt = 0;
+let centerGpsButtonLongPressTimer = null;
+let centerGpsButtonLongPressTriggered = false;
+let centerGpsButtonActivePointerId = null;
+let centerGpsButtonPressStartX = 0;
+let centerGpsButtonPressStartY = 0;
+let centerGpsButtonSuppressClickUntil = 0;
 const CENTER_GPS_FOLLOW_RECENTER_DELAY_MS = 10000;
+const CENTER_GPS_BUTTON_LONG_PRESS_MS = 650;
+const CENTER_GPS_BUTTON_MOVE_TOLERANCE_PX = 14;
 let ownGpsVectorLayer = null, ownGpsVectorMarkers = [];
 let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
 let showLftwRoute = true;
@@ -580,7 +588,8 @@ let roadOverlayLayer = null;
 let roadOverlayCasingLayer = null;
 let roadOverlayLineLayer = null;
 let roadOverlayLabelsLayer = null;
-let roadOverlayRenderer = null;
+let roadOverlayCasingRenderer = null;
+let roadOverlayLineRenderer = null;
 let roadOverlayRefreshTimer = null;
 let roadOverlayRefreshToken = 0;
 const loadedRoadOverlayParts = new Map();
@@ -2682,7 +2691,24 @@ function initMap() {
         if (trafficPane) trafficPane.style.zIndex = '690';
     }
     highVoltageLinesRenderer = L.canvas ? L.canvas({ padding: 0.35 }) : null;
-    roadOverlayRenderer = L.canvas ? L.canvas({ padding: 0.45 }) : null;
+
+    /*
+     * v14.16 — un Canvas distinct par pane.
+     * Le partage d'un même renderer entre l'entourage et la ligne pouvait
+     * provoquer des redessins incomplets sur Safari/iPadOS.
+     */
+    roadOverlayCasingRenderer = L.canvas
+        ? L.canvas({
+            padding: 0.55,
+            pane: 'roadOverlayCasingPane'
+        })
+        : null;
+    roadOverlayLineRenderer = L.canvas
+        ? L.canvas({
+            padding: 0.55,
+            pane: 'roadOverlayLinePane'
+        })
+        : null;
 
     setupBaseTileLayer();
     permanentAirportLayer = L.layerGroup().addTo(map);
@@ -3406,7 +3432,7 @@ function setupEventListeners() {
     if (centerGpsButton) {
         refreshCenterGpsFollowButtonState();
         installCenterGpsFollowHandlers();
-        centerGpsButton.addEventListener('click', toggleCenterGpsFollow);
+        installCenterGpsButtonPressHandlers(centerGpsButton);
     }
 
     liveGpsButton.addEventListener('click', toggleLiveGps);
@@ -4785,6 +4811,7 @@ function getRoadOverlayLineStyle(feature, casing = false) {
     ) || String(feature?.properties?.roadClass || '');
 
     const zoom = map?.getZoom?.() ?? 10;
+    const visibleAtCurrentZoom = shouldDisplayRoadOverlayFeature(feature);
     const styleByClass = {
         A: {
             color: '#e85d04',
@@ -4805,10 +4832,19 @@ function getRoadOverlayLineStyle(feature, casing = false) {
 
     const selected = styleByClass[roadClass] || styleByClass.D;
 
+    /*
+     * Toutes les routes restent présentes dans les couches Leaflet. En dessous
+     * du zoom prévu, elles deviennent transparentes mais ne sont pas supprimées.
+     */
     return {
         color: casing ? '#ffffff' : selected.color,
-        weight: casing ? selected.casingWeight : selected.weight,
-        opacity: casing ? 0.94 : 0.95,
+        weight: visibleAtCurrentZoom
+            ? (casing ? selected.casingWeight : selected.weight)
+            : 0,
+        opacity: visibleAtCurrentZoom
+            ? (casing ? 0.94 : 0.95)
+            : 0,
+        fillOpacity: 0,
         lineCap: 'round',
         lineJoin: 'round',
         interactive: false,
@@ -4951,18 +4987,21 @@ async function loadRoadOverlayPart(part, token) {
     const geojson = await response.json();
     if (token !== roadOverlayRefreshToken || !showRoadOverlayLayer) return null;
 
+    /*
+     * Ne jamais filtrer A/N/D au chargement selon le zoom.
+     * Le filtrage de la v14.15 pouvait laisser une étiquette sans tracé après
+     * un zoom avant, car l'étiquette était reconstruite mais pas la géométrie.
+     */
     const casing = L.geoJSON(geojson, {
         pane: 'roadOverlayCasingPane',
-        renderer: roadOverlayRenderer || undefined,
+        renderer: roadOverlayCasingRenderer || undefined,
         interactive: false,
-        filter: shouldDisplayRoadOverlayFeature,
         style: feature => getRoadOverlayLineStyle(feature, true)
     });
     const lines = L.geoJSON(geojson, {
         pane: 'roadOverlayLinePane',
-        renderer: roadOverlayRenderer || undefined,
+        renderer: roadOverlayLineRenderer || undefined,
         interactive: false,
-        filter: shouldDisplayRoadOverlayFeature,
         style: feature => getRoadOverlayLineStyle(feature, false)
     });
 
@@ -5024,10 +5063,22 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
 
         loadedRoadOverlayParts.forEach(record => {
             try {
-                record.casing.setStyle(feature => getRoadOverlayLineStyle(feature, true));
-                record.lines.setStyle(feature => getRoadOverlayLineStyle(feature, false));
+                record.casing.setStyle(
+                    feature => getRoadOverlayLineStyle(feature, true)
+                );
+                record.lines.setStyle(
+                    feature => getRoadOverlayLineStyle(feature, false)
+                );
             } catch (_) {}
         });
+
+        /*
+         * Safari/iPadOS peut conserver une frame Canvas incomplète après un
+         * déplacement ou un zoom rapide. Forcer le redraw stabilise le tracé.
+         */
+        try { roadOverlayCasingRenderer?._redraw?.(); } catch (_) {}
+        try { roadOverlayLineRenderer?._redraw?.(); } catch (_) {}
+
         rebuildRoadOverlayLabels();
     } finally {
         if (token === roadOverlayRefreshToken) {
@@ -8823,12 +8874,173 @@ function getKnownGpsLatLngForCentering() {
 function refreshCenterGpsFollowButtonState() {
     const button = document.getElementById('center-gps-button');
     if (!button) return;
+
     button.classList.toggle('center-follow-active', centerGpsFollowActive);
     button.classList.toggle('active', centerGpsFollowActive);
     button.setAttribute('aria-pressed', centerGpsFollowActive ? 'true' : 'false');
+
     button.title = centerGpsFollowActive
-        ? 'Suivi position actif — cliquer pour désactiver'
-        : 'Centrer puis suivre ma position GPS';
+        ? 'Clic : centrer sur ma position · Appui long : désactiver le suivi'
+        : 'Clic : centrer sur ma position · Appui long : activer le suivi';
+
+    button.setAttribute(
+        'aria-label',
+        centerGpsFollowActive
+            ? 'Centrer sur ma position ; appui long pour désactiver le suivi'
+            : 'Centrer sur ma position ; appui long pour activer le suivi'
+    );
+}
+
+function clearCenterGpsButtonLongPressTimer() {
+    if (centerGpsButtonLongPressTimer) {
+        clearTimeout(centerGpsButtonLongPressTimer);
+        centerGpsButtonLongPressTimer = null;
+    }
+}
+
+function resetCenterGpsButtonPressState(button = null) {
+    clearCenterGpsButtonLongPressTimer();
+    centerGpsButtonActivePointerId = null;
+    centerGpsButtonPressStartX = 0;
+    centerGpsButtonPressStartY = 0;
+    if (button) {
+        button.classList.remove('center-gps-pressing');
+    }
+}
+
+function handleCenterGpsButtonLongPress(button) {
+    centerGpsButtonLongPressTimer = null;
+    centerGpsButtonLongPressTriggered = true;
+    centerGpsButtonSuppressClickUntil = Date.now() + 900;
+
+    button.classList.remove('center-gps-pressing');
+    button.classList.add('center-gps-long-press-confirmed');
+
+    /*
+     * L'appui long conserve la possibilité de désactiver le suivi avec le même
+     * bouton. Lorsqu'il est inactif, il l'active comme demandé.
+     */
+    if (centerGpsFollowActive) {
+        disableCenterGpsFollow();
+    } else {
+        enableCenterGpsFollow();
+    }
+
+    try {
+        if (navigator.vibrate) navigator.vibrate(35);
+    } catch (_) {}
+
+    setTimeout(() => {
+        button.classList.remove('center-gps-long-press-confirmed');
+    }, 360);
+}
+
+function installCenterGpsButtonPressHandlers(button) {
+    if (!button || button.dataset.centerGpsPressHandlersInstalled === 'true') {
+        return;
+    }
+    button.dataset.centerGpsPressHandlersInstalled = 'true';
+
+    const cancelPress = () => {
+        resetCenterGpsButtonPressState(button);
+    };
+
+    button.addEventListener('pointerdown', (event) => {
+        if (String(event.pointerType || '').toLowerCase() === 'pen') return;
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        centerGpsButtonLongPressTriggered = false;
+        centerGpsButtonActivePointerId = event.pointerId;
+        centerGpsButtonPressStartX = Number(event.clientX) || 0;
+        centerGpsButtonPressStartY = Number(event.clientY) || 0;
+
+        button.classList.add('center-gps-pressing');
+        clearCenterGpsButtonLongPressTimer();
+
+        try {
+            button.setPointerCapture?.(event.pointerId);
+        } catch (_) {}
+
+        centerGpsButtonLongPressTimer = setTimeout(() => {
+            if (centerGpsButtonActivePointerId !== event.pointerId) return;
+            handleCenterGpsButtonLongPress(button);
+        }, CENTER_GPS_BUTTON_LONG_PRESS_MS);
+    }, { passive: false });
+
+    button.addEventListener('pointermove', (event) => {
+        if (centerGpsButtonActivePointerId !== event.pointerId) return;
+
+        const deltaX = (Number(event.clientX) || 0) - centerGpsButtonPressStartX;
+        const deltaY = (Number(event.clientY) || 0) - centerGpsButtonPressStartY;
+        const distance = Math.hypot(deltaX, deltaY);
+
+        if (distance > CENTER_GPS_BUTTON_MOVE_TOLERANCE_PX) {
+            cancelPress();
+        }
+    }, { passive: true });
+
+    button.addEventListener('pointerup', (event) => {
+        if (centerGpsButtonActivePointerId !== event.pointerId) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const wasLongPress = centerGpsButtonLongPressTriggered;
+        centerGpsButtonSuppressClickUntil = Date.now() + 700;
+        resetCenterGpsButtonPressState(button);
+
+        try {
+            button.releasePointerCapture?.(event.pointerId);
+        } catch (_) {}
+
+        if (!wasLongPress) {
+            centerMapOnCurrentPosition();
+        }
+
+        centerGpsButtonLongPressTriggered = false;
+    }, { passive: false });
+
+    button.addEventListener('pointercancel', cancelPress, { passive: true });
+    button.addEventListener('lostpointercapture', () => {
+        if (!centerGpsButtonLongPressTriggered) {
+            cancelPress();
+        }
+    }, { passive: true });
+
+    /*
+     * Supprimer le clic synthétique émis par Safari après pointerup ou après
+     * l'appui long, afin qu'il ne déclenche jamais une seconde action.
+     */
+    button.addEventListener('click', (event) => {
+        if (Date.now() <= centerGpsButtonSuppressClickUntil) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+            return;
+        }
+
+        /*
+         * Repli souris/clavier si aucun événement Pointer n'a été reçu.
+         */
+        event.preventDefault();
+        event.stopPropagation();
+        centerMapOnCurrentPosition();
+    }, true);
+
+    button.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    button.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            centerMapOnCurrentPosition();
+        }
+    });
 }
 
 function recenterMapOnKnownGpsPosition(reason = 'manual') {
@@ -9030,11 +9242,17 @@ function toggleCenterGpsFollow() {
 }
 
 function centerMapOnCurrentPosition() {
-    // Conservé pour compatibilité avec d'éventuels appels existants : action ponctuelle sans activer le suivi.
+    /*
+     * Action ponctuelle : recentrer immédiatement, sans modifier l'état du
+     * suivi. La dernière position connue est prioritaire pour éviter tout délai.
+     */
     if (!map) return;
 
+    if (recenterMapOnKnownGpsPosition('short-press-known')) {
+        return;
+    }
+
     if (!navigator.geolocation) {
-        if (recenterMapOnKnownGpsPosition('legacy')) return;
         alert("La géolocalisation n'est pas supportée par votre navigateur.");
         return;
     }
@@ -9042,14 +9260,18 @@ function centerMapOnCurrentPosition() {
     navigator.geolocation.getCurrentPosition(
         (pos) => {
             updateUserPosition(pos);
-            recenterMapOnKnownGpsPosition('legacy-current');
+            recenterMapOnKnownGpsPosition('short-press-current');
         },
         () => {
-            if (!recenterMapOnKnownGpsPosition('legacy-fallback')) {
+            if (!recenterMapOnKnownGpsPosition('short-press-fallback')) {
                 alert("Impossible d'obtenir la position GPS. Vérifiez les autorisations.");
             }
         },
-        { enableHighAccuracy: true, timeout: 30000, maximumAge: 600000 }
+        {
+            enableHighAccuracy: true,
+            timeout: 30000,
+            maximumAge: 600000
+        }
     );
 }
 
