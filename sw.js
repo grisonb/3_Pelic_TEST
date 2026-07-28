@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-17_routes_stables_clic_centrage_appui_long_suivi';
-const APP_VERSION = 'v14.17';
+const SW_VERSION = 'sw-v14-18_departementales_a_partir_1nm';
+const APP_VERSION = 'v14.18';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
