@@ -6330,11 +6330,11 @@ function resolveTrafficVisualType(aircraft) {
         HANG_GLIDER: 'hangglider',
         GYROCOPTER: 'gyrocopter',
         MILITARY: 'military',
-        FLEX_WING_TRIKES: 'ultralight',
+        FLEX_WING_TRIKES: 'pendular',
         PARA_MOTOR: 'paramotor',
-        THREE_AXES_LIGHT_PLANE: 'airplane',
+        THREE_AXES_LIGHT_PLANE: 'ultralight',
         MOTORPLANE: 'airplane',
-        PAV: 'airplane',
+        PAV: 'pav',
         STATIC_OBJECT: 'static'
     };
     if (safeSkyMapping[safeSkyType]) return safeSkyMapping[safeSkyType];
@@ -6462,6 +6462,12 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             label: 'Drone',
             path: 'M5 3a2.6 2.6 0 1 1-1.8.8L7.4 8H10V5.5h4V8h2.6l4.2-4.2A2.6 2.6 0 1 1 22 5l-4.2 4.2V12h2.7v4h-2.7l4.2 4.2A2.6 2.6 0 1 1 20.8 22l-4.2-4.2H14v2.7h-4v-2.7H7.4L3.2 22A2.6 2.6 0 1 1 2 20.2L6.2 16H3.5v-4h2.7V9.2L2 5A2.6 2.6 0 0 1 5 3Zm7 7.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z'
         },
+        pav: {
+            className: 'pav',
+            directional: true,
+            label: 'PAV',
+            path: 'M12 2.2 14 6l4.1-1.1 1.2 1.8-3.2 2.8 4.3 2.2v2.2l-5.2-.8-1.1 3.6 2.7 2.5-.8 1.7-4-1.9-4 1.9-.8-1.7 2.7-2.5-1.1-3.6-5.2.8v-2.2l4.3-2.2-3.2-2.8 1.2-1.8L10 6l2-3.8Zm0 5.4a3.1 3.1 0 1 0 0 6.2 3.1 3.1 0 0 0 0-6.2Z'
+        },
         balloon: {
             className: 'balloon',
             directional: false,
@@ -6546,6 +6552,12 @@ function getTrafficAircraftVisualDefinition(aircraft) {
             label: 'ULM',
             path: 'M2 7.5 12 3l10 4.5-10 3-10-3ZM11 11h2v3.7h3.1l3 5.3h-2.4l-2.1-3.5H9.4L7.3 20H4.9l3-5.3H11V11Z'
         },
+        pendular: {
+            className: 'pendular',
+            directional: true,
+            label: 'Pendulaire',
+            path: 'M1.4 8.2 12 3l10.6 5.2L12 11.1 1.4 8.2Zm9.5 3.9h2.2v2.6l4.1 4.4-1.6 1.5-3.6-3.8-3.6 3.8-1.6-1.5 4.1-4.4v-2.6Zm-1.6 8.2h5.4v1.7H9.3v-1.7Z'
+        },
         paramotor: {
             className: 'paramotor',
             directional: true,
@@ -6607,10 +6619,13 @@ function buildTrafficMarkerIcon(aircraft) {
      * Le libellé est désormais plus large car il contient aussi l'identifiant.
      * Rayon légèrement augmenté pour éviter tout contact avec le rond.
      */
-    const labelRadiusPx = 31;
+    const markerCenterPx = 22;
+    const labelRadiusPx = 39;
     const trackRadians = track * Math.PI / 180;
-    const altitudeLabelLeft = 18 - Math.sin(trackRadians) * labelRadiusPx;
-    const altitudeLabelTop = 18 + Math.cos(trackRadians) * labelRadiusPx;
+    const altitudeLabelLeft = markerCenterPx
+        - Math.sin(trackRadians) * labelRadiusPx;
+    const altitudeLabelTop = markerCenterPx
+        + Math.cos(trackRadians) * labelRadiusPx;
 
     const compactIdentifier = getTrafficCompactIdentifier(aircraft);
     const compactLabelParts = [
@@ -6622,18 +6637,18 @@ function buildTrafficMarkerIcon(aircraft) {
         ? `<span class="traffic-aircraft-altitude-label" style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">${compactLabelParts.map(escapeHtml).join('<span class="traffic-label-separator"> · </span>')}</span>`
         : '';
 
-    const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path d="${visual.path}"></path></svg>`;
+    /*
+     * v14.25 — silhouette noire inspirée de la lisibilité SafeSky, avec un
+     * contour blanc distinct pour rester visible sur tous les fonds de carte.
+     */
+    const symbolSvg = `<svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true"><path class="traffic-symbol-outline" d="${visual.path}"></path><path class="traffic-symbol-fill" d="${visual.path}"></path></svg>`;
 
     return L.divIcon({
         className: 'traffic-aircraft-icon',
         html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}"><span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);"><span class="traffic-aircraft-dotted-vector"></span></span><span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
-        /*
-         * v14.05 — ancrage relatif au vrai centre Leaflet du trafic.
-         * -8 px place la pointe juste au-dessus du rond de 15 px.
-         */
-        popupAnchor: [0, -8]
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+        popupAnchor: [0, -14]
     });
 }
 
