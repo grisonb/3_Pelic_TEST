@@ -1,5 +1,34 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.22 TEST — correction de l’import des références DN, RD, RN et CD
+
+Modifications apportées :
+- correction du rejet de la référence DN7 pendant l’import du pack routier ;
+- identification de la cause restante observée autour de Brignoles ;
+- le générateur v4 produisait correctement DN7, mais l’importeur v14.21 exigeait D suivi directement d’un chiffre ;
+- ajout d’un normaliseur routier dédié dans l’application ;
+- reconnaissance de DN7 ;
+- reconnaissance de DN 7 ;
+- reconnaissance de D N 7 ;
+- reconnaissance de D.N.7 ;
+- reconnaissance de RD N7 et RDN7 ;
+- reconnaissance de RD559 et RD 559 sous la forme D559 ;
+- reconnaissance de CD35 et CD 35 sous la forme D35 ;
+- reconnaissance de RN7 et RN 7 sous la forme N7 ;
+- conservation des formes A8, N7, D559, D7N et D2007 ;
+- suppression des accents avant analyse des références textuelles ;
+- suppression des espaces, points, barres obliques et séparateurs administratifs ;
+- recherche supplémentaire dans les propriétés ref_raw et toponyme produites par le générateur v4 ;
+- maintien de la classe D pour les références DN ;
+- conservation des seuils d’affichage : A à 2 NM, N et D à 1 NM ;
+- conservation de l’optimisation mémoire et des trois niveaux de chargement introduits en v14.21 ;
+- conservation du comportement du bouton de position : clic court = centrage, appui long = suivi ;
+- nécessité de réimporter le pack v4 après installation pour restaurer les objets rejetés lors de l’ancien import ;
+- aucune nécessité de régénérer le pack v4 s’il a déjà été créé ;
+- aucune modification du trafic, de la simulation, des cartes offline ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.22 TEST.
+
 v14.21 TEST — optimisation mémoire et fluidité du calque routier par niveau de zoom
 
 Modifications apportées :
