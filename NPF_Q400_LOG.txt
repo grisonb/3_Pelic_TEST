@@ -1,5 +1,45 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.25 TEST — icônes trafic renforcées dans le style visuel SafeSky
+
+Modifications apportées :
+- refonte visuelle complète des symboles de trafic affichés sur la carte ;
+- remplacement du petit disque coloré par une silhouette aéronautique noire ;
+- ajout d’un contour blanc épais autour de chaque silhouette ;
+- amélioration du contraste sur fonds clairs, sombres, raster et vectoriels ;
+- augmentation de la taille visuelle des symboles d’environ 10–11 px à 26–28 px ;
+- conservation d’une zone tactile Leaflet de 44 × 44 px ;
+- recentrage des symboles sur leur coordonnée réelle ;
+- adaptation de l’ancrage de la fenêtre d’information ;
+- adaptation de la longueur du vecteur pointillé ;
+- adaptation du rayon de placement de l’étiquette opposée au vecteur ;
+- ajout d’un petit témoin coloré pour conserver l’information d’altitude relative ;
+- témoin rouge pour un trafic dans la même tranche d’altitude ;
+- témoin vert pour un trafic situé en dessous ;
+- témoin bleu pour un trafic situé au-dessus ;
+- témoin gris lorsque l’altitude relative est inconnue ;
+- maintien de la couleur du vecteur pointillé selon l’altitude relative ;
+- maintien de la bordure colorée de l’étiquette ;
+- passage du texte de l’étiquette en noir pour une lecture plus immédiate ;
+- augmentation légère de la taille et de l’épaisseur du texte d’identification ;
+- ajout d’un halo et d’une ombre discrète autour des silhouettes ;
+- utilisation d’un SVG à double couche : contour blanc puis remplissage noir ;
+- différenciation visuelle spécifique de la catégorie PAV ;
+- la catégorie SafeSky PAV n’est plus représentée comme un avion standard ;
+- différenciation visuelle spécifique des pendulaires ;
+- la catégorie SafeSky FLEX_WING_TRIKES utilise désormais une silhouette pendulaire ;
+- la catégorie THREE_AXES_LIGHT_PLANE utilise désormais la silhouette ULM ;
+- conservation des catégories avion, jet, hélicoptère, planeur, drone, ballon, dirigeable, parachute, parapente, deltaplane, autogire, paramoteur, militaire et objet statique ;
+- taille légèrement augmentée pour les jets et aéronefs militaires ;
+- taille adaptée pour les silhouettes larges comme hélicoptère, drone, PAV, parachute et dirigeable ;
+- maintien de SafeSky comme source unique du trafic ;
+- maintien de l’appel direct SafeSky et de la clé temporaire intégrée ;
+- maintien du rafraîchissement toutes les cinq secondes ;
+- conservation des corrections routières, de l’optimisation mémoire et du comportement du bouton de position ;
+- aucune modification des cartes offline, de la simulation ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.25 TEST.
+
 v14.24 TEST — SafeSky direct avec clé intégrée, sans NAS
 
 Modifications apportées :
