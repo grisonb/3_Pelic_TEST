@@ -4424,6 +4424,55 @@ function saveRoadOverlayManifest(manifest) {
     localStorage.setItem(ROAD_OVERLAY_MANIFEST_KEY, JSON.stringify(manifest));
 }
 
+function normalizeRoadOverlayReferenceValue(value) {
+    if (value === null || value === undefined) return '';
+
+    let normalized = String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .toUpperCase()
+        .replace(/[°º]/g, '')
+        .replace(/\bNUMERO\b/g, '')
+        .replace(/\bAUTOROUTE\b/g, 'A')
+        .replace(/\bROUTE\s*NATIONALE\b/g, 'N')
+        .replace(/\bNATIONALE\b/g, 'N')
+        .replace(/\bROUTE\s*DEPARTEMENTALE\b/g, 'D')
+        .replace(/\bDEPARTEMENTALE\b/g, 'D')
+        .replace(/[\s._/]+/g, '');
+
+    if (!normalized) return '';
+
+    /*
+     * L'ordre est important : DN/RDN doit être reconnu avant RD/D.
+     * Exemples : DN7, D.N.7, D N 7 et RD N7 deviennent tous DN7.
+     */
+    let match = normalized.match(/(?:^|[^A-Z0-9])R?DN(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/R?DN(\d+[A-Z0-9-]*)/);
+    if (match) return `DN${match[1]}`;
+
+    /*
+     * Formes départementales administratives : RD559, RD 559, CD35.
+     */
+    match = normalized.match(/(?:^|[^A-Z0-9])(?:R|C)D(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/(?:R|C)D(\d+[A-Z0-9-]*)/);
+    if (match) return `D${match[1]}`;
+
+    /*
+     * Formes nationales administratives : RN7, RN 7.
+     */
+    match = normalized.match(/(?:^|[^A-Z0-9])RN(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/RN(\d+[A-Z0-9-]*)/);
+    if (match) return `N${match[1]}`;
+
+    /*
+     * Formes directement exploitables : A8, N7, D559, D7N, D2007.
+     */
+    match = normalized.match(/(?:^|[^A-Z0-9])([AND]\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/([AND]\d+[A-Z0-9-]*)/);
+    return match ? match[1] : '';
+}
+
 function getRoadOverlayFeatureReference(feature) {
     const props = feature?.properties || {};
     const candidates = [
@@ -4438,23 +4487,17 @@ function getRoadOverlayFeatureReference(feature) {
         props.CODE_ROUTE,
         props.numero,
         props.NUMERO,
+        props.ref_raw,
+        props.toponyme,
+        props.TOPONYME,
         props.name,
-        props.nom
+        props.nom,
+        props.NOM
     ];
 
     for (const value of candidates) {
-        if (value === null || value === undefined) continue;
-        const normalized = String(value)
-            .trim()
-            .toUpperCase()
-            .replace(/\s+/g, '')
-            .replace(/^AUTOROUTE/, 'A')
-            .replace(/^NATIONALE/, 'N')
-            .replace(/^DEPARTEMENTALE/, 'D')
-            .replace(/^DÉPARTEMENTALE/, 'D');
-
-        const match = normalized.match(/\b([AND]\d+[A-Z0-9-]*)\b/);
-        if (match) return match[1];
+        const ref = normalizeRoadOverlayReferenceValue(value);
+        if (ref) return ref;
     }
 
     return '';
