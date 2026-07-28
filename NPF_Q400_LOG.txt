@@ -1,5 +1,35 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.21 TEST — optimisation mémoire et fluidité du calque routier par niveau de zoom
+
+Modifications apportées :
+- correction du fort ralentissement observé aux zooms où les routes sont masquées ;
+- correction du risque de page blanche et de rechargement de la PWA par manque de mémoire ;
+- suppression du maintien en mémoire de toutes les géométries A/N/D avec une opacité nulle ;
+- création de trois niveaux internes de chargement routier ;
+- niveau 0, avant 2 NM : aucune géométrie routière chargée ;
+- niveau 1, à partir de 2 NM : chargement exclusif des autoroutes A ;
+- niveau 2, à partir de 1 NM : chargement des autoroutes A, nationales N et départementales D ;
+- absence totale de lecture GeoJSON et de rendu Canvas sous le seuil 2 NM ;
+- destruction complète des couches lors du passage d’un niveau de zoom à un autre ;
+- reconstruction propre des couches à chaque franchissement des seuils 2 NM et 1 NM ;
+- filtrage des objets avant leur création dans Leaflet ;
+- conservation en mémoire uniquement des objets réellement affichables au niveau courant ;
+- gestion des parties ne contenant aucune autoroute sans relecture répétée à 2 NM ;
+- libération explicite des couches de tracés, entourages et étiquettes ;
+- redessin explicite des canvases après nettoyage ;
+- réduction du padding géographique des parties chargées à 2 NM ;
+- réduction du padding géographique des parties chargées à 1 NM ;
+- augmentation du délai de stabilisation après zoom de 140 à 220 ms pour éviter les reconstructions successives ;
+- maintien de la correction contre les étiquettes départementales sans tracé ;
+- maintien des seuils : A à 2 NM, N et D à 1 NM ;
+- maintien du comportement du bouton de position : clic court = centrage, appui long = suivi ;
+- aucune modification du pack routier déjà importé ;
+- le ZIP France Sud + Corse reste compatible et n’a pas besoin d’être réimporté ;
+- aucune modification du trafic, de la simulation, des cartes offline ou du blocage du stylet ;
+- la ressource SafeSky monochrome reste uniquement dans l’archive ;
+- version applicative portée en v14.21 TEST.
+
 v14.20 TEST — nationales à partir de 1 NM, autoroutes à partir de 2 NM
 
 Modifications apportées :
