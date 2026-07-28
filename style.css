@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.15') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.15') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.17') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.17') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -10703,4 +10703,49 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 .road-overlay-delete-button {
     align-self: flex-start !important;
+}
+
+
+/* ==========================================================================
+   v14.16 TEST — stabilité du calque routier
+   ========================================================================== */
+
+.leaflet-roadOverlayCasingPane-pane canvas,
+.leaflet-roadOverlayLinePane-pane canvas {
+    pointer-events: none !important;
+    will-change: transform !important;
+}
+
+
+/* ==========================================================================
+   v14.17 TEST — clic court centrage / appui long suivi GPS
+   ========================================================================== */
+
+#center-gps-button {
+    -webkit-touch-callout: none !important;
+    touch-action: manipulation !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    transition:
+        transform .12s ease,
+        box-shadow .12s ease,
+        background-color .12s ease !important;
+}
+
+#center-gps-button.center-gps-pressing {
+    transform: scale(.94) !important;
+    box-shadow:
+        0 0 0 5px rgba(10, 104, 170, .22),
+        var(--shadow) !important;
+}
+
+#center-gps-button.center-gps-long-press-confirmed {
+    transform: scale(.97) !important;
+    box-shadow:
+        0 0 0 7px rgba(16, 185, 129, .32),
+        var(--shadow) !important;
+}
+
+#center-gps-button.center-follow-active::after {
+    content: "SUIVI" !important;
 }
