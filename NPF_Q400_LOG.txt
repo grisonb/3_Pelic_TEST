@@ -1,5 +1,27 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.33 TEST — flèches compactes et étiquette maintenue hors de l’icône
+
+Modifications apportées :
+- réduction de la hauteur visuelle des flèches diagonales de montée et de descente ;
+- taille des flèches ramenée de 22 px à 18 px ;
+- hauteur réservée ramenée de 18 px à 14 px ;
+- épaisseur augmentée par un contour de 0,85 px et plusieurs ombres directionnelles ;
+- largeur légèrement renforcée par une mise à l’échelle horizontale ;
+- réduction de la hauteur minimale de la deuxième ligne à 15 px ;
+- maintien d’un espace de 7 px entre l’altitude et la flèche ;
+- suppression du risque de contact entre la flèche et la première ligne ;
+- remplacement du placement centré de l’étiquette par un placement ancré sur son bord ;
+- calcul de la position de l’étiquette toujours opposé à la route du trafic ;
+- ajout de huit secteurs de placement couvrant les routes tous les 45 degrés ;
+- ancrage par le bord inférieur, supérieur, gauche, droit ou l’un des quatre coins selon la route ;
+- largeur de l’étiquette empêchée de revenir au-dessus de l’icône ;
+- distance minimale maintenue entre l’icône et le bord de l’étiquette ;
+- stabilité du placement lors des faibles variations de route ;
+- conservation de toutes les fonctions de la v14.32 ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.33 TEST.
+
 v14.32 TEST — flèches montée/descente diagonales et renforcées
 
 Modifications apportées :
