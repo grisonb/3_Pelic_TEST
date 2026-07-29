@@ -1,5 +1,42 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.31 TEST — fenêtre trafic enrichie, couleur des icônes et étiquette permanente sur deux lignes
+
+Modifications apportées :
+- demande à SafeSky d’inclure les trafics au sol ;
+- suppression de l’exclusion locale des trafics GROUNDED ;
+- maintien de l’exclusion des trafics INACTIVE ;
+- affichage des trafics au sol avec altitude « SOL » ;
+- ajout d’un état spécifique « trafic au sol » ;
+- icônes des trafics conventionnels colorées comme leur étiquette ;
+- rouge pour la même tranche d’altitude ±500 ft ;
+- vert pour les trafics situés plus de 500 ft en dessous ;
+- bleu pour les trafics situés plus de 500 ft au-dessus ;
+- gris lorsque l’altitude relative est inconnue ;
+- noir pour tous les trafics au sol ;
+- maintien du magenta pour parapente et paramoteur en vol ;
+- maintien du cyan pour deltaplane, parachutiste et pendulaire en vol ;
+- passage de toutes les familles colorées au noir lorsqu’elles sont au sol ;
+- ajout de la compagnie dans la fenêtre trafic lorsqu’elle est disponible ;
+- récupération des champs opérateur, compagnie, propriétaire ou compagnie aérienne lorsqu’ils sont fournis ;
+- ajout d’une reconnaissance locale des principaux préfixes ICAO de compagnies aériennes ;
+- ajout du modèle ou type précis d’aéronef dans la fenêtre lorsqu’il est disponible ;
+- récupération des champs modèle, description, désignateur OACI et type enrichi lorsqu’ils sont fournis ;
+- maintien de la catégorie SafeSky française dans la fenêtre ;
+- affichage séparé de l’immatriculation et de l’indicatif lorsqu’ils sont disponibles ;
+- transformation de la petite étiquette permanente en étiquette sur deux lignes ;
+- ligne 1 : immatriculation ou meilleur identifiant, puis modèle ou catégorie ;
+- ligne 2 : altitude, puis flèche de montée ou de descente ;
+- flèche ↑ lorsque la vitesse verticale est positive ;
+- flèche ↓ lorsque la vitesse verticale est négative ;
+- aucune flèche lorsque la vitesse verticale est nulle ou inconnue ;
+- absence de flèche pour les trafics au sol ;
+- conservation du placement opposé au vecteur ;
+- conservation des vecteurs proportionnels à la vitesse sol ;
+- conservation de SafeSky comme source unique du trafic ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.31 TEST.
+
 v14.30 TEST — harmonisation des couleurs paramoteur, parachutiste et pendulaire
 
 Modifications apportées :
