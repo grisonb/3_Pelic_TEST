@@ -6044,7 +6044,7 @@ function buildTrafficApiUrl(point, provider = null) {
         const url = new URL(activeProvider.baseUrl, window.location.href);
 
         url.searchParams.set('viewport', viewport);
-        url.searchParams.set('show_grounded', 'false');
+        url.searchParams.set('show_grounded', 'true');
 
         const altitudeParameters = getSafeSkyAltitudeQueryParameters();
         Object.entries(altitudeParameters).forEach(([key, value]) => {
@@ -6224,8 +6224,23 @@ function normalizeTrafficAircraft(raw) {
         || raw.emitterCategory
         || ''
     ).trim().toUpperCase();
-    const type = String(raw.beacon_type || raw.t || raw.aircraft_type || raw.type || '').trim();
-    const registration = String(raw.registration || raw.r || '').trim();
+    const type = String(
+        raw.beacon_type
+        || raw.t
+        || raw.aircraft_type
+        || raw.type
+        || ''
+    ).trim();
+
+    const registration = String(
+        raw.registration
+        || raw.registration_number
+        || raw.tail_number
+        || raw.tail
+        || raw.r
+        || ''
+    ).trim();
+
     const source = String(
         raw.transponder_type
         || raw.source
@@ -6233,8 +6248,37 @@ function normalizeTrafficAircraft(raw) {
         || raw.dbFlags
         || ''
     ).trim();
+
     const status = String(raw.status || '').trim().toUpperCase();
     const remarks = String(raw.remarks || '').trim();
+
+    /*
+     * Ces champs ne sont pas garantis par le modèle public SafeSky, mais ils
+     * sont conservés lorsqu'une réponse enrichie les fournit.
+     */
+    const operatorName = String(
+        raw.operator_name
+        || raw.operator
+        || raw.airline_name
+        || raw.airline
+        || raw.company_name
+        || raw.company
+        || raw.owner_name
+        || raw.owner
+        || ''
+    ).trim();
+
+    const aircraftModel = String(
+        raw.aircraft_model
+        || raw.aircraft_model_name
+        || raw.model_name
+        || raw.model
+        || raw.type_description
+        || raw.aircraft_description
+        || raw.icao_type_designator
+        || raw.type_designator
+        || ''
+    ).trim();
 
     let verticalRateFpm = null;
     if (safeSkyFormat && Number.isFinite(Number(raw.vertical_rate))) {
@@ -6243,8 +6287,17 @@ function normalizeTrafficAircraft(raw) {
         );
     }
 
-    if (status === 'GROUNDED' || status === 'INACTIVE') {
+    if (status === 'INACTIVE') {
         return null;
+    }
+
+    const isGrounded = (
+        status === 'GROUNDED'
+        || String(raw.alt_baro || '').toLowerCase() === 'ground'
+    );
+
+    if (isGrounded) {
+        altitude = 'SOL';
     }
 
     return {
@@ -6264,7 +6317,10 @@ function normalizeTrafficAircraft(raw) {
         registration,
         source,
         status,
+        isGrounded,
         remarks,
+        operatorName,
+        aircraftModel,
         verticalRateFpm,
         providerFormat: safeSkyFormat ? 'safesky' : 'readsb',
         raw
@@ -6278,6 +6334,14 @@ function formatTrafficAge(seconds) {
 }
 
 function getTrafficRelativeAltitudeState(aircraft) {
+    if (aircraft?.isGrounded) {
+        return {
+            className: 'traffic-altitude-grounded',
+            label: 'Trafic au sol',
+            deltaFt: null
+        };
+    }
+
     const ownAltitudeFt = getOwnTrafficAltitudeFeet();
     const trafficAltitudeFt = Number(aircraft?.altitudeFeet);
 
@@ -6784,6 +6848,147 @@ function getTrafficCompactIdentifier(aircraft) {
     return '';
 }
 
+
+const TRAFFIC_AIRLINE_ICAO_NAMES = Object.freeze({
+    AFR: 'Air France',
+    TVF: 'Transavia France',
+    CCM: 'Air Corsica',
+    HOP: 'HOP!',
+    FPO: 'ASL Airlines France',
+    CRL: 'Corsair',
+    RYR: 'Ryanair',
+    EZY: 'easyJet',
+    EJU: 'easyJet Europe',
+    VOE: 'Volotea',
+    VLG: 'Vueling',
+    IBE: 'Iberia',
+    I2L: 'Iberia Express',
+    BAW: 'British Airways',
+    DLH: 'Lufthansa',
+    SWR: 'Swiss',
+    BEL: 'Brussels Airlines',
+    KLM: 'KLM',
+    TAP: 'TAP Air Portugal',
+    ITY: 'ITA Airways',
+    SAS: 'SAS',
+    NSZ: 'Norwegian',
+    WZZ: 'Wizz Air',
+    EIN: 'Aer Lingus',
+    THY: 'Turkish Airlines',
+    UAE: 'Emirates',
+    QTR: 'Qatar Airways',
+    ETD: 'Etihad Airways',
+    AAL: 'American Airlines',
+    DAL: 'Delta Air Lines',
+    UAL: 'United Airlines',
+    FDX: 'FedEx Express',
+    UPS: 'UPS Airlines'
+});
+
+function getTrafficCompanyName(aircraft) {
+    const directName = String(aircraft?.operatorName || '').trim();
+    if (directName) {
+        return directName;
+    }
+
+    const callsign = String(aircraft?.callsign || '')
+        .trim()
+        .toUpperCase();
+
+    const prefixMatch = callsign.match(/^([A-Z]{3})/);
+    if (!prefixMatch) {
+        return '';
+    }
+
+    return TRAFFIC_AIRLINE_ICAO_NAMES[prefixMatch[1]] || '';
+}
+
+function getTrafficAircraftModel(aircraft) {
+    const rawModel = String(aircraft?.aircraftModel || '').trim();
+    if (!rawModel) {
+        return '';
+    }
+
+    const technicalValues = new Set([
+        String(aircraft?.beaconType || '').trim().toUpperCase(),
+        String(aircraft?.source || '').trim().toUpperCase(),
+        'UNKNOWN',
+        'MOTORPLANE',
+        'THREE_AXES_LIGHT_PLANE',
+        'JET',
+        'HELICOPTER',
+        'GLIDER',
+        'UAV'
+    ]);
+
+    if (technicalValues.has(rawModel.toUpperCase())) {
+        return '';
+    }
+
+    return rawModel;
+}
+
+function getTrafficPermanentIdentifier(aircraft) {
+    const registration = String(aircraft?.registration || '')
+        .trim()
+        .toUpperCase();
+
+    if (registration) {
+        return registration;
+    }
+
+    return getTrafficCompactIdentifier(aircraft);
+}
+
+function getTrafficPermanentType(aircraft) {
+    return (
+        getTrafficAircraftModel(aircraft)
+        || getTrafficTypeDisplayLabel(aircraft)
+    );
+}
+
+function compactTrafficLabelText(value, maxLength = 18) {
+    const text = String(value || '').trim();
+    if (text.length <= maxLength) {
+        return text;
+    }
+    return `${text.slice(0, Math.max(1, maxLength - 1))}…`;
+}
+
+function getTrafficVerticalTrend(aircraft) {
+    const verticalRateFpm = Number(aircraft?.verticalRateFpm);
+
+    if (!Number.isFinite(verticalRateFpm) || aircraft?.isGrounded) {
+        return {
+            symbol: '',
+            className: 'traffic-trend-level',
+            label: ''
+        };
+    }
+
+    if (verticalRateFpm > 0) {
+        return {
+            symbol: '↑',
+            className: 'traffic-trend-climb',
+            label: 'Montée'
+        };
+    }
+
+    if (verticalRateFpm < 0) {
+        return {
+            symbol: '↓',
+            className: 'traffic-trend-descent',
+            label: 'Descente'
+        };
+    }
+
+    return {
+        symbol: '',
+        className: 'traffic-trend-level',
+        label: ''
+    };
+}
+
 const TRAFFIC_VECTOR_MIN_LENGTH_PX = 12;
 const TRAFFIC_VECTOR_MAX_LENGTH_PX = 92;
 const TRAFFIC_VECTOR_BASE_LENGTH_PX = 10;
@@ -6849,15 +7054,49 @@ function buildTrafficMarkerIcon(aircraft) {
     const altitudeLabelTop = markerCenterPx
         + Math.cos(trackRadians) * labelRadiusPx;
 
-    const compactIdentifier = getTrafficCompactIdentifier(aircraft);
-    const compactLabelParts = [
-        compactIdentifier,
-        aircraft.altitude && aircraft.altitude !== '--' ? aircraft.altitude : ''
+    const permanentIdentifier = compactTrafficLabelText(
+        getTrafficPermanentIdentifier(aircraft),
+        12
+    );
+    const permanentType = compactTrafficLabelText(
+        getTrafficPermanentType(aircraft),
+        18
+    );
+    const permanentAltitude = (
+        aircraft.altitude
+        && aircraft.altitude !== '--'
+    ) ? aircraft.altitude : '';
+    const verticalTrend = getTrafficVerticalTrend(aircraft);
+
+    const firstLineParts = [
+        permanentIdentifier,
+        permanentType
     ].filter(Boolean);
 
-    const altitudeHtml = settings.showAltitudeLabel && compactLabelParts.length
-        ? `<span class="traffic-aircraft-altitude-label" style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">${compactLabelParts.map(escapeHtml).join('<span class="traffic-label-separator"> · </span>')}</span>`
-        : '';
+    const secondLineParts = [
+        permanentAltitude,
+        verticalTrend.symbol
+    ].filter(Boolean);
+
+    const altitudeHtml = (
+        settings.showAltitudeLabel
+        && (firstLineParts.length || secondLineParts.length)
+    ) ? `
+        <span class="traffic-aircraft-altitude-label"
+              style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">
+            ${firstLineParts.length ? `
+                <span class="traffic-label-line traffic-label-line-primary">
+                    ${firstLineParts.map(escapeHtml).join('<span class="traffic-label-space"> </span>')}
+                </span>
+            ` : ''}
+            ${secondLineParts.length ? `
+                <span class="traffic-label-line traffic-label-line-secondary">
+                    ${permanentAltitude ? `<span>${escapeHtml(permanentAltitude)}</span>` : ''}
+                    ${verticalTrend.symbol ? `<span class="traffic-vertical-trend ${verticalTrend.className}" aria-label="${escapeHtml(verticalTrend.label)}">${escapeHtml(verticalTrend.symbol)}</span>` : ''}
+                </span>
+            ` : ''}
+        </span>
+    ` : '';
 
     /*
      * v14.26 — chaque catégorie fournit son propre pictogramme SVG, composé de
@@ -6871,7 +7110,7 @@ function buildTrafficMarkerIcon(aircraft) {
 
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} traffic-type-${visual.className}">${vectorHtml}<span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
+        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} ${aircraft.isGrounded ? 'traffic-status-grounded' : 'traffic-status-airborne'} traffic-type-${visual.className}">${vectorHtml}<span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
         iconSize: [42, 42],
         iconAnchor: [21, 21],
         popupAnchor: [0, -13]
@@ -6988,8 +7227,15 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             keyboard: false
         });
 
-        const title = escapeHtml(ac.callsign);
+        const title = escapeHtml(
+            ac.registration
+            || ac.callsign
+            || ac.hex
+            || 'Trafic'
+        );
         const displayType = getTrafficTypeDisplayLabel(ac);
+        const aircraftModel = getTrafficAircraftModel(ac);
+        const companyName = getTrafficCompanyName(ac);
         const subtitle = [
             displayType,
             ac.source,
@@ -7007,6 +7253,11 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             <div class="traffic-popup">
                 <div class="traffic-popup-title">${title}</div>
                 ${subtitle ? `<div class="traffic-popup-subtitle">${subtitle}</div>` : ''}
+                ${companyName ? `<div>Compagnie : <b>${escapeHtml(companyName)}</b></div>` : ''}
+                ${aircraftModel ? `<div>Type d’avion : <b>${escapeHtml(aircraftModel)}</b></div>` : ''}
+                ${ac.registration ? `<div>Immatriculation : <b>${escapeHtml(ac.registration)}</b></div>` : ''}
+                ${ac.callsign && ac.callsign !== ac.registration ? `<div>Indicatif : <b>${escapeHtml(ac.callsign)}</b></div>` : ''}
+                <div>Catégorie : <b>${escapeHtml(displayType)}</b></div>
                 <div>Altitude : <b>${escapeHtml(ac.altitude)}</b></div>
                 <div>Écart avec moi : <b>${escapeHtml(relativeAltitudeText)}</b> — ${escapeHtml(altitudeState.label)}</div>
                 <div>Vitesse sol : <b>${escapeHtml(ac.gs)}</b></div>
@@ -7291,7 +7542,7 @@ async function testSafeSkyApi() {
         'viewport',
         '43.20,5.20,43.40,5.55'
     );
-    testUrl.searchParams.set('show_grounded', 'false');
+    testUrl.searchParams.set('show_grounded', 'true');
 
     try {
         const response = await fetch(testUrl.toString(), {
