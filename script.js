@@ -6968,7 +6968,11 @@ function getTrafficVerticalTrend(aircraft) {
 
     if (verticalRateFpm > 0) {
         return {
-            symbol: '↑',
+            /*
+             * Le sélecteur de présentation texte évite un rendu emoji sur
+             * Safari/iPadOS et conserve une flèche aéronautique nette.
+             */
+            symbol: '↗︎',
             className: 'traffic-trend-climb',
             label: 'Montée'
         };
@@ -6976,7 +6980,7 @@ function getTrafficVerticalTrend(aircraft) {
 
     if (verticalRateFpm < 0) {
         return {
-            symbol: '↓',
+            symbol: '↘︎',
             className: 'traffic-trend-descent',
             label: 'Descente'
         };
