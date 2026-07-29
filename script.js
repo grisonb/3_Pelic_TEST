@@ -719,6 +719,30 @@ let lastTrafficError = '';
 let lastTrafficDisplayedCount = 0;
 let lastTrafficAircraftSnapshot = [];
 let lastTrafficRenderMeta = null;
+
+/*
+ * v14.35 — suivi direct, recherche globale et animation locale.
+ */
+const TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY =
+    'safeSkyTrackedIdentifiersV1';
+const TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY =
+    'safeSkyPublishedBeaconIdV1';
+const TRAFFIC_MAX_TRACKED_IDENTIFIERS = 20;
+const TRAFFIC_TEMPORARY_SEARCH_RESULT_TTL_MS = 10 * 60 * 1000;
+const TRAFFIC_SMOOTH_FRAME_INTERVAL_MS = 100;
+const TRAFFIC_MAX_EXTRAPOLATION_SECONDS = 8;
+const SAFESKY_OWN_PUBLISH_INTERVAL_MS = 5000;
+
+let trafficMarkerRegistry = new Map();
+let trafficSmoothAnimationFrame = null;
+let trafficSmoothAnimationLastAt = 0;
+let temporaryGlobalTrafficResults = new Map();
+let safeSkyOwnPublishTimer = null;
+let safeSkyOwnPublishInProgress = false;
+let lastSafeSkyOwnPublishAt = 0;
+let lastSafeSkyOwnPublishError = '';
+let ownPublicationMotionState = null;
+
 const TRAFFIC_SETTINGS_STORAGE_KEY = 'trafficLayerSettingsV1';
 const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     radiusNm: TRAFFIC_RADIUS_NM,
@@ -730,7 +754,12 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     relativeAltitudeBandFt: 1500,
     groundToAboveBandFt: 1500,
     trafficAroundOwnPosition: true,
-    trafficAroundFire: true
+    trafficAroundFire: true,
+    showDroneAdvisories: false,
+    onlyTrackedIdentifiers: false,
+    publishOwnPosition: false,
+    publicationCallsign: '',
+    publicationBeaconType: 'MOTORPLANE'
 });
 let trafficSettings = loadTrafficSettings();
 const FIRE_HISTORY_STORAGE_KEY = 'fireHistoryV1';
@@ -2675,6 +2704,11 @@ function initMap() {
             roadLabelPane.style.zIndex = '415';
             roadLabelPane.style.pointerEvents = 'none';
         }
+    }
+    if (map.createPane && !map.getPane('trafficAdvisoryPane')) {
+        map.createPane('trafficAdvisoryPane');
+        const advisoryPane = map.getPane('trafficAdvisoryPane');
+        if (advisoryPane) advisoryPane.style.zIndex = '675';
     }
     if (map.createPane && !map.getPane('trafficPane')) {
         map.createPane('trafficPane');
@@ -5393,6 +5427,43 @@ function sanitizeTrafficSettings(candidate = {}) {
         fallback.trafficAroundFire
     );
 
+    const showDroneAdvisories = asBool(
+        candidate.showDroneAdvisories,
+        fallback.showDroneAdvisories
+    );
+    const onlyTrackedIdentifiers = asBool(
+        candidate.onlyTrackedIdentifiers,
+        fallback.onlyTrackedIdentifiers
+    );
+    const publishOwnPosition = asBool(
+        candidate.publishOwnPosition,
+        fallback.publishOwnPosition
+    );
+    const publicationCallsign = String(
+        candidate.publicationCallsign
+        ?? fallback.publicationCallsign
+        ?? ''
+    )
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9_-]/g, '')
+        .slice(0, 16);
+
+    const validPublicationTypes = new Set([
+        'MOTORPLANE',
+        'JET',
+        'HELICOPTER',
+        'THREE_AXES_LIGHT_PLANE'
+    ]);
+    let publicationBeaconType = String(
+        candidate.publicationBeaconType
+        || fallback.publicationBeaconType
+        || 'MOTORPLANE'
+    ).trim().toUpperCase();
+    if (!validPublicationTypes.has(publicationBeaconType)) {
+        publicationBeaconType = 'MOTORPLANE';
+    }
+
     return {
         radiusNm,
         minAltitudeFt,
@@ -5407,9 +5478,237 @@ function sanitizeTrafficSettings(candidate = {}) {
         relativeAltitudeBandFt,
         groundToAboveBandFt,
         trafficAroundOwnPosition,
-        trafficAroundFire
+        trafficAroundFire,
+        showDroneAdvisories,
+        onlyTrackedIdentifiers,
+        publishOwnPosition,
+        publicationCallsign,
+        publicationBeaconType
     };
 }
+
+
+function sanitizeTrackedTrafficIdentifierEntry(entry) {
+    if (!entry) return null;
+
+    const id = String(entry.id || entry.hex || '')
+        .trim()
+        .toUpperCase();
+    if (!id) return null;
+
+    return {
+        id,
+        callsign: String(entry.callsign || entry.call_sign || '')
+            .trim()
+            .toUpperCase(),
+        registration: String(entry.registration || '')
+            .trim()
+            .toUpperCase(),
+        type: String(entry.type || entry.beaconType || '')
+            .trim()
+            .toUpperCase(),
+        addedAt: Number(entry.addedAt) || Date.now()
+    };
+}
+
+function loadTrackedTrafficIdentifiers() {
+    try {
+        const parsed = JSON.parse(
+            localStorage.getItem(
+                TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY
+            ) || '[]'
+        );
+
+        if (!Array.isArray(parsed)) return [];
+
+        const result = [];
+        const seen = new Set();
+
+        parsed.forEach(entry => {
+            const cleanEntry = sanitizeTrackedTrafficIdentifierEntry(entry);
+            if (!cleanEntry || seen.has(cleanEntry.id)) return;
+            seen.add(cleanEntry.id);
+            result.push(cleanEntry);
+        });
+
+        return result.slice(0, TRAFFIC_MAX_TRACKED_IDENTIFIERS);
+    } catch (_) {
+        return [];
+    }
+}
+
+function saveTrackedTrafficIdentifiers(entries) {
+    const cleanEntries = [];
+    const seen = new Set();
+
+    (Array.isArray(entries) ? entries : []).forEach(entry => {
+        const cleanEntry = sanitizeTrackedTrafficIdentifierEntry(entry);
+        if (!cleanEntry || seen.has(cleanEntry.id)) return;
+        seen.add(cleanEntry.id);
+        cleanEntries.push(cleanEntry);
+    });
+
+    const limitedEntries = cleanEntries.slice(
+        0,
+        TRAFFIC_MAX_TRACKED_IDENTIFIERS
+    );
+
+    try {
+        localStorage.setItem(
+            TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY,
+            JSON.stringify(limitedEntries)
+        );
+    } catch (_) {}
+
+    return limitedEntries;
+}
+
+function getTrackedTrafficIdentifiers() {
+    return loadTrackedTrafficIdentifiers();
+}
+
+function getTrackedTrafficIdentifierSet() {
+    return new Set(
+        getTrackedTrafficIdentifiers()
+            .map(entry => entry.id)
+            .filter(Boolean)
+    );
+}
+
+function isTrafficIdentifierTracked(id) {
+    const normalizedId = String(id || '').trim().toUpperCase();
+    return normalizedId
+        ? getTrackedTrafficIdentifierSet().has(normalizedId)
+        : false;
+}
+
+function addTrackedTrafficIdentifier(aircraft) {
+    const normalized = normalizeTrafficAircraft(
+        aircraft?.raw || aircraft
+    );
+    const id = String(
+        normalized?.hex
+        || aircraft?.id
+        || aircraft?.hex
+        || ''
+    ).trim().toUpperCase();
+
+    if (!id) {
+        throw new Error(
+            'Ce trafic ne fournit pas d’identifiant SafeSky exploitable'
+        );
+    }
+
+    const current = getTrackedTrafficIdentifiers()
+        .filter(entry => entry.id !== id);
+
+    current.unshift({
+        id,
+        callsign: normalized?.callsign || '',
+        registration: normalized?.registration || '',
+        type: normalized?.beaconType || normalized?.type || '',
+        addedAt: Date.now()
+    });
+
+    const saved = saveTrackedTrafficIdentifiers(current);
+    refreshTrackedTrafficListUi();
+
+    if (showTrafficLayer) {
+        refreshTrafficLayer({
+            force: true,
+            reason: 'tracked-add'
+        });
+    }
+
+    return saved;
+}
+
+function removeTrackedTrafficIdentifier(id) {
+    const normalizedId = String(id || '').trim().toUpperCase();
+    const saved = saveTrackedTrafficIdentifiers(
+        getTrackedTrafficIdentifiers().filter(
+            entry => entry.id !== normalizedId
+        )
+    );
+
+    refreshTrackedTrafficListUi();
+
+    if (showTrafficLayer) {
+        refreshTrafficLayer({
+            force: true,
+            reason: 'tracked-remove'
+        });
+    }
+
+    return saved;
+}
+
+function refreshTrackedTrafficListUi() {
+    const listElement = document.getElementById(
+        'traffic-tracked-list'
+    );
+    if (!listElement) return;
+
+    const entries = getTrackedTrafficIdentifiers();
+    listElement.innerHTML = '';
+
+    const countElement = document.getElementById(
+        'traffic-tracked-count'
+    );
+    if (countElement) {
+        countElement.textContent = entries.length
+            ? `${entries.length}/${TRAFFIC_MAX_TRACKED_IDENTIFIERS}`
+            : '0';
+    }
+
+    if (!entries.length) {
+        const empty = document.createElement('div');
+        empty.className = 'traffic-tool-empty';
+        empty.textContent = 'Aucun identifiant suivi';
+        listElement.appendChild(empty);
+        return;
+    }
+
+    entries.forEach(entry => {
+        const row = document.createElement('div');
+        row.className = 'traffic-tracked-row';
+
+        const label = document.createElement('div');
+        label.className = 'traffic-tracked-label';
+
+        const primary = document.createElement('strong');
+        primary.textContent = (
+            entry.registration
+            || entry.callsign
+            || entry.id
+        );
+
+        const secondary = document.createElement('span');
+        secondary.textContent = [
+            entry.callsign
+                && entry.callsign !== primary.textContent
+                ? entry.callsign
+                : '',
+            entry.type,
+            entry.id
+        ].filter(Boolean).join(' · ');
+
+        label.append(primary, secondary);
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className =
+            'traffic-tool-button traffic-tool-button-danger';
+        removeButton.textContent = 'Retirer';
+        removeButton.addEventListener('click', () => {
+            removeTrackedTrafficIdentifier(entry.id);
+        });
+
+        row.append(label, removeButton);
+        listElement.appendChild(row);
+    });
+}
+
 
 function loadTrafficSettings() {
     try {
@@ -5453,7 +5752,18 @@ function getTrafficSettingsSummary() {
         ? referenceLabels.join(' + ')
         : 'tous les trafics — centre carte';
 
-    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel}`;
+    const trackedCount = getTrackedTrafficIdentifiers().length;
+    const trackedLabel = settings.onlyTrackedIdentifiers
+        ? `liste suivie ${trackedCount}`
+        : 'tous identifiants';
+    const advisoryLabel = settings.showDroneAdvisories
+        ? 'zones drone ON'
+        : 'zones drone OFF';
+    const publicationLabel = settings.publishOwnPosition
+        ? `publication ${settings.publicationCallsign || 'sans indicatif'}`
+        : 'publication OFF';
+
+    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${trackedLabel} · ${advisoryLabel} · ${publicationLabel}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -5534,9 +5844,88 @@ function ensureTrafficSettingsModal() {
                         <em>Etiquette Alt. Trafics</em>
                     </div>
                 </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-drone-advisories-input" type="checkbox">
+                        <em>Zones d’activité drone déclarées</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-only-tracked-input" type="checkbox">
+                        <em>Afficher uniquement la liste suivie</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-publish-own-input" type="checkbox">
+                        <em>Publier ma position NPF vers SafeSky</em>
+                    </div>
+                </label>
+
+                <label id="traffic-publication-callsign-field" class="traffic-settings-field traffic-settings-relative-line">
+                    <span>Indicatif publié sur SafeSky</span>
+                    <input id="traffic-publication-callsign-input"
+                           type="text"
+                           maxlength="16"
+                           autocomplete="off"
+                           autocapitalize="characters"
+                           placeholder="Ex. SECURITE01">
+                </label>
+
+                <label id="traffic-publication-type-field" class="traffic-settings-field traffic-settings-relative-line">
+                    <span>Catégorie publiée</span>
+                    <select id="traffic-publication-type-input">
+                        <option value="MOTORPLANE">AVION</option>
+                        <option value="JET">JET</option>
+                        <option value="HELICOPTER">HÉLICOPTÈRE</option>
+                        <option value="THREE_AXES_LIGHT_PLANE">ULM</option>
+                    </select>
+                </label>
             </div>
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse. Si « Trafic autour de ma position » et « Trafic autour du feu » sont décochés, tous les trafics reçus dans le rayon choisi autour du centre de la carte sont affichés. Rafraîchissement toutes les 5 secondes. Données SafeSky/ADS-B indicatives et non certifiées.</div>
+            <div class="traffic-tools-section">
+                <div class="traffic-tools-title">Recherche globale SafeSky</div>
+                <div class="traffic-search-row">
+                    <input id="traffic-global-search-input"
+                           type="search"
+                           maxlength="24"
+                           autocomplete="off"
+                           autocapitalize="characters"
+                           placeholder="Indicatif complet, partie d’indicatif ou identifiant">
+                    <button type="button"
+                            id="traffic-global-search-button"
+                            class="traffic-tool-button traffic-tool-button-primary">
+                        Rechercher
+                    </button>
+                </div>
+                <div class="traffic-tools-note">
+                    La recherche globale SafeSky utilise un indicatif complet ou un identifiant.
+                    Une partie d’indicatif est aussi recherchée dans les trafics déjà reçus par NPF.
+                </div>
+                <div id="traffic-search-results" class="traffic-search-results"></div>
+            </div>
+
+            <div class="traffic-tools-section">
+                <div class="traffic-tools-title">
+                    Liste d’identifiants suivis
+                    <span id="traffic-tracked-count" class="traffic-tracked-count"></span>
+                </div>
+                <div class="traffic-tools-note">
+                    La liste se crée depuis les résultats de recherche ou depuis la fenêtre d’un trafic.
+                    NPF mémorise l’identifiant SafeSky, pas seulement l’indicatif.
+                </div>
+                <div id="traffic-tracked-list" class="traffic-tracked-list"></div>
+            </div>
+
+            <div id="traffic-publication-status"
+                 class="traffic-publication-status"
+                 aria-live="polite"></div>
+
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse. Si « Trafic autour de ma position » et « Trafic autour du feu » sont décochés, tous les trafics reçus dans le rayon choisi autour du centre de la carte sont affichés. Rafraîchissement toutes les 5 secondes. Le déplacement intermédiaire est extrapolé localement. Les données SafeSky/ADS-B restent indicatives et non certifiées.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -5595,6 +5984,36 @@ function ensureTrafficSettingsModal() {
         }
     };
 
+    const updatePublicationUi = () => {
+        const enabled = !!modal.querySelector(
+            '#traffic-publish-own-input'
+        )?.checked;
+
+        const callsignField = modal.querySelector(
+            '#traffic-publication-callsign-field'
+        );
+        const typeField = modal.querySelector(
+            '#traffic-publication-type-field'
+        );
+        const callsignInput = modal.querySelector(
+            '#traffic-publication-callsign-input'
+        );
+        const typeInput = modal.querySelector(
+            '#traffic-publication-type-input'
+        );
+
+        if (callsignInput) callsignInput.disabled = !enabled;
+        if (typeInput) typeInput.disabled = !enabled;
+        callsignField?.classList.toggle(
+            'traffic-settings-field-disabled',
+            !enabled
+        );
+        typeField?.classList.toggle(
+            'traffic-settings-field-disabled',
+            !enabled
+        );
+    };
+
     const fillDefaults = () => {
         const defaults = sanitizeTrafficSettings(DEFAULT_TRAFFIC_SETTINGS);
         modal.querySelector('#traffic-radius-input').value = String(defaults.radiusNm);
@@ -5606,12 +6025,33 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-relative-band-input').value = String(defaults.relativeAltitudeBandFt);
         modal.querySelector('#traffic-ground-band-input').value = String(defaults.groundToAboveBandFt);
         modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
+        modal.querySelector('#traffic-drone-advisories-input').checked = !!defaults.showDroneAdvisories;
+        modal.querySelector('#traffic-only-tracked-input').checked = !!defaults.onlyTrackedIdentifiers;
+        modal.querySelector('#traffic-publish-own-input').checked = !!defaults.publishOwnPosition;
+        modal.querySelector('#traffic-publication-callsign-input').value = defaults.publicationCallsign;
+        modal.querySelector('#traffic-publication-type-input').value = defaults.publicationBeaconType;
         updateAltitudeModeUi();
+        updatePublicationUi();
     };
 
     modal.querySelectorAll('input[name="traffic-altitude-mode"]').forEach(input => {
         input.addEventListener('change', updateAltitudeModeUi);
     });
+
+    modal.querySelector('#traffic-publish-own-input')
+        .addEventListener('change', updatePublicationUi);
+
+    modal.querySelector('#traffic-global-search-button')
+        .addEventListener('click', () => {
+            performTrafficSearchFromModal(modal);
+        });
+
+    modal.querySelector('#traffic-global-search-input')
+        .addEventListener('keydown', event => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            performTrafficSearchFromModal(modal);
+        });
 
     modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-cancel').addEventListener('click', closeModal);
@@ -5631,6 +6071,28 @@ function ensureTrafficSettingsModal() {
         const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
         const groundBandInput = modal.querySelector('#traffic-ground-band-input');
         const altitudeLabelInput = modal.querySelector('#traffic-altitude-label-input');
+        const droneAdvisoriesInput = modal.querySelector('#traffic-drone-advisories-input');
+        const onlyTrackedInput = modal.querySelector('#traffic-only-tracked-input');
+        const publishOwnInput = modal.querySelector('#traffic-publish-own-input');
+        const publicationCallsignInput = modal.querySelector('#traffic-publication-callsign-input');
+        const publicationTypeInput = modal.querySelector('#traffic-publication-type-input');
+
+        const publicationCallsign = String(
+            publicationCallsignInput?.value || ''
+        )
+            .trim()
+            .toUpperCase()
+            .replace(/[^A-Z0-9_-]/g, '')
+            .slice(0, 16);
+
+        if (publishOwnInput?.checked && !publicationCallsign) {
+            updateSafeSkyPublicationStatus(
+                'Saisis un indicatif avant d’activer la publication.',
+                'error'
+            );
+            publicationCallsignInput?.focus();
+            return;
+        }
 
         saveTrafficSettings({
             radiusNm: radiusInput.value,
@@ -5641,9 +6103,16 @@ function ensureTrafficSettingsModal() {
             altitudeFilterMode: altitudeModeInput?.value || 'absolute',
             relativeAltitudeBandFt: relativeBandInput.value,
             groundToAboveBandFt: groundBandInput.value,
-            showAltitudeLabel: !!altitudeLabelInput.checked
+            showAltitudeLabel: !!altitudeLabelInput.checked,
+            showDroneAdvisories: !!droneAdvisoriesInput.checked,
+            onlyTrackedIdentifiers: !!onlyTrackedInput.checked,
+            publishOwnPosition: !!publishOwnInput.checked,
+            publicationCallsign,
+            publicationBeaconType:
+                publicationTypeInput?.value || 'MOTORPLANE'
         });
 
+        syncSafeSkyOwnPublication();
         refreshTrafficButtonState(lastTrafficDisplayedCount);
 
         if (showTrafficLayer) {
@@ -5652,6 +6121,10 @@ function ensureTrafficSettingsModal() {
 
         closeModal();
     });
+
+    refreshTrackedTrafficListUi();
+    updatePublicationUi();
+    updateSafeSkyPublicationStatus();
 
     return modal;
 }
@@ -5669,6 +6142,14 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-relative-band-input').value = String(current.relativeAltitudeBandFt);
     modal.querySelector('#traffic-ground-band-input').value = String(current.groundToAboveBandFt);
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
+    modal.querySelector('#traffic-drone-advisories-input').checked = !!current.showDroneAdvisories;
+    modal.querySelector('#traffic-only-tracked-input').checked = !!current.onlyTrackedIdentifiers;
+    modal.querySelector('#traffic-publish-own-input').checked = !!current.publishOwnPosition;
+    modal.querySelector('#traffic-publication-callsign-input').value = current.publicationCallsign;
+    modal.querySelector('#traffic-publication-type-input').value = current.publicationBeaconType;
+
+    refreshTrackedTrafficListUi();
+    updateSafeSkyPublicationStatus();
 
     try {
         const mode = current.altitudeFilterMode;
@@ -5704,6 +6185,26 @@ function openTrafficSettingsDialog() {
         if (groundAltitudeField) {
             groundAltitudeField.classList.toggle('traffic-settings-field-disabled', !groundActive);
         }
+
+        const publishEnabled = !!current.publishOwnPosition;
+        const publicationCallsignInput = modal.querySelector(
+            '#traffic-publication-callsign-input'
+        );
+        const publicationTypeInput = modal.querySelector(
+            '#traffic-publication-type-input'
+        );
+        publicationCallsignInput.disabled = !publishEnabled;
+        publicationTypeInput.disabled = !publishEnabled;
+        modal.querySelector('#traffic-publication-callsign-field')
+            ?.classList.toggle(
+                'traffic-settings-field-disabled',
+                !publishEnabled
+            );
+        modal.querySelector('#traffic-publication-type-field')
+            ?.classList.toggle(
+                'traffic-settings-field-disabled',
+                !publishEnabled
+            );
     } catch (_) {}
 
     modal.classList.add('open');
@@ -5767,6 +6268,834 @@ function installTrafficButtonInteractions(button) {
         toggleTrafficLayer();
     });
 }
+
+
+function buildSafeSkyApiEndpoint(relativePath = '') {
+    return new URL(
+        String(relativePath || '').replace(/^\/+/, ''),
+        SAFESKY_API_BASE_URL
+    );
+}
+
+async function fetchSafeSkyJson(
+    url,
+    {
+        method = 'GET',
+        body = null,
+        allowNotFound = false,
+        timeoutMs = TRAFFIC_FETCH_TIMEOUT_MS
+    } = {}
+) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+        () => controller.abort(),
+        timeoutMs
+    );
+
+    try {
+        const response = await fetch(
+            url instanceof URL ? url.toString() : String(url),
+            {
+                method,
+                cache: 'no-store',
+                mode: 'cors',
+                credentials: 'omit',
+                referrerPolicy: 'no-referrer',
+                signal: controller.signal,
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'x-api-key': SAFESKY_API_KEY
+                },
+                body: body === null
+                    ? undefined
+                    : JSON.stringify(body)
+            }
+        );
+
+        if (allowNotFound && response.status === 404) {
+            return null;
+        }
+
+        let data = null;
+        const contentType = String(
+            response.headers.get('content-type') || ''
+        ).toLowerCase();
+
+        if (contentType.includes('json')) {
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = null;
+            }
+        } else {
+            try {
+                data = await response.text();
+            } catch (_) {
+                data = null;
+            }
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                String(
+                    data?.error
+                    || data?.message
+                    || data
+                    || `HTTP ${response.status}`
+                ).trim()
+            );
+        }
+
+        return data;
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            throw new Error('délai de réponse SafeSky dépassé');
+        }
+
+        if (
+            error instanceof TypeError
+            && /fetch/i.test(String(error.message || ''))
+        ) {
+            throw new Error(
+                'SafeSky direct inaccessible : réseau ou CORS'
+            );
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+function extractSingleSafeSkyBeacon(data) {
+    if (!data) return null;
+    if (Array.isArray(data)) return data[0] || null;
+    if (data.beacon && typeof data.beacon === 'object') {
+        return data.beacon;
+    }
+    if (data.data && !Array.isArray(data.data)) {
+        return data.data;
+    }
+    if (
+        typeof data === 'object'
+        && (
+            data.id
+            || data.latitude !== undefined
+            || data.call_sign
+        )
+    ) {
+        return data;
+    }
+    return null;
+}
+
+async function fetchSafeSkyBeaconById(identifier) {
+    const id = String(identifier || '')
+        .trim()
+        .toUpperCase();
+    if (!id) return null;
+
+    const url = buildSafeSkyApiEndpoint(
+        encodeURIComponent(id)
+    );
+    const data = await fetchSafeSkyJson(
+        url,
+        { allowNotFound: true }
+    );
+    return extractSingleSafeSkyBeacon(data);
+}
+
+async function searchSafeSkyBeaconExact(query) {
+    const normalizedQuery = String(query || '')
+        .trim()
+        .toUpperCase();
+
+    if (!normalizedQuery) return [];
+
+    const requests = [
+        ['call_sign', normalizedQuery],
+        ['aircraft_id', normalizedQuery]
+    ].map(async ([parameter, value]) => {
+        const url = buildSafeSkyApiEndpoint('search');
+        url.searchParams.set(parameter, value);
+
+        try {
+            const data = await fetchSafeSkyJson(
+                url,
+                { allowNotFound: true }
+            );
+            return extractSingleSafeSkyBeacon(data);
+        } catch (error) {
+            console.warn(
+                `Recherche SafeSky ${parameter} impossible:`,
+                error
+            );
+            return null;
+        }
+    });
+
+    const results = await Promise.all(requests);
+    const uniqueResults = [];
+    const seen = new Set();
+
+    results.filter(Boolean).forEach(raw => {
+        const normalized = normalizeTrafficAircraft(raw);
+        const key = buildTrafficAircraftKey(normalized);
+        if (!normalized || !key || seen.has(key)) return;
+        seen.add(key);
+        uniqueResults.push(raw);
+    });
+
+    return uniqueResults;
+}
+
+function getLocalTrafficSearchResults(query) {
+    const normalizedQuery = String(query || '')
+        .trim()
+        .toUpperCase();
+
+    if (!normalizedQuery) return [];
+
+    const candidates = [
+        ...(Array.isArray(lastTrafficAircraftSnapshot)
+            ? lastTrafficAircraftSnapshot
+            : []),
+        ...getTemporaryGlobalTrafficRaw()
+    ];
+
+    const unique = [];
+    const seen = new Set();
+
+    candidates
+        .map(normalizeTrafficAircraft)
+        .filter(Boolean)
+        .filter(ac => {
+            const haystack = [
+                ac.callsign,
+                ac.hex,
+                ac.registration,
+                ac.aircraftModel,
+                ac.operatorName,
+                ac.type,
+                ac.beaconType
+            ].join(' ').toUpperCase();
+
+            return haystack.includes(normalizedQuery);
+        })
+        .forEach(ac => {
+            const key = buildTrafficAircraftKey(ac);
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            unique.push(ac.raw || ac);
+        });
+
+    return unique.slice(0, 20);
+}
+
+function mergeTrafficSearchResults(...groups) {
+    const result = [];
+    const seen = new Set();
+
+    groups.flat().filter(Boolean).forEach(raw => {
+        const normalized = normalizeTrafficAircraft(raw);
+        const key = buildTrafficAircraftKey(normalized);
+        if (!normalized || !key || seen.has(key)) return;
+        seen.add(key);
+        result.push(raw);
+    });
+
+    return result;
+}
+
+function renderTrafficSearchResults(modal, results, message = '') {
+    const container = modal?.querySelector(
+        '#traffic-search-results'
+    );
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (message) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'traffic-search-message';
+        messageElement.textContent = message;
+        container.appendChild(messageElement);
+    }
+
+    if (!Array.isArray(results) || !results.length) {
+        return;
+    }
+
+    results.forEach(raw => {
+        const aircraft = normalizeTrafficAircraft(raw);
+        if (!aircraft) return;
+
+        const row = document.createElement('div');
+        row.className = 'traffic-search-result-row';
+
+        const description = document.createElement('div');
+        description.className = 'traffic-search-result-description';
+
+        const primary = document.createElement('strong');
+        primary.textContent = (
+            aircraft.registration
+            || aircraft.callsign
+            || aircraft.hex
+            || 'Trafic'
+        );
+
+        const secondary = document.createElement('span');
+        secondary.textContent = [
+            aircraft.callsign
+                && aircraft.callsign !== primary.textContent
+                ? aircraft.callsign
+                : '',
+            getTrafficAircraftModel(aircraft)
+                || getTrafficTypeDisplayLabel(aircraft),
+            aircraft.hex
+        ].filter(Boolean).join(' · ');
+
+        description.append(primary, secondary);
+
+        const actions = document.createElement('div');
+        actions.className = 'traffic-search-result-actions';
+
+        const showButton = document.createElement('button');
+        showButton.type = 'button';
+        showButton.className =
+            'traffic-tool-button traffic-tool-button-primary';
+        showButton.textContent = 'Afficher';
+        showButton.addEventListener('click', async () => {
+            await focusTrafficAircraftResult(raw);
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+        });
+
+        const trackButton = document.createElement('button');
+        trackButton.type = 'button';
+        trackButton.className = 'traffic-tool-button';
+        trackButton.textContent = isTrafficIdentifierTracked(
+            aircraft.hex
+        ) ? 'Déjà suivi' : 'Ajouter à la liste';
+        trackButton.disabled = isTrafficIdentifierTracked(
+            aircraft.hex
+        );
+        trackButton.addEventListener('click', () => {
+            try {
+                addTrackedTrafficIdentifier(aircraft);
+                trackButton.textContent = 'Déjà suivi';
+                trackButton.disabled = true;
+            } catch (error) {
+                renderTrafficSearchResults(
+                    modal,
+                    results,
+                    error.message
+                );
+            }
+        });
+
+        actions.append(showButton, trackButton);
+        row.append(description, actions);
+        container.appendChild(row);
+    });
+}
+
+async function performTrafficSearchFromModal(modal) {
+    const input = modal?.querySelector(
+        '#traffic-global-search-input'
+    );
+    const query = String(input?.value || '')
+        .trim()
+        .toUpperCase();
+
+    if (!query) {
+        renderTrafficSearchResults(
+            modal,
+            [],
+            'Saisis un indicatif ou un identifiant.'
+        );
+        return;
+    }
+
+    renderTrafficSearchResults(
+        modal,
+        [],
+        'Recherche SafeSky en cours…'
+    );
+
+    const localResults = getLocalTrafficSearchResults(query);
+    let globalResults = [];
+    let globalError = '';
+
+    try {
+        globalResults = await searchSafeSkyBeaconExact(query);
+    } catch (error) {
+        globalError = error?.message || String(error);
+    }
+
+    const results = mergeTrafficSearchResults(
+        globalResults,
+        localResults
+    );
+
+    let message = '';
+    if (!results.length) {
+        message = globalError
+            ? `Aucun trafic trouvé — ${globalError}`
+            : 'Aucun trafic trouvé.';
+    } else if (globalResults.length && localResults.length) {
+        message =
+            'Résultats globaux SafeSky et correspondances locales.';
+    } else if (globalResults.length) {
+        message = 'Résultat global SafeSky.';
+    } else {
+        message =
+            'Correspondances dans les trafics déjà reçus par NPF.';
+    }
+
+    renderTrafficSearchResults(modal, results, message);
+}
+
+function storeTemporaryGlobalTraffic(raw) {
+    const normalized = normalizeTrafficAircraft(raw);
+    const key = buildTrafficAircraftKey(normalized);
+    if (!normalized || !key) return null;
+
+    const rawCopy = {
+        ...(normalized.raw || raw),
+        _npfForceDisplay: true,
+        _npfSearchResult: true
+    };
+
+    temporaryGlobalTrafficResults.set(key, {
+        raw: rawCopy,
+        expiresAt:
+            Date.now() + TRAFFIC_TEMPORARY_SEARCH_RESULT_TTL_MS
+    });
+
+    return rawCopy;
+}
+
+function getTemporaryGlobalTrafficRaw() {
+    const now = Date.now();
+    const result = [];
+
+    temporaryGlobalTrafficResults.forEach((entry, key) => {
+        if (!entry || entry.expiresAt <= now) {
+            temporaryGlobalTrafficResults.delete(key);
+            return;
+        }
+        if (entry.raw) result.push(entry.raw);
+    });
+
+    return result;
+}
+
+async function focusTrafficAircraftResult(raw) {
+    let currentRaw = raw;
+    const normalized = normalizeTrafficAircraft(raw);
+    const identifier = normalized?.hex;
+
+    if (identifier) {
+        try {
+            currentRaw = (
+                await fetchSafeSkyBeaconById(identifier)
+            ) || raw;
+        } catch (_) {}
+    }
+
+    const storedRaw = storeTemporaryGlobalTraffic(currentRaw);
+    const aircraft = normalizeTrafficAircraft(storedRaw);
+
+    if (!aircraft) {
+        throw new Error('Position trafic indisponible');
+    }
+
+    if (!showTrafficLayer) {
+        toggleTrafficLayer(true);
+    } else if (
+        trafficLayer
+        && map
+        && !map.hasLayer(trafficLayer)
+    ) {
+        trafficLayer.addTo(map);
+    }
+
+    const combined = [
+        ...(Array.isArray(lastTrafficAircraftSnapshot)
+            ? lastTrafficAircraftSnapshot
+            : []),
+        storedRaw
+    ];
+
+    renderTrafficAircraft(combined, {
+        points: getTrafficQueryPoints(),
+        provider: { label: 'SafeSky recherche' },
+        now: Date.now()
+    });
+
+    try {
+        map.setView(
+            [aircraft.lat, aircraft.lon],
+            Math.max(10, map.getZoom()),
+            { animate: true }
+        );
+    } catch (_) {}
+
+    const key = buildTrafficAircraftKey(aircraft);
+    setTimeout(() => {
+        try {
+            trafficMarkerRegistry.get(key)?.marker?.openPopup();
+        } catch (_) {}
+    }, 300);
+
+    return aircraft;
+}
+
+async function fetchTrackedTrafficBeacons() {
+    const entries = getTrackedTrafficIdentifiers();
+    if (!entries.length) return [];
+
+    const settled = await Promise.allSettled(
+        entries.map(entry => fetchSafeSkyBeaconById(entry.id))
+    );
+
+    return settled
+        .filter(result => result.status === 'fulfilled')
+        .map(result => result.value)
+        .filter(Boolean)
+        .map(raw => ({
+            ...raw,
+            _npfForceDisplay: true,
+            _npfTracked: true
+        }));
+}
+
+function getOrCreateSafeSkyPublishedBeaconId() {
+    try {
+        const existing = String(
+            localStorage.getItem(
+                TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY
+            ) || ''
+        ).trim();
+
+        if (existing) return existing;
+
+        const randomPart = (
+            globalThis.crypto?.randomUUID?.()
+            || `${Date.now().toString(36)}-${Math.random()
+                .toString(36)
+                .slice(2, 12)}`
+        ).replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+
+        const newId = `NPF_${randomPart.toUpperCase()}`;
+        localStorage.setItem(
+            TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY,
+            newId
+        );
+        return newId;
+    } catch (_) {
+        return `NPF_${Date.now().toString(36).toUpperCase()}`;
+    }
+}
+
+function updateSafeSkyPublicationStatus(
+    message = '',
+    state = ''
+) {
+    const element = document.getElementById(
+        'traffic-publication-status'
+    );
+    if (!element) return;
+
+    const settings = sanitizeTrafficSettings(trafficSettings);
+
+    let text = message;
+    let resolvedState = state;
+
+    if (!text) {
+        if (!settings.publishOwnPosition) {
+            text = 'Publication de la position NPF désactivée.';
+            resolvedState = 'idle';
+        } else if (lastSafeSkyOwnPublishError) {
+            text = `Publication SafeSky : ${lastSafeSkyOwnPublishError}`;
+            resolvedState = 'error';
+        } else if (lastSafeSkyOwnPublishAt > 0) {
+            text = `Position publiée sous l’indicatif ${settings.publicationCallsign} à ${new Date(lastSafeSkyOwnPublishAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`;
+            resolvedState = 'ok';
+        } else {
+            text = `Publication prête sous l’indicatif ${settings.publicationCallsign || 'non saisi'}.`;
+            resolvedState = 'waiting';
+        }
+    }
+
+    element.textContent = text;
+    element.className =
+        `traffic-publication-status traffic-publication-${resolvedState || 'idle'}`;
+}
+
+function calculateOwnPublicationMotion(
+    altitudeMeters,
+    headingDegrees,
+    timestampMs
+) {
+    const previous = ownPublicationMotionState;
+    let verticalRate = null;
+    let turnRate = null;
+
+    if (
+        previous
+        && Number.isFinite(previous.timestampMs)
+        && timestampMs > previous.timestampMs
+    ) {
+        const deltaSeconds = (
+            timestampMs - previous.timestampMs
+        ) / 1000;
+
+        if (
+            deltaSeconds > 0
+            && deltaSeconds <= 20
+            && Number.isFinite(previous.altitudeMeters)
+            && Number.isFinite(altitudeMeters)
+        ) {
+            verticalRate = (
+                altitudeMeters - previous.altitudeMeters
+            ) / deltaSeconds;
+        }
+
+        if (
+            deltaSeconds > 0
+            && deltaSeconds <= 20
+            && Number.isFinite(previous.headingDegrees)
+            && Number.isFinite(headingDegrees)
+        ) {
+            let deltaHeading = (
+                headingDegrees - previous.headingDegrees
+            );
+            while (deltaHeading > 180) deltaHeading -= 360;
+            while (deltaHeading < -180) deltaHeading += 360;
+            turnRate = deltaHeading / deltaSeconds;
+        }
+    }
+
+    ownPublicationMotionState = {
+        altitudeMeters,
+        headingDegrees,
+        timestampMs
+    };
+
+    return { verticalRate, turnRate };
+}
+
+function buildSafeSkyOwnPublishPayload() {
+    const settings = sanitizeTrafficSettings(trafficSettings);
+
+    if (!settings.publishOwnPosition) {
+        return {
+            payload: null,
+            reason: 'publication désactivée'
+        };
+    }
+
+    if (
+        isSimulationMode
+        || lastPosition?.simulation === true
+    ) {
+        return {
+            payload: null,
+            reason: 'publication interdite en mode simulation'
+        };
+    }
+
+    const latitude = Number(
+        lastPosition?.lat
+        ?? lastPosition?.latitude
+    );
+    const longitude = Number(
+        lastPosition?.lng
+        ?? lastPosition?.longitude
+    );
+    const altitudeFeet = Number(
+        lastPosition?.altitudeFt
+        ?? lastPosition?.altitudeFeet
+    );
+    const gpsTimestampMs = Number(
+        lastPosition?.timestamp
+    );
+    const gpsAgeMs = Number.isFinite(gpsTimestampMs)
+        ? Date.now() - gpsTimestampMs
+        : Infinity;
+
+    if (
+        lastPosition?.stored === true
+        || !Number.isFinite(gpsTimestampMs)
+        || gpsAgeMs < 0
+        || gpsAgeMs > 15000
+    ) {
+        return {
+            payload: null,
+            reason: 'position GPS actuelle indisponible'
+        };
+    }
+
+    if (
+        !Number.isFinite(latitude)
+        || !Number.isFinite(longitude)
+    ) {
+        return {
+            payload: null,
+            reason: 'position GPS indisponible'
+        };
+    }
+
+    if (!Number.isFinite(altitudeFeet)) {
+        return {
+            payload: null,
+            reason: 'altitude GPS indisponible'
+        };
+    }
+
+    if (!settings.publicationCallsign) {
+        return {
+            payload: null,
+            reason: 'indicatif non saisi'
+        };
+    }
+
+    const speedMps = Math.max(
+        0,
+        Number(lastPosition?.speedMps) || 0
+    );
+    const heading = Number(lastPosition?.heading);
+    const course = Number.isFinite(heading)
+        ? ((heading % 360) + 360) % 360
+        : 0;
+    const altitudeMeters = Math.round(
+        altitudeFeet / 3.280839895
+    );
+    const timestampMs = Date.now();
+    const motion = calculateOwnPublicationMotion(
+        altitudeMeters,
+        course,
+        timestampMs
+    );
+
+    const payload = {
+        id: getOrCreateSafeSkyPublishedBeaconId(),
+        call_sign: settings.publicationCallsign,
+        latitude,
+        longitude,
+        altitude: altitudeMeters,
+        course: Math.round(course),
+        ground_speed: Math.round(speedMps),
+        status: speedMps >= 2
+            ? 'AIRBORNE'
+            : 'GROUNDED',
+        beacon_type: settings.publicationBeaconType,
+        last_update: Math.floor(timestampMs / 1000)
+    };
+
+    if (Number.isFinite(motion.verticalRate)) {
+        payload.vertical_rate = Number(
+            motion.verticalRate.toFixed(2)
+        );
+    }
+    if (Number.isFinite(motion.turnRate)) {
+        payload.turn_rate = Number(
+            motion.turnRate.toFixed(2)
+        );
+    }
+
+    return { payload, reason: '' };
+}
+
+async function publishOwnSafeSkyPosition() {
+    if (safeSkyOwnPublishInProgress) return false;
+    if (
+        typeof document !== 'undefined'
+        && document.visibilityState === 'hidden'
+    ) {
+        return false;
+    }
+
+    const { payload, reason } =
+        buildSafeSkyOwnPublishPayload();
+
+    if (!payload) {
+        lastSafeSkyOwnPublishError = reason;
+        updateSafeSkyPublicationStatus();
+        return false;
+    }
+
+    safeSkyOwnPublishInProgress = true;
+
+    try {
+        await fetchSafeSkyJson(
+            buildSafeSkyApiEndpoint(''),
+            {
+                method: 'POST',
+                body: payload,
+                timeoutMs: 8000
+            }
+        );
+
+        lastSafeSkyOwnPublishAt = Date.now();
+        lastSafeSkyOwnPublishError = '';
+        updateSafeSkyPublicationStatus();
+        return true;
+    } catch (error) {
+        lastSafeSkyOwnPublishError =
+            error?.message || String(error);
+        updateSafeSkyPublicationStatus();
+        console.warn(
+            'Publication position NPF vers SafeSky impossible:',
+            error
+        );
+        return false;
+    } finally {
+        safeSkyOwnPublishInProgress = false;
+    }
+}
+
+function stopSafeSkyOwnPublication() {
+    if (safeSkyOwnPublishTimer) {
+        clearInterval(safeSkyOwnPublishTimer);
+        safeSkyOwnPublishTimer = null;
+    }
+}
+
+function startSafeSkyOwnPublication() {
+    stopSafeSkyOwnPublication();
+
+    const settings = sanitizeTrafficSettings(trafficSettings);
+    if (!settings.publishOwnPosition) return;
+
+    if (
+        typeof document !== 'undefined'
+        && document.visibilityState === 'hidden'
+    ) {
+        return;
+    }
+
+    publishOwnSafeSkyPosition();
+    safeSkyOwnPublishTimer = setInterval(
+        publishOwnSafeSkyPosition,
+        SAFESKY_OWN_PUBLISH_INTERVAL_MS
+    );
+}
+
+function syncSafeSkyOwnPublication() {
+    const settings = sanitizeTrafficSettings(trafficSettings);
+    if (settings.publishOwnPosition) {
+        startSafeSkyOwnPublication();
+    } else {
+        stopSafeSkyOwnPublication();
+        lastSafeSkyOwnPublishError = '';
+        updateSafeSkyPublicationStatus();
+    }
+}
+
 
 function getTrafficRadiusNm() {
     return sanitizeTrafficSettings(trafficSettings).radiusNm;
@@ -6051,6 +7380,20 @@ function buildTrafficApiUrl(point, provider = null) {
             url.searchParams.set(key, value);
         });
 
+        const settings = sanitizeTrafficSettings(trafficSettings);
+        if (settings.onlyTrackedIdentifiers) {
+            const identifiers = getTrackedTrafficIdentifiers()
+                .map(entry => entry.id)
+                .filter(Boolean);
+
+            if (identifiers.length) {
+                url.searchParams.set(
+                    'identifiers',
+                    identifiers.join(',')
+                );
+            }
+        }
+
         return url.toString();
     }
 
@@ -6135,6 +7478,270 @@ async function fetchTrafficAircraftFromProvider(point, provider) {
     }
 }
 
+
+function isSafeSkyAdvisory(raw) {
+    return String(
+        raw?.transponder_type
+        || raw?.transponderType
+        || ''
+    ).trim().toUpperCase() === 'ADVISORY';
+}
+
+function parseSafeSkyOperationArea(raw) {
+    let area = (
+        raw?.operation_area
+        ?? raw?.operationArea
+        ?? null
+    );
+
+    if (typeof area === 'string') {
+        try {
+            area = JSON.parse(area);
+        } catch (_) {
+            area = null;
+        }
+    }
+
+    if (
+        area?.type === 'Feature'
+        && area.geometry
+    ) {
+        return {
+            geometry: area.geometry,
+            properties: area.properties || {}
+        };
+    }
+
+    if (
+        area
+        && typeof area === 'object'
+        && typeof area.type === 'string'
+        && area.coordinates
+    ) {
+        return {
+            geometry: area,
+            properties: area.properties || {}
+        };
+    }
+
+    return null;
+}
+
+function formatSafeSkyAdvisoryAltitude(raw) {
+    const altitudeMeters = Number(
+        raw?.max_altitude
+        ?? raw?.altitude
+    );
+
+    if (!Number.isFinite(altitudeMeters)) {
+        return '--';
+    }
+
+    return `${Math.round(
+        altitudeMeters * 3.280839895
+    )} ft AMSL`;
+}
+
+function buildSafeSkyAdvisoryPopup(raw) {
+    const title = String(
+        raw?.call_sign
+        || raw?.callsign
+        || raw?.id
+        || 'Zone d’activité drone'
+    ).trim();
+
+    const remarks = String(raw?.remarks || '').trim();
+    const updatedAt = Number(raw?.last_update);
+
+    return `
+        <div class="traffic-popup traffic-advisory-popup">
+            <div class="traffic-popup-title">
+                ${escapeHtml(title)}
+            </div>
+            <div class="traffic-popup-subtitle">
+                ZONE D’ACTIVITÉ DRONE DÉCLARÉE
+            </div>
+            <div>Altitude maximale :
+                <b>${escapeHtml(
+                    formatSafeSkyAdvisoryAltitude(raw)
+                )}</b>
+            </div>
+            ${remarks
+                ? `<div>Remarque : <b>${escapeHtml(remarks)}</b></div>`
+                : ''}
+            ${Number.isFinite(updatedAt)
+                ? `<div>Mise à jour : <b>${escapeHtml(
+                    new Date(updatedAt * 1000)
+                        .toLocaleTimeString(
+                            'fr-FR',
+                            {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }
+                        )
+                )}</b></div>`
+                : ''}
+            <div class="traffic-popup-warning">
+                Zone déclarative SafeSky — position exacte du drone non garantie
+            </div>
+        </div>
+    `;
+}
+
+function renderSafeSkyAdvisories(rawList) {
+    if (!trafficLayer) return 0;
+
+    const settings = sanitizeTrafficSettings(trafficSettings);
+    if (!settings.showDroneAdvisories) return 0;
+
+    let count = 0;
+
+    (Array.isArray(rawList) ? rawList : [])
+        .filter(isSafeSkyAdvisory)
+        .forEach(raw => {
+            const area = parseSafeSkyOperationArea(raw);
+            const popup = buildSafeSkyAdvisoryPopup(raw);
+            const commonStyle = {
+                pane: 'trafficAdvisoryPane',
+                color: '#7c3aed',
+                weight: 3,
+                opacity: 0.95,
+                fillColor: '#c084fc',
+                fillOpacity: 0.22,
+                dashArray: '10 7',
+                interactive: true
+            };
+
+            if (
+                area?.geometry?.type === 'Point'
+                && Array.isArray(area.geometry.coordinates)
+            ) {
+                const [longitude, latitude] =
+                    area.geometry.coordinates.map(Number);
+                const radius = Math.max(
+                    50,
+                    Number(
+                        area.geometry.radius
+                        ?? area.properties?.radius
+                        ?? raw?.radius
+                        ?? raw?.accuracy
+                        ?? 500
+                    ) || 500
+                );
+
+                if (
+                    Number.isFinite(latitude)
+                    && Number.isFinite(longitude)
+                ) {
+                    L.circle(
+                        [latitude, longitude],
+                        {
+                            ...commonStyle,
+                            radius
+                        }
+                    )
+                        .bindPopup(popup, {
+                            className:
+                                'traffic-aircraft-popup traffic-advisory-leaflet-popup'
+                        })
+                        .addTo(trafficLayer);
+                    count += 1;
+                }
+                return;
+            }
+
+            if (area?.geometry) {
+                try {
+                    const geoJsonLayer = L.geoJSON(
+                        {
+                            type: 'Feature',
+                            properties:
+                                area.properties || {},
+                            geometry: area.geometry
+                        },
+                        {
+                            pane: 'trafficAdvisoryPane',
+                            style: () => commonStyle,
+                            pointToLayer: (
+                                feature,
+                                latlng
+                            ) => L.circle(
+                                latlng,
+                                {
+                                    ...commonStyle,
+                                    radius: Math.max(
+                                        50,
+                                        Number(
+                                            feature?.properties
+                                                ?.radius
+                                            ?? raw?.radius
+                                            ?? raw?.accuracy
+                                            ?? 500
+                                        ) || 500
+                                    )
+                                }
+                            )
+                        }
+                    );
+
+                    geoJsonLayer.eachLayer(layer => {
+                        layer.bindPopup(popup, {
+                            className:
+                                'traffic-aircraft-popup traffic-advisory-leaflet-popup'
+                        });
+                        layer.addTo(trafficLayer);
+                    });
+                    count += 1;
+                } catch (error) {
+                    console.warn(
+                        'Zone drone GeoJSON invalide:',
+                        error,
+                        raw
+                    );
+                }
+                return;
+            }
+
+            const latitude = Number(
+                raw?.latitude ?? raw?.lat
+            );
+            const longitude = Number(
+                raw?.longitude
+                ?? raw?.lon
+                ?? raw?.lng
+            );
+
+            if (
+                Number.isFinite(latitude)
+                && Number.isFinite(longitude)
+            ) {
+                L.circle(
+                    [latitude, longitude],
+                    {
+                        ...commonStyle,
+                        radius: Math.max(
+                            50,
+                            Number(
+                                raw?.radius
+                                ?? raw?.accuracy
+                                ?? 500
+                            ) || 500
+                        )
+                    }
+                )
+                    .bindPopup(popup, {
+                        className:
+                            'traffic-aircraft-popup traffic-advisory-leaflet-popup'
+                    })
+                    .addTo(trafficLayer);
+                count += 1;
+            }
+        });
+
+    return count;
+}
+
+
 function normalizeTrafficAircraft(raw) {
     if (!raw) return null;
 
@@ -6177,13 +7784,21 @@ function normalizeTrafficAircraft(raw) {
     const lon = Number(longitudeRaw);
 
     let seenPos = null;
+    let sourceTimestampMs = Date.now();
+
     if (safeSkyFormat && Number.isFinite(Number(raw.last_update))) {
         const eventTimestampSeconds = Number(raw.last_update);
-        seenPos = Math.max(0, (Date.now() / 1000) - eventTimestampSeconds);
+        sourceTimestampMs = eventTimestampSeconds * 1000;
+        seenPos = Math.max(
+            0,
+            (Date.now() / 1000) - eventTimestampSeconds
+        );
     } else if (Number.isFinite(Number(raw.seen_pos))) {
         seenPos = Number(raw.seen_pos);
+        sourceTimestampMs = Date.now() - seenPos * 1000;
     } else if (Number.isFinite(Number(raw.seen))) {
         seenPos = Number(raw.seen);
+        sourceTimestampMs = Date.now() - seenPos * 1000;
     }
 
     let altitudeFeet = null;
@@ -6287,6 +7902,18 @@ function normalizeTrafficAircraft(raw) {
         );
     }
 
+    const turnRateDegPerSec = Number.isFinite(
+        Number(raw.turn_rate)
+    )
+        ? Number(raw.turn_rate)
+        : null;
+
+    const forceDisplay = Boolean(
+        raw._npfForceDisplay
+        || raw._npfTracked
+        || raw._npfSearchResult
+    );
+
     if (status === 'INACTIVE') {
         return null;
     }
@@ -6306,11 +7933,13 @@ function normalizeTrafficAircraft(raw) {
         lat,
         lon,
         seenPos,
+        sourceTimestampMs,
         altitude,
         altitudeFeet,
         gs,
         groundSpeedKnots,
         track,
+        turnRateDegPerSec,
         type,
         beaconType,
         emitterCategory,
@@ -6322,6 +7951,7 @@ function normalizeTrafficAircraft(raw) {
         operatorName,
         aircraftModel,
         verticalRateFpm,
+        forceDisplay,
         providerFormat: safeSkyFormat ? 'safesky' : 'readsb',
         raw
     };
@@ -7028,6 +8658,328 @@ function getTrafficSpeedVectorLengthPx(aircraft) {
 }
 
 
+
+const TRAFFIC_VECTOR_TURN_HORIZON_SECONDS = 8;
+
+function buildTrafficCurvedVectorPath(
+    vectorLengthPx,
+    turnRateDegPerSec
+) {
+    const canvasCenter = 110;
+    const length = Math.max(
+        0,
+        Number(vectorLengthPx) || 0
+    );
+
+    if (length <= 0) return '';
+
+    const turnAngleDeg = Math.max(
+        -70,
+        Math.min(
+            70,
+            (
+                Number(turnRateDegPerSec) || 0
+            ) * TRAFFIC_VECTOR_TURN_HORIZON_SECONDS
+        )
+    );
+    const turnAngleRad = turnAngleDeg * Math.PI / 180;
+
+    if (Math.abs(turnAngleDeg) < 2) {
+        return `M ${canvasCenter} ${canvasCenter} L ${canvasCenter} ${canvasCenter - length}`;
+    }
+
+    const endX = canvasCenter
+        + Math.sin(turnAngleRad) * length;
+    const endY = canvasCenter
+        - Math.cos(turnAngleRad) * length;
+    const controlAngle = turnAngleRad * 0.48;
+    const controlDistance = length * 0.58;
+    const controlX = canvasCenter
+        + Math.sin(controlAngle) * controlDistance;
+    const controlY = canvasCenter
+        - Math.cos(controlAngle) * controlDistance;
+
+    return [
+        `M ${canvasCenter} ${canvasCenter}`,
+        `Q ${controlX.toFixed(2)} ${controlY.toFixed(2)}`,
+        `${endX.toFixed(2)} ${endY.toFixed(2)}`
+    ].join(' ');
+}
+
+function buildTrafficVectorHtml(
+    aircraft,
+    track,
+    vectorLengthPx
+) {
+    if (vectorLengthPx <= 0) return '';
+
+    const path = buildTrafficCurvedVectorPath(
+        vectorLengthPx,
+        aircraft?.turnRateDegPerSec
+    );
+
+    if (!path) return '';
+
+    return `
+        <span class="traffic-aircraft-vector-wrap"
+              style="transform: rotate(${track}deg);">
+            <svg class="traffic-speed-vector-svg"
+                 viewBox="0 0 220 220"
+                 aria-hidden="true"
+                 focusable="false">
+                <path class="traffic-speed-vector-path"
+                      d="${path}"></path>
+            </svg>
+        </span>
+    `;
+}
+
+function destinationFromBearingDistance(
+    latitude,
+    longitude,
+    bearingDegrees,
+    distanceMeters
+) {
+    const earthRadiusMeters = 6371008.8;
+    const angularDistance =
+        distanceMeters / earthRadiusMeters;
+    const bearing =
+        bearingDegrees * Math.PI / 180;
+    const latitudeRad =
+        latitude * Math.PI / 180;
+    const longitudeRad =
+        longitude * Math.PI / 180;
+
+    const destinationLatitude = Math.asin(
+        Math.sin(latitudeRad)
+            * Math.cos(angularDistance)
+        + Math.cos(latitudeRad)
+            * Math.sin(angularDistance)
+            * Math.cos(bearing)
+    );
+
+    const destinationLongitude = longitudeRad
+        + Math.atan2(
+            Math.sin(bearing)
+                * Math.sin(angularDistance)
+                * Math.cos(latitudeRad),
+            Math.cos(angularDistance)
+                - Math.sin(latitudeRad)
+                * Math.sin(destinationLatitude)
+        );
+
+    return {
+        lat: destinationLatitude * 180 / Math.PI,
+        lon: (
+            (
+                destinationLongitude * 180 / Math.PI
+                + 540
+            ) % 360
+        ) - 180
+    };
+}
+
+function extrapolateTrafficAircraft(
+    aircraft,
+    targetTimestampMs = Date.now()
+) {
+    if (!aircraft) return null;
+
+    const baseLatitude = Number(aircraft.lat);
+    const baseLongitude = Number(aircraft.lon);
+    const speedMps = Number(
+        aircraft.groundSpeedKnots
+    ) / 1.943844492;
+    const baseTrack = Number(aircraft.track);
+    const turnRate = Number(
+        aircraft.turnRateDegPerSec
+    ) || 0;
+    const sourceTimestampMs = Number(
+        aircraft.sourceTimestampMs
+    ) || targetTimestampMs;
+
+    if (
+        aircraft.isGrounded
+        || !Number.isFinite(baseLatitude)
+        || !Number.isFinite(baseLongitude)
+        || !Number.isFinite(speedMps)
+        || speedMps <= 0
+        || !Number.isFinite(baseTrack)
+    ) {
+        return {
+            lat: baseLatitude,
+            lon: baseLongitude,
+            track: Number.isFinite(baseTrack)
+                ? baseTrack
+                : 0
+        };
+    }
+
+    const elapsedSeconds = Math.max(
+        0,
+        Math.min(
+            TRAFFIC_MAX_EXTRAPOLATION_SECONDS,
+            (
+                targetTimestampMs
+                - sourceTimestampMs
+            ) / 1000
+        )
+    );
+
+    if (elapsedSeconds <= 0) {
+        return {
+            lat: baseLatitude,
+            lon: baseLongitude,
+            track: baseTrack
+        };
+    }
+
+    let latitude = baseLatitude;
+    let longitude = baseLongitude;
+    let track = baseTrack;
+    let remaining = elapsedSeconds;
+
+    /*
+     * Intégration par pas de 0,25 s : suffisamment fluide pour un virage tout
+     * en restant légère sur iPad, même avec plusieurs dizaines de trafics.
+     */
+    while (remaining > 0.0001) {
+        const step = Math.min(0.25, remaining);
+        const midTrack = track + turnRate * step * 0.5;
+        const destination = destinationFromBearingDistance(
+            latitude,
+            longitude,
+            midTrack,
+            speedMps * step
+        );
+
+        latitude = destination.lat;
+        longitude = destination.lon;
+        track = (
+            (
+                track + turnRate * step
+            ) % 360
+            + 360
+        ) % 360;
+        remaining -= step;
+    }
+
+    return {
+        lat: latitude,
+        lon: longitude,
+        track
+    };
+}
+
+function stopTrafficSmoothAnimation() {
+    if (trafficSmoothAnimationFrame) {
+        cancelAnimationFrame(
+            trafficSmoothAnimationFrame
+        );
+        trafficSmoothAnimationFrame = null;
+    }
+    trafficSmoothAnimationLastAt = 0;
+}
+
+function updateTrafficSmoothPositions(timestamp) {
+    if (
+        !showTrafficLayer
+        || !trafficLayer
+        || (
+            typeof document !== 'undefined'
+            && document.visibilityState === 'hidden'
+        )
+    ) {
+        stopTrafficSmoothAnimation();
+        return;
+    }
+
+    if (
+        timestamp - trafficSmoothAnimationLastAt
+        >= TRAFFIC_SMOOTH_FRAME_INTERVAL_MS
+    ) {
+        trafficSmoothAnimationLastAt = timestamp;
+        const now = Date.now();
+
+        trafficMarkerRegistry.forEach(entry => {
+            const marker = entry?.marker;
+            const aircraft = entry?.aircraft;
+            if (!marker || !aircraft) return;
+
+            const predicted = extrapolateTrafficAircraft(
+                aircraft,
+                now
+            );
+            if (
+                !predicted
+                || !Number.isFinite(predicted.lat)
+                || !Number.isFinite(predicted.lon)
+            ) {
+                return;
+            }
+
+            try {
+                marker.setLatLng([
+                    predicted.lat,
+                    predicted.lon
+                ]);
+
+                const markerElement =
+                    marker.getElement?.();
+                const arrow = markerElement?.querySelector(
+                    '.traffic-aircraft-arrow'
+                );
+                const vector = markerElement?.querySelector(
+                    '.traffic-aircraft-vector-wrap'
+                );
+                const visual =
+                    getTrafficAircraftVisualDefinition(
+                        aircraft
+                    );
+
+                if (
+                    arrow
+                    && visual?.directional
+                    && Number.isFinite(predicted.track)
+                ) {
+                    arrow.style.transform =
+                        `translate(-50%, -50%) rotate(${predicted.track}deg)`;
+                }
+
+                if (
+                    vector
+                    && Number.isFinite(predicted.track)
+                ) {
+                    vector.style.transform =
+                        `rotate(${predicted.track}deg)`;
+                }
+            } catch (_) {}
+        });
+    }
+
+    trafficSmoothAnimationFrame =
+        requestAnimationFrame(
+            updateTrafficSmoothPositions
+        );
+}
+
+function startTrafficSmoothAnimation() {
+    stopTrafficSmoothAnimation();
+
+    if (
+        !showTrafficLayer
+        || !trafficMarkerRegistry.size
+    ) {
+        return;
+    }
+
+    trafficSmoothAnimationFrame =
+        requestAnimationFrame(
+            updateTrafficSmoothPositions
+        );
+}
+
+
 function buildTrafficMarkerIcon(aircraft) {
     const hasTrack = Number.isFinite(aircraft.track);
     const track = hasTrack ? aircraft.track : 0;
@@ -7124,9 +9076,11 @@ function buildTrafficMarkerIcon(aircraft) {
      */
     const symbolSvg = `<svg viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true">${visual.svg}</svg>`;
 
-    const vectorHtml = vectorLengthPx > 0
-        ? `<span class="traffic-aircraft-vector-wrap" style="transform: rotate(${track}deg);--traffic-vector-length:${vectorLengthPx}px;"><span class="traffic-aircraft-dotted-vector"></span></span>`
-        : '';
+    const vectorHtml = buildTrafficVectorHtml(
+        aircraft,
+        track,
+        vectorLengthPx
+    );
 
     return L.divIcon({
         className: 'traffic-aircraft-icon',
@@ -7139,6 +9093,9 @@ function buildTrafficMarkerIcon(aircraft) {
 
 function renderTrafficAircraft(aircraftList, meta = {}) {
     if (!trafficLayer) return;
+
+    stopTrafficSmoothAnimation();
+    trafficMarkerRegistry.clear();
 
     if (meta?.skipSnapshot !== true) {
         lastTrafficAircraftSnapshot = Array.isArray(aircraftList)
@@ -7174,6 +9131,9 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     trafficLayer.clearLayers();
 
     const settings = sanitizeTrafficSettings(trafficSettings);
+    const advisoryCount = renderSafeSkyAdvisories(
+        aircraftList
+    );
     const points = Array.isArray(meta.points) && meta.points.length
         ? meta.points
         : (meta.point ? [meta.point] : []);
@@ -7208,11 +9168,50 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     aircraftList
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
-        .filter(ac => !Number.isFinite(ac.seenPos) || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS)
-        .filter(ac => settings.altitudeFilterMode !== 'absolute' || ac.altitudeFeet === null || ac.altitudeFeet >= settings.minAltitudeFt)
-        .filter(ac => settings.altitudeFilterMode !== 'absolute' || settings.maxAltitudeFt === null || ac.altitudeFeet === null || ac.altitudeFeet <= settings.maxAltitudeFt)
-        .filter(ac => !useAroundAltitude || ac.altitudeFeet === null || (ac.altitudeFeet >= relativeMinAltitudeFt && ac.altitudeFeet <= relativeMaxAltitudeFt))
-        .filter(ac => !useGroundToAboveAltitude || ac.altitudeFeet === null || ac.altitudeFeet <= groundToAboveMaxAltitudeFt)
+        .filter(ac => (
+            ac.forceDisplay
+            || !Number.isFinite(ac.seenPos)
+            || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS
+        ))
+        .filter(ac => (
+            ac.forceDisplay
+            || settings.altitudeFilterMode !== 'absolute'
+            || ac.altitudeFeet === null
+            || ac.altitudeFeet >= settings.minAltitudeFt
+        ))
+        .filter(ac => (
+            ac.forceDisplay
+            || settings.altitudeFilterMode !== 'absolute'
+            || settings.maxAltitudeFt === null
+            || ac.altitudeFeet === null
+            || ac.altitudeFeet <= settings.maxAltitudeFt
+        ))
+        .filter(ac => (
+            ac.forceDisplay
+            || !useAroundAltitude
+            || ac.altitudeFeet === null
+            || (
+                ac.altitudeFeet >= relativeMinAltitudeFt
+                && ac.altitudeFeet <= relativeMaxAltitudeFt
+            )
+        ))
+        .filter(ac => (
+            ac.forceDisplay
+            || !useGroundToAboveAltitude
+            || ac.altitudeFeet === null
+            || ac.altitudeFeet <= groundToAboveMaxAltitudeFt
+        ))
+        .filter(ac => {
+            if (!settings.onlyTrackedIdentifiers) {
+                return true;
+            }
+            return (
+                ac.forceDisplay
+                || getTrackedTrafficIdentifierSet().has(
+                    String(ac.hex || '').toUpperCase()
+                )
+            );
+        })
         .forEach(ac => {
             const reference = getNearestTrafficReference(ac, points);
 
@@ -7221,9 +9220,14 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
              * les trafics retournés par la source dans la zone de requête.
              */
             if (
-                !showAllTraffic
+                !ac.forceDisplay
+                && !showAllTraffic
                 && points.length
-                && (!reference || reference.distance > settings.radiusNm + 0.5)
+                && (
+                    !reference
+                    || reference.distance
+                        > settings.radiusNm + 0.5
+                )
             ) {
                 return;
             }
@@ -7282,12 +9286,14 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 <div>Écart avec moi : <b>${escapeHtml(relativeAltitudeText)}</b> — ${escapeHtml(altitudeState.label)}</div>
                 <div>Vitesse sol : <b>${escapeHtml(ac.gs)}</b></div>
                 <div>Route : <b>${Number.isFinite(ac.track) ? Math.round(ac.track) + '°' : '--'}</b></div>
+                ${Number.isFinite(ac.turnRateDegPerSec) ? `<div>Taux de virage : <b>${ac.turnRateDegPerSec > 0 ? '+' : ''}${Number(ac.turnRateDegPerSec).toFixed(1)}°/s</b></div>` : ''}
                 ${Number.isFinite(ac.verticalRateFpm) ? `<div>Vitesse verticale : <b>${ac.verticalRateFpm > 0 ? '+' : ''}${Math.round(ac.verticalRateFpm)} ft/min</b></div>` : ''}
                 ${ac.remarks ? `<div>Remarque : <b>${escapeHtml(ac.remarks)}</b></div>` : ''}
                 ${Number.isFinite(distance) ? `<div>Distance ${referenceLabel ? `à ${referenceLabel}` : ''} : <b>${Math.round(distance)} Nm</b></div>` : ''}
                 <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
                 ${useAroundAltitude ? `<div>Filtre altitude : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
                 ${useGroundToAboveAltitude ? `<div>Filtre altitude : <b>sol / ${Math.round(groundToAboveMaxAltitudeFt)} ft</b></div>` : ''}
+                ${ac.hex ? `<button type="button" class="traffic-popup-track-button">${isTrafficIdentifierTracked(ac.hex) ? 'Retirer de la liste suivie' : 'Ajouter à la liste suivie'}</button>` : ''}
                 <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
             </div>`;
         marker._trafficAircraftKey = aircraftKey;
@@ -7299,7 +9305,33 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             offset: L.point(0, 0),
             className: 'traffic-aircraft-popup'
         });
+        marker.on('popupopen', () => {
+            const popupElement =
+                marker.getPopup()?.getElement?.();
+            const trackButton = popupElement?.querySelector(
+                '.traffic-popup-track-button'
+            );
+
+            if (trackButton && ac.hex) {
+                trackButton.onclick = () => {
+                    if (isTrafficIdentifierTracked(ac.hex)) {
+                        removeTrackedTrafficIdentifier(ac.hex);
+                        trackButton.textContent =
+                            'Ajouter à la liste suivie';
+                    } else {
+                        addTrackedTrafficIdentifier(ac);
+                        trackButton.textContent =
+                            'Retirer de la liste suivie';
+                    }
+                };
+            }
+        });
+
         marker.addTo(trafficLayer);
+        trafficMarkerRegistry.set(aircraftKey, {
+            marker,
+            aircraft: ac
+        });
 
         if (openTrafficPopupKey && aircraftKey === openTrafficPopupKey) {
             popupMarkerToRestore = marker;
@@ -7333,8 +9365,13 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         state: 'ok',
         count: aircraft.length,
         pointLabel: buildTrafficReferenceLabel(points),
+        message: advisoryCount
+            ? `${advisoryCount} zone(s) drone`
+            : '',
         now: meta.now || Date.now()
     });
+
+    startTrafficSmoothAnimation();
 }
 
 function redrawTrafficLayerFromSnapshot() {
@@ -7437,7 +9474,10 @@ async function refreshTrafficLayer(options = {}) {
     if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 4500) return;
 
     const points = getTrafficQueryPoints();
-    if (!points.length) {
+    const trackedIdentifiers =
+        getTrackedTrafficIdentifiers();
+
+    if (!points.length && !trackedIdentifiers.length) {
         lastTrafficError = 'Aucun point de référence';
         lastTrafficDisplayedCount = 0;
         refreshTrafficButtonState(0);
@@ -7471,7 +9511,67 @@ async function refreshTrafficLayer(options = {}) {
             }
         }
 
-        if (!combinedAircraft.length && errors.length === points.length) {
+        /*
+         * Lorsque le filtre identifiers est actif, la réponse viewport ne
+         * contient plus les zones ADVISORY. Une seconde lecture non filtrée est
+         * alors limitée aux zones déclarées.
+         */
+        const settings = sanitizeTrafficSettings(trafficSettings);
+        if (
+            settings.onlyTrackedIdentifiers
+            && settings.showDroneAdvisories
+        ) {
+            for (const point of points) {
+                try {
+                    const url = new URL(
+                        buildTrafficApiUrl(
+                            point,
+                            SAFESKY_PROVIDER
+                        )
+                    );
+                    url.searchParams.delete('identifiers');
+                    const advisoryData = await fetchSafeSkyJson(url);
+                    combinedAircraft.push(
+                        ...extractTrafficAircraftList(
+                            advisoryData
+                        ).filter(isSafeSkyAdvisory)
+                    );
+                } catch (advisoryError) {
+                    console.warn(
+                        'Zones drone SafeSky indisponibles:',
+                        advisoryError
+                    );
+                }
+            }
+        }
+
+        if (trackedIdentifiers.length) {
+            try {
+                combinedAircraft.push(
+                    ...await fetchTrackedTrafficBeacons()
+                );
+                if (!usedProviders.includes('SafeSky direct')) {
+                    usedProviders.push('SafeSky direct');
+                }
+            } catch (trackedError) {
+                errors.push(
+                    `liste suivie: ${
+                        trackedError?.message
+                        || trackedError
+                    }`
+                );
+            }
+        }
+
+        combinedAircraft.push(
+            ...getTemporaryGlobalTrafficRaw()
+        );
+
+        if (
+            !combinedAircraft.length
+            && errors.length
+            && errors.length >= points.length
+        ) {
             throw new Error(errors.join(' / ') || 'aucune source disponible');
         }
 
@@ -7486,6 +9586,8 @@ async function refreshTrafficLayer(options = {}) {
         lastTrafficError = error && error.message ? error.message : String(error);
         lastTrafficDisplayedCount = 0;
         console.warn('Trafic temporairement indisponible:', error);
+        stopTrafficSmoothAnimation();
+        trafficMarkerRegistry.clear();
         if (trafficLayer) trafficLayer.clearLayers();
         refreshTrafficButtonState(0);
         updateTrafficStatus({ state: 'error', visible: true, message: 'Trafic temporairement indisponible — nouvelle tentative automatique' });
@@ -7539,6 +9641,8 @@ function toggleTrafficLayer(forceState = null) {
         refreshTrafficLayer({ force: true, reason: 'toggle' });
     } else {
         stopTrafficAutoRefresh();
+        stopTrafficSmoothAnimation();
+        trafficMarkerRegistry.clear();
         lastTrafficDisplayedCount = 0;
         if (trafficLayer) trafficLayer.clearLayers();
         if (trafficLayer && map && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
@@ -7623,11 +9727,16 @@ async function testSafeSkyApi() {
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
         stopTrafficAutoRefresh();
+        stopTrafficSmoothAnimation();
+        stopSafeSkyOwnPublication();
         return;
     }
 
+    syncSafeSkyOwnPublication();
+
     if (showTrafficLayer) {
         startTrafficAutoRefresh();
+        startTrafficSmoothAnimation();
         refreshTrafficLayer({
             force: true,
             reason: 'visibility-resume'
@@ -7638,6 +9747,10 @@ document.addEventListener('visibilitychange', () => {
 window.toggleTrafficLayer = toggleTrafficLayer;
 window.refreshTrafficLayer = refreshTrafficLayer;
 window.testSafeSkyApi = testSafeSkyApi;
+window.searchSafeSkyBeaconExact = searchSafeSkyBeaconExact;
+window.fetchSafeSkyBeaconById = fetchSafeSkyBeaconById;
+window.publishOwnSafeSkyPosition = publishOwnSafeSkyPosition;
+window.getTrackedTrafficIdentifiers = getTrackedTrafficIdentifiers;
 window.getSafeSkyIntegrationStatus = () => ({
     codeReady: true,
     mode: 'direct',
@@ -7651,8 +9764,24 @@ window.getSafeSkyIntegrationStatus = () => ({
         .map(provider => provider?.label)
         .filter(Boolean),
     refreshIntervalMs: TRAFFIC_REFRESH_INTERVAL_MS,
+    smoothInterpolationEnabled: true,
+    curvedTurnRateVectorEnabled: true,
+    trackedIdentifiers:
+        getTrackedTrafficIdentifiers().length,
+    droneAdvisoriesEnabled:
+        sanitizeTrafficSettings(
+            trafficSettings
+        ).showDroneAdvisories,
+    ownPositionPublicationEnabled:
+        sanitizeTrafficSettings(
+            trafficSettings
+        ).publishOwnPosition,
     backgroundPollingDisabled: true
 });
+
+setTimeout(() => {
+    syncSafeSkyOwnPublication();
+}, 3500);
 
 function updateMapBingoDisplay() {
     const bingoDisplay = document.getElementById('bingo-map-display');
@@ -10922,10 +13051,14 @@ function updateUserPosition(pos) {
             latitude,
             longitude,
             timestamp: gpsTimestampMs,
+            heading: Number.isFinite(motionHeading)
+                ? ((motionHeading % 360) + 360) % 360
+                : null,
             speedMps: storedSpeedMps,
             speedKt: storedSpeedMps !== null ? storedSpeedMps * 1.9438444924406 : null,
             altitudeFt: Number.isFinite(Number(pos.coords.altitude)) ? Math.round(Number(pos.coords.altitude) * 3.28084) : null,
-            altitudeTimeMs: Number.isFinite(Number(pos.coords.altitude)) ? gpsTimestampMs : null
+            altitudeTimeMs: Number.isFinite(Number(pos.coords.altitude)) ? gpsTimestampMs : null,
+            stored: pos?.npfIsStoredPosition === true
         };
         saveStoredGpsPosition(latitude, longitude, gpsTimestampMs);
         applyStartupGpsAutoCenter(latitude, longitude, {
@@ -12609,7 +14742,8 @@ async function handleZipImport(file) {
         return;
     }
 
-    const packName = file.name.replace(/\.zip$/i, '');
+    const sourcePackName = file.name.replace(/\.zip$/i, '');
+    const packName = normalizeOfflinePackName(sourcePackName);
     const packGroupNameForImport = getOfflinePackGroupName(packName);
     const isolatedImportDbName = getOfflineMapDatabaseNameForGroup(packGroupNameForImport);
     let importTileDb = null;
@@ -12619,7 +14753,9 @@ async function handleZipImport(file) {
 
     progressSection.style.display = 'block';
     progressBar.style.width = '0%';
-    statusMessage.textContent = `Ouverture du ZIP ${packName}...`;
+    statusMessage.textContent = sourcePackName === packName
+        ? `Ouverture du ZIP ${packName}...`
+        : `Ouverture du ZIP ${sourcePackName} → ${packName}...`;
     isZipImportRunning = true;
     try { sessionStorage.setItem('npfZipImportRunning', '1'); } catch (_) {}
 
@@ -13031,23 +15167,35 @@ async function handleZipImport(file) {
 
         await updateImportProgress(skippedTiles > 0 ? `Importation de ${packName} terminée — ${skippedTiles} tuile(s) ignorée(s).` : `Importation de ${packName} terminée !`, 100, true);
 
-        const installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
-        const existingPack = installedPacks.find(p => p.name === packName);
-        if (existingPack) {
-            existingPack.date = new Date().toLocaleDateString();
-            existingPack.groupName = packGroupNameForImport;
-            existingPack.dbName = isolatedImportDbName;
-            existingPack.storageMode = 'isolated-v13.73';
-        } else {
-            installedPacks.push({
-                name: packName,
-                date: new Date().toLocaleDateString(),
-                groupName: packGroupNameForImport,
-                dbName: isolatedImportDbName,
-                storageMode: 'isolated-v13.73'
-            });
-        }
-        localStorage.setItem('installedMapPacks', JSON.stringify(installedPacks));
+        const installedPacks = JSON.parse(
+            localStorage.getItem('installedMapPacks') || '[]'
+        );
+
+        /*
+         * Un ancien enregistrement NPF_France_V8_01 ou NPF_France_V9_01 est
+         * remplacé logiquement par NPF_France_01. Il ne peut donc pas apparaître
+         * comme une deuxième dalle dans la liste.
+         */
+        const installedPacksWithoutSameCanonicalName = installedPacks.filter(
+            pack => (
+                !pack
+                || normalizeOfflinePackName(pack.name) !== packName
+            )
+        );
+
+        installedPacksWithoutSameCanonicalName.push({
+            name: packName,
+            sourceName: sourcePackName,
+            date: new Date().toLocaleDateString(),
+            groupName: packGroupNameForImport,
+            dbName: isolatedImportDbName,
+            storageMode: 'isolated-v13.73'
+        });
+
+        localStorage.setItem(
+            'installedMapPacks',
+            JSON.stringify(installedPacksWithoutSameCanonicalName)
+        );
 
         const importedGroupName = getOfflinePackGroupName(packName);
         const importedGroupPacks = getInstalledPackNamesForGroup(importedGroupName);
@@ -13218,13 +15366,67 @@ function reloadAfterOfflinePackChange(message = 'Rechargement de la carte...') {
 }
 
 
+
+function normalizeOfflinePackName(packName) {
+    /*
+     * v14.34 — la version de fabrication du pack ne fait pas partie de son
+     * identité locale.
+     *
+     * Exemples :
+     * NPF_France_V9_01.zip    -> NPF_France_01
+     * NPF_France_V12_10.zip   -> NPF_France_10
+     * NPF_France_V9.2_03.zip  -> NPF_France_03
+     * NPF_France_04.zip       -> NPF_France_04
+     *
+     * Le suffixe final reste le numéro de dalle. Il est normalisé sur au moins
+     * deux chiffres pour conserver l'ordre 01...10.
+     */
+    const rawName = String(packName || '')
+        .split(/[\\/]/)
+        .pop()
+        .replace(/\.zip$/i, '')
+        .trim();
+
+    const cleaned = rawName
+        .replace(/\s*\(\d+\)\s*$/i, '')
+        .replace(/\s+(copy|copie)\s*$/i, '')
+        .trim();
+
+    const versionedMatch = cleaned.match(
+        /^(.*?)[\s_-]+v(?:ersion)?[\s_-]*\d+(?:\.\d+)*(?:[\s_-]+(?:part|partie|zip)?[\s_-]*(\d{1,3}))$/i
+    );
+
+    if (!versionedMatch) {
+        return cleaned;
+    }
+
+    const prefix = versionedMatch[1]
+        .replace(/[\s_-]+$/g, '')
+        .trim();
+
+    const partNumber = Number.parseInt(versionedMatch[2], 10);
+    if (!prefix || !Number.isFinite(partNumber)) {
+        return cleaned;
+    }
+
+    const sourcePartWidth = String(versionedMatch[2]).length;
+    const normalizedPartWidth = Math.max(2, sourcePartWidth);
+    const normalizedPart = String(partNumber).padStart(
+        normalizedPartWidth,
+        '0'
+    );
+
+    return `${prefix}_${normalizedPart}`;
+}
+
+
 function getOfflinePackGroupName(packName) {
     /*
      * v12.15 — groupes de packs offline plus tolérants.
      * Exemples :
      * OpenStreet_01, OpenStreet-02, IGN_001, IGN 03, IGN_part04 => groupe IGN.
      */
-    const name = String(packName || '').trim();
+    const name = normalizeOfflinePackName(packName);
     const cleaned = name
         .replace(/\s*\(\d+\)\s*$/i, '')
         .replace(/\s+(copy|copie)\s*$/i, '')
