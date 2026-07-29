@@ -1,5 +1,37 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.36 TEST — réparation de la connexion IndexedDB des cartes offline
+
+Modifications apportées :
+- correction de l’erreur Safari « Failed to execute transaction on IDBDatabase: the database connection is closing » ;
+- correction d’une référence globale `db` pouvant conserver un objet IndexedDB déjà fermé ;
+- remplacement du gestionnaire onversionchange afin de fermer uniquement la bonne connexion ;
+- remise immédiate de la variable globale `db` à null lorsque cette connexion est fermée ;
+- ajout d’un gestionnaire d’événement close lorsque le navigateur le prend en charge ;
+- ajout d’un compteur de génération évitant qu’une ancienne connexion n’efface une connexion plus récente ;
+- ajout d’une promesse d’ouverture unique afin d’éviter plusieurs ouvertures concurrentes de la même base ;
+- ajout d’un test de validité réel par création d’une transaction settings en lecture seule ;
+- réouverture automatique de la base si la connexion est absente, fermée ou en cours de fermeture ;
+- ajout d’une fonction centralisée de détection des erreurs InvalidStateError, connexion fermée et connexion en fermeture ;
+- ajout d’un exécuteur de transaction settings avec une nouvelle tentative automatique après réouverture ;
+- sécurisation de la lecture de la préférence offline ;
+- sécurisation de l’écriture de la préférence offline ;
+- sécurisation de l’enregistrement des packs actifs et des bases IndexedDB associées ;
+- sécurisation de la persistance du mode de secours online ;
+- sécurisation de la suspension des cartes pendant un import ZIP ;
+- sécurisation du changement de groupe de carte offline ;
+- vérification du contrôle effectif de la page par le service worker avant l’activation d’une carte offline ;
+- sécurisation du scan des niveaux de zoom disponibles ;
+- sécurisation de la purge des packs inactifs ;
+- maintien de localStorage comme solution de repli si l’écriture IndexedDB settings échoue ;
+- ajout d’une relance propre de NPF en ultime recours si Safari ferme la connexion pendant le changement de carte ;
+- conservation de la sélection choisie avant cette relance ;
+- aucune suppression ni réimportation des cartes déjà présentes ;
+- conservation de toutes les fonctions SafeSky de la v14.35 ;
+- conservation de la normalisation des noms NPF_France_Vx_01 en NPF_France_01 ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.36 TEST.
+
 v14.35 TEST — recherche globale, suivi direct, zones drone, taux de virage, animation fluide et publication NPF
 
 Modifications apportées :
