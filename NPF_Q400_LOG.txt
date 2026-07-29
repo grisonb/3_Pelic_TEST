@@ -1,36 +1,40 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
-v14.36 TEST — réparation de la connexion IndexedDB des cartes offline
+v14.37 TEST — compatibilité cartes NPF multi-ZIP et diagnostic publication SafeSky
 
 Modifications apportées :
-- correction de l’erreur Safari « Failed to execute transaction on IDBDatabase: the database connection is closing » ;
-- correction d’une référence globale `db` pouvant conserver un objet IndexedDB déjà fermé ;
-- remplacement du gestionnaire onversionchange afin de fermer uniquement la bonne connexion ;
-- remise immédiate de la variable globale `db` à null lorsque cette connexion est fermée ;
-- ajout d’un gestionnaire d’événement close lorsque le navigateur le prend en charge ;
-- ajout d’un compteur de génération évitant qu’une ancienne connexion n’efface une connexion plus récente ;
-- ajout d’une promesse d’ouverture unique afin d’éviter plusieurs ouvertures concurrentes de la même base ;
-- ajout d’un test de validité réel par création d’une transaction settings en lecture seule ;
-- réouverture automatique de la base si la connexion est absente, fermée ou en cours de fermeture ;
-- ajout d’une fonction centralisée de détection des erreurs InvalidStateError, connexion fermée et connexion en fermeture ;
-- ajout d’un exécuteur de transaction settings avec une nouvelle tentative automatique après réouverture ;
-- sécurisation de la lecture de la préférence offline ;
-- sécurisation de l’écriture de la préférence offline ;
-- sécurisation de l’enregistrement des packs actifs et des bases IndexedDB associées ;
-- sécurisation de la persistance du mode de secours online ;
-- sécurisation de la suspension des cartes pendant un import ZIP ;
-- sécurisation du changement de groupe de carte offline ;
-- vérification du contrôle effectif de la page par le service worker avant l’activation d’une carte offline ;
-- sécurisation du scan des niveaux de zoom disponibles ;
-- sécurisation de la purge des packs inactifs ;
-- maintien de localStorage comme solution de repli si l’écriture IndexedDB settings échoue ;
-- ajout d’une relance propre de NPF en ultime recours si Safari ferme la connexion pendant le changement de carte ;
-- conservation de la sélection choisie avant cette relance ;
-- aucune suppression ni réimportation des cartes déjà présentes ;
-- conservation de toutes les fonctions SafeSky de la v14.35 ;
-- conservation de la normalisation des noms NPF_France_Vx_01 en NPF_France_01 ;
+- retour sur la base fonctionnelle v14.35 pour éviter de conserver la réécriture trop large de l’IndexedDB introduite en v14.36 ;
+- correction ciblée d’une connexion settings IndexedDB fermée ou en cours de fermeture ;
+- ouverture IndexedDB principale rendue unique afin d’éviter deux ouvertures concurrentes ;
+- remise à null de la bonne connexion lors de versionchange ou close ;
+- nouvelle tentative unique des transactions settings après réouverture ;
+- les erreurs de la base settings ne bloquent plus le changement de fond de carte ;
+- ajout d’une liste d’alias pour les packs offline actifs ;
+- conservation simultanée du nom logique sans version et du nom source avec version ;
+- compatibilité entre NPF_France_01 et les anciennes tuiles enregistrées sous NPF_France_Vx_01 ;
+- compatibilité entre les anciens groupes NPF_France_Vx et le nouveau groupe NPF_France ;
+- génération de plusieurs hôtes fictifs de tuiles afin de retrouver les anciennes clés IndexedDB ;
+- recherche d’une tuile sur l’hôte logique actuel et sur les hôtes dérivés des anciens noms source ;
+- ajout automatique de la base isolée déterministe OfflineMap_NPF_France ;
+- maintien de la base commune historique OfflineTilesDB_v13_70_clean comme solution de repli ;
+- le service worker teste désormais les bases déclarées, les bases déterministes et la base historique ;
+- accusé de réception du service worker avant la reconstruction du fond de carte ;
+- la configuration envoyée par la page reste prioritaire pendant deux minutes ;
+- suppression du risque que le service worker remplace une sélection récente par une ancienne valeur IndexedDB ;
+- cache mémoire des tuiles vidé à chaque changement de groupe ;
+- reconnexion automatique du service worker si une base de tuiles se ferme ;
+- aucune suppression des cartes installées ;
+- aucun réimport des dix ZIP NPF requis ;
+- maintien de la carte OACI et des autres cartes offline ;
+- ajout du code HTTP et de la méthode aux erreurs SafeSky ;
+- détection explicite des réponses 401, 403, Access denied et Forbidden lors de la publication ;
+- arrêt immédiat de la boucle de publication en cas d’accès refusé ;
+- désactivation automatique de la case Publication afin d’éviter un POST refusé toutes les cinq secondes ;
+- message précis indiquant que la clé actuelle n’est pas autorisée à publier ;
+- conservation de l’indicatif saisi pour une future autorisation SafeSky ;
+- maintien de la recherche globale, du suivi par identifiant, des zones ADVISORY, du vecteur courbe et de l’animation fluide ;
 - aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
-- version applicative portée en v14.36 TEST.
+- version applicative portée en v14.37 TEST.
 
 v14.35 TEST — recherche globale, suivi direct, zones drone, taux de virage, animation fluide et publication NPF
 
