@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-31_popup_compagnie_modele_couleur_icones_etiquette_2_lignes';
-const APP_VERSION = 'v14.31';
+const SW_VERSION = 'sw-v14-32_fleches_verticales_diagonales_renforcees';
+const APP_VERSION = 'v14.32';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
