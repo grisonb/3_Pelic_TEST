@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.32') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.32') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.33') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.33') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11407,4 +11407,73 @@ body.gaar-point-search-open .gaar-editing-banner {
     text-shadow:
         0 0 1px currentColor,
         0 1px 0 rgba(255,255,255,.88) !important;
+}
+
+
+/* ==========================================================================
+   v14.33 TEST — flèches compactes et étiquette jamais superposée à l'icône
+   ========================================================================== */
+
+/*
+ * La transformation centrale historique est neutralisée par huit ancrages.
+ * Le bord ou le coin le plus proche du trafic est placé sur le point calculé.
+ */
+.traffic-aircraft-altitude-label.traffic-label-anchor-top {
+    transform: translate(-50%, 0) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-top-right {
+    transform: translate(-100%, 0) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-right {
+    transform: translate(-100%, -50%) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-bottom-right {
+    transform: translate(-100%, -100%) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-bottom {
+    transform: translate(-50%, -100%) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-bottom-left {
+    transform: translate(0, -100%) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-left {
+    transform: translate(0, -50%) !important;
+}
+
+.traffic-aircraft-altitude-label.traffic-label-anchor-top-left {
+    transform: translate(0, 0) !important;
+}
+
+/*
+ * Flèche moins longue verticalement, mais plus épaisse.
+ * Elle reste centrée dans la deuxième ligne sans toucher la première.
+ */
+.traffic-label-line-secondary {
+    gap: 7px !important;
+    min-height: 15px !important;
+    line-height: 15px !important;
+}
+
+.traffic-vertical-trend {
+    flex: 0 0 19px !important;
+    width: 19px !important;
+    min-width: 19px !important;
+    height: 14px !important;
+    font-size: 18px !important;
+    line-height: 13px !important;
+    font-weight: 1000 !important;
+    transform: translateY(0) scaleX(1.08) !important;
+    -webkit-text-stroke: .85px currentColor !important;
+    text-shadow:
+        .35px 0 currentColor,
+        -.35px 0 currentColor,
+        0 .35px currentColor,
+        0 -.35px currentColor,
+        0 1px 0 rgba(255,255,255,.9) !important;
 }
