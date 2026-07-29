@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.31') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.31') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.32') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.32') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11360,4 +11360,51 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 .traffic-trend-descent {
     color: #dc2626 !important;
+}
+
+
+/* ==========================================================================
+   v14.32 TEST — flèches montée/descente diagonales et renforcées
+   ========================================================================== */
+
+/*
+ * Un peu plus d'espace sur la deuxième ligne pour séparer nettement
+ * l'altitude de la tendance verticale.
+ */
+.traffic-aircraft-altitude-label {
+    min-width: 86px !important;
+    max-width: 168px !important;
+    padding-left: 7px !important;
+    padding-right: 7px !important;
+}
+
+.traffic-label-line-secondary {
+    gap: 8px !important;
+    min-height: 18px !important;
+    font-size: 10.5px !important;
+}
+
+/*
+ * Flèche diagonale plus grosse et plus épaisse.
+ * ↗ = montée ; ↘ = descente.
+ */
+.traffic-vertical-trend {
+    flex: 0 0 22px !important;
+    width: 22px !important;
+    min-width: 22px !important;
+    height: 18px !important;
+    font-family:
+        "Arial Unicode MS",
+        "Helvetica Neue",
+        Arial,
+        sans-serif !important;
+    font-size: 22px !important;
+    line-height: 18px !important;
+    font-weight: 1000 !important;
+    letter-spacing: 0 !important;
+    transform: translateY(-1px) !important;
+    -webkit-text-stroke: .45px currentColor !important;
+    text-shadow:
+        0 0 1px currentColor,
+        0 1px 0 rgba(255,255,255,.88) !important;
 }
