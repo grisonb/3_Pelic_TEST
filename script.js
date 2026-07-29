@@ -7040,23 +7040,39 @@ function buildTrafficMarkerIcon(aircraft) {
         : 0;
 
     /*
-     * L'étiquette est placée sur le rayon opposé au vecteur :
-     * - route 000° : étiquette sous le rond ;
-     * - route 090° : étiquette à gauche ;
-     * - route 180° : étiquette au-dessus ;
-     * - route 270° : étiquette à droite.
-     */
-    /*
-     * Le libellé est désormais plus large car il contient aussi l'identifiant.
-     * Rayon légèrement augmenté pour éviter tout contact avec le rond.
+     * L'étiquette reste opposée à la route, mais son BORD le plus proche est
+     * désormais ancré sur le point calculé. Sa largeur ne peut donc plus
+     * revenir recouvrir l'icône, même lorsqu'elle est placée à gauche ou à
+     * droite du trafic.
      */
     const markerCenterPx = 21;
-    const labelRadiusPx = 37;
+    const labelEdgeDistancePx = 24;
     const trackRadians = track * Math.PI / 180;
+    const oppositeX = -Math.sin(trackRadians);
+    const oppositeY = Math.cos(trackRadians);
     const altitudeLabelLeft = markerCenterPx
-        - Math.sin(trackRadians) * labelRadiusPx;
+        + oppositeX * labelEdgeDistancePx;
     const altitudeLabelTop = markerCenterPx
-        + Math.cos(trackRadians) * labelRadiusPx;
+        + oppositeY * labelEdgeDistancePx;
+
+    /*
+     * Huit secteurs déterminent le coin ou le bord de l'étiquette à utiliser.
+     * Le placement reste stable lors des changements légers de route.
+     */
+    const labelSector = Math.round(
+        (((track % 360) + 360) % 360) / 45
+    ) % 8;
+    const labelAnchorClasses = [
+        'traffic-label-anchor-top',
+        'traffic-label-anchor-top-right',
+        'traffic-label-anchor-right',
+        'traffic-label-anchor-bottom-right',
+        'traffic-label-anchor-bottom',
+        'traffic-label-anchor-bottom-left',
+        'traffic-label-anchor-left',
+        'traffic-label-anchor-top-left'
+    ];
+    const labelAnchorClass = labelAnchorClasses[labelSector];
 
     const permanentIdentifier = compactTrafficLabelText(
         getTrafficPermanentIdentifier(aircraft),
@@ -7086,7 +7102,7 @@ function buildTrafficMarkerIcon(aircraft) {
         settings.showAltitudeLabel
         && (firstLineParts.length || secondLineParts.length)
     ) ? `
-        <span class="traffic-aircraft-altitude-label"
+        <span class="traffic-aircraft-altitude-label ${labelAnchorClass}"
               style="--traffic-alt-left:${altitudeLabelLeft.toFixed(1)}px;--traffic-alt-top:${altitudeLabelTop.toFixed(1)}px;">
             ${firstLineParts.length ? `
                 <span class="traffic-label-line traffic-label-line-primary">
