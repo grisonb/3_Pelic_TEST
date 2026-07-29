@@ -1,5 +1,28 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.32 TEST — flèches montée/descente diagonales et renforcées
+
+Modifications apportées :
+- remplacement de la flèche verticale de montée ↑ par une flèche diagonale ↗ ;
+- remplacement de la flèche verticale de descente ↓ par une flèche diagonale ↘ ;
+- ajout du sélecteur Unicode de présentation texte pour éviter un rendu emoji sur iPadOS ;
+- taille des flèches portée à 22 px ;
+- épaisseur visuelle renforcée par graisse maximale et contour léger ;
+- ajout d’une ombre discrète améliorant le contraste sur fond clair ;
+- largeur réservée de 22 px afin d’éviter le déplacement de l’altitude ;
+- espacement entre altitude et flèche porté à 8 px ;
+- hauteur minimale de la deuxième ligne portée à 18 px ;
+- largeur minimale de l’étiquette portée à 86 px ;
+- largeur maximale de l’étiquette portée à 168 px ;
+- marges horizontales internes légèrement augmentées ;
+- aucune modification de la logique de détection de montée ou de descente ;
+- aucune flèche lorsque la vitesse verticale est nulle ou indisponible ;
+- aucune flèche pour les trafics au sol ;
+- conservation des couleurs vertes pour la montée et rouges pour la descente ;
+- conservation de toutes les fonctions de la v14.31 ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.32 TEST.
+
 v14.31 TEST — fenêtre trafic enrichie, couleur des icônes et étiquette permanente sur deux lignes
 
 Modifications apportées :
