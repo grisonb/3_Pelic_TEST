@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-35_recherche_suivi_advisory_virage_animation_publication';
-const APP_VERSION = 'v14.35';
+const SW_VERSION = 'sw-v14-36_reparation_connexion_indexeddb_cartes_offline';
+const APP_VERSION = 'v14.36';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
