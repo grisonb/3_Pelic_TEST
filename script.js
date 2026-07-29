@@ -624,6 +624,8 @@ let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
 let db; // Variable pour la connexion à la base de données IndexedDB
+let offlineDbOpenPromise = null;
+let offlineDbConnectionGeneration = 0;
 const OFFLINE_DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const OFFLINE_TILES_ENABLED_KEY = 'offlineTilesEnabled';
 const DEFAULT_OFFLINE_TILES_ENABLED = true;
@@ -3763,7 +3765,16 @@ function displayResults(results) {
 }
 
 async function findOfflineTileZoomRange() {
-    if (!db) return null;
+    try {
+        await ensureMainOfflineDatabaseConnection();
+    } catch (error) {
+        console.warn(
+            '[Offline] Base principale indisponible pour le scan de zoom:',
+            error
+        );
+        return null;
+    }
+
     const targetPacks = new Set(activeOfflinePacks);
     return new Promise((resolve) => {
         let settled = false;
@@ -3779,9 +3790,21 @@ async function findOfflineTileZoomRange() {
             finalize(null);
         }, 8000);
 
-        const tx = db.transaction('tiles', 'readonly');
-        const store = tx.objectStore('tiles');
-        const request = store.openCursor();
+        let tx;
+        let store;
+        let request;
+
+        try {
+            tx = db.transaction('tiles', 'readonly');
+            store = tx.objectStore('tiles');
+            request = store.openCursor();
+        } catch (error) {
+            if (isOfflineDatabaseConnectionError(error)) {
+                invalidateMainOfflineDatabaseConnection(db);
+            }
+            finalize(null);
+            return;
+        }
         let minZoom = null;
         let maxZoom = null;
 
@@ -14159,63 +14182,300 @@ function soundex(s) { if (!s) return ""; const a = s.toLowerCase().split(""), f 
 // =========================================================================
 // GESTION DES CARTES HORS-LIGNE
 // =========================================================================
-function initDB() {
+function isOfflineDatabaseConnectionError(error) {
+    const name = String(error?.name || '').toLowerCase();
+    const message = String(
+        error?.message || error || ''
+    ).toLowerCase();
+
+    return (
+        name === 'invalidstateerror'
+        || name === 'transactioninactiveerror'
+        || message.includes('connection is closing')
+        || message.includes('database connection is closing')
+        || message.includes('database is closing')
+        || message.includes('connection is closed')
+        || message.includes('database connection is closed')
+        || message.includes('not allowed to create a transaction')
+    );
+}
+
+function isOfflineDatabaseConnectionUsable(candidate = db) {
+    if (!candidate) return false;
+
+    try {
+        /*
+         * La simple création d'une transaction suffit à détecter une connexion
+         * déjà fermée ou en cours de fermeture sur Safari/iPadOS.
+         */
+        candidate.transaction('settings', 'readonly');
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function invalidateMainOfflineDatabaseConnection(candidate = db) {
+    const connection = candidate || db;
+
+    try {
+        if (connection) connection.close();
+    } catch (_) {}
+
+    if (!candidate || db === candidate) {
+        db = null;
+    }
+}
+
+function initDB({ forceReopen = false } = {}) {
     /*
-     * v11.27 — retour au module offline ancien/simple.
-     * Ouverture conservée en version 3 pour rester compatible avec les bases déjà créées
-     * par les versions récentes, mais sans scan ni logique avancée pendant l'import.
+     * v14.36 — une connexion IndexedDB fermée ne doit jamais rester référencée.
+     *
+     * Safari peut fermer une connexion lors d'un changement de version,
+     * d'une mise à jour du service worker ou d'une reprise après arrière-plan.
+     * L'ancien code fermait bien la base, mais la variable globale `db`
+     * conservait parfois l'objet fermé. La transaction suivante échouait alors
+     * avec « database connection is closing ».
      */
-    return new Promise((resolve, reject) => {
+    if (
+        !forceReopen
+        && isOfflineDatabaseConnectionUsable(db)
+    ) {
+        return Promise.resolve(db);
+    }
+
+    if (forceReopen || db) {
+        invalidateMainOfflineDatabaseConnection(db);
+    }
+
+    if (offlineDbOpenPromise) {
+        return offlineDbOpenPromise;
+    }
+
+    offlineDbOpenPromise = new Promise((resolve, reject) => {
         if (typeof indexedDB === 'undefined') {
             reject(new Error('IndexedDB indisponible'));
             return;
         }
 
-        const request = indexedDB.open(OFFLINE_DB_NAME, 3);
+        const request = indexedDB.open(
+            OFFLINE_DB_NAME,
+            3
+        );
 
         request.onupgradeneeded = event => {
             const dbInstance = event.target.result;
 
             if (!dbInstance.objectStoreNames.contains('tiles')) {
-                const store = dbInstance.createObjectStore('tiles', { keyPath: 'url' });
-                store.createIndex('packName', 'packName', { unique: false });
-                store.createIndex('tileUrl', 'tileUrl', { unique: false });
+                const store = dbInstance.createObjectStore(
+                    'tiles',
+                    { keyPath: 'url' }
+                );
+                store.createIndex(
+                    'packName',
+                    'packName',
+                    { unique: false }
+                );
+                store.createIndex(
+                    'tileUrl',
+                    'tileUrl',
+                    { unique: false }
+                );
             } else {
-                const store = event.target.transaction.objectStore('tiles');
+                const store = event.target.transaction
+                    .objectStore('tiles');
+
                 if (!store.indexNames.contains('packName')) {
-                    store.createIndex('packName', 'packName', { unique: false });
+                    store.createIndex(
+                        'packName',
+                        'packName',
+                        { unique: false }
+                    );
                 }
                 if (!store.indexNames.contains('tileUrl')) {
-                    store.createIndex('tileUrl', 'tileUrl', { unique: false });
+                    store.createIndex(
+                        'tileUrl',
+                        'tileUrl',
+                        { unique: false }
+                    );
                 }
             }
 
-            if (!dbInstance.objectStoreNames.contains('settings')) {
-                dbInstance.createObjectStore('settings', { keyPath: 'key' });
+            if (
+                !dbInstance.objectStoreNames
+                    .contains('settings')
+            ) {
+                dbInstance.createObjectStore(
+                    'settings',
+                    { keyPath: 'key' }
+                );
             }
         };
 
         request.onsuccess = event => {
-            db = event.target.result;
+            const openedDb = event.target.result;
+            const generation =
+                ++offlineDbConnectionGeneration;
+
+            db = openedDb;
+
+            const clearReference = () => {
+                if (
+                    db === openedDb
+                    && generation
+                        === offlineDbConnectionGeneration
+                ) {
+                    db = null;
+                }
+            };
+
             try {
-                db.onversionchange = () => {
-                    try { db.close(); } catch (_) {}
-                    if (window.db === db) window.db = null;
+                openedDb.onversionchange = () => {
+                    try {
+                        openedDb.close();
+                    } catch (_) {}
+                    clearReference();
                 };
             } catch (_) {}
-            console.log("[DB] Connexion réussie.");
-            resolve(db);
+
+            try {
+                openedDb.addEventListener(
+                    'close',
+                    clearReference,
+                    { once: true }
+                );
+            } catch (_) {}
+
+            console.log(
+                '[DB] Connexion IndexedDB offline ouverte.'
+            );
+            resolve(openedDb);
         };
 
         request.onerror = event => {
-            console.error("[DB] Erreur de connexion:", event.target.error);
-            reject(event.target.error);
+            console.error(
+                '[DB] Erreur de connexion:',
+                event.target.error
+            );
+            reject(
+                event.target.error
+                || new Error(
+                    'Ouverture IndexedDB impossible'
+                )
+            );
         };
 
         request.onblocked = () => {
-            reject(new Error("Base IndexedDB bloquée. Fermez les autres onglets de l'application puis réessayez."));
+            reject(
+                new Error(
+                    'Base IndexedDB bloquée. Fermez les autres onglets de l’application puis réessayez.'
+                )
+            );
         };
+    }).finally(() => {
+        offlineDbOpenPromise = null;
     });
+
+    return offlineDbOpenPromise;
+}
+
+async function ensureMainOfflineDatabaseConnection({
+    forceReopen = false
+} = {}) {
+    if (
+        !forceReopen
+        && isOfflineDatabaseConnectionUsable(db)
+    ) {
+        return db;
+    }
+
+    return initDB({ forceReopen: true });
+}
+
+async function runMainOfflineSettingsTransaction(
+    mode,
+    operation
+) {
+    let lastError = null;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+        const connection =
+            await ensureMainOfflineDatabaseConnection({
+                forceReopen: attempt > 0
+            });
+
+        try {
+            return await new Promise(
+                (resolve, reject) => {
+                    let transaction;
+                    let operationResult;
+
+                    try {
+                        transaction =
+                            connection.transaction(
+                                'settings',
+                                mode
+                            );
+                        const store =
+                            transaction.objectStore(
+                                'settings'
+                            );
+                        operationResult = operation(
+                            store,
+                            transaction
+                        );
+                    } catch (error) {
+                        reject(error);
+                        return;
+                    }
+
+                    transaction.oncomplete = () => {
+                        resolve(operationResult);
+                    };
+                    transaction.onerror = () => {
+                        reject(
+                            transaction.error
+                            || new Error(
+                                'Transaction IndexedDB échouée'
+                            )
+                        );
+                    };
+                    transaction.onabort = () => {
+                        reject(
+                            transaction.error
+                            || new Error(
+                                'Transaction IndexedDB annulée'
+                            )
+                        );
+                    };
+                }
+            );
+        } catch (error) {
+            lastError = error;
+
+            if (
+                !isOfflineDatabaseConnectionError(error)
+                || attempt >= 1
+            ) {
+                throw error;
+            }
+
+            console.warn(
+                '[Offline] Connexion IndexedDB fermée, réouverture automatique.',
+                error
+            );
+            invalidateMainOfflineDatabaseConnection(
+                connection
+            );
+        }
+    }
+
+    throw (
+        lastError
+        || new Error(
+            'Connexion IndexedDB offline indisponible'
+        )
+    );
 }
 
 
@@ -14299,49 +14559,77 @@ function openOfflineTileDatabaseByName(dbName = OFFLINE_DB_NAME, version = 3) {
     });
 }
 
-function getOfflineTilesEnabled() {
-    return new Promise((resolve) => {
-        if (!db) {
-            resolve(DEFAULT_OFFLINE_TILES_ENABLED);
-            return;
-        }
+async function getOfflineTilesEnabled() {
+    try {
+        let storedValue;
 
-        const transaction = db.transaction('settings', 'readonly');
-        const store = transaction.objectStore('settings');
-        const request = store.get(OFFLINE_TILES_ENABLED_KEY);
-
-        request.onsuccess = () => {
-            if (!request.result || typeof request.result.value !== 'boolean') {
-                resolve(DEFAULT_OFFLINE_TILES_ENABLED);
-                return;
+        await runMainOfflineSettingsTransaction(
+            'readonly',
+            store => {
+                const request = store.get(
+                    OFFLINE_TILES_ENABLED_KEY
+                );
+                request.onsuccess = () => {
+                    storedValue =
+                        request.result?.value;
+                };
             }
-            resolve(request.result.value);
-        };
-        request.onerror = () => resolve(DEFAULT_OFFLINE_TILES_ENABLED);
-    });
+        );
+
+        return typeof storedValue === 'boolean'
+            ? storedValue
+            : DEFAULT_OFFLINE_TILES_ENABLED;
+    } catch (error) {
+        console.warn(
+            '[Offline] Lecture préférence impossible, repli localStorage:',
+            error
+        );
+
+        const localValue = localStorage.getItem(
+            OFFLINE_TILES_ENABLED_KEY
+        );
+        if (localValue === 'true') return true;
+        if (localValue === 'false') return false;
+
+        return DEFAULT_OFFLINE_TILES_ENABLED;
+    }
 }
 
-function setOfflineTilesEnabled(enabled) {
-    offlineTilesMode = !!enabled;
-    localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, String(offlineTilesMode));
-    notifyServiceWorkerOfflineTilesPreference(offlineTilesMode);
 
-    if (!db) {
-        return Promise.resolve();
-    }
+async function setOfflineTilesEnabled(enabled) {
+    offlineTilesMode = !!enabled;
+
+    localStorage.setItem(
+        OFFLINE_TILES_ENABLED_KEY,
+        String(offlineTilesMode)
+    );
+    notifyServiceWorkerOfflineTilesPreference(
+        offlineTilesMode
+    );
 
     try {
-        const transaction = db.transaction('settings', 'readwrite');
-        const store = transaction.objectStore('settings');
-        store.put({ key: OFFLINE_TILES_ENABLED_KEY, value: offlineTilesMode });
-        transaction.onerror = () => console.warn('[Offline] Impossible de persister la préférence offline:', transaction.error);
-        transaction.onabort = () => console.warn('[Offline] Transaction annulée lors de la persistance offline:', transaction.error);
+        await runMainOfflineSettingsTransaction(
+            'readwrite',
+            store => {
+                store.put({
+                    key: OFFLINE_TILES_ENABLED_KEY,
+                    value: offlineTilesMode
+                });
+            }
+        );
     } catch (error) {
-        console.warn('[Offline] IndexedDB indisponible, préférence conservée en localStorage uniquement:', error);
+        /*
+         * Le mode choisi reste valide dans localStorage. L'application ne doit
+         * plus bloquer le changement de carte à cause d'une connexion settings
+         * fermée pendant une reprise Safari.
+         */
+        console.warn(
+            '[Offline] Préférence conservée en localStorage, écriture IndexedDB différée:',
+            error
+        );
     }
-
-    return Promise.resolve();
 }
+
 
 function notifyServiceWorkerOfflineTilesPreference(enabled) {
     if (!('serviceWorker' in navigator)) return;
@@ -14377,33 +14665,81 @@ function notifyServiceWorkerActivePacks(packs) {
 }
 
 async function setOfflineActivePacks(packs) {
-    activeOfflinePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
-    activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
-    localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
-    localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(activeOfflinePackDatabases));
-    if (db) {
-        try {
-            const tx = db.transaction('settings', 'readwrite');
-            const store = tx.objectStore('settings');
-            store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: activeOfflinePacks });
-            store.put({ key: OFFLINE_ACTIVE_PACK_DATABASES_KEY, value: activeOfflinePackDatabases });
-        } catch (_) {}
+    activeOfflinePacks = Array.isArray(packs)
+        ? packs.filter(Boolean)
+        : [];
+
+    activeOfflinePackDatabases =
+        getOfflineActivePackDatabasesForPacks(
+            activeOfflinePacks
+        );
+
+    localStorage.setItem(
+        OFFLINE_ACTIVE_PACKS_KEY,
+        JSON.stringify(activeOfflinePacks)
+    );
+    localStorage.setItem(
+        OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+        JSON.stringify(activeOfflinePackDatabases)
+    );
+
+    try {
+        await runMainOfflineSettingsTransaction(
+            'readwrite',
+            store => {
+                store.put({
+                    key: OFFLINE_ACTIVE_PACKS_KEY,
+                    value: activeOfflinePacks
+                });
+                store.put({
+                    key:
+                        OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+                    value: activeOfflinePackDatabases
+                });
+            }
+        );
+    } catch (error) {
+        console.warn(
+            '[Offline] Packs actifs conservés en localStorage:',
+            error
+        );
     }
-    notifyServiceWorkerActivePacks(activeOfflinePacks);
+
+    notifyServiceWorkerActivePacks(
+        activeOfflinePacks
+    );
     await refreshOfflineTilesRendering();
 }
 
+
 function setOfflineOnlineFallbackMode(enabled) {
     offlineOnlineFallbackMode = !!enabled;
-    localStorage.setItem(OFFLINE_ONLINE_FALLBACK_KEY, String(offlineOnlineFallbackMode));
-    if (db) {
-        try {
-            const tx = db.transaction('settings', 'readwrite');
-            tx.objectStore('settings').put({ key: OFFLINE_ONLINE_FALLBACK_KEY, value: offlineOnlineFallbackMode });
-        } catch (_) {}
-    }
-    notifyServiceWorkerOfflineOnlineFallback(offlineOnlineFallbackMode);
+
+    localStorage.setItem(
+        OFFLINE_ONLINE_FALLBACK_KEY,
+        String(offlineOnlineFallbackMode)
+    );
+
+    runMainOfflineSettingsTransaction(
+        'readwrite',
+        store => {
+            store.put({
+                key: OFFLINE_ONLINE_FALLBACK_KEY,
+                value: offlineOnlineFallbackMode
+            });
+        }
+    ).catch(error => {
+        console.warn(
+            '[Offline] Mode de secours conservé en localStorage:',
+            error
+        );
+    });
+
+    notifyServiceWorkerOfflineOnlineFallback(
+        offlineOnlineFallbackMode
+    );
 }
+
 
 function updateMapSourceButtons() {
     const onlineBtn = document.getElementById('map-source-online-btn');
@@ -14521,13 +14857,11 @@ async function initializeOfflineTilePreference() {
 }
 
 async function purgeInactivePacksCache() {
-    if (!db) {
-        try {
-            await initDB();
-        } catch (_) {
-            alert('Base offline indisponible.');
-            return;
-        }
+    try {
+        await ensureMainOfflineDatabaseConnection();
+    } catch (_) {
+        alert('Base offline indisponible.');
+        return;
     }
     const installedPacks = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
     const inactiveNames = installedPacks.map((p) => p.name).filter((name) => !activeOfflinePacks.includes(name));
@@ -14570,39 +14904,51 @@ async function purgeInactivePacksCache() {
 
 async function persistOfflineImportPauseSettings() {
     /*
-     * v13.70 — import ZIP stable iPad.
-     * On écrit réellement dans IndexedDB/settings que les tuiles offline sont suspendues
-     * et qu'aucun pack n'est actif. Le service worker relit périodiquement ces settings :
-     * si on ne les met pas à jour, il peut reprendre la lecture de l'ancien pack pendant
-     * que l'import écrit le nouveau ZIP, ce qui bloque Safari/iPadOS dès le premier lot.
+     * v14.36 — la suspension reste écrite même si la connexion IndexedDB a été
+     * fermée par Safari. La transaction est automatiquement rejouée une fois.
      */
-    try { localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'false'); } catch (_) {}
-    try { localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify([])); } catch (_) {}
-    try { localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify([])); } catch (_) {}
+    try {
+        localStorage.setItem(
+            OFFLINE_TILES_ENABLED_KEY,
+            'false'
+        );
+        localStorage.setItem(
+            OFFLINE_ACTIVE_PACKS_KEY,
+            JSON.stringify([])
+        );
+        localStorage.setItem(
+            OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+            JSON.stringify([])
+        );
+    } catch (_) {}
 
-    if (!db) {
-        try { await initDB(); } catch (_) {}
+    try {
+        await runMainOfflineSettingsTransaction(
+            'readwrite',
+            store => {
+                store.put({
+                    key: OFFLINE_TILES_ENABLED_KEY,
+                    value: false
+                });
+                store.put({
+                    key: OFFLINE_ACTIVE_PACKS_KEY,
+                    value: []
+                });
+                store.put({
+                    key:
+                        OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+                    value: []
+                });
+            }
+        );
+    } catch (error) {
+        console.warn(
+            '[Offline] Suspension settings import conservée uniquement en localStorage:',
+            error
+        );
     }
-
-    if (!db) return;
-
-    await new Promise((resolve, reject) => {
-        try {
-            const tx = db.transaction('settings', 'readwrite');
-            const store = tx.objectStore('settings');
-            store.put({ key: OFFLINE_TILES_ENABLED_KEY, value: false });
-            store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: [] });
-            store.put({ key: OFFLINE_ACTIVE_PACK_DATABASES_KEY, value: [] });
-            tx.oncomplete = resolve;
-            tx.onerror = () => reject(tx.error || new Error('Erreur suspension settings offline'));
-            tx.onabort = () => reject(tx.error || new Error('Transaction suspension settings annulée'));
-        } catch (error) {
-            reject(error);
-        }
-    }).catch((error) => {
-        console.warn('[Offline] Suspension settings import incomplète:', error);
-    });
 }
+
 
 function postServiceWorkerMessageWithAck(message, expectedType = 'OFFLINE_IMPORT_READY', timeoutMs = 2500) {
     return new Promise((resolve) => {
@@ -14722,10 +15068,7 @@ async function releaseOfflineDatabaseForHeavyOperation(reason = 'Opération offl
         await postServiceWorkerMessageWithAck({ type: 'OFFLINE_IMPORT_START' }, 'OFFLINE_IMPORT_READY', 3000);
     } catch (_) {}
 
-    try {
-        if (db) db.close();
-    } catch (_) {}
-    db = null;
+    invalidateMainOfflineDatabaseConnection(db);
 
     await new Promise(resolve => setTimeout(resolve, 1200));
     await initDB();
@@ -15293,53 +15636,64 @@ function parseTilePathFromName(name) {
 
 async function persistSimpleActiveOfflinePacks(packs) {
     /*
-     * v13.78 — cartes multi-ZIP en bases séparées.
-     *
-     * Correction critique :
-     * v13.73 persistait bien la liste des packs actifs, mais pas toujours la
-     * liste des bases IndexedDB isolées dans la base settings. Après relance,
-     * le service worker pouvait donc revenir sur la base héritée et ne lire
-     * qu'une fraction de carte, typiquement une seule tuile visible.
-     *
-     * On persiste maintenant systématiquement :
-     * - les packs actifs ;
-     * - les bases IndexedDB correspondantes ;
-     * - les seuils de zoom sont invalidés au changement de groupe.
+     * v14.36 — la sélection locale reste la source immédiate de vérité.
+     * L'écriture IndexedDB est automatiquement retentée après réouverture si
+     * Safari a fermé la connexion au même moment.
      */
-    activeOfflinePacks = Array.isArray(packs) ? packs.filter(Boolean) : [];
-    activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
-    localStorage.setItem(OFFLINE_ACTIVE_PACKS_KEY, JSON.stringify(activeOfflinePacks));
-    localStorage.setItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY, JSON.stringify(activeOfflinePackDatabases));
+    activeOfflinePacks = Array.isArray(packs)
+        ? packs.filter(Boolean)
+        : [];
+
+    activeOfflinePackDatabases =
+        getOfflineActivePackDatabasesForPacks(
+            activeOfflinePacks
+        );
+
+    localStorage.setItem(
+        OFFLINE_ACTIVE_PACKS_KEY,
+        JSON.stringify(activeOfflinePacks)
+    );
+    localStorage.setItem(
+        OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+        JSON.stringify(activeOfflinePackDatabases)
+    );
 
     try {
-        localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
-        localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
+        localStorage.removeItem(
+            OFFLINE_TILES_MIN_ZOOM_KEY
+        );
+        localStorage.removeItem(
+            OFFLINE_TILES_MAX_ZOOM_KEY
+        );
     } catch (_) {}
 
-    if (!db) {
-        try {
-            await initDB();
-        } catch (_) {}
+    try {
+        await runMainOfflineSettingsTransaction(
+            'readwrite',
+            store => {
+                store.put({
+                    key: OFFLINE_ACTIVE_PACKS_KEY,
+                    value: activeOfflinePacks
+                });
+                store.put({
+                    key:
+                        OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+                    value: activeOfflinePackDatabases
+                });
+            }
+        );
+    } catch (error) {
+        console.warn(
+            '[Offline] Packs/bases actifs conservés en localStorage après échec IndexedDB:',
+            error
+        );
     }
 
-    if (db) {
-        try {
-            await new Promise((resolve, reject) => {
-                const tx = db.transaction('settings', 'readwrite');
-                const store = tx.objectStore('settings');
-                store.put({ key: OFFLINE_ACTIVE_PACKS_KEY, value: activeOfflinePacks });
-                store.put({ key: OFFLINE_ACTIVE_PACK_DATABASES_KEY, value: activeOfflinePackDatabases });
-                tx.oncomplete = resolve;
-                tx.onerror = () => reject(tx.error);
-                tx.onabort = () => reject(tx.error || new Error('Transaction settings annulée'));
-            });
-        } catch (error) {
-            console.warn('[Offline] Impossible de persister les packs/bases actifs dans IndexedDB:', error);
-        }
-    }
-
-    notifyServiceWorkerActivePacks(activeOfflinePacks);
+    notifyServiceWorkerActivePacks(
+        activeOfflinePacks
+    );
 }
+
 
 function reloadAfterOfflinePackChange(message = 'Rechargement de la carte...') {
     const statusMessage = document.getElementById('import-status-message');
@@ -15547,7 +15901,13 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
     closeOfflineMapModalSoon(120);
 
     try {
+        if (checked) {
+            await ensureServiceWorkerControlsPageForOffline();
+        }
+
+        await ensureMainOfflineDatabaseConnection();
         await persistSimpleActiveOfflinePacks(nextPacks);
+
         if (token !== offlineMapSwitchToken) return;
 
         try {
@@ -15566,8 +15926,71 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         setTimeout(() => rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-second-pass'), 1200);
         setTimeout(() => scheduleStartupAuxiliaryLayers(), 2500);
     } catch (error) {
-        console.error('Changement de carte offline impossible:', error);
-        alert(`Impossible de changer de carte offline: ${error.message || error}`);
+        console.error(
+            'Changement de carte offline impossible:',
+            error
+        );
+
+        if (isOfflineDatabaseConnectionError(error)) {
+            /*
+             * Ultime protection Safari : la sélection est déjà conservée dans
+             * localStorage. Une relance propre recrée toutes les connexions.
+             */
+            activeOfflinePacks = nextPacks;
+            activeOfflinePackDatabases =
+                getOfflineActivePackDatabasesForPacks(
+                    nextPacks
+                );
+            mapSourceMode = nextMode;
+
+            localStorage.setItem(
+                OFFLINE_ACTIVE_PACKS_KEY,
+                JSON.stringify(nextPacks)
+            );
+            localStorage.setItem(
+                OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+                JSON.stringify(
+                    activeOfflinePackDatabases
+                )
+            );
+            localStorage.setItem(
+                MAP_SOURCE_MODE_KEY,
+                mapSourceMode
+            );
+
+            setOfflineMapSwitchBusy(
+                'Connexion offline réinitialisée. Rechargement...'
+            );
+
+            invalidateMainOfflineDatabaseConnection(
+                db
+            );
+
+            setTimeout(() => {
+                const refreshUrl = new URL(
+                    window.location.href
+                );
+                refreshUrl.searchParams.set(
+                    'appv',
+                    APP_VERSION
+                );
+                refreshUrl.searchParams.set(
+                    'idbreopen',
+                    Date.now().toString()
+                );
+                window.location.replace(
+                    refreshUrl.toString()
+                );
+            }, 350);
+
+            return;
+        }
+
+        alert(
+            `Impossible de changer de carte offline: ${
+                error.message || error
+            }`
+        );
     } finally {
         if (token === offlineMapSwitchToken) {
             isMapSourceSwitching = false;
