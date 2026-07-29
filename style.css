@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.33') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.33') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.35') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.35') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11476,4 +11476,263 @@ body.gaar-point-search-open .gaar-editing-banner {
         0 .35px currentColor,
         0 -.35px currentColor,
         0 1px 0 rgba(255,255,255,.9) !important;
+}
+
+
+/* ==========================================================================
+   v14.35 TEST — recherche, suivi, ADVISORY, vecteur courbe et publication
+   ========================================================================== */
+
+.traffic-tools-section {
+    margin-top: 12px;
+    padding: 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    background: #f8fafc;
+}
+
+.traffic-tools-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 950;
+}
+
+.traffic-tools-note {
+    margin-top: 7px;
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.3;
+    font-weight: 650;
+}
+
+.traffic-search-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+}
+
+.traffic-search-row input,
+#traffic-publication-callsign-input,
+#traffic-publication-type-input {
+    width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+    border: 1px solid #94a3b8;
+    border-radius: 11px;
+    padding: 0 10px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 850;
+}
+
+.traffic-tool-button,
+.traffic-popup-track-button {
+    min-height: 38px;
+    border: 1px solid #64748b;
+    border-radius: 10px;
+    padding: 6px 10px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.traffic-tool-button-primary {
+    border-color: #1d4ed8;
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.traffic-tool-button-danger {
+    border-color: #dc2626;
+    color: #b91c1c;
+}
+
+.traffic-tool-button:disabled {
+    opacity: .52;
+    cursor: default;
+}
+
+.traffic-search-results,
+.traffic-tracked-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 9px;
+}
+
+.traffic-search-result-row,
+.traffic-tracked-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid #dbe3ec;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.traffic-search-result-description,
+.traffic-tracked-label {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.traffic-search-result-description strong,
+.traffic-tracked-label strong {
+    overflow: hidden;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 950;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.traffic-search-result-description span,
+.traffic-tracked-label span {
+    overflow: hidden;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.traffic-search-result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 5px;
+}
+
+.traffic-search-message,
+.traffic-tool-empty {
+    padding: 8px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 750;
+    text-align: center;
+}
+
+.traffic-tracked-count {
+    color: #2563eb;
+    font-size: 12px;
+}
+
+.traffic-publication-status {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.traffic-publication-idle,
+.traffic-publication-waiting {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.traffic-publication-ok {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.traffic-publication-error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.traffic-popup-track-button {
+    width: 100%;
+    margin-top: 8px;
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+/* Vecteur vitesse SVG, courbé selon le taux de virage SafeSky. */
+.traffic-aircraft-vector-wrap {
+    overflow: visible !important;
+}
+
+.traffic-speed-vector-svg {
+    position: absolute;
+    left: -110px;
+    top: -110px;
+    width: 220px;
+    height: 220px;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.traffic-speed-vector-path {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 4px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 2 8;
+    vector-effect: non-scaling-stroke;
+    filter:
+        drop-shadow(1px 0 0 rgba(255,255,255,.98))
+        drop-shadow(-1px 0 0 rgba(255,255,255,.98))
+        drop-shadow(0 1px 0 rgba(255,255,255,.98))
+        drop-shadow(0 -1px 0 rgba(255,255,255,.98));
+}
+
+.traffic-altitude-same .traffic-speed-vector-path {
+    stroke: #dc2626;
+}
+
+.traffic-altitude-below .traffic-speed-vector-path {
+    stroke: #16a34a;
+}
+
+.traffic-altitude-above .traffic-speed-vector-path {
+    stroke: #2563eb;
+}
+
+.traffic-altitude-unknown .traffic-speed-vector-path {
+    stroke: #64748b;
+}
+
+.traffic-altitude-grounded .traffic-speed-vector-path,
+.traffic-status-grounded .traffic-speed-vector-path {
+    stroke: #080c13;
+}
+
+/* Zones déclarées d'activité drone. */
+.leaflet-trafficAdvisoryPane-pane {
+    pointer-events: auto;
+}
+
+.traffic-advisory-popup .traffic-popup-subtitle {
+    color: #6d28d9;
+    font-weight: 950;
+}
+
+@media (max-width: 760px) {
+    .traffic-search-row,
+    .traffic-search-result-row,
+    .traffic-tracked-row {
+        grid-template-columns: 1fr;
+    }
+
+    .traffic-search-result-actions {
+        justify-content: stretch;
+    }
+
+    .traffic-search-result-actions .traffic-tool-button {
+        flex: 1 1 120px;
+    }
 }
