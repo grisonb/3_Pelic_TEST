@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.30') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.30') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.31') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.31') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11203,4 +11203,161 @@ body.gaar-point-search-open .gaar-editing-banner {
         drop-shadow(0 1.4px 0 rgba(255,255,255,.99))
         drop-shadow(0 -1.4px 0 rgba(255,255,255,.99))
         drop-shadow(0 1px 2px rgba(15,23,42,.32)) !important;
+}
+
+
+/* ==========================================================================
+   v14.31 TEST — couleur des icônes, sol noir et étiquette sur deux lignes
+   ========================================================================== */
+
+.traffic-aircraft-symbol-wrap {
+    --traffic-icon-color: #64748b;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-same {
+    --traffic-icon-color: #dc2626;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-below {
+    --traffic-icon-color: #16a34a;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-above {
+    --traffic-icon-color: #2563eb;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-unknown {
+    --traffic-icon-color: #64748b;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-grounded,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded {
+    --traffic-icon-color: #080c13;
+}
+
+/*
+ * Les aéronefs conventionnels reprennent la couleur de leur étiquette :
+ * rouge, vert, bleu ou gris.
+ */
+.traffic-aircraft-symbol-wrap:not(.traffic-type-paraglider):not(.traffic-type-paramotor):not(.traffic-type-hangglider):not(.traffic-type-parachute):not(.traffic-type-pendular)
+.traffic-aircraft-arrow svg .ss-fill {
+    fill: var(--traffic-icon-color) !important;
+    stroke: var(--traffic-icon-color) !important;
+}
+
+.traffic-aircraft-symbol-wrap:not(.traffic-type-paraglider):not(.traffic-type-paramotor):not(.traffic-type-hangglider):not(.traffic-type-parachute):not(.traffic-type-pendular)
+.traffic-aircraft-arrow svg .ss-line,
+.traffic-aircraft-symbol-wrap:not(.traffic-type-paraglider):not(.traffic-type-paramotor):not(.traffic-type-hangglider):not(.traffic-type-parachute):not(.traffic-type-pendular)
+.traffic-aircraft-arrow svg .ss-line * {
+    stroke: var(--traffic-icon-color) !important;
+}
+
+.traffic-aircraft-symbol-wrap:not(.traffic-type-paraglider):not(.traffic-type-paramotor):not(.traffic-type-hangglider):not(.traffic-type-parachute):not(.traffic-type-pendular)
+.traffic-aircraft-arrow svg .ss-ring {
+    stroke: var(--traffic-icon-color) !important;
+}
+
+/* Au sol, toutes les catégories deviennent noires. */
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-fill,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-paraglider-color,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-hangglider-color {
+    fill: #080c13 !important;
+    stroke: #080c13 !important;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-line,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-line *,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-paraglider-line,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-paraglider-line *,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-hangglider-line,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-hangglider-line * {
+    stroke: #080c13 !important;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-ring,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-paraglider-ring,
+.traffic-aircraft-symbol-wrap.traffic-status-grounded
+.traffic-aircraft-arrow svg .ss-hangglider-ring {
+    stroke: #080c13 !important;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-grounded
+.traffic-aircraft-dotted-vector {
+    background-image:
+        radial-gradient(circle, #080c13 0 2px, transparent 2.6px) !important;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-altitude-grounded
+.traffic-aircraft-altitude-label {
+    border-color: #080c13 !important;
+}
+
+/* Étiquette permanente strictement sur deux lignes. */
+.traffic-aircraft-altitude-label {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 1px !important;
+    min-width: 78px !important;
+    max-width: 158px !important;
+    padding: 3px 6px !important;
+    white-space: nowrap !important;
+}
+
+.traffic-label-line {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.traffic-label-line-primary {
+    gap: 4px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 9.5px !important;
+    line-height: 1.05 !important;
+    font-weight: 900 !important;
+}
+
+.traffic-label-line-secondary {
+    gap: 5px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    font-weight: 850 !important;
+}
+
+.traffic-label-space {
+    display: inline-block !important;
+    width: 3px !important;
+}
+
+.traffic-vertical-trend {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 15px !important;
+    line-height: .8 !important;
+    font-weight: 1000 !important;
+}
+
+.traffic-trend-climb {
+    color: #15803d !important;
+}
+
+.traffic-trend-descent {
+    color: #dc2626 !important;
 }
