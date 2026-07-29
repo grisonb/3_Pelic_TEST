@@ -1,5 +1,97 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.35 TEST — recherche globale, suivi direct, zones drone, taux de virage, animation fluide et publication NPF
+
+Modifications apportées :
+- ajout d’une recherche globale SafeSky par indicatif complet ;
+- ajout d’une recherche globale SafeSky par identifiant d’aéronef ;
+- interrogation de GET /v1/beacons/search avec call_sign et aircraft_id ;
+- recherche complémentaire par partie d’indicatif dans les trafics déjà reçus par NPF ;
+- affichage des résultats directement dans la fenêtre de réglage trafic ;
+- bouton « Afficher » recentrant la carte et ouvrant la fenêtre du trafic ;
+- conservation temporaire pendant dix minutes d’un trafic trouvé hors du rayon courant ;
+- ajout de la récupération directe GET /v1/beacons/{id} ;
+- rafraîchissement direct d’un trafic recherché avant son affichage ;
+- ajout d’une liste locale d’identifiants suivis limitée à vingt trafics ;
+- création de la liste depuis les résultats de recherche ;
+- création ou suppression de la liste depuis la fenêtre d’un trafic ;
+- mémorisation de l’identifiant SafeSky réel et non du seul indicatif ;
+- affichage de l’indicatif, de l’immatriculation, de la catégorie et de l’identifiant dans la liste ;
+- ajout d’un bouton Retirer pour chaque élément suivi ;
+- ajout de la case « Afficher uniquement la liste suivie » ;
+- transmission du paramètre identifiers à l’API SafeSky lorsque cette case est cochée ;
+- récupération directe par identifiant des trafics suivis, y compris hors du viewport ;
+- affichage forcé des trafics suivis et recherchés hors du rayon courant ;
+- ajout de la case « Zones d’activité drone déclarées » ;
+- détection des objets SafeSky dont transponder_type vaut ADVISORY ;
+- interprétation de operation_area et operationArea ;
+- prise en charge des GeoJSON Point, Polygon, MultiPolygon et autres géométries gérées par Leaflet ;
+- prise en charge d’un point accompagné d’un rayon ;
+- repli sur latitude, longitude et accuracy lorsque la géométrie manque ;
+- affichage violet translucide et pointillé des zones drone ;
+- fenêtre dédiée indiquant nom, altitude maximale, remarque et heure de mise à jour ;
+- requête séparée des zones drone lorsque le filtre identifiers masque les autres objets ;
+- ajout du champ turn_rate à l’objet trafic normalisé ;
+- affichage du taux de virage dans la fenêtre trafic ;
+- remplacement du vecteur rectiligne par un chemin SVG ;
+- courbure du vecteur vers la gauche ou la droite selon le taux de virage ;
+- courbure plafonnée à ±70 degrés pour préserver la lisibilité ;
+- conservation de la longueur proportionnelle à la vitesse sol ;
+- ajout d’une extrapolation locale entre les réponses SafeSky espacées de cinq secondes ;
+- déplacement des marqueurs toutes les cent millisecondes ;
+- extrapolation basée sur position, vitesse sol, route et taux de virage ;
+- intégration du mouvement par pas de 0,25 seconde dans les virages ;
+- extrapolation limitée à huit secondes afin d’éviter une dérive prolongée ;
+- rotation progressive du pictogramme et du vecteur pendant un virage ;
+- arrêt de l’animation lorsque NPF est masqué ou lorsque le calque trafic est coupé ;
+- ajout de la case « Publier ma position NPF vers SafeSky » ;
+- ajout d’un champ d’indicatif publié ;
+- ajout d’un choix de catégorie publiée : avion, jet, hélicoptère ou ULM ;
+- création automatique d’un identifiant technique NPF persistant ;
+- publication par POST /v1/beacons toutes les cinq secondes ;
+- envoi de id, call_sign, latitude, longitude, altitude, course, vitesse sol, statut, catégorie et last_update ;
+- calcul local et publication du taux de montée ou descente lorsque possible ;
+- calcul local et publication du taux de virage lorsque possible ;
+- état GROUNDED publié lorsque la vitesse sol est inférieure à 2 m/s ;
+- interdiction absolue de publication en mode simulation ;
+- absence de publication si la position GPS ou l’altitude GPS manque ;
+- refus de publier une position GPS restaurée depuis le stockage local ;
+- refus de publier une position GPS datant de plus de quinze secondes ;
+- ajout d’un compteur visible pour la liste des identifiants suivis ;
+- arrêt de la publication lorsque NPF passe en arrière-plan ;
+- reprise automatique au retour au premier plan ;
+- affichage de l’état et de l’heure de la dernière publication dans les réglages ;
+- stockage de la route GPS dans lastPosition afin d’alimenter la publication ;
+- maintien de SafeSky comme source unique du trafic ;
+- conservation des cartes offline, des noms de packs sans version et de toutes les fonctions de la v14.34 ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.35 TEST.
+
+v14.34 TEST — noms des ZIP de carte indépendants de leur version
+
+Modifications apportées :
+- ajout d’une fonction unique normalizeOfflinePackName() ;
+- suppression logique du numéro de version contenu dans le nom d’un ZIP de carte ;
+- NPF_France_V9_01 est désormais lu et enregistré comme NPF_France_01 ;
+- NPF_France_V12_10 est désormais lu et enregistré comme NPF_France_10 ;
+- prise en charge des versions comportant plusieurs chiffres ;
+- prise en charge des versions décimales comme V9.2 ;
+- conservation du numéro de dalle placé en fin de nom ;
+- normalisation du numéro de dalle sur au moins deux chiffres ;
+- conservation inchangée des noms qui ne comportent pas de segment de version ;
+- maintien de la compatibilité avec NPF_France_01, OpenStreet_01, IGN_001 et les noms actuels ;
+- affichage du nom d’origine et du nom logique pendant l’ouverture du ZIP lorsque les deux diffèrent ;
+- utilisation immédiate du nom logique pour les clés IndexedDB, le regroupement et l’activation ;
+- regroupement de toutes les dalles NPF_France_Vx_01 à NPF_France_Vx_10 sous la carte unique NPF_France ;
+- remplacement logique d’un ancien enregistrement versionné par son nom sans version ;
+- prévention des doublons de liste entre NPF_France_V8_01, NPF_France_V9_01 et NPF_France_01 ;
+- conservation du nom source dans la métadonnée sourceName à titre de diagnostic ;
+- aucune modification du contenu des ZIP ni des chemins de tuiles qu’ils contiennent ;
+- aucune modification des imports manuels existants ;
+- conservation de toutes les fonctions de la v14.33 ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.34 TEST.
+
 v14.33 TEST — flèches compactes et étiquette maintenue hors de l’icône
 
 Modifications apportées :
