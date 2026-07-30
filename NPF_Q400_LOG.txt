@@ -1,5 +1,26 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.42 TEST — filtre d’affichage des trafics au sol et suppression des zones GPS / feu
+
+Modifications apportées :
+- ajout dans « Filtres trafic » d’une cellule avec case à cocher « Afficher les trafics au sol » ;
+- case décochée par défaut : les aéronefs signalés GROUNDED ou altitude « ground » sont masqués ;
+- lorsque la case est cochée, la requête SafeSky demande également les trafics au sol et NPF les affiche ;
+- le réglage est mémorisé dans les préférences trafic ;
+- la recherche d’identifiants par partie applique le même choix concernant les trafics au sol ;
+- suppression des cellules « Trafic autour de ma position » et « Trafic autour du feu » ;
+- neutralisation des anciennes valeurs GPS / feu éventuellement enregistrées dans le stockage local ;
+- zone SafeSky désormais unique : rayon choisi autour du centre courant de la carte ;
+- libellé de synthèse des filtres mis à jour avec l’état des trafics au sol ;
+- aucune modification du déplacement, du zoom, des tuiles, des calques ni du rendu de la carte ;
+- aucune modification du moteur d’animation des trafics ;
+- conservation de la recherche partielle d’identifiants SafeSky de la v14.41 ;
+- conservation de la suppression complète de la publication NPF vers SafeSky ;
+- conservation intégrale de la base nationale offline de 179 402 localités ;
+- archive nationale renommée localites-france-v14.42.zip uniquement pour la cohérence du cache ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.42 TEST.
+
 v14.41 TEST — recherche partielle d’identifiants SafeSky et suppression de la publication NPF
 
 Modifications apportées :
