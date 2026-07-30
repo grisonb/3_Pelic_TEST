@@ -183,28 +183,20 @@ def read_candidates(payload: bytes, department: str) -> list[dict[str, Any]]:
 
 def build_records(payload: bytes, department: str) -> list[dict[str, Any]]:
     candidates = read_candidates(payload, department)
-
     exact_names = {
         (item["normalized"], item["insee"], item["commune"])
         for item in candidates
     }
-
     records: dict[tuple[str, str, str], dict[str, Any]] = {}
 
     for item in candidates:
         use_base = (
             item["has_direction"]
-            and (
-                item["base_normalized"],
-                item["insee"],
-                item["commune"],
-            )
-            in exact_names
+            and (item["base_normalized"], item["insee"], item["commune"]) in exact_names
         )
         display_name = item["base_name"] if use_base else item["name"]
         normalized = simplify(display_name)
         key = (normalized, item["insee"], item["commune"])
-
         candidate = {
             "n": display_name,
             "c": item["commune"],
@@ -214,7 +206,6 @@ def build_records(payload: bytes, department: str) -> list[dict[str, Any]]:
             "o": item["lon"],
             "k": normalized,
         }
-
         existing = records.get(key)
         if existing is None:
             records[key] = candidate
@@ -251,7 +242,6 @@ def build_all(output_dir: Path, workers: int) -> list[dict[str, Any]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     results: list[dict[str, Any]] = []
     errors: list[str] = []
-
     with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
         futures = {
             executor.submit(write_department, department, output_dir): department
@@ -262,16 +252,11 @@ def build_all(output_dir: Path, workers: int) -> list[dict[str, Any]]:
             try:
                 result = future.result()
                 results.append(result)
-                print(
-                    f"{department}: {result['count']} entrées, "
-                    f"{result['bytes']} octets"
-                )
+                print(f"{department}: {result['count']} entrées, {result['bytes']} octets")
             except Exception as exc:
                 errors.append(f"{department}: {exc}")
-
     if errors:
         raise RuntimeError("\n".join(errors))
-
     return sorted(results, key=lambda item: DEPARTMENTS.index(item["department"]))
 
 
@@ -304,7 +289,6 @@ def write_report(output_dir: Path, results: list[dict[str, Any]]) -> Path:
     if blagon_path.exists():
         data = json.loads(blagon_path.read_text(encoding="utf-8"))
         blagon_found = any(item.get("k") == "blagon" for item in data["items"])
-
     lines = [
         "BASE LOCALE NPF-Q400 — FRANCE ENTIÈRE",
         "",
@@ -330,7 +314,6 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("data/localites"))
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
-
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
