@@ -1,5 +1,46 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.38 TEST — recherche complémentaire de localités par Géoplateforme avec classement phonétique NPF
+
+Modifications apportées :
+- ajout d’un test pilote pour les villages, hameaux, quartiers et lieux nommés absents de la base des communes ;
+- conservation intégrale du moteur local actuel des communes ;
+- conservation intégrale du fichier communes_aliases.json et de son cache ;
+- conservation du calcul Soundex et de la distance de Levenshtein déjà utilisés par NPF ;
+- affichage immédiat des résultats locaux sans attendre internet ;
+- interrogation complémentaire de l’API officielle de géocodage Géoplateforme ;
+- utilisation de l’URL https://data.geopf.fr/geocodage/search ;
+- recherche effectuée uniquement après la temporisation normale de saisie ;
+- aucune requête pour une saisie inférieure à trois caractères ;
+- annulation de la requête précédente lorsqu’une nouvelle saisie commence ;
+- délai maximal de réponse fixé à 6,5 secondes ;
+- limite fixée à vingt résultats côté Géoplateforme ;
+- envoi du département dans la requête lorsqu’il est saisi ;
+- filtrage local strict du département après réception ;
+- prise en charge des réponses GeoJSON et des réponses sous forme de tableau ;
+- prise en charge des coordonnées geometry.coordinates et des variantes latitude/longitude ;
+- rejet des numéros d’adresse et des parcelles cadastrales ;
+- extraction du nom du lieu, de la commune de rattachement, du code INSEE, du département et des coordonnées ;
+- reclassement des résultats externes avec le même moteur phonétique que les communes NPF ;
+- les correspondances locales exactes restent prioritaires sur les résultats externes ;
+- ajout d’un léger malus aux résultats Géoplateforme pour éviter qu’ils remplacent une commune exacte ;
+- fusion et dédoublonnage des communes, alias et lieux nommés ;
+- affichage sous la forme « Blagon — Lanton (33) » ;
+- ajout d’un pictogramme et de la mention « Lieu nommé » dans la liste ;
+- centrage du feu sur les coordonnées propres du village ou du hameau ;
+- conservation du nom exact de la localité dans le feu actif et dans l’historique ;
+- interdiction de remplacer automatiquement Blagon par Lanton lors de la normalisation de l’historique ;
+- cache local des recherches Géoplateforme pendant trente jours ;
+- conservation des cent vingt recherches les plus récentes ;
+- fonctionnement hors ligne pour les recherches déjà présentes dans ce cache ;
+- ajout de window.testNamedPlacesSearch('Blagon 33') pour le diagnostic ;
+- aucune base nationale volumineuse chargée au démarrage ;
+- aucun ralentissement du premier affichage de la recherche des communes ;
+- maintien de toutes les corrections cartes offline de la v14.37 ;
+- maintien de toutes les fonctions SafeSky de la v14.37 ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.38 TEST.
+
 v14.37 TEST — compatibilité cartes NPF multi-ZIP et diagnostic publication SafeSky
 
 Modifications apportées :
