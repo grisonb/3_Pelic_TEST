@@ -1,4 +1,4 @@
-name: Build localites offline test
+name: Build localites offline France
 
 on:
   push:
@@ -7,16 +7,14 @@ on:
     paths:
       - 'tools/build_localites_offline.py'
       - '.github/workflows/build-localites-offline-test.yml'
-  pull_request:
-    branches:
-      - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-gironde:
+  build-france:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,37 +26,46 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Generate Gironde locality database
-        run: python tools/build_localites_offline.py --department 33
+      - name: Generate nationwide offline locality database
+        run: |
+          rm -rf data/localites
+          python tools/build_localites_offline.py --all --workers 8
 
-      - name: Verify Blagon and report size
+      - name: Verify database and known localities
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          path = Path('data/localites/localites-33.json')
-          data = json.loads(path.read_text(encoding='utf-8'))
-          matches = [item for item in data['items'] if item.get('k') == 'blagon']
-          print('count=', data['count'])
-          print('size=', path.stat().st_size)
-          print('blagon=', matches)
-          if not matches:
-              raise SystemExit('Blagon absent de la base générée')
+
+          root = Path('data/localites')
+          index = json.loads((root / 'localites-index.json').read_text(encoding='utf-8'))
+          assert index['department_count'] == 102, index['department_count']
+          assert index['total_count'] > 10000, index['total_count']
+
+          gironde = json.loads((root / 'localites-33.json').read_text(encoding='utf-8'))
+          names = {item.get('k') for item in gironde['items']}
+          assert 'blagon' in names
+          assert 'anseillan' in names
+
+          print('departments=', index['department_count'])
+          print('total_count=', index['total_count'])
+          print('total_bytes=', index['total_bytes'])
+          print('blagon=OK')
+          print('anseillan=OK')
           PY
 
-      - name: Upload Gironde test database
+      - name: Package database
+        run: |
+          zip -9 -r NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v3.zip \
+            data/localites RAPPORT_BASE_LOCALITES_FRANCE.txt
+          ls -lh NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v3.zip
+
+      - name: Upload nationwide database
         uses: actions/upload-artifact@v4
         with:
-          name: localites-offline-33
-          path: data/localites/localites-33.json
+          name: base-localites-france-offline-v3
+          path: |
+            NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v3.zip
+            RAPPORT_BASE_LOCALITES_FRANCE.txt
           if-no-files-found: error
-
-      - name: Commit generated test database
-        if: github.event_name == 'push'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/localites/localites-33.json
-          git diff --cached --quiet && exit 0
-          git commit -m 'Génère la base offline des localités de Gironde'
-          git push origin HEAD:localites-offline-test
+          retention-days: 90
