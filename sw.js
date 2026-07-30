@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-38_recherche_localites_geoplateforme_phonetique';
-const APP_VERSION = 'v14.38';
+const SW_VERSION = 'sw-v14-39_localites_gironde_100_pourcent_offline';
+const APP_VERSION = 'v14.39';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -28,6 +28,7 @@ const APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
+    './data/localites/localites-33.json',
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
     './icons/icon-192x192.png',
@@ -51,7 +52,8 @@ const CORE_APP_SHELL_URLS = [
     './suncalc.js',
     './jszip.min.js',
     './communes.json',
-    './communes_aliases.json'
+    './communes_aliases.json',
+    './data/localites/localites-33.json'
 ];
 
 
@@ -360,6 +362,7 @@ function isAppShellRequest(request) {
             'jszip.min.js',
             'communes.json',
             'communes_aliases.json',
+            'localites-33.json',
             'lignes_ht_rte_simplifiees.geojson'
         ].includes(filename) || parsed.pathname.includes('/icons/');
     } catch (_) {
