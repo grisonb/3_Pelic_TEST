@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-37_compatibilite_cartes_npf_et_refus_publication_safesky';
-const APP_VERSION = 'v14.37';
+const SW_VERSION = 'sw-v14-38_recherche_localites_geoplateforme_phonetique';
+const APP_VERSION = 'v14.38';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
