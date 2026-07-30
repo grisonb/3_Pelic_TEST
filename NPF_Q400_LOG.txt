@@ -1,5 +1,26 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.46 TEST — heure sur feu avec forfait plein retardant
+Date : 30 juillet 2026
+
+Modifications apportées :
+- base fonctionnelle utilisée : v14.45 avec curseur tactile libre, recherche phonétique et déplacement fluide des trafics ;
+- onglet Prévi : Heure sur Feu calculée par BLOC DÉPART + 10 min de plein retardant + durée transit Base → Feu ;
+- durée transit affichée conservée comme temps de vol seul, sans inclure le forfait de plein retardant ;
+- consommation transit inchangée : aucun forfait carburant ajouté pour les 10 min ;
+- onglet Suivi rotations : même forfait de 10 min ajouté avant le premier transit vers le feu ;
+- exception du premier transit : si une masse RLT est déjà saisie dans la cellule RLT de la première ligne, aucun forfait de 10 min n'est ajouté à la première heure d'arrivée sur feu ;
+- après chaque ligne BLOC/FUEL renseignée, ajout systématique de 10 min de plein retardant avant le transit suivant vers le feu ;
+- maintien de la distance et de la vitesse de transit existantes : 210 kt jusqu'à 70 Nm, 240 kt au-delà ;
+- maintien séparé des 10 min avant validation du premier largage pour les limites CS, TMD et HDV ;
+- prise en compte du forfait plein retardant dans le temps consommé pour la limite HDV ;
+- aides de calcul Prévi et Suivi rotations mises à jour avec la formule et le motif d'application ou d'exemption ;
+- aucune modification du fuel sur feu, de la consommation rotation, des BINGO, des trafics SafeSky, des cartes ou de la recherche des communes ;
+- base nationale hors ligne conservée à l'identique et archive renommée localites-france-v14.46.zip pour la cohérence du cache ;
+- version applicative portée en v14.46 TEST.
+
+===============================================================================
+
 v14.45 TEST — curseur tactile libre et recherche phonétique Ayssènes
 Date : 30 juillet 2026
 
