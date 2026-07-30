@@ -1,5 +1,20 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.43 TEST — rétablissement de la connexion SafeSky
+Date : 30 juillet 2026
+
+CORRECTION
+- rétablit la fonction interne getOwnTrafficAltitudeFeet supprimée par erreur lors de la préparation de la v14.42 ;
+- cette fonction est appelée lors de la construction des paramètres d'altitude SafeSky ;
+- son absence provoquait une erreur JavaScript avant l'envoi de la requête et empêchait toute connexion SafeSky ;
+- la lecture du trafic SafeSky est de nouveau opérationnelle ;
+- le filtre « Afficher les trafics au sol » et le centrage sur le centre de la carte sont conservés ;
+- aucune modification du déplacement, du zoom, des tuiles, des calques ou du rendu de la carte ;
+- base nationale des localités hors ligne conservée ;
+- version applicative portée en v14.43 TEST.
+
+===============================================================================
+
 v14.42 TEST — filtre d’affichage des trafics au sol et suppression des zones GPS / feu
 
 Modifications apportées :
