@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
-// v14.42 TEST — filtre trafics au sol et zone centrée sur la carte.
+// v14.43 TEST — filtre trafics au sol et zone centrée sur la carte.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.42.zip?appv=v14.42';
+    './data/localites/localites-france-v14.43.zip?appv=v14.43';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -780,7 +780,7 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     relativeAltitudeBandFt: 1500,
     groundToAboveBandFt: 1500,
     /*
-     * v14.42 TEST — la zone trafic est toujours centrée sur la carte.
+     * v14.43 TEST — la zone trafic est toujours centrée sur la carte.
      * Les deux anciennes options GPS / feu restent neutralisées pour assurer
      * la migration des réglages déjà stockés.
      */
@@ -1937,11 +1937,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.42'
+                        !== 'v14.43'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.42'
+                        'v14.43'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6182,7 +6182,7 @@ function sanitizeTrafficSettings(candidate = {}) {
     );
 
     /*
-     * v14.42 TEST — suppression des modes « autour de ma position » et
+     * v14.43 TEST — suppression des modes « autour de ma position » et
      * « autour du feu ». Le trafic est toujours demandé autour du centre
      * courant de la carte, quelle que soit une ancienne valeur mémorisée.
      */
@@ -7643,7 +7643,7 @@ function getFireTrafficPoint() {
 
 function getTrafficQueryPoints() {
     /*
-     * v14.42 TEST — les anciennes zones GPS et feu sont supprimées.
+     * v14.43 TEST — les anciennes zones GPS et feu sont supprimées.
      * Le rayon SafeSky est toujours appliqué autour du centre actuel de la
      * carte, ce qui rend le comportement unique et prévisible.
      */
@@ -7674,6 +7674,20 @@ function getTrafficQueryPoints() {
     }
 
     return [];
+}
+
+function getOwnTrafficAltitudeFeet() {
+    const candidates = [
+        lastPosition?.altitudeFt,
+        lastPosition?.altitudeFeet
+    ];
+
+    for (const candidate of candidates) {
+        const num = Number(candidate);
+        if (Number.isFinite(num)) return Math.round(num);
+    }
+
+    return null;
 }
 
 function getNearestTrafficReference(ac, points = []) {
@@ -22831,4 +22845,7 @@ document.addEventListener('visibilitychange', () => {
 // v13.89 TEST — corrections d'affichage RLT/Suivi et alerte post-MAJ gérées par index.html/style.css.
 
 
-// v14.42 TEST — filtres trafic : centre carte unique et affichage au sol optionnel.
+// v14.43 TEST — filtres trafic : centre carte unique et affichage au sol optionnel.
+
+
+// v14.43 TEST — restauration de getOwnTrafficAltitudeFeet : connexion SafeSky rétablie, carte inchangée.
