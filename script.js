@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.45.zip?appv=v14.45';
+    './data/localites/localites-france-v14.46.zip?appv=v14.46';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1943,11 +1943,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.45'
+                        !== 'v14.46'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.45'
+                        'v14.46'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -17408,6 +17408,13 @@ const calculateBingo = (dist) => (dist <= 70) ? (dist * 5) + 700 : (dist * 4) + 
 const calculateFuelToGo = (dist) => (dist <= 70) ? (dist * 5) : (dist * 4);
 const calculateConsoRotation = (dist) => { const effectiveDist = Math.max(dist, 10); return (effectiveDist <= 70) ? (effectiveDist * 10) + 250 : (effectiveDist * 8) + 250; };
 const calculateTransitTime = (dist) => (dist <= 70) ? (dist * (60 / 210)) : (dist * (60 / 240));
+
+/*
+ * v14.46 TEST — forfait temporel de plein retardant avant chaque transit feu.
+ * Ce forfait est distinct des 10 minutes conservées avant validation du largage.
+ */
+const RETARDANT_LOADING_FORFAIT_MIN = 10;
+
 const calculateRotationTime = (dist) => {
     const effectiveDist = Math.max(dist, 10);
     const rotationDistance = effectiveDist * 2;
@@ -17834,13 +17841,14 @@ function updatePreviTab() {
     const rotationTime = Math.round(calculateRotationTime(CALCULATOR_DATA.distPelicFeu));
     const consoRotation = calculateConsoRotation(CALCULATOR_DATA.distPelicFeu);
     const consoAller = calculateFuelToGo(CALCULATOR_DATA.distBaseFeu);
-    const heureSurFeu = heureTO !== null ? heureTO + transitTime : null;
+    const previTempsAvantFeu = RETARDANT_LOADING_FORFAIT_MIN + transitTime;
+    const heureSurFeu = heureTO !== null ? heureTO + previTempsAvantFeu : null;
 
     document.getElementById('duree-transit').textContent = formatTime(transitTime) || '--:--';
     setHelp('duree-transit-help', `DURÉE TRANSIT BASE → FEU\n\nFormule : Distance Base → Feu × (60 / Vitesse)\n\nRègle vitesse :\n- Distance ≤ 70 Nm : 210 kt\n- Distance > 70 Nm : 240 kt\n\nDistance Base → Feu : ${CALCULATOR_DATA.distBaseFeu} Nm\nVitesse retenue : ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240} kt\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} × (60 / ${CALCULATOR_DATA.distBaseFeu <= 70 ? 210 : 240}) = ${formatTime(transitTime)} (${transitTime} min)`);
 
     document.getElementById('heure-sur-feu').textContent = formatTime(heureSurFeu) || '--:--';
-    setHelp('heure-sur-feu-help', `HEURE SUR FEU\n\nFormule : HEURE TO + Durée transit Base → Feu\n\nHEURE TO : ${formatTime(heureTO) || 'N/A'}\nDurée transit : ${formatTime(transitTime)} (${transitTime} min)\n\nCalcul : ${formatTime(heureTO) || 'N/A'} + ${formatTime(transitTime)} = ${formatTime(heureSurFeu) || 'N/A'}\n\nCette heure sert ensuite à vérifier le +1 Coucher Soleil et TMD avec le forfait de 10 min avant largage.`);
+    setHelp('heure-sur-feu-help', `HEURE SUR FEU — PRÉVI\n\nFormule : BLOC DÉPART + forfait plein retardant + durée transit Base → Feu\n\nBLOC DÉPART : ${formatTime(heureTO) || 'N/A'}\nForfait plein retardant : ${RETARDANT_LOADING_FORFAIT_MIN} min\nDurée transit : ${formatTime(transitTime)} (${transitTime} min)\n\nCalcul : ${formatTime(heureTO) || 'N/A'} + ${RETARDANT_LOADING_FORFAIT_MIN} min + ${formatTime(transitTime)} = ${formatTime(heureSurFeu) || 'N/A'}\n\nLe forfait de ${RETARDANT_LOADING_FORFAIT_MIN} min représente le plein retardant avant le transit. Les 10 min avant validation du largage restent appliquées séparément dans les limites CS/TMD/HDV.`);
 
     document.getElementById('conso-aller-feu').textContent = `${consoAller} kg`;
     setHelp('conso-aller-feu-help', `CONSO TRANSIT BASE → FEU\n\nFormule : Distance Base → Feu × Conso au Nm\n\nRègle consommation :\n- Distance ≤ 70 Nm : 5 kg/Nm\n- Distance > 70 Nm : 4 kg/Nm\n\nDistance Base → Feu : ${CALCULATOR_DATA.distBaseFeu} Nm\nConso retenue : ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} kg/Nm\n\nCalcul : ${CALCULATOR_DATA.distBaseFeu} × ${CALCULATOR_DATA.distBaseFeu <= 70 ? 5 : 4} = ${consoAller} kg`);
@@ -17873,7 +17881,27 @@ Cette valeur sert aux calculs Fuel retour Base/Pélic.`);
     document.getElementById('tmd-display').textContent = formatTime(tmdTime);
     document.getElementById('hdv-restant-display').textContent = formatTime(limiteHDV);
 
-    updateAndSortRotations(document.getElementById('previ-rotation-results-container'), { fuel: fuelSurFeu, time: heureSurFeu }, { bingoBase, bingoPelic, consoRotation, rotationTime, csFeuTime, tmdTime, limiteHDV, transitTime, consoTransitFromGps: consoAller });
+    updateAndSortRotations(
+        document.getElementById('previ-rotation-results-container'),
+        { fuel: fuelSurFeu, time: heureSurFeu },
+        {
+            bingoBase,
+            bingoPelic,
+            consoRotation,
+            rotationTime,
+            csFeuTime,
+            tmdTime,
+            limiteHDV,
+            transitTime: previTempsAvantFeu,
+            rawTransitTime: transitTime,
+            preTransitForfaitMin: RETARDANT_LOADING_FORFAIT_MIN,
+            effectiveTransitDistance: CALCULATOR_DATA.distBaseFeu,
+            transitSourceLabel: selectedBaseOACI ? `BLOC DÉPART / base (${selectedBaseOACI})` : 'BLOC DÉPART / base non renseignée',
+            currentTimeLabel: 'Heure sur feu',
+            consoTransitFromGps: consoAller,
+            firstDropForfaitMin: 10
+        }
+    );
 }
 
 function updateSuiviTab() {
@@ -17928,6 +17956,14 @@ function updateSuiviTab() {
 
     const getRowTime = row => parseTime(row?.querySelector('.time-input-wrapper .display-input')?.value || '');
     const getRowFuel = row => parseNumeric(row?.querySelector('.numeric-input-wrapper .display-input')?.value || '');
+    const getRowRltMass = row => {
+        const wrapper = row?.querySelector('.rlt-mass-input-wrapper');
+        const datasetMass = parseNumeric(wrapper?.dataset?.mass || '');
+        if (datasetMass !== null) return datasetMass;
+        return parseNumeric(wrapper?.querySelector('.display-input')?.value || '');
+    };
+    const firstRowRltMass = getRowRltMass(firstRow);
+    const firstTransitAlreadyLoaded = firstRowRltMass !== null && firstRowRltMass > 0;
     const getRowOaci = row => {
         const datasetOaci = String(row?.dataset?.airportOaci || '').trim().toUpperCase();
         if (datasetOaci) return datasetOaci;
@@ -17962,6 +17998,7 @@ function updateSuiviTab() {
     let transitEffectiveDistanceVersFeu = null;
     let transitConsoDistanceVersFeu = null;
     let preTransitForfaitMin = 0;
+    let preTransitForfaitReason = '';
     let transitSourceLabel = '';
     let transitSourceDetail = '';
 
@@ -17990,7 +18027,8 @@ function updateSuiviTab() {
     if (lastFilledRow) {
         currentFuel = getRowFuel(lastFilledRow);
         currentTime = getRowTime(lastFilledRow);
-        preTransitForfaitMin = 10;
+        preTransitForfaitMin = RETARDANT_LOADING_FORFAIT_MIN;
+        preTransitForfaitReason = `Forfait plein retardant appliqué après la dernière ligne BLOC/FUEL renseignée.`;
 
         if (lastFilledRow === firstRow && isFirstRowFullDeparture) {
             const firstRowOaci = getRowOaci(firstRow);
@@ -17999,18 +18037,26 @@ function updateSuiviTab() {
             currentHdv = limiteHdvDepart;
             transitSourceLabel = firstRowOaci ? `1re ligne Plein au départ (${firstRowOaci})` : '1re ligne Plein au départ — OACI non renseigné';
             transitSourceDetail = `Terrain départ retenu : 1re ligne BLOC/FUEL en mode Plein au départ`;
+
+            if (firstTransitAlreadyLoaded) {
+                preTransitForfaitMin = 0;
+                preTransitForfaitReason = `Premier transit sans forfait : une masse RLT de ${firstRowRltMass} kg est déjà saisie sur la première ligne.`;
+            }
         } else {
             currentHdv = parseTime(lastFilledRow.querySelector('.tps-vol-restant-cell')?.textContent || '');
             const hasSelectedPelicForSuivi = !!selectedPelicanOACI && Number.isFinite(CALCULATOR_DATA.distPelicFeu);
             setTransitDistancePolicy({ measuredDistance: hasSelectedPelicForSuivi ? CALCULATOR_DATA.distPelicFeu : null, usePelicMinimum: true });
             transitSourceLabel = selectedPelicanOACI ? `Pélic sélectionné (${selectedPelicanOACI})` : 'Pélic sélectionné non renseigné';
-            transitSourceDetail = `Terrain départ retenu : pélicandrome sélectionné après le premier transit`;
+            transitSourceDetail = `Terrain départ retenu : pélicandrome sélectionné après la dernière ligne BLOC/FUEL`;
         }
     } else {
         currentFuel = fuelDepart;
         currentTime = blocDepartTime;
         currentHdv = limiteHdvDepart;
-        preTransitForfaitMin = 0;
+        preTransitForfaitMin = firstTransitAlreadyLoaded ? 0 : RETARDANT_LOADING_FORFAIT_MIN;
+        preTransitForfaitReason = firstTransitAlreadyLoaded
+            ? `Premier transit sans forfait : une masse RLT de ${firstRowRltMass} kg est déjà saisie sur la première ligne.`
+            : `Premier transit avec forfait plein retardant de ${RETARDANT_LOADING_FORFAIT_MIN} min.`;
         setTransitDistancePolicy({ measuredDistance: Number.isFinite(CALCULATOR_DATA.distBaseFeu) ? CALCULATOR_DATA.distBaseFeu : null, usePelicMinimum: false });
         transitSourceLabel = selectedBaseOACI ? `BLOC DÉPART / base (${selectedBaseOACI})` : 'BLOC DÉPART / base non renseignée';
         transitSourceDetail = `Terrain départ retenu : ligne BLOC DÉPART / FUEL DÉPART / BASE`;
@@ -18056,7 +18102,8 @@ Vitesse retenue : ${transitSpeedKt ?? 'N/A'} kt
 Calcul : ${Number.isFinite(transitEffectiveDistanceVersFeu) ? transitEffectiveDistanceVersFeu : 'N/A'} × (60 / ${transitSpeedKt ?? 'N/A'}) = ${formatTime(transitTimeVersFeu)} (${transitTimeVersFeu} min)
 
 La valeur affichée correspond uniquement au temps de vol source → feu.
-Forfait avant transit : ${preTransitForfaitMin} min, intégré à « Heure sur Feu » mais pas à la durée affichée.`
+Forfait plein retardant avant transit : ${preTransitForfaitMin} min, intégré à « Heure sur Feu » mais pas à la durée affichée.
+${preTransitForfaitReason}`
         : 'Distance vers le feu indisponible. Vérifiez le terrain de départ, le pélicandrome sélectionné et le feu.');
 
     setSuiviHelp('suivi-fuel-sur-feu-help', fuelSurFeu !== null && currentFuel !== null && consoTransitVersFeu !== null
@@ -18133,16 +18180,17 @@ ${isSuiviConsoManual ? 'La valeur manuelle remplace actuellement le calcul AUTO 
         if (suiviHeureHelpIcon) {
             suiviHeureHelpIcon.onclick = () => alert(`HEURE SUR FEU — SUIVI ROTATION
 
-Règle v12.88 :
-- depuis BLOC DÉPART / FUEL DÉPART / BASE : premier transit depuis la base ;
-- depuis une ligne BLOC/FUEL en mode Plein au départ : premier transit depuis l'OACI de cette ligne ;
-- depuis une arrivée pélicandrome : 10 min de mise en œuvre/roulage/décollage, puis transit vers le feu ;
-- le largage est ensuite validé avec 10 min supplémentaires avant largage.
+Règle v14.46 :
+- premier transit : BLOC DÉPART + 10 min plein retardant + transit vers le feu ;
+- exception au premier transit : si une masse RLT est déjà saisie sur la première ligne, le forfait de 10 min n'est pas ajouté ;
+- après chaque ligne BLOC/FUEL : heure de la ligne + 10 min plein retardant + transit vers le feu ;
+- les 10 min avant validation du largage restent ensuite appliquées séparément.
 
 ${transitSourceDetail}
 Source utilisée : ${transitSourceLabel}
 Heure départ retenue : ${formatTime(currentTime) || 'N/A'}
-Forfait avant transit : ${preTransitForfaitMin} min
+Forfait plein retardant : ${preTransitForfaitMin} min
+${preTransitForfaitReason}
 Distance source → Feu mesurée : ${Number.isFinite(transitDistanceVersFeu) ? transitDistanceVersFeu : 'N/A'} Nm
 Distance transit retenue : ${Number.isFinite(transitEffectiveDistanceVersFeu) ? transitEffectiveDistanceVersFeu : 'N/A'} Nm
 Règle vitesse : ≤70 Nm = 210 kt, >70 Nm = 240 kt
