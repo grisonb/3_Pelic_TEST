@@ -6,6 +6,7 @@ on:
       - localites-offline-test
     paths:
       - 'tools/build_localites_offline.py'
+      - 'tools/finalize_localites_offline.py'
       - '.github/workflows/build-localites-offline-test.yml'
   pull_request:
     branches:
@@ -35,6 +36,9 @@ jobs:
           rm -rf data/localites
           python tools/build_localites_offline.py --all --workers 8
 
+      - name: Finalize and deduplicate nationwide database
+        run: python tools/finalize_localites_offline.py
+
       - name: Verify database and known localities
         run: |
           python - <<'PY'
@@ -60,16 +64,16 @@ jobs:
 
       - name: Package database
         run: |
-          zip -9 -r NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v3.zip \
+          zip -9 -r NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v4.zip \
             data/localites RAPPORT_BASE_LOCALITES_FRANCE.txt
-          ls -lh NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v3.zip
+          ls -lh NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v4.zip
 
       - name: Upload nationwide database
         uses: actions/upload-artifact@v4
         with:
-          name: base-localites-france-offline-v3
+          name: base-localites-france-offline-v4
           path: |
-            NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v3.zip
+            NPF_Q400_BASE_LOCALITES_FRANCE_OFFLINE_v4.zip
             RAPPORT_BASE_LOCALITES_FRANCE.txt
           if-no-files-found: error
           retention-days: 90
