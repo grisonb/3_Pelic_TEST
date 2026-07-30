@@ -1,5 +1,27 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.45 TEST — curseur tactile libre et recherche phonétique Ayssènes
+Date : 30 juillet 2026
+
+Modifications apportées :
+- base fonctionnelle utilisée : v14.44 avec déplacement fluide des trafics ;
+- suppression du repositionnement automatique du curseur à droite après un toucher dans le champ de recherche des communes ;
+- placement du curseur désormais laissé au comportement tactile natif de Safari/iPadOS ;
+- possibilité de toucher directement au milieu d'un nom déjà saisi pour corriger une lettre ;
+- maintien de l'ouverture du clavier, de l'historique des feux et du bouton d'effacement ;
+- ajout d'une comparaison phonétique française complémentaire lorsque le département est saisi ;
+- recherche « essen 12 » compatible avec Ayssènes ;
+- recherche « esen 12 » compatible avec Ayssènes ;
+- recherche « aissen 12 » conservée et améliorée ;
+- priorité inchangée pour les noms exacts, préfixes, Soundex et distances de Levenshtein existantes ;
+- comparaison phonétique effectuée sur le nom compact complet pour éviter les faux résultats liés aux mots fréquents tels que Saint ou Sainte ;
+- recherche nationale sans département inchangée afin de préserver la rapidité ;
+- déplacement fluide des trafics, filtre des trafics au sol, zone SafeSky centrée sur la carte et cartes offline inchangés ;
+- base nationale hors ligne conservée et archive renommée localites-france-v14.45.zip pour la cohérence du cache ;
+- version applicative portée en v14.45 TEST.
+
+===============================================================================
+
 v14.44 TEST — réactivation du déplacement fluide des trafics sur la bonne base v14.43
 Date : 30 juillet 2026
 
