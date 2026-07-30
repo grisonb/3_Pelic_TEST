@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.39') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.39') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.41') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.41') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11770,3 +11770,35 @@ body.gaar-point-search-open .gaar-editing-banner {
     font-weight: 900;
     vertical-align: middle;
 }
+
+
+/* v14.40 TEST — état discret de la base nationale de localités offline. */
+#named-places-offline-status {
+    position: fixed;
+    left: max(12px, env(safe-area-inset-left));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 12000;
+    max-width: min(520px, calc(100vw - 24px));
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: rgba(8, 47, 73, 0.94);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .18s ease, transform .18s ease;
+}
+#named-places-offline-status.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+#named-places-offline-status.error {
+    background: rgba(127, 29, 29, 0.96);
+}
+
+
+/* v14.41 TEST — aucune modification du rendu ni du fonctionnement de la carte. */
