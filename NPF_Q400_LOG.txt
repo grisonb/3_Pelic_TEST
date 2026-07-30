@@ -1,24 +1,63 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
-v14.42 TEST — réactivation du déplacement fluide continu des trafics SafeSky
+v14.44 TEST — réactivation du déplacement fluide des trafics sur la bonne base v14.43
+Date : 30 juillet 2026
 
 Modifications apportées :
-- conservation des marqueurs trafic existants entre deux réponses SafeSky au lieu de les détruire puis de les recréer toutes les cinq secondes ;
-- déplacement local des trafics porté de dix à vingt actualisations par seconde ;
-- continuité de l’extrapolation basée sur la position, la vitesse sol, la route et le taux de virage ;
-- raccord progressif pendant 0,9 seconde entre la trajectoire extrapolée et la nouvelle position reçue ;
-- suppression du retour visuel brutal à la position brute au moment de chaque rafraîchissement ;
-- correction immédiate conservée lorsqu’un écart supérieur à 3 NM révèle une position incohérente ou un déplacement exceptionnel ;
-- interpolation de route par le chemin angulaire le plus court afin d’éviter une rotation complète lors du passage 359° / 0° ;
-- maintien de la fenêtre détaillée ouverte sans reconstruction complète du marqueur ;
-- mise à jour en place du pictogramme, du vecteur, des données et du bouton de suivi ;
-- séparation des zones drone ADVISORY dans un sous-calque dédié afin que leur actualisation ne coupe plus l’animation des aéronefs ;
-- position initiale d’un nouveau trafic directement extrapolée à l’heure courante ;
-- acceptation robuste des horodatages SafeSky en secondes Unix, millisecondes Unix ou texte ISO ;
-- protection contre un horodatage futur qui pourrait figer le déplacement local ;
-- arrêt de l’animation toujours conservé lorsque NPF est masqué ou lorsque le calque trafic est coupé ;
-- aucune modification de la recherche partielle SafeSky, de la liste suivie, des filtres, des cartes offline, des localités ou des autres fonctions NPF ;
-- archive nationale localites-france-v14.41.zip conservée sans réimport ;
+- base fonctionnelle utilisée : v14.43 avec connexion SafeSky rétablie ;
+- conservation de la zone SafeSky unique centrée sur le centre actuel de la carte ;
+- conservation de la suppression des options « Trafic autour de ma position » et « Trafic autour du feu » ;
+- conservation de la case « Afficher les trafics au sol », décochée par défaut et mémorisée ;
+- conservation du paramètre SafeSky show_grounded piloté uniquement par cette case ;
+- réactivation du déplacement fluide continu des trafics ;
+- fréquence de rendu portée à vingt mises à jour par seconde ;
+- conservation des marqueurs entre deux réponses SafeSky au lieu de leur destruction et recréation ;
+- raccord progressif pendant 0,9 seconde vers chaque nouvelle position reçue ;
+- interpolation de la route par le chemin angulaire le plus court, y compris au passage de 359° à 0° ;
+- extrapolation locale conservée entre deux rafraîchissements SafeSky de cinq secondes ;
+- prise en charge renforcée des horodatages SafeSky en secondes Unix, millisecondes ou texte ISO ;
+- séparation des zones drone dans un sous-calque afin que leur rafraîchissement ne coupe plus l’animation des aéronefs ;
+- maintien de la fenêtre d’un trafic ouverte pendant les rafraîchissements ;
+- aucun changement des filtres altitude, de la recherche d’identifiants, de la liste suivie, des cartes offline ou des localités ;
+- base nationale hors ligne conservée et archive renommée localites-france-v14.44.zip pour la cohérence du cache ;
+- version applicative portée en v14.44 TEST.
+
+===============================================================================
+
+v14.43 TEST — rétablissement de la connexion SafeSky
+Date : 30 juillet 2026
+
+CORRECTION
+- rétablit la fonction interne getOwnTrafficAltitudeFeet supprimée par erreur lors de la préparation de la v14.42 ;
+- cette fonction est appelée lors de la construction des paramètres d'altitude SafeSky ;
+- son absence provoquait une erreur JavaScript avant l'envoi de la requête et empêchait toute connexion SafeSky ;
+- la lecture du trafic SafeSky est de nouveau opérationnelle ;
+- le filtre « Afficher les trafics au sol » et le centrage sur le centre de la carte sont conservés ;
+- aucune modification du déplacement, du zoom, des tuiles, des calques ou du rendu de la carte ;
+- base nationale des localités hors ligne conservée ;
+- version applicative portée en v14.43 TEST.
+
+===============================================================================
+
+v14.42 TEST — filtre d’affichage des trafics au sol et suppression des zones GPS / feu
+
+Modifications apportées :
+- ajout dans « Filtres trafic » d’une cellule avec case à cocher « Afficher les trafics au sol » ;
+- case décochée par défaut : les aéronefs signalés GROUNDED ou altitude « ground » sont masqués ;
+- lorsque la case est cochée, la requête SafeSky demande également les trafics au sol et NPF les affiche ;
+- le réglage est mémorisé dans les préférences trafic ;
+- la recherche d’identifiants par partie applique le même choix concernant les trafics au sol ;
+- suppression des cellules « Trafic autour de ma position » et « Trafic autour du feu » ;
+- neutralisation des anciennes valeurs GPS / feu éventuellement enregistrées dans le stockage local ;
+- zone SafeSky désormais unique : rayon choisi autour du centre courant de la carte ;
+- libellé de synthèse des filtres mis à jour avec l’état des trafics au sol ;
+- aucune modification du déplacement, du zoom, des tuiles, des calques ni du rendu de la carte ;
+- aucune modification du moteur d’animation des trafics ;
+- conservation de la recherche partielle d’identifiants SafeSky de la v14.41 ;
+- conservation de la suppression complète de la publication NPF vers SafeSky ;
+- conservation intégrale de la base nationale offline de 179 402 localités ;
+- archive nationale renommée localites-france-v14.42.zip uniquement pour la cohérence du cache ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
 - version applicative portée en v14.42 TEST.
 
 v14.41 TEST — recherche partielle d’identifiants SafeSky et suppression de la publication NPF
