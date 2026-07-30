@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-45_curseur_recherche_phonetique';
-const APP_VERSION = 'v14.45';
+const SW_VERSION = 'sw-v14-46_heure_sur_feu_forfait_rlt';
+const APP_VERSION = 'v14.46';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -28,7 +28,7 @@ const APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
-    './data/localites/localites-france-v14.45.zip',
+    './data/localites/localites-france-v14.46.zip',
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
     './icons/icon-192x192.png',
@@ -53,7 +53,7 @@ const CORE_APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
-    './data/localites/localites-france-v14.45.zip'
+    './data/localites/localites-france-v14.46.zip'
 ];
 
 
@@ -362,7 +362,7 @@ function isAppShellRequest(request) {
             'jszip.min.js',
             'communes.json',
             'communes_aliases.json',
-            'localites-france-v14.45.zip',
+            'localites-france-v14.46.zip',
             'lignes_ht_rte_simplifiees.geojson'
         ].includes(filename) || parsed.pathname.includes('/icons/');
     } catch (_) {
