@@ -1,5 +1,48 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.39 TEST — base pilote Gironde 100 % offline pour villages, hameaux et lieux-dits
+
+Modifications apportées :
+- suppression de toute dépendance au géocodeur Géoplateforme pour la recherche des localités ;
+- aucune requête vers data.geopf.fr lors d’une recherche ;
+- ajout du fichier local data/localites/localites-33.json dans l’application ;
+- base pilote limitée au département de la Gironde pour valider l’architecture avant la France entière ;
+- source officielle : fichier bêta des lieux-dits de la Base Adresse Nationale pour le département 33 ;
+- base générée automatiquement à partir de la source officielle ;
+- 2 227 localités conservées après nettoyage ;
+- présence de Blagon vérifiée dans la base ;
+- Blagon rattaché à Lanton avec ses propres coordonnées ;
+- suppression à la génération des routes, rues, chemins, avenues, impasses et autres voies évidentes ;
+- suppression à la génération des accès, parkings et principaux équipements publics ou commerciaux ;
+- regroupement à la génération des variantes directionnelles nord, sud, est, ouest, nord-est, nord-ouest, sud-est et sud-ouest ;
+- conservation du moteur phonétique NPF existant ;
+- conservation du Soundex et de la distance de Levenshtein ;
+- recherche tolérante aux fautes telles que Blagond pour Blagon ;
+- calcul des index de recherche en mémoire après lecture du fichier local ;
+- priorité donnée au nom exact ;
+- lorsqu’un nom exact est trouvé, seules les correspondances exactes sont affichées ;
+- les propositions phonétiques multiples restent affichées uniquement pour une saisie approximative ;
+- limitation à cinq résultats de localités ;
+- dédoublonnage par nom, commune de rattachement et coordonnées ;
+- maintien de la recherche normale des communes et de communes_aliases.json ;
+- fusion locale des résultats communes, alias et localités ;
+- affichage sous la forme « Blagon — Lanton (33) » ;
+- conservation du nom et des coordonnées exactes de la localité sélectionnée ;
+- préchargement discret de la base après le démarrage de l’application ;
+- ajout de la base localités dans les fichiers obligatoires du service worker ;
+- installation refusée si la base Gironde manque sur le serveur, afin d’éviter une fausse version offline ;
+- mise en cache de la base lors de l’installation de la PWA ;
+- première recherche de Blagon disponible en mode avion après installation de la version ;
+- aucun cache de recherche internet nécessaire ;
+- ajout du diagnostic window.testNamedPlacesSearch('Blagon 33') ;
+- diagnostic indiquant explicitement onlineFallbackEnabled: false ;
+- poids JSON non compressé d’environ 387 ko ;
+- poids compressé dans l’archive d’environ 54 ko ;
+- maintien des corrections cartes offline de la v14.37 et de la v14.38 ;
+- maintien des fonctions SafeSky existantes ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.39 TEST.
+
 v14.38 TEST — recherche complémentaire de localités par Géoplateforme avec classement phonétique NPF
 
 Modifications apportées :
