@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.44.zip?appv=v14.44';
+    './data/localites/localites-france-v14.45.zip?appv=v14.45';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1943,11 +1943,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.44'
+                        !== 'v14.45'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.44'
+                        'v14.45'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -2215,7 +2215,18 @@ function shouldSearchCandidate(candidate, searchWords, searchCompact, department
     return soundexParts.includes(firstSoundex);
 }
 
-function scoreCommuneSearchCandidate(candidate, searchWords) {
+function buildFrenchConsonantSearchKey(value) {
+    return simplifyString(String(value || ''))
+        .replace(/ph/g, 'f')
+        .replace(/gn/g, 'n')
+        .replace(/qu/g, 'k')
+        .replace(/ck/g, 'k')
+        .replace(/y/g, 'i')
+        .replace(/[aeiou0-9\s]/g, '')
+        .replace(/(.)\1+/g, '$1');
+}
+
+function scoreCommuneSearchCandidate(candidate, searchWords, departmentFilter = null) {
     if (!candidate || !Array.isArray(searchWords) || !searchWords.length) return 999;
 
     const parts = Array.isArray(candidate.search_parts) && candidate.search_parts.length
@@ -2245,6 +2256,40 @@ function scoreCommuneSearchCandidate(candidate, searchWords) {
         const compactTolerance = Math.max(1, Math.floor(searchCompact.length / 4));
         if (compactDistance <= compactTolerance) {
             return 0.5 + compactDistance;
+        }
+
+        /*
+         * v14.45 TEST — tolérance phonétique ciblée avec département.
+         * « essen 12 », « esen 12 » et « aissen 12 » doivent retrouver
+         * Ayssènes. La comparaison porte sur le nom compact complet afin que
+         * les mots très fréquents de noms composés (Saint, Sainte...) ne
+         * produisent pas une multitude de faux positifs.
+         */
+        const searchPhonetic = buildFrenchConsonantSearchKey(searchCompact);
+        const candidatePhonetic = buildFrenchConsonantSearchKey(candidateCompact);
+        if (
+            departmentFilter
+            && searchPhonetic.length >= 2
+            && candidatePhonetic.length >= 2
+        ) {
+            if (searchPhonetic === candidatePhonetic) {
+                return 1.75;
+            }
+
+            const phoneticDistance = levenshteinDistance(searchPhonetic, candidatePhonetic);
+            if (
+                phoneticDistance <= 1
+                && (
+                    searchPhonetic.startsWith(candidatePhonetic)
+                    || candidatePhonetic.startsWith(searchPhonetic)
+                )
+            ) {
+                return 2.3 + (phoneticDistance * 0.2);
+            }
+
+            if (phoneticDistance <= 1) {
+                return 3.4;
+            }
         }
     }
 
@@ -2309,7 +2354,7 @@ function searchAliasCommunes(searchWords, departmentFilter = null) {
 
     return candidates
         .map(alias => {
-            const score = scoreCommuneSearchCandidate(alias, searchWords);
+            const score = scoreCommuneSearchCandidate(alias, searchWords, departmentFilter);
             return { ...alias, score: score + 0.25 };
         })
         .filter(alias => alias.score < 999)
@@ -2720,7 +2765,8 @@ async function searchNamedPlacesOffline(
             let score =
                 scoreCommuneSearchCandidate(
                     candidate,
-                    searchWords
+                    searchWords,
+                    departmentFilter
                 );
 
             if (
@@ -3974,7 +4020,7 @@ function setupEventListeners() {
 
         const scoredResults = communesToSearch
             .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
-            .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords) }))
+            .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords, departmentFilter) }))
             .filter(c => c.score < 999);
 
         const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
@@ -4042,23 +4088,15 @@ function setupEventListeners() {
 
     const showFireHistoryFromSearch = () => {
         /*
-         * v11.25 — correction saisie commune après sélection d'un feu.
-         * L'historique reste accessible au clic, mais la barre de recherche
-         * garde toujours le focus et le clavier doit pouvoir s'ouvrir.
+         * v14.45 TEST — placement tactile natif du curseur dans la recherche.
+         * L'ancien setSelectionRange différé remettait systématiquement le
+         * curseur à droite après un toucher au milieu du nom. On conserve le
+         * focus et l'historique, mais Safari/iPadOS choisit désormais lui-même
+         * la position exacte correspondant au toucher de l'utilisateur.
          */
         searchInput.disabled = false;
         searchInput.readOnly = false;
         displayFireHistory();
-
-        if (searchInput.value && searchInput.value.trim().length > 0) {
-            setTimeout(() => {
-                try {
-                    const end = searchInput.value.length;
-                    searchInput.focus();
-                    searchInput.setSelectionRange(end, end);
-                } catch (_) {}
-            }, 0);
-        }
     };
 
     const collapseSearchInputSelection = () => {
@@ -14488,7 +14526,7 @@ function searchCommunesForGaarPoint(rawSearch) {
 
     const scoredResults = communesToSearch
         .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
-        .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords) }))
+        .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords, departmentFilter) }))
         .filter(c => c.score < 999);
 
     const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
