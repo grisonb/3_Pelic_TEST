@@ -1,0 +1,53 @@
+name: Build localites offline test
+
+on:
+  push:
+    branches:
+      - localites-offline-test
+    paths:
+      - 'tools/build_localites_offline.py'
+      - '.github/workflows/build-localites-offline-test.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-gironde:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: localites-offline-test
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate Gironde locality database
+        run: python tools/build_localites_offline.py --department 33
+
+      - name: Verify Blagon and report size
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('data/localites/localites-33.json')
+          data = json.loads(path.read_text(encoding='utf-8'))
+          matches = [item for item in data['items'] if item.get('k') == 'blagon']
+          print('count=', data['count'])
+          print('size=', path.stat().st_size)
+          print('blagon=', matches)
+          if not matches:
+              raise SystemExit('Blagon absent de la base générée')
+          PY
+
+      - name: Commit generated test database
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/localites/localites-33.json
+          git diff --cached --quiet && exit 0
+          git commit -m 'Génère la base offline des localités de Gironde'
+          git push origin HEAD:localites-offline-test
