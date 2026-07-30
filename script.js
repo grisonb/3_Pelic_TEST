@@ -550,27 +550,33 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
+// v14.41 TEST — suppression publication SafeSky et recherche partielle active.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
 
 /*
- * v14.39 TEST — base pilote Gironde intégralement locale.
+ * v14.40 TEST — base nationale de localités intégralement offline.
  *
- * Le fichier est livré dans l'archive et pré-caché par le service worker.
- * La recherche des villages, hameaux et lieux-dits ne fait aucun appel
- * internet, y compris lors d'une première recherche en mode avion.
+ * Une archive ZIP unique est pré-cachée par le service worker. Elle contient
+ * 179 402 villages, hameaux et lieux-dits répartis en petits fragments de
+ * recherche. Une saisie ne décompresse que le fragment utile : la base France
+ * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
-const NAMED_PLACES_OFFLINE_URL =
-    './data/localites/localites-33.json?appv=v14.39';
-const NAMED_PLACES_OFFLINE_DEPARTMENTS =
-    new Set(['33']);
+const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
+    './data/localites/localites-france-v14.41.zip?appv=v14.41';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
+const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
+const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
 
 let namedPlacesSearchSequence = 0;
-let namedPlacesOfflineRecords = [];
+let namedPlacesOfflineArchive = null;
+let namedPlacesOfflineIndex = null;
 let namedPlacesOfflineLoadPromise = null;
 let namedPlacesOfflineLoadError = '';
+let namedPlacesOfflineLoadedCount = 0;
+const namedPlacesOfflineShardCache = new Map();
+const namedPlacesOfflineShardPromises = new Map();
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null, accuracyCircle = null, headingLayer = null, lastPosition = null;
@@ -1919,8 +1925,32 @@ async function initializeApp() {
     }, 500);
     setTimeout(() => {
         loadNamedPlacesOfflineDatabase()
-            .catch(() => {});
-    }, 800);
+            .then(() => {
+                if (!namedPlacesOfflineIndex) return;
+                const noticeKey =
+                    'npfNamedPlacesFranceReadyNoticeVersion';
+                if (
+                    localStorage.getItem(noticeKey)
+                        !== 'v14.41'
+                ) {
+                    localStorage.setItem(
+                        noticeKey,
+                        'v14.41'
+                    );
+                    showNamedPlacesOfflineStatus(
+                        `Base localités France hors ligne prête — ${Number(
+                            namedPlacesOfflineIndex.total_count
+                        ).toLocaleString('fr-FR')} localités`
+                    );
+                }
+            })
+            .catch(() => {
+                showNamedPlacesOfflineStatus(
+                    'Base localités France hors ligne indisponible',
+                    { error: true, duration: 6500 }
+                );
+            });
+    }, 1000);
 
     setTimeout(() => {
         ensureDepartmentsLayerDataLoaded()
@@ -2369,80 +2399,215 @@ function buildOfflineNamedPlaceCandidate(record) {
     };
 }
 
+function normalizeNamedPlacesShardSearchKey(value) {
+    const original = simplifyString(value);
+    const stripped = original.replace(
+        /^(?:(?:de la|de l|les|aux|des|le|la|au|du|en|de|l|a)\s+)+/,
+        ''
+    ).trim();
+    return stripped || original;
+}
+
+function getNamedPlacesShardId(searchTerm) {
+    const normalized = normalizeNamedPlacesShardSearchKey(searchTerm);
+    let prefix = normalized.slice(
+        0,
+        NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH
+    );
+    prefix = prefix.padEnd(
+        NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH,
+        '_'
+    );
+    return Array.from(prefix)
+        .map(character => character
+            .charCodeAt(0)
+            .toString(16)
+            .padStart(2, '0'))
+        .join('');
+}
+
+function showNamedPlacesOfflineStatus(
+    message,
+    {
+        error = false,
+        duration = 4200
+    } = {}
+) {
+    let element = document.getElementById(
+        'named-places-offline-status'
+    );
+    if (!element) {
+        element = document.createElement('div');
+        element.id = 'named-places-offline-status';
+        document.body.appendChild(element);
+    }
+    element.textContent = String(message || '');
+    element.classList.toggle('error', Boolean(error));
+    requestAnimationFrame(() => {
+        element.classList.add('visible');
+    });
+    window.clearTimeout(
+        showNamedPlacesOfflineStatus.hideTimer
+    );
+    showNamedPlacesOfflineStatus.hideTimer =
+        window.setTimeout(() => {
+            element.classList.remove('visible');
+        }, Math.max(1200, Number(duration) || 4200));
+}
+
 async function loadNamedPlacesOfflineDatabase({
-    force = false
+    force = false,
+    searchTerm = ''
 } = {}) {
-    if (
-        !force
-        && Array.isArray(namedPlacesOfflineRecords)
-        && namedPlacesOfflineRecords.length
-    ) {
-        return namedPlacesOfflineRecords;
+    if (force) {
+        namedPlacesOfflineArchive = null;
+        namedPlacesOfflineIndex = null;
+        namedPlacesOfflineShardCache.clear();
+        namedPlacesOfflineShardPromises.clear();
+        namedPlacesOfflineLoadedCount = 0;
     }
 
-    if (!force && namedPlacesOfflineLoadPromise) {
-        return namedPlacesOfflineLoadPromise;
-    }
-
-    namedPlacesOfflineLoadError = '';
-
-    namedPlacesOfflineLoadPromise = (async () => {
-        const response = await fetch(
-            NAMED_PLACES_OFFLINE_URL,
-            {
-                method: 'GET',
-                cache: 'force-cache',
-                credentials: 'same-origin',
-                headers: {
-                    'Accept': 'application/json'
+    if (!namedPlacesOfflineArchive) {
+        if (!namedPlacesOfflineLoadPromise) {
+            namedPlacesOfflineLoadError = '';
+            namedPlacesOfflineLoadPromise = (async () => {
+                if (typeof JSZip === 'undefined') {
+                    throw new Error('JSZip non chargé');
                 }
-            }
+
+                const response = await fetch(
+                    NAMED_PLACES_OFFLINE_ARCHIVE_URL,
+                    {
+                        method: 'GET',
+                        cache: 'force-cache',
+                        credentials: 'same-origin'
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error(
+                        `Base localités France HTTP ${response.status}`
+                    );
+                }
+
+                const archiveBuffer = await response.arrayBuffer();
+                const archive = await JSZip.loadAsync(archiveBuffer);
+                const indexFile = archive.file(
+                    'localites-index.json'
+                );
+                if (!indexFile) {
+                    throw new Error(
+                        'Index de la base France absent'
+                    );
+                }
+
+                const indexPayload = JSON.parse(
+                    await indexFile.async('string')
+                );
+                if (
+                    !indexPayload
+                    || Number(indexPayload.total_count) < 10000
+                    || !Array.isArray(indexPayload.departments)
+                ) {
+                    throw new Error(
+                        'Index de la base France invalide'
+                    );
+                }
+
+                namedPlacesOfflineArchive = archive;
+                namedPlacesOfflineIndex = indexPayload;
+                return archive;
+            })()
+                .catch(error => {
+                    namedPlacesOfflineLoadError =
+                        error?.message || String(error);
+                    namedPlacesOfflineArchive = null;
+                    namedPlacesOfflineIndex = null;
+                    console.warn(
+                        '[Localités France offline] Chargement impossible:',
+                        error
+                    );
+                    throw error;
+                })
+                .finally(() => {
+                    namedPlacesOfflineLoadPromise = null;
+                });
+        }
+
+        try {
+            await namedPlacesOfflineLoadPromise;
+        } catch (_) {
+            return [];
+        }
+    }
+
+    if (!searchTerm) {
+        return [];
+    }
+
+    const shardId = getNamedPlacesShardId(searchTerm);
+    if (namedPlacesOfflineShardCache.has(shardId)) {
+        const cached = namedPlacesOfflineShardCache.get(shardId);
+        namedPlacesOfflineShardCache.delete(shardId);
+        namedPlacesOfflineShardCache.set(shardId, cached);
+        return cached;
+    }
+
+    if (namedPlacesOfflineShardPromises.has(shardId)) {
+        return namedPlacesOfflineShardPromises.get(shardId);
+    }
+
+    const loadPromise = (async () => {
+        const shardFile = namedPlacesOfflineArchive.file(
+            `shards/${shardId}.json`
         );
+        if (!shardFile) return [];
 
-        if (!response.ok) {
-            throw new Error(
-                `Base localités HTTP ${response.status}`
-            );
-        }
+        const payload = JSON.parse(
+            await shardFile.async('string')
+        );
+        const records = Array.isArray(payload?.items)
+            ? payload.items
+                .map(buildOfflineNamedPlaceCandidate)
+                .filter(Boolean)
+            : [];
 
-        const payload = await response.json();
-        if (
-            !payload
-            || !Array.isArray(payload.items)
+        namedPlacesOfflineShardCache.set(
+            shardId,
+            records
+        );
+        namedPlacesOfflineLoadedCount += records.length;
+
+        while (
+            namedPlacesOfflineShardCache.size
+                > NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX
         ) {
-            throw new Error(
-                'Format de la base localités invalide'
-            );
+            const oldestKey =
+                namedPlacesOfflineShardCache.keys()
+                    .next().value;
+            namedPlacesOfflineShardCache.delete(oldestKey);
         }
 
-        const records = payload.items
-            .map(buildOfflineNamedPlaceCandidate)
-            .filter(Boolean);
-
-        if (!records.length) {
-            throw new Error(
-                'Base localités vide'
-            );
-        }
-
-        namedPlacesOfflineRecords = records;
         return records;
     })()
         .catch(error => {
             namedPlacesOfflineLoadError =
                 error?.message || String(error);
-            namedPlacesOfflineRecords = [];
             console.warn(
-                '[Localités offline] Chargement impossible:',
+                '[Localités France offline] Fragment impossible:',
+                shardId,
                 error
             );
             return [];
         })
         .finally(() => {
-            namedPlacesOfflineLoadPromise = null;
+            namedPlacesOfflineShardPromises.delete(shardId);
         });
 
-    return namedPlacesOfflineLoadPromise;
+    namedPlacesOfflineShardPromises.set(
+        shardId,
+        loadPromise
+    );
+    return loadPromise;
 }
 
 function isDirectionalSearchTerm(searchTerm) {
@@ -2505,14 +2670,19 @@ async function searchNamedPlacesOffline(
 
     if (
         departmentFilter
-        && !NAMED_PLACES_OFFLINE_DEPARTMENTS
-            .has(departmentFilter)
+        && Array.isArray(
+            namedPlacesOfflineIndex?.departments
+        )
+        && !namedPlacesOfflineIndex.departments
+            .includes(departmentFilter)
     ) {
         return [];
     }
 
     const records =
-        await loadNamedPlacesOfflineDatabase();
+        await loadNamedPlacesOfflineDatabase({
+            searchTerm
+        });
     if (!records.length) return [];
 
     const searchCompact =
@@ -6022,34 +6192,13 @@ function sanitizeTrafficSettings(candidate = {}) {
         candidate.onlyTrackedIdentifiers,
         fallback.onlyTrackedIdentifiers
     );
-    const publishOwnPosition = asBool(
-        candidate.publishOwnPosition,
-        fallback.publishOwnPosition
-    );
-    const publicationCallsign = String(
-        candidate.publicationCallsign
-        ?? fallback.publicationCallsign
-        ?? ''
-    )
-        .trim()
-        .toUpperCase()
-        .replace(/[^A-Z0-9_-]/g, '')
-        .slice(0, 16);
-
-    const validPublicationTypes = new Set([
-        'MOTORPLANE',
-        'JET',
-        'HELICOPTER',
-        'THREE_AXES_LIGHT_PLANE'
-    ]);
-    let publicationBeaconType = String(
-        candidate.publicationBeaconType
-        || fallback.publicationBeaconType
-        || 'MOTORPLANE'
-    ).trim().toUpperCase();
-    if (!validPublicationTypes.has(publicationBeaconType)) {
-        publicationBeaconType = 'MOTORPLANE';
-    }
+    /*
+     * v14.41 TEST — publication NPF vers SafeSky supprimée.
+     * Les anciennes valeurs mémorisées sont ignorées et neutralisées.
+     */
+    const publishOwnPosition = false;
+    const publicationCallsign = '';
+    const publicationBeaconType = 'MOTORPLANE';
 
     return {
         radiusNm,
@@ -6346,11 +6495,8 @@ function getTrafficSettingsSummary() {
     const advisoryLabel = settings.showDroneAdvisories
         ? 'zones drone ON'
         : 'zones drone OFF';
-    const publicationLabel = settings.publishOwnPosition
-        ? `publication ${settings.publicationCallsign || 'sans indicatif'}`
-        : 'publication OFF';
 
-    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${trackedLabel} · ${advisoryLabel} · ${publicationLabel}`;
+    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${trackedLabel} · ${advisoryLabel}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -6446,43 +6592,17 @@ function ensureTrafficSettingsModal() {
                     </div>
                 </label>
 
-                <label class="traffic-settings-field traffic-settings-checkbox-field traffic-settings-relative-line">
-                    <div class="traffic-settings-check-row">
-                        <input id="traffic-publish-own-input" type="checkbox">
-                        <em>Publier ma position NPF vers SafeSky</em>
-                    </div>
-                </label>
-
-                <label id="traffic-publication-callsign-field" class="traffic-settings-field traffic-settings-relative-line">
-                    <span>Indicatif publié sur SafeSky</span>
-                    <input id="traffic-publication-callsign-input"
-                           type="text"
-                           maxlength="16"
-                           autocomplete="off"
-                           autocapitalize="characters"
-                           placeholder="Ex. SECURITE01">
-                </label>
-
-                <label id="traffic-publication-type-field" class="traffic-settings-field traffic-settings-relative-line">
-                    <span>Catégorie publiée</span>
-                    <select id="traffic-publication-type-input">
-                        <option value="MOTORPLANE">AVION</option>
-                        <option value="JET">JET</option>
-                        <option value="HELICOPTER">HÉLICOPTÈRE</option>
-                        <option value="THREE_AXES_LIGHT_PLANE">ULM</option>
-                    </select>
-                </label>
             </div>
 
             <div class="traffic-tools-section">
-                <div class="traffic-tools-title">Recherche globale SafeSky</div>
+                <div class="traffic-tools-title">Recherche d’identifiants SafeSky</div>
                 <div class="traffic-search-row">
                     <input id="traffic-global-search-input"
                            type="search"
                            maxlength="24"
                            autocomplete="off"
                            autocapitalize="characters"
-                           placeholder="Indicatif complet, partie d’indicatif ou identifiant">
+                           placeholder="Indicatif entier ou partie, ex. MILAN">
                     <button type="button"
                             id="traffic-global-search-button"
                             class="traffic-tool-button traffic-tool-button-primary">
@@ -6490,8 +6610,8 @@ function ensureTrafficSettingsModal() {
                     </button>
                 </div>
                 <div class="traffic-tools-note">
-                    La recherche globale SafeSky utilise un indicatif complet ou un identifiant.
-                    Une partie d’indicatif est aussi recherchée dans les trafics déjà reçus par NPF.
+                    Un indicatif complet est recherché directement dans SafeSky.
+                    Une partie comme MILAN affiche les trafics actifs correspondants dans les zones surveillées par NPF.
                 </div>
                 <div id="traffic-search-results" class="traffic-search-results"></div>
             </div>
@@ -6508,9 +6628,6 @@ function ensureTrafficSettingsModal() {
                 <div id="traffic-tracked-list" class="traffic-tracked-list"></div>
             </div>
 
-            <div id="traffic-publication-status"
-                 class="traffic-publication-status"
-                 aria-live="polite"></div>
 
             <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse. Si « Trafic autour de ma position » et « Trafic autour du feu » sont décochés, tous les trafics reçus dans le rayon choisi autour du centre de la carte sont affichés. Rafraîchissement toutes les 5 secondes. Le déplacement intermédiaire est extrapolé localement. Les données SafeSky/ADS-B restent indicatives et non certifiées.</div>
 
@@ -6571,36 +6688,6 @@ function ensureTrafficSettingsModal() {
         }
     };
 
-    const updatePublicationUi = () => {
-        const enabled = !!modal.querySelector(
-            '#traffic-publish-own-input'
-        )?.checked;
-
-        const callsignField = modal.querySelector(
-            '#traffic-publication-callsign-field'
-        );
-        const typeField = modal.querySelector(
-            '#traffic-publication-type-field'
-        );
-        const callsignInput = modal.querySelector(
-            '#traffic-publication-callsign-input'
-        );
-        const typeInput = modal.querySelector(
-            '#traffic-publication-type-input'
-        );
-
-        if (callsignInput) callsignInput.disabled = !enabled;
-        if (typeInput) typeInput.disabled = !enabled;
-        callsignField?.classList.toggle(
-            'traffic-settings-field-disabled',
-            !enabled
-        );
-        typeField?.classList.toggle(
-            'traffic-settings-field-disabled',
-            !enabled
-        );
-    };
-
     const fillDefaults = () => {
         const defaults = sanitizeTrafficSettings(DEFAULT_TRAFFIC_SETTINGS);
         modal.querySelector('#traffic-radius-input').value = String(defaults.radiusNm);
@@ -6614,19 +6701,12 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
         modal.querySelector('#traffic-drone-advisories-input').checked = !!defaults.showDroneAdvisories;
         modal.querySelector('#traffic-only-tracked-input').checked = !!defaults.onlyTrackedIdentifiers;
-        modal.querySelector('#traffic-publish-own-input').checked = !!defaults.publishOwnPosition;
-        modal.querySelector('#traffic-publication-callsign-input').value = defaults.publicationCallsign;
-        modal.querySelector('#traffic-publication-type-input').value = defaults.publicationBeaconType;
         updateAltitudeModeUi();
-        updatePublicationUi();
     };
 
     modal.querySelectorAll('input[name="traffic-altitude-mode"]').forEach(input => {
         input.addEventListener('change', updateAltitudeModeUi);
     });
-
-    modal.querySelector('#traffic-publish-own-input')
-        .addEventListener('change', updatePublicationUi);
 
     modal.querySelector('#traffic-global-search-button')
         .addEventListener('click', () => {
@@ -6660,27 +6740,6 @@ function ensureTrafficSettingsModal() {
         const altitudeLabelInput = modal.querySelector('#traffic-altitude-label-input');
         const droneAdvisoriesInput = modal.querySelector('#traffic-drone-advisories-input');
         const onlyTrackedInput = modal.querySelector('#traffic-only-tracked-input');
-        const publishOwnInput = modal.querySelector('#traffic-publish-own-input');
-        const publicationCallsignInput = modal.querySelector('#traffic-publication-callsign-input');
-        const publicationTypeInput = modal.querySelector('#traffic-publication-type-input');
-
-        const publicationCallsign = String(
-            publicationCallsignInput?.value || ''
-        )
-            .trim()
-            .toUpperCase()
-            .replace(/[^A-Z0-9_-]/g, '')
-            .slice(0, 16);
-
-        if (publishOwnInput?.checked && !publicationCallsign) {
-            updateSafeSkyPublicationStatus(
-                'Saisis un indicatif avant d’activer la publication.',
-                'error'
-            );
-            publicationCallsignInput?.focus();
-            return;
-        }
-
         saveTrafficSettings({
             radiusNm: radiusInput.value,
             minAltitudeFt: minAltitudeInput.value,
@@ -6692,14 +6751,9 @@ function ensureTrafficSettingsModal() {
             groundToAboveBandFt: groundBandInput.value,
             showAltitudeLabel: !!altitudeLabelInput.checked,
             showDroneAdvisories: !!droneAdvisoriesInput.checked,
-            onlyTrackedIdentifiers: !!onlyTrackedInput.checked,
-            publishOwnPosition: !!publishOwnInput.checked,
-            publicationCallsign,
-            publicationBeaconType:
-                publicationTypeInput?.value || 'MOTORPLANE'
+            onlyTrackedIdentifiers: !!onlyTrackedInput.checked
         });
 
-        syncSafeSkyOwnPublication();
         refreshTrafficButtonState(lastTrafficDisplayedCount);
 
         if (showTrafficLayer) {
@@ -6710,8 +6764,6 @@ function ensureTrafficSettingsModal() {
     });
 
     refreshTrackedTrafficListUi();
-    updatePublicationUi();
-    updateSafeSkyPublicationStatus();
 
     return modal;
 }
@@ -6731,12 +6783,8 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
     modal.querySelector('#traffic-drone-advisories-input').checked = !!current.showDroneAdvisories;
     modal.querySelector('#traffic-only-tracked-input').checked = !!current.onlyTrackedIdentifiers;
-    modal.querySelector('#traffic-publish-own-input').checked = !!current.publishOwnPosition;
-    modal.querySelector('#traffic-publication-callsign-input').value = current.publicationCallsign;
-    modal.querySelector('#traffic-publication-type-input').value = current.publicationBeaconType;
 
     refreshTrackedTrafficListUi();
-    updateSafeSkyPublicationStatus();
 
     try {
         const mode = current.altitudeFilterMode;
@@ -6765,33 +6813,19 @@ function openTrafficSettingsDialog() {
 
         if (relativeBandInput) relativeBandInput.disabled = !aroundActive;
         if (aroundAltitudeField) {
-            aroundAltitudeField.classList.toggle('traffic-settings-field-disabled', !aroundActive);
+            aroundAltitudeField.classList.toggle(
+                'traffic-settings-field-disabled',
+                !aroundActive
+            );
         }
 
         if (groundBandInput) groundBandInput.disabled = !groundActive;
         if (groundAltitudeField) {
-            groundAltitudeField.classList.toggle('traffic-settings-field-disabled', !groundActive);
+            groundAltitudeField.classList.toggle(
+                'traffic-settings-field-disabled',
+                !groundActive
+            );
         }
-
-        const publishEnabled = !!current.publishOwnPosition;
-        const publicationCallsignInput = modal.querySelector(
-            '#traffic-publication-callsign-input'
-        );
-        const publicationTypeInput = modal.querySelector(
-            '#traffic-publication-type-input'
-        );
-        publicationCallsignInput.disabled = !publishEnabled;
-        publicationTypeInput.disabled = !publishEnabled;
-        modal.querySelector('#traffic-publication-callsign-field')
-            ?.classList.toggle(
-                'traffic-settings-field-disabled',
-                !publishEnabled
-            );
-        modal.querySelector('#traffic-publication-type-field')
-            ?.classList.toggle(
-                'traffic-settings-field-disabled',
-                !publishEnabled
-            );
     } catch (_) {}
 
     modal.classList.add('open');
@@ -7040,38 +7074,86 @@ async function searchSafeSkyBeaconExact(query) {
     return uniqueResults;
 }
 
-function getLocalTrafficSearchResults(query) {
+function buildTrafficSearchHaystack(aircraft) {
+    return [
+        aircraft?.callsign,
+        aircraft?.hex,
+        aircraft?.registration,
+        aircraft?.aircraftModel,
+        aircraft?.operatorName,
+        aircraft?.type,
+        aircraft?.beaconType
+    ]
+        .filter(Boolean)
+        .join(' ')
+        .toUpperCase();
+}
+
+function getTrafficSearchRank(aircraft, normalizedQuery) {
+    const identifiers = [
+        aircraft?.callsign,
+        aircraft?.registration,
+        aircraft?.hex
+    ]
+        .filter(Boolean)
+        .map(value => String(value).trim().toUpperCase());
+
+    if (identifiers.some(value => value === normalizedQuery)) return 0;
+    if (identifiers.some(value => value.startsWith(normalizedQuery))) return 1;
+    if (identifiers.some(value => value.includes(normalizedQuery))) return 2;
+    return 3;
+}
+
+function filterTrafficSearchCandidates(
+    candidates,
+    query,
+    {
+        airborneOnly = false,
+        limit = 50
+    } = {}
+) {
     const normalizedQuery = String(query || '')
         .trim()
         .toUpperCase();
 
     if (!normalizedQuery) return [];
 
-    const candidates = [
-        ...(Array.isArray(lastTrafficAircraftSnapshot)
-            ? lastTrafficAircraftSnapshot
-            : []),
-        ...getTemporaryGlobalTrafficRaw()
-    ];
-
     const unique = [];
     const seen = new Set();
 
-    candidates
+    (Array.isArray(candidates) ? candidates : [])
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
-        .filter(ac => {
-            const haystack = [
-                ac.callsign,
-                ac.hex,
-                ac.registration,
-                ac.aircraftModel,
-                ac.operatorName,
-                ac.type,
-                ac.beaconType
-            ].join(' ').toUpperCase();
+        .filter(ac => !airborneOnly || !ac.isGrounded)
+        .filter(ac => (
+            ac.forceDisplay
+            || !Number.isFinite(ac.seenPos)
+            || ac.seenPos <= TRAFFIC_MAX_SEEN_SECONDS
+        ))
+        .filter(ac => (
+            buildTrafficSearchHaystack(ac)
+                .includes(normalizedQuery)
+        ))
+        .sort((left, right) => {
+            const rankDifference = (
+                getTrafficSearchRank(left, normalizedQuery)
+                - getTrafficSearchRank(right, normalizedQuery)
+            );
+            if (rankDifference) return rankDifference;
 
-            return haystack.includes(normalizedQuery);
+            const leftLabel = String(
+                left.callsign
+                || left.registration
+                || left.hex
+                || ''
+            ).toUpperCase();
+            const rightLabel = String(
+                right.callsign
+                || right.registration
+                || right.hex
+                || ''
+            ).toUpperCase();
+            return leftLabel.localeCompare(rightLabel, 'fr');
         })
         .forEach(ac => {
             const key = buildTrafficAircraftKey(ac);
@@ -7080,7 +7162,108 @@ function getLocalTrafficSearchResults(query) {
             unique.push(ac.raw || ac);
         });
 
-    return unique.slice(0, 20);
+    return unique.slice(0, Math.max(1, limit));
+}
+
+function getLocalTrafficSearchResults(query) {
+    const candidates = [
+        ...(Array.isArray(lastTrafficAircraftSnapshot)
+            ? lastTrafficAircraftSnapshot
+            : []),
+        ...getTemporaryGlobalTrafficRaw()
+    ];
+
+    return filterTrafficSearchCandidates(
+        candidates,
+        query,
+        { airborneOnly: true, limit: 50 }
+    );
+}
+
+function getTrafficPartialSearchPoints() {
+    const points = getTrafficQueryPoints();
+    if (points.length) return points;
+
+    try {
+        const center = map?.getCenter?.();
+        if (
+            center
+            && Number.isFinite(Number(center.lat))
+            && Number.isFinite(Number(center.lng))
+        ) {
+            return [{
+                lat: Number(center.lat),
+                lon: Number(center.lng),
+                label: 'centre carte',
+                kind: 'search-center'
+            }];
+        }
+    } catch (_) {}
+
+    return [];
+}
+
+async function fetchActiveSafeSkyTrafficForPartialSearch() {
+    const provider = TRAFFIC_API_PROVIDERS.find(candidate => (
+        candidate?.dataFormat === 'safesky'
+        && candidate?.urlFormat === 'viewport'
+        && candidate?.baseUrl
+    ));
+    const points = getTrafficPartialSearchPoints();
+
+    if (!provider) {
+        return {
+            candidates: [],
+            pointCount: points.length,
+            errors: ['source SafeSky indisponible']
+        };
+    }
+    if (!points.length) {
+        return {
+            candidates: [],
+            pointCount: 0,
+            errors: ['aucune position, aucun feu et aucun centre carte disponible']
+        };
+    }
+
+    const settled = await Promise.allSettled(
+        points.map(async point => {
+            const url = new URL(provider.baseUrl, window.location.href);
+            url.searchParams.set(
+                'viewport',
+                buildSafeSkyViewport(point, getTrafficRadiusNm())
+            );
+            /*
+             * Recherche par partie : ne pas appliquer le filtre d’altitude ni
+             * la liste suivie. L’objectif est de retrouver tous les indicatifs
+             * actifs dans les zones NPF, sans modifier le calque affiché.
+             */
+            url.searchParams.set('show_grounded', 'false');
+            const data = await fetchSafeSkyJson(url);
+            return extractTrafficAircraftList(data);
+        })
+    );
+
+    const candidates = [];
+    const errors = [];
+    settled.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+            candidates.push(...result.value);
+            return;
+        }
+        errors.push(
+            `${points[index]?.label || 'zone'} : ${
+                result.reason?.message
+                || String(result.reason || 'erreur SafeSky')
+            }`
+        );
+    });
+
+    return {
+        candidates,
+        pointCount: points.length,
+        errors
+    };
 }
 
 function mergeTrafficSearchResults(...groups) {
@@ -7129,8 +7312,8 @@ function renderTrafficSearchResults(modal, results, message = '') {
 
         const primary = document.createElement('strong');
         primary.textContent = (
-            aircraft.registration
-            || aircraft.callsign
+            aircraft.callsign
+            || aircraft.registration
             || aircraft.hex
             || 'Trafic'
         );
@@ -7203,7 +7386,7 @@ async function performTrafficSearchFromModal(modal) {
         renderTrafficSearchResults(
             modal,
             [],
-            'Saisis un indicatif ou un identifiant.'
+            'Saisis un indicatif ou une partie d’indicatif.'
         );
         return;
     }
@@ -7211,37 +7394,58 @@ async function performTrafficSearchFromModal(modal) {
     renderTrafficSearchResults(
         modal,
         [],
-        'Recherche SafeSky en cours…'
+        `Recherche des indicatifs contenant « ${query} »…`
     );
 
     const localResults = getLocalTrafficSearchResults(query);
-    let globalResults = [];
-    let globalError = '';
+    const [exactOutcome, activeOutcome] = await Promise.allSettled([
+        searchSafeSkyBeaconExact(query),
+        fetchActiveSafeSkyTrafficForPartialSearch()
+    ]);
 
-    try {
-        globalResults = await searchSafeSkyBeaconExact(query);
-    } catch (error) {
-        globalError = error?.message || String(error);
-    }
+    const exactResults = exactOutcome.status === 'fulfilled'
+        ? exactOutcome.value
+        : [];
+    const activeSearch = activeOutcome.status === 'fulfilled'
+        ? activeOutcome.value
+        : {
+            candidates: [],
+            pointCount: 0,
+            errors: [
+                activeOutcome.reason?.message
+                || String(activeOutcome.reason || 'erreur SafeSky')
+            ]
+        };
+    const partialResults = filterTrafficSearchCandidates(
+        activeSearch.candidates,
+        query,
+        { airborneOnly: true, limit: 50 }
+    );
 
     const results = mergeTrafficSearchResults(
-        globalResults,
+        exactResults,
+        partialResults,
         localResults
-    );
+    ).slice(0, 50);
 
     let message = '';
     if (!results.length) {
-        message = globalError
-            ? `Aucun trafic trouvé — ${globalError}`
-            : 'Aucun trafic trouvé.';
-    } else if (globalResults.length && localResults.length) {
-        message =
-            'Résultats globaux SafeSky et correspondances locales.';
-    } else if (globalResults.length) {
-        message = 'Résultat global SafeSky.';
+        const detail = activeSearch.errors?.length
+            ? ` — ${activeSearch.errors.join(' / ')}`
+            : '';
+        message = (
+            `Aucun trafic actif contenant « ${query} » dans les zones NPF`
+            + detail
+        );
     } else {
-        message =
-            'Correspondances dans les trafics déjà reçus par NPF.';
+        const zoneLabel = activeSearch.pointCount
+            ? ` dans ${activeSearch.pointCount} zone${activeSearch.pointCount > 1 ? 's' : ''} NPF`
+            : '';
+        message = (
+            `${results.length} correspondance${results.length > 1 ? 's' : ''}`
+            + zoneLabel
+            + ' — indicatif exact recherché globalement.'
+        );
     }
 
     renderTrafficSearchResults(modal, results, message);
@@ -7362,348 +7566,13 @@ async function fetchTrackedTrafficBeacons() {
         }));
 }
 
-function getOrCreateSafeSkyPublishedBeaconId() {
-    try {
-        const existing = String(
-            localStorage.getItem(
-                TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY
-            ) || ''
-        ).trim();
-
-        if (existing) return existing;
-
-        const randomPart = (
-            globalThis.crypto?.randomUUID?.()
-            || `${Date.now().toString(36)}-${Math.random()
-                .toString(36)
-                .slice(2, 12)}`
-        ).replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
-
-        const newId = `NPF_${randomPart.toUpperCase()}`;
-        localStorage.setItem(
-            TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY,
-            newId
-        );
-        return newId;
-    } catch (_) {
-        return `NPF_${Date.now().toString(36).toUpperCase()}`;
-    }
-}
-
-function updateSafeSkyPublicationStatus(
-    message = '',
-    state = ''
-) {
-    const element = document.getElementById(
-        'traffic-publication-status'
-    );
-    if (!element) return;
-
-    const settings = sanitizeTrafficSettings(trafficSettings);
-
-    let text = message;
-    let resolvedState = state;
-
-    if (!text) {
-        if (!settings.publishOwnPosition) {
-            text = 'Publication de la position NPF désactivée.';
-            resolvedState = 'idle';
-        } else if (lastSafeSkyOwnPublishError) {
-            text = `Publication SafeSky : ${lastSafeSkyOwnPublishError}`;
-            resolvedState = 'error';
-        } else if (lastSafeSkyOwnPublishAt > 0) {
-            text = `Position publiée sous l’indicatif ${settings.publicationCallsign} à ${new Date(lastSafeSkyOwnPublishAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`;
-            resolvedState = 'ok';
-        } else {
-            text = `Publication prête sous l’indicatif ${settings.publicationCallsign || 'non saisi'}.`;
-            resolvedState = 'waiting';
-        }
-    }
-
-    element.textContent = text;
-    element.className =
-        `traffic-publication-status traffic-publication-${resolvedState || 'idle'}`;
-}
-
-function calculateOwnPublicationMotion(
-    altitudeMeters,
-    headingDegrees,
-    timestampMs
-) {
-    const previous = ownPublicationMotionState;
-    let verticalRate = null;
-    let turnRate = null;
-
-    if (
-        previous
-        && Number.isFinite(previous.timestampMs)
-        && timestampMs > previous.timestampMs
-    ) {
-        const deltaSeconds = (
-            timestampMs - previous.timestampMs
-        ) / 1000;
-
-        if (
-            deltaSeconds > 0
-            && deltaSeconds <= 20
-            && Number.isFinite(previous.altitudeMeters)
-            && Number.isFinite(altitudeMeters)
-        ) {
-            verticalRate = (
-                altitudeMeters - previous.altitudeMeters
-            ) / deltaSeconds;
-        }
-
-        if (
-            deltaSeconds > 0
-            && deltaSeconds <= 20
-            && Number.isFinite(previous.headingDegrees)
-            && Number.isFinite(headingDegrees)
-        ) {
-            let deltaHeading = (
-                headingDegrees - previous.headingDegrees
-            );
-            while (deltaHeading > 180) deltaHeading -= 360;
-            while (deltaHeading < -180) deltaHeading += 360;
-            turnRate = deltaHeading / deltaSeconds;
-        }
-    }
-
-    ownPublicationMotionState = {
-        altitudeMeters,
-        headingDegrees,
-        timestampMs
-    };
-
-    return { verticalRate, turnRate };
-}
-
-function buildSafeSkyOwnPublishPayload() {
-    const settings = sanitizeTrafficSettings(trafficSettings);
-
-    if (!settings.publishOwnPosition) {
-        return {
-            payload: null,
-            reason: 'publication désactivée'
-        };
-    }
-
-    if (
-        isSimulationMode
-        || lastPosition?.simulation === true
-    ) {
-        return {
-            payload: null,
-            reason: 'publication interdite en mode simulation'
-        };
-    }
-
-    const latitude = Number(
-        lastPosition?.lat
-        ?? lastPosition?.latitude
-    );
-    const longitude = Number(
-        lastPosition?.lng
-        ?? lastPosition?.longitude
-    );
-    const altitudeFeet = Number(
-        lastPosition?.altitudeFt
-        ?? lastPosition?.altitudeFeet
-    );
-    const gpsTimestampMs = Number(
-        lastPosition?.timestamp
-    );
-    const gpsAgeMs = Number.isFinite(gpsTimestampMs)
-        ? Date.now() - gpsTimestampMs
-        : Infinity;
-
-    if (
-        lastPosition?.stored === true
-        || !Number.isFinite(gpsTimestampMs)
-        || gpsAgeMs < 0
-        || gpsAgeMs > 15000
-    ) {
-        return {
-            payload: null,
-            reason: 'position GPS actuelle indisponible'
-        };
-    }
-
-    if (
-        !Number.isFinite(latitude)
-        || !Number.isFinite(longitude)
-    ) {
-        return {
-            payload: null,
-            reason: 'position GPS indisponible'
-        };
-    }
-
-    if (!Number.isFinite(altitudeFeet)) {
-        return {
-            payload: null,
-            reason: 'altitude GPS indisponible'
-        };
-    }
-
-    if (!settings.publicationCallsign) {
-        return {
-            payload: null,
-            reason: 'indicatif non saisi'
-        };
-    }
-
-    const speedMps = Math.max(
-        0,
-        Number(lastPosition?.speedMps) || 0
-    );
-    const heading = Number(lastPosition?.heading);
-    const course = Number.isFinite(heading)
-        ? ((heading % 360) + 360) % 360
-        : 0;
-    const altitudeMeters = Math.round(
-        altitudeFeet / 3.280839895
-    );
-    const timestampMs = Date.now();
-    const motion = calculateOwnPublicationMotion(
-        altitudeMeters,
-        course,
-        timestampMs
-    );
-
-    const payload = {
-        id: getOrCreateSafeSkyPublishedBeaconId(),
-        call_sign: settings.publicationCallsign,
-        latitude,
-        longitude,
-        altitude: altitudeMeters,
-        course: Math.round(course),
-        ground_speed: Math.round(speedMps),
-        status: speedMps >= 2
-            ? 'AIRBORNE'
-            : 'GROUNDED',
-        beacon_type: settings.publicationBeaconType,
-        last_update: Math.floor(timestampMs / 1000)
-    };
-
-    if (Number.isFinite(motion.verticalRate)) {
-        payload.vertical_rate = Number(
-            motion.verticalRate.toFixed(2)
-        );
-    }
-    if (Number.isFinite(motion.turnRate)) {
-        payload.turn_rate = Number(
-            motion.turnRate.toFixed(2)
-        );
-    }
-
-    return { payload, reason: '' };
-}
-
-
-function isSafeSkyPublicationAccessDenied(error) {
-    const status = Number(error?.status);
-    const message = String(
-        error?.message || error || ''
-    ).toLowerCase();
-
-    return (
-        status === 401
-        || status === 403
-        || message.includes('access denied')
-        || message.includes('accès refusé')
-        || message.includes('forbidden')
-        || message.includes('not authorized')
-        || message.includes('non autorisé')
-    );
-}
-
-function disableSafeSkyPublicationAfterAccessDenied() {
-    stopSafeSkyOwnPublication();
-
-    const current = sanitizeTrafficSettings(
-        trafficSettings
-    );
-    saveTrafficSettings({
-        ...current,
-        publishOwnPosition: false
-    });
-
-    const checkbox = document.getElementById(
-        'traffic-publish-own-input'
-    );
-    if (checkbox) checkbox.checked = false;
-
-    const callsignInput = document.getElementById(
-        'traffic-publication-callsign-input'
-    );
-    const typeInput = document.getElementById(
-        'traffic-publication-type-input'
-    );
-    if (callsignInput) callsignInput.disabled = true;
-    if (typeInput) typeInput.disabled = true;
-}
-
-
+/*
+ * v14.41 TEST — SafeSky est strictement utilisé en lecture.
+ * Ces fonctions restent comme stubs de compatibilité interne, sans requête POST.
+ */
 async function publishOwnSafeSkyPosition() {
-    if (safeSkyOwnPublishInProgress) return false;
-    if (
-        typeof document !== 'undefined'
-        && document.visibilityState === 'hidden'
-    ) {
-        return false;
-    }
-
-    const { payload, reason } =
-        buildSafeSkyOwnPublishPayload();
-
-    if (!payload) {
-        lastSafeSkyOwnPublishError = reason;
-        updateSafeSkyPublicationStatus();
-        return false;
-    }
-
-    safeSkyOwnPublishInProgress = true;
-
-    try {
-        await fetchSafeSkyJson(
-            buildSafeSkyApiEndpoint(''),
-            {
-                method: 'POST',
-                body: payload,
-                timeoutMs: 8000
-            }
-        );
-
-        lastSafeSkyOwnPublishAt = Date.now();
-        lastSafeSkyOwnPublishError = '';
-        updateSafeSkyPublicationStatus();
-        return true;
-    } catch (error) {
-        if (
-            isSafeSkyPublicationAccessDenied(error)
-        ) {
-            lastSafeSkyOwnPublishError =
-                'accès POST refusé par SafeSky. La clé actuelle permet la consultation du trafic mais n’est pas autorisée à publier une position.';
-            disableSafeSkyPublicationAfterAccessDenied();
-            updateSafeSkyPublicationStatus(
-                `Publication désactivée : ${lastSafeSkyOwnPublishError}`,
-                'error'
-            );
-        } else {
-            lastSafeSkyOwnPublishError =
-                error?.message || String(error);
-            updateSafeSkyPublicationStatus();
-        }
-
-        console.warn(
-            'Publication position NPF vers SafeSky impossible:',
-            error
-        );
-        return false;
-    } finally {
-        safeSkyOwnPublishInProgress = false;
-    }
+    stopSafeSkyOwnPublication();
+    return false;
 }
 
 function stopSafeSkyOwnPublication() {
@@ -7711,39 +7580,16 @@ function stopSafeSkyOwnPublication() {
         clearInterval(safeSkyOwnPublishTimer);
         safeSkyOwnPublishTimer = null;
     }
+    safeSkyOwnPublishInProgress = false;
 }
 
 function startSafeSkyOwnPublication() {
     stopSafeSkyOwnPublication();
-
-    const settings = sanitizeTrafficSettings(trafficSettings);
-    if (!settings.publishOwnPosition) return;
-
-    if (
-        typeof document !== 'undefined'
-        && document.visibilityState === 'hidden'
-    ) {
-        return;
-    }
-
-    publishOwnSafeSkyPosition();
-    safeSkyOwnPublishTimer = setInterval(
-        publishOwnSafeSkyPosition,
-        SAFESKY_OWN_PUBLISH_INTERVAL_MS
-    );
 }
 
 function syncSafeSkyOwnPublication() {
-    const settings = sanitizeTrafficSettings(trafficSettings);
-    if (settings.publishOwnPosition) {
-        startSafeSkyOwnPublication();
-    } else {
-        stopSafeSkyOwnPublication();
-        lastSafeSkyOwnPublishError = '';
-        updateSafeSkyPublicationStatus();
-    }
+    stopSafeSkyOwnPublication();
 }
-
 
 function getTrafficRadiusNm() {
     return sanitizeTrafficSettings(trafficSettings).radiusNm;
@@ -10397,7 +10243,6 @@ window.refreshTrafficLayer = refreshTrafficLayer;
 window.testSafeSkyApi = testSafeSkyApi;
 window.searchSafeSkyBeaconExact = searchSafeSkyBeaconExact;
 window.fetchSafeSkyBeaconById = fetchSafeSkyBeaconById;
-window.publishOwnSafeSkyPosition = publishOwnSafeSkyPosition;
 window.getTrackedTrafficIdentifiers = getTrackedTrafficIdentifiers;
 window.testNamedPlacesSearch = async (
     query = 'Blagon 33'
@@ -10422,17 +10267,36 @@ window.testNamedPlacesSearch = async (
     };
 };
 window.getNamedPlacesSearchStatus = () => ({
-    databaseUrl: NAMED_PLACES_OFFLINE_URL,
-    departments: Array.from(
-        NAMED_PLACES_OFFLINE_DEPARTMENTS
-    ),
-    loadedCount:
-        namedPlacesOfflineRecords.length,
+    databaseUrl:
+        NAMED_PLACES_OFFLINE_ARCHIVE_URL,
+    databaseReady:
+        Boolean(namedPlacesOfflineArchive),
+    departments:
+        Array.isArray(
+            namedPlacesOfflineIndex?.departments
+        )
+            ? namedPlacesOfflineIndex.departments
+            : [],
+    departmentCount:
+        Number(
+            namedPlacesOfflineIndex?.department_count
+            || 0
+        ),
+    totalCount:
+        Number(
+            namedPlacesOfflineIndex?.total_count
+            || 0
+        ),
+    loadedShardCount:
+        namedPlacesOfflineShardCache.size,
+    loadedRecordCount:
+        namedPlacesOfflineLoadedCount,
     loadError:
         namedPlacesOfflineLoadError,
     localPhoneticScoringRetained: true,
     onlineFallbackEnabled: false,
-    firstSearchWorksOffline: true
+    firstSearchWorksOffline: true,
+    nationwideOfflineEnabled: true
 });
 
 window.getSafeSkyIntegrationStatus = () => ({
@@ -10456,10 +10320,10 @@ window.getSafeSkyIntegrationStatus = () => ({
         sanitizeTrafficSettings(
             trafficSettings
         ).showDroneAdvisories,
-    ownPositionPublicationEnabled:
-        sanitizeTrafficSettings(
-            trafficSettings
-        ).publishOwnPosition,
+    ownPositionPublicationAvailable: false,
+    ownPositionPublicationEnabled: false,
+    partialCallsignSearchEnabled: true,
+    partialCallsignSearchScope: 'zones NPF actives',
     backgroundPollingDisabled: true
 });
 
