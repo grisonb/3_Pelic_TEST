@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
-// v14.41 TEST — suppression publication SafeSky et recherche partielle active.
+// v14.42 TEST — filtre trafics au sol et zone centrée sur la carte.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.41.zip?appv=v14.41';
+    './data/localites/localites-france-v14.42.zip?appv=v14.42';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -779,8 +779,14 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     relativeAltitudeEnabled: false,
     relativeAltitudeBandFt: 1500,
     groundToAboveBandFt: 1500,
-    trafficAroundOwnPosition: true,
-    trafficAroundFire: true,
+    /*
+     * v14.42 TEST — la zone trafic est toujours centrée sur la carte.
+     * Les deux anciennes options GPS / feu restent neutralisées pour assurer
+     * la migration des réglages déjà stockés.
+     */
+    trafficAroundOwnPosition: false,
+    trafficAroundFire: false,
+    showGroundTraffic: false,
     showDroneAdvisories: false,
     onlyTrackedIdentifiers: false,
     publishOwnPosition: false,
@@ -1931,11 +1937,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.41'
+                        !== 'v14.42'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.41'
+                        'v14.42'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6175,13 +6181,16 @@ function sanitizeTrafficSettings(candidate = {}) {
         )
     );
 
-    const trafficAroundOwnPosition = asBool(
-        candidate.trafficAroundOwnPosition,
-        fallback.trafficAroundOwnPosition
-    );
-    const trafficAroundFire = asBool(
-        candidate.trafficAroundFire,
-        fallback.trafficAroundFire
+    /*
+     * v14.42 TEST — suppression des modes « autour de ma position » et
+     * « autour du feu ». Le trafic est toujours demandé autour du centre
+     * courant de la carte, quelle que soit une ancienne valeur mémorisée.
+     */
+    const trafficAroundOwnPosition = false;
+    const trafficAroundFire = false;
+    const showGroundTraffic = asBool(
+        candidate.showGroundTraffic,
+        fallback.showGroundTraffic
     );
 
     const showDroneAdvisories = asBool(
@@ -6215,6 +6224,7 @@ function sanitizeTrafficSettings(candidate = {}) {
         groundToAboveBandFt,
         trafficAroundOwnPosition,
         trafficAroundFire,
+        showGroundTraffic,
         showDroneAdvisories,
         onlyTrackedIdentifiers,
         publishOwnPosition,
@@ -6480,13 +6490,10 @@ function getTrafficSettingsSummary() {
         altitudeFilterLabel = `du sol à +${settings.groundToAboveBandFt} ft au-dessus de moi`;
     }
 
-    const referenceLabels = [];
-    if (settings.trafficAroundOwnPosition) referenceLabels.push('GPS');
-    if (settings.trafficAroundFire) referenceLabels.push('feu');
-
-    const referenceLabel = referenceLabels.length
-        ? referenceLabels.join(' + ')
-        : 'tous les trafics — centre carte';
+    const referenceLabel = 'centre carte';
+    const groundLabel = settings.showGroundTraffic
+        ? 'trafics au sol ON'
+        : 'trafics au sol OFF';
 
     const trackedCount = getTrackedTrafficIdentifiers().length;
     const trackedLabel = settings.onlyTrackedIdentifiers
@@ -6496,7 +6503,7 @@ function getTrafficSettingsSummary() {
         ? 'zones drone ON'
         : 'zones drone OFF';
 
-    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${trackedLabel} · ${advisoryLabel}`;
+    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${groundLabel} · ${trackedLabel} · ${advisoryLabel}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -6559,15 +6566,8 @@ function ensureTrafficSettingsModal() {
 
                 <label class="traffic-settings-field traffic-settings-checkbox-field">
                     <div class="traffic-settings-check-row">
-                        <input id="traffic-around-own-input" type="checkbox">
-                        <em>Trafic autour de ma position</em>
-                    </div>
-                </label>
-
-                <label class="traffic-settings-field traffic-settings-checkbox-field">
-                    <div class="traffic-settings-check-row">
-                        <input id="traffic-around-fire-input" type="checkbox">
-                        <em>Trafic autour du feu</em>
+                        <input id="traffic-show-ground-input" type="checkbox">
+                        <em>Afficher les trafics au sol</em>
                     </div>
                 </label>
 
@@ -6611,7 +6611,7 @@ function ensureTrafficSettingsModal() {
                 </div>
                 <div class="traffic-tools-note">
                     Un indicatif complet est recherché directement dans SafeSky.
-                    Une partie comme MILAN affiche les trafics actifs correspondants dans les zones surveillées par NPF.
+                    Une partie comme MILAN affiche les trafics actifs correspondants autour du centre de la carte.
                 </div>
                 <div id="traffic-search-results" class="traffic-search-results"></div>
             </div>
@@ -6629,7 +6629,7 @@ function ensureTrafficSettingsModal() {
             </div>
 
 
-            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse. Si « Trafic autour de ma position » et « Trafic autour du feu » sont décochés, tous les trafics reçus dans le rayon choisi autour du centre de la carte sont affichés. Rafraîchissement toutes les 5 secondes. Le déplacement intermédiaire est extrapolé localement. Les données SafeSky/ADS-B restent indicatives et non certifiées.</div>
+            <div class="traffic-settings-note">Altitude maxi vide = pas de limite haute. « Autour de mon altitude » affiche une tranche ±. « Du sol à + » ne fixe aucune limite basse. Les trafics sont recherchés dans le rayon choisi autour du centre de la carte. Les trafics au sol sont masqués par défaut et apparaissent uniquement lorsque « Afficher les trafics au sol » est coché. Rafraîchissement toutes les 5 secondes. Le déplacement intermédiaire est extrapolé localement. Les données SafeSky/ADS-B restent indicatives et non certifiées.</div>
 
             <div class="traffic-settings-actions">
                 <button type="button" id="traffic-settings-reset" class="traffic-settings-secondary">Défaut</button>
@@ -6693,8 +6693,7 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-radius-input').value = String(defaults.radiusNm);
         modal.querySelector('#traffic-min-altitude-input').value = String(defaults.minAltitudeFt);
         modal.querySelector('#traffic-max-altitude-input').value = '';
-        modal.querySelector('#traffic-around-own-input').checked = !!defaults.trafficAroundOwnPosition;
-        modal.querySelector('#traffic-around-fire-input').checked = !!defaults.trafficAroundFire;
+        modal.querySelector('#traffic-show-ground-input').checked = !!defaults.showGroundTraffic;
         modal.querySelector(`#traffic-altitude-mode-${defaults.altitudeFilterMode}`).checked = true;
         modal.querySelector('#traffic-relative-band-input').value = String(defaults.relativeAltitudeBandFt);
         modal.querySelector('#traffic-ground-band-input').value = String(defaults.groundToAboveBandFt);
@@ -6732,8 +6731,7 @@ function ensureTrafficSettingsModal() {
         const radiusInput = modal.querySelector('#traffic-radius-input');
         const minAltitudeInput = modal.querySelector('#traffic-min-altitude-input');
         const maxAltitudeInput = modal.querySelector('#traffic-max-altitude-input');
-        const aroundOwnInput = modal.querySelector('#traffic-around-own-input');
-        const aroundFireInput = modal.querySelector('#traffic-around-fire-input');
+        const showGroundInput = modal.querySelector('#traffic-show-ground-input');
         const altitudeModeInput = modal.querySelector('input[name="traffic-altitude-mode"]:checked');
         const relativeBandInput = modal.querySelector('#traffic-relative-band-input');
         const groundBandInput = modal.querySelector('#traffic-ground-band-input');
@@ -6744,8 +6742,9 @@ function ensureTrafficSettingsModal() {
             radiusNm: radiusInput.value,
             minAltitudeFt: minAltitudeInput.value,
             maxAltitudeFt: maxAltitudeInput.value.trim() === '' ? null : maxAltitudeInput.value,
-            trafficAroundOwnPosition: !!aroundOwnInput.checked,
-            trafficAroundFire: !!aroundFireInput.checked,
+            trafficAroundOwnPosition: false,
+            trafficAroundFire: false,
+            showGroundTraffic: !!showGroundInput.checked,
             altitudeFilterMode: altitudeModeInput?.value || 'absolute',
             relativeAltitudeBandFt: relativeBandInput.value,
             groundToAboveBandFt: groundBandInput.value,
@@ -6775,8 +6774,7 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-radius-input').value = String(current.radiusNm);
     modal.querySelector('#traffic-min-altitude-input').value = String(current.minAltitudeFt);
     modal.querySelector('#traffic-max-altitude-input').value = current.maxAltitudeFt === null ? '' : String(current.maxAltitudeFt);
-    modal.querySelector('#traffic-around-own-input').checked = !!current.trafficAroundOwnPosition;
-    modal.querySelector('#traffic-around-fire-input').checked = !!current.trafficAroundFire;
+    modal.querySelector('#traffic-show-ground-input').checked = !!current.showGroundTraffic;
     modal.querySelector(`#traffic-altitude-mode-${current.altitudeFilterMode}`).checked = true;
     modal.querySelector('#traffic-relative-band-input').value = String(current.relativeAltitudeBandFt);
     modal.querySelector('#traffic-ground-band-input').value = String(current.groundToAboveBandFt);
@@ -7173,10 +7171,11 @@ function getLocalTrafficSearchResults(query) {
         ...getTemporaryGlobalTrafficRaw()
     ];
 
+    const settings = sanitizeTrafficSettings(trafficSettings);
     return filterTrafficSearchCandidates(
         candidates,
         query,
-        { airborneOnly: true, limit: 50 }
+        { airborneOnly: !settings.showGroundTraffic, limit: 50 }
     );
 }
 
@@ -7222,7 +7221,7 @@ async function fetchActiveSafeSkyTrafficForPartialSearch() {
         return {
             candidates: [],
             pointCount: 0,
-            errors: ['aucune position, aucun feu et aucun centre carte disponible']
+            errors: ['centre de carte indisponible']
         };
     }
 
@@ -7236,9 +7235,13 @@ async function fetchActiveSafeSkyTrafficForPartialSearch() {
             /*
              * Recherche par partie : ne pas appliquer le filtre d’altitude ni
              * la liste suivie. L’objectif est de retrouver tous les indicatifs
-             * actifs dans les zones NPF, sans modifier le calque affiché.
+             * actifs autour du centre de la carte, sans modifier le calque affiché.
              */
-            url.searchParams.set('show_grounded', 'false');
+            const settings = sanitizeTrafficSettings(trafficSettings);
+            url.searchParams.set(
+                'show_grounded',
+                settings.showGroundTraffic ? 'true' : 'false'
+            );
             const data = await fetchSafeSkyJson(url);
             return extractTrafficAircraftList(data);
         })
@@ -7416,14 +7419,21 @@ async function performTrafficSearchFromModal(modal) {
                 || String(activeOutcome.reason || 'erreur SafeSky')
             ]
         };
+    const settings = sanitizeTrafficSettings(trafficSettings);
+    const airborneOnly = !settings.showGroundTraffic;
+    const exactFilteredResults = filterTrafficSearchCandidates(
+        exactResults,
+        query,
+        { airborneOnly, limit: 50 }
+    );
     const partialResults = filterTrafficSearchCandidates(
         activeSearch.candidates,
         query,
-        { airborneOnly: true, limit: 50 }
+        { airborneOnly, limit: 50 }
     );
 
     const results = mergeTrafficSearchResults(
-        exactResults,
+        exactFilteredResults,
         partialResults,
         localResults
     ).slice(0, 50);
@@ -7434,12 +7444,12 @@ async function performTrafficSearchFromModal(modal) {
             ? ` — ${activeSearch.errors.join(' / ')}`
             : '';
         message = (
-            `Aucun trafic actif contenant « ${query} » dans les zones NPF`
+            `Aucun trafic actif contenant « ${query} » autour du centre de la carte`
             + detail
         );
     } else {
         const zoneLabel = activeSearch.pointCount
-            ? ` dans ${activeSearch.pointCount} zone${activeSearch.pointCount > 1 ? 's' : ''} NPF`
+            ? ` dans ${activeSearch.pointCount} zone carte`
             : '';
         message = (
             `${results.length} correspondance${results.length > 1 ? 's' : ''}`
@@ -7632,86 +7642,38 @@ function getFireTrafficPoint() {
 }
 
 function getTrafficQueryPoints() {
-    const settings = sanitizeTrafficSettings(trafficSettings);
-    const points = [];
-    const showAllTraffic = (
-        !settings.trafficAroundOwnPosition
-        && !settings.trafficAroundFire
-    );
-
-    if (showAllTraffic && map && typeof map.getCenter === 'function') {
-        const center = map.getCenter();
-        if (center && Number.isFinite(center.lat) && Number.isFinite(center.lng)) {
-            points.push({
-                lat: center.lat,
-                lon: center.lng,
-                label: 'tous trafics — centre carte',
-                kind: 'all'
-            });
-        }
-    }
-
-    if (settings.trafficAroundOwnPosition) {
-        const ownPoint = getOwnTrafficPoint();
-        if (ownPoint) points.push(ownPoint);
-    }
-
-    if (settings.trafficAroundFire) {
-        const firePoint = getFireTrafficPoint();
-        if (firePoint) points.push(firePoint);
-    }
-
     /*
-     * Secours uniquement si le centre de carte n'est pas encore disponible.
-     * Le mode reste « tous les trafics » : aucun filtre de distance
-     * supplémentaire ne sera appliqué au rendu.
+     * v14.42 TEST — les anciennes zones GPS et feu sont supprimées.
+     * Le rayon SafeSky est toujours appliqué autour du centre actuel de la
+     * carte, ce qui rend le comportement unique et prévisible.
      */
-    if (!points.length) {
-        const ownPoint = getOwnTrafficPoint();
-        if (ownPoint) {
-            points.push({
-                ...ownPoint,
-                label: showAllTraffic ? 'tous trafics' : ownPoint.label,
-                kind: showAllTraffic ? 'all' : ownPoint.kind
-            });
+    try {
+        const center = map?.getCenter?.();
+        if (
+            center
+            && Number.isFinite(Number(center.lat))
+            && Number.isFinite(Number(center.lng))
+        ) {
+            return [{
+                lat: Number(center.lat),
+                lon: Number(center.lng),
+                label: 'centre carte',
+                kind: 'all'
+            }];
         }
+    } catch (_) {}
+
+    /* Secours de démarrage si Leaflet n'a pas encore fourni son centre. */
+    const ownPoint = getOwnTrafficPoint();
+    if (ownPoint) {
+        return [{
+            ...ownPoint,
+            label: 'centre carte',
+            kind: 'all'
+        }];
     }
 
-    if (!points.length) {
-        const firePoint = getFireTrafficPoint();
-        if (firePoint) {
-            points.push({
-                ...firePoint,
-                label: showAllTraffic ? 'tous trafics' : firePoint.label,
-                kind: showAllTraffic ? 'all' : firePoint.kind
-            });
-        }
-    }
-
-    const unique = [];
-    const keys = new Set();
-    points.forEach(point => {
-        const key = `${point.kind}:${Number(point.lat).toFixed(4)}:${Number(point.lon).toFixed(4)}`;
-        if (keys.has(key)) return;
-        keys.add(key);
-        unique.push(point);
-    });
-
-    return unique;
-}
-
-function getOwnTrafficAltitudeFeet() {
-    const candidates = [
-        lastPosition?.altitudeFt,
-        lastPosition?.altitudeFeet
-    ];
-
-    for (const candidate of candidates) {
-        const num = Number(candidate);
-        if (Number.isFinite(num)) return Math.round(num);
-    }
-
-    return null;
+    return [];
 }
 
 function getNearestTrafficReference(ac, points = []) {
@@ -7867,14 +7829,17 @@ function buildTrafficApiUrl(point, provider = null) {
         const url = new URL(activeProvider.baseUrl, window.location.href);
 
         url.searchParams.set('viewport', viewport);
-        url.searchParams.set('show_grounded', 'true');
+        const settings = sanitizeTrafficSettings(trafficSettings);
+        url.searchParams.set(
+            'show_grounded',
+            settings.showGroundTraffic ? 'true' : 'false'
+        );
 
         const altitudeParameters = getSafeSkyAltitudeQueryParameters();
         Object.entries(altitudeParameters).forEach(([key, value]) => {
             url.searchParams.set(key, value);
         });
 
-        const settings = sanitizeTrafficSettings(trafficSettings);
         if (settings.onlyTrackedIdentifiers) {
             const identifiers = getTrackedTrafficIdentifiers()
                 .map(entry => entry.id)
@@ -9631,10 +9596,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     const points = Array.isArray(meta.points) && meta.points.length
         ? meta.points
         : (meta.point ? [meta.point] : []);
-    const showAllTraffic = (
-        !settings.trafficAroundOwnPosition
-        && !settings.trafficAroundFire
-    );
+    const showAllTraffic = true;
     const ownAltitudeFt = getOwnTrafficAltitudeFeet();
 
     const useAroundAltitude = (
@@ -9662,6 +9624,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     aircraftList
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
+        .filter(ac => settings.showGroundTraffic || !ac.isGrounded)
         .filter(ac => (
             ac.forceDisplay
             || !Number.isFinite(ac.seenPos)
@@ -22866,3 +22829,6 @@ document.addEventListener('visibilitychange', () => {
 
 
 // v13.89 TEST — corrections d'affichage RLT/Suivi et alerte post-MAJ gérées par index.html/style.css.
+
+
+// v14.42 TEST — filtres trafic : centre carte unique et affichage au sol optionnel.
