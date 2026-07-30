@@ -553,6 +553,23 @@ document.addEventListener('DOMContentLoaded', () => {
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
+
+/*
+ * v14.38 — recherche complémentaire de villages, hameaux et lieux nommés.
+ * Le moteur local communes/alias reste prioritaire. L'API Géoplateforme
+ * intervient uniquement en complément, après la temporisation de saisie.
+ */
+const NAMED_PLACES_GEOCODING_URL =
+    'https://data.geopf.fr/geocodage/search';
+const NAMED_PLACES_CACHE_KEY =
+    'npfNamedPlacesSearchCacheV1';
+const NAMED_PLACES_CACHE_TTL_MS =
+    30 * 24 * 60 * 60 * 1000;
+const NAMED_PLACES_CACHE_MAX_ENTRIES = 120;
+const NAMED_PLACES_FETCH_TIMEOUT_MS = 6500;
+
+let namedPlacesSearchSequence = 0;
+let namedPlacesSearchAbortController = null;
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
 const MAGNETIC_DECLINATION = 1.0;
 let userMarker = null, watchId = null, accuracyCircle = null, headingLayer = null, lastPosition = null;
@@ -1175,6 +1192,48 @@ function normalizeHistoryCommune(commune) {
     const lat = Number(commune.latitude_mairie);
     const lon = Number(commune.longitude_mairie);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+    /*
+     * v14.38 — une localité sélectionnée doit rester la localité exacte.
+     * Le polygone communal sert uniquement au rattachement administratif et
+     * ne doit pas remplacer « Blagon » par « Lanton » dans le feu actif.
+     */
+    if (commune.locality_match) {
+        const localityName = String(
+            commune.nom_standard
+            || commune.name
+            || 'Lieu nommé'
+        ).trim();
+
+        if (!localityName) return null;
+
+        return {
+            nom_standard: localityName,
+            dep_code:
+                commune.dep_code || null,
+            dep_nom:
+                commune.dep_nom || null,
+            code_insee:
+                commune.code_insee || null,
+            latitude_mairie: lat,
+            longitude_mairie: lon,
+            locality_match: true,
+            locality_commune_name: String(
+                commune.locality_commune_name
+                || ''
+            ).trim(),
+            locality_type: String(
+                commune.locality_type
+                || 'lieu nommé'
+            ).trim(),
+            locality_source: String(
+                commune.locality_source
+                || ''
+            ).trim(),
+            savedAt:
+                commune.savedAt || Date.now()
+        };
+    }
 
     const polygonCommune = findCommuneContainingPoint(lat, lon);
     const polygonDatabaseCommune = polygonCommune ? (getCommuneFromDatabaseByNameAndDepartment(polygonCommune) || polygonCommune) : null;
@@ -2209,6 +2268,776 @@ function searchAliasCommunes(searchWords, departmentFilter = null) {
         .sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length)
         .slice(0, 10);
 }
+
+
+function parseSearchDepartmentFilter(rawSearch) {
+    const value = String(rawSearch || '');
+    const match = value.match(
+        /\s(\d{1,3}|2A|2B)$/i
+    );
+
+    if (!match) {
+        return {
+            departmentFilter: null,
+            searchTerm: value.trim()
+        };
+    }
+
+    return {
+        departmentFilter:
+            match[1].length === 1
+                ? `0${match[1]}`
+                : match[1].toUpperCase(),
+        searchTerm: value
+            .substring(0, match.index)
+            .trim()
+    };
+}
+
+function normalizeDepartmentCode(value) {
+    const raw = String(value || '')
+        .trim()
+        .toUpperCase();
+
+    if (!raw) return null;
+    if (raw === '2A' || raw === '2B') return raw;
+
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return null;
+
+    if (digits.startsWith('97') || digits.startsWith('98')) {
+        return digits.slice(0, 3);
+    }
+
+    return digits.slice(0, 2).padStart(2, '0');
+}
+
+function deriveNamedPlaceDepartmentCode(properties) {
+    const context = String(
+        properties?.context || ''
+    ).trim();
+    const contextCode = context.match(
+        /^(\d{2,3}|2A|2B)\b/i
+    )?.[1];
+
+    return (
+        normalizeDepartmentCode(contextCode)
+        || normalizeDepartmentCode(
+            properties?.postcode
+            || properties?.postalcode
+        )
+        || normalizeDepartmentCode(
+            properties?.citycode
+            || properties?.municipalitycode
+        )
+    );
+}
+
+function deriveNamedPlaceDepartmentName(properties) {
+    const contextParts = String(
+        properties?.context || ''
+    )
+        .split(',')
+        .map(part => part.trim())
+        .filter(Boolean);
+
+    if (contextParts.length >= 2) {
+        return contextParts[1];
+    }
+
+    return String(
+        properties?.department
+        || properties?.department_name
+        || ''
+    ).trim();
+}
+
+function loadNamedPlacesSearchCache() {
+    try {
+        const parsed = JSON.parse(
+            localStorage.getItem(
+                NAMED_PLACES_CACHE_KEY
+            ) || '{}'
+        );
+        return (
+            parsed
+            && typeof parsed === 'object'
+            && !Array.isArray(parsed)
+        ) ? parsed : {};
+    } catch (_) {
+        return {};
+    }
+}
+
+function saveNamedPlacesSearchCache(cache) {
+    try {
+        const entries = Object.entries(
+            cache && typeof cache === 'object'
+                ? cache
+                : {}
+        )
+            .sort(
+                (a, b) =>
+                    Number(b[1]?.savedAt || 0)
+                    - Number(a[1]?.savedAt || 0)
+            )
+            .slice(
+                0,
+                NAMED_PLACES_CACHE_MAX_ENTRIES
+            );
+
+        localStorage.setItem(
+            NAMED_PLACES_CACHE_KEY,
+            JSON.stringify(
+                Object.fromEntries(entries)
+            )
+        );
+    } catch (_) {}
+}
+
+function buildNamedPlacesCacheKey(
+    searchTerm,
+    departmentFilter
+) {
+    return [
+        simplifyString(searchTerm)
+            .replace(/\s+/g, ' ')
+            .trim(),
+        departmentFilter || ''
+    ].join('|');
+}
+
+function readNamedPlacesSearchCache(
+    searchTerm,
+    departmentFilter
+) {
+    const cache = loadNamedPlacesSearchCache();
+    const key = buildNamedPlacesCacheKey(
+        searchTerm,
+        departmentFilter
+    );
+    const entry = cache[key];
+
+    if (
+        !entry
+        || !Array.isArray(entry.results)
+        || (
+            Date.now()
+            - Number(entry.savedAt || 0)
+        ) > NAMED_PLACES_CACHE_TTL_MS
+    ) {
+        return null;
+    }
+
+    return entry.results;
+}
+
+function writeNamedPlacesSearchCache(
+    searchTerm,
+    departmentFilter,
+    results
+) {
+    const cache = loadNamedPlacesSearchCache();
+    const key = buildNamedPlacesCacheKey(
+        searchTerm,
+        departmentFilter
+    );
+
+    cache[key] = {
+        savedAt: Date.now(),
+        results: Array.isArray(results)
+            ? results.slice(0, 20)
+            : []
+    };
+
+    saveNamedPlacesSearchCache(cache);
+}
+
+function getNamedPlaceFeatureCollection(payload) {
+    if (Array.isArray(payload?.features)) {
+        return payload.features;
+    }
+    if (Array.isArray(payload?.results)) {
+        return payload.results;
+    }
+    if (Array.isArray(payload)) {
+        return payload;
+    }
+    return [];
+}
+
+function getNamedPlaceCoordinates(feature) {
+    const coordinates = (
+        feature?.geometry?.coordinates
+        || feature?.coordinates
+        || null
+    );
+
+    if (
+        Array.isArray(coordinates)
+        && coordinates.length >= 2
+    ) {
+        const lon = Number(coordinates[0]);
+        const lat = Number(coordinates[1]);
+
+        if (
+            Number.isFinite(lat)
+            && Number.isFinite(lon)
+        ) {
+            return { lat, lon };
+        }
+    }
+
+    const properties = feature?.properties || feature;
+    const lat = Number(
+        properties?.lat
+        ?? properties?.latitude
+        ?? properties?.y
+    );
+    const lon = Number(
+        properties?.lon
+        ?? properties?.lng
+        ?? properties?.longitude
+        ?? properties?.x
+    );
+
+    return (
+        Number.isFinite(lat)
+        && Number.isFinite(lon)
+    ) ? { lat, lon } : null;
+}
+
+function cleanNamedPlaceDisplayName(
+    properties,
+    municipalityName
+) {
+    let name = String(
+        properties?.name
+        || properties?.toponym
+        || properties?.nom
+        || ''
+    ).trim();
+
+    if (!name) {
+        name = String(
+            properties?.label
+            || properties?.display_name
+            || ''
+        )
+            .split(',')[0]
+            .trim();
+    }
+
+    if (
+        municipalityName
+        && simplifyString(name)
+            === simplifyString(municipalityName)
+    ) {
+        return '';
+    }
+
+    return name;
+}
+
+function isAcceptableNamedPlaceFeature(
+    properties,
+    name
+) {
+    const type = String(
+        properties?.type
+        || properties?._type
+        || properties?.category
+        || ''
+    )
+        .trim()
+        .toLowerCase();
+
+    if (!name) return false;
+    if (/^\d+\b/.test(name)) return false;
+
+    if (
+        type.includes('housenumber')
+        || type === 'address'
+        || type === 'parcel'
+        || type === 'cadastral'
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+function buildNamedPlaceSearchCandidate(
+    feature,
+    searchWords,
+    departmentFilter
+) {
+    const properties = feature?.properties || feature || {};
+    const coordinates =
+        getNamedPlaceCoordinates(feature);
+
+    if (!coordinates) return null;
+
+    const municipalityName = String(
+        properties?.city
+        || properties?.municipality
+        || properties?.commune
+        || properties?.city_name
+        || ''
+    ).trim();
+
+    const name = cleanNamedPlaceDisplayName(
+        properties,
+        municipalityName
+    );
+
+    if (
+        !isAcceptableNamedPlaceFeature(
+            properties,
+            name
+        )
+    ) {
+        return null;
+    }
+
+    const depCode =
+        deriveNamedPlaceDepartmentCode(
+            properties
+        );
+
+    if (
+        departmentFilter
+        && depCode !== departmentFilter
+    ) {
+        return null;
+    }
+
+    const normalizedName =
+        simplifyString(name);
+    const searchParts = normalizedName
+        .split(' ')
+        .filter(Boolean);
+    const sourceScore = Number(
+        properties?.score
+        ?? properties?.importance
+    );
+
+    const candidate = {
+        nom_standard: name,
+        nom_sans_pronom: name,
+        nom_sans_accent:
+            normalizedName.replace(/\s+/g, '-'),
+        normalized_name: normalizedName,
+        search_parts: searchParts,
+        search_compact: searchParts.join(''),
+        soundex_parts:
+            searchParts.map(part => soundex(part)),
+        latitude_mairie: coordinates.lat,
+        longitude_mairie: coordinates.lon,
+        dep_code: depCode,
+        dep_nom:
+            deriveNamedPlaceDepartmentName(
+                properties
+            ),
+        code_insee: String(
+            properties?.citycode
+            || properties?.municipalitycode
+            || ''
+        ).trim(),
+        locality_match: true,
+        locality_commune_name:
+            municipalityName,
+        locality_type: String(
+            properties?.type
+            || properties?._type
+            || properties?.category
+            || 'lieu nommé'
+        ).trim(),
+        locality_source:
+            'Géoplateforme — BAN / BD TOPO',
+        locality_api_label: String(
+            properties?.label
+            || properties?.display_name
+            || ''
+        ).trim(),
+        locality_api_score:
+            Number.isFinite(sourceScore)
+                ? sourceScore
+                : null
+    };
+
+    let phoneticScore =
+        scoreCommuneSearchCandidate(
+            candidate,
+            searchWords
+        );
+
+    /*
+     * Le géocodeur peut retourner une correspondance pertinente avec une
+     * graphie légèrement différente. Elle reste admise mais classée après les
+     * correspondances validées par le moteur phonétique NPF.
+     */
+    if (phoneticScore >= 999) {
+        const queryCompact =
+            searchWords.join('');
+        const candidateCompact =
+            candidate.search_compact;
+
+        if (
+            queryCompact.length >= 3
+            && (
+                candidateCompact.includes(
+                    queryCompact
+                )
+                || queryCompact.includes(
+                    candidateCompact
+                )
+            )
+        ) {
+            phoneticScore = 3;
+        } else {
+            phoneticScore = 8;
+        }
+    }
+
+    const apiPenalty =
+        candidate.locality_api_score !== null
+            ? Math.max(
+                0,
+                1 - candidate.locality_api_score
+            )
+            : 0.5;
+
+    candidate.score =
+        phoneticScore
+        + 0.35
+        + apiPenalty;
+
+    return candidate;
+}
+
+function parseNamedPlaceSearchPayload(
+    payload,
+    searchWords,
+    departmentFilter
+) {
+    const results = [];
+    const seen = new Set();
+
+    getNamedPlaceFeatureCollection(payload)
+        .forEach(feature => {
+            const candidate =
+                buildNamedPlaceSearchCandidate(
+                    feature,
+                    searchWords,
+                    departmentFilter
+                );
+
+            if (!candidate) return;
+
+            const key = [
+                simplifyString(
+                    candidate.nom_standard
+                ),
+                candidate.code_insee || '',
+                Number(
+                    candidate.latitude_mairie
+                ).toFixed(5),
+                Number(
+                    candidate.longitude_mairie
+                ).toFixed(5)
+            ].join('|');
+
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push(candidate);
+        });
+
+    return results
+        .sort(
+            (a, b) =>
+                a.score - b.score
+                || a.nom_standard.length
+                    - b.nom_standard.length
+        )
+        .slice(0, 20);
+}
+
+async function fetchNamedPlacesSearch(
+    searchTerm,
+    departmentFilter,
+    searchWords,
+    signal
+) {
+    const cached =
+        readNamedPlacesSearchCache(
+            searchTerm,
+            departmentFilter
+        );
+
+    if (cached) {
+        return {
+            results: cached,
+            fromCache: true
+        };
+    }
+
+    if (
+        !navigator.onLine
+        || typeof fetch !== 'function'
+    ) {
+        return {
+            results: [],
+            fromCache: false,
+            offline: true
+        };
+    }
+
+    const controller = new AbortController();
+    const abortExternal = () => controller.abort();
+
+    if (signal) {
+        if (signal.aborted) {
+            controller.abort();
+        } else {
+            signal.addEventListener(
+                'abort',
+                abortExternal,
+                { once: true }
+            );
+        }
+    }
+
+    const timeoutId = setTimeout(
+        () => controller.abort(),
+        NAMED_PLACES_FETCH_TIMEOUT_MS
+    );
+
+    try {
+        const url = new URL(
+            NAMED_PLACES_GEOCODING_URL
+        );
+        const query = [
+            searchTerm,
+            departmentFilter || ''
+        ].filter(Boolean).join(' ');
+
+        url.searchParams.set('q', query);
+        url.searchParams.set('limit', '20');
+        url.searchParams.set(
+            'autocomplete',
+            'true'
+        );
+
+        const response = await fetch(
+            url.toString(),
+            {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-store',
+                credentials: 'omit',
+                signal: controller.signal,
+                headers: {
+                    'Accept':
+                        'application/geo+json, application/json'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}`
+            );
+        }
+
+        const payload = await response.json();
+        const results =
+            parseNamedPlaceSearchPayload(
+                payload,
+                searchWords,
+                departmentFilter
+            );
+
+        writeNamedPlacesSearchCache(
+            searchTerm,
+            departmentFilter,
+            results
+        );
+
+        return {
+            results,
+            fromCache: false
+        };
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            return {
+                results: [],
+                aborted: true,
+                fromCache: false
+            };
+        }
+
+        console.warn(
+            'Recherche de lieux nommés indisponible:',
+            error
+        );
+
+        return {
+            results: [],
+            error:
+                error?.message || String(error),
+            fromCache: false
+        };
+    } finally {
+        clearTimeout(timeoutId);
+
+        if (signal) {
+            try {
+                signal.removeEventListener(
+                    'abort',
+                    abortExternal
+                );
+            } catch (_) {}
+        }
+    }
+}
+
+function mergeCommuneAndNamedPlaceResults(
+    communeResults,
+    namedPlaceResults
+) {
+    const merged = [];
+    const seen = new Set();
+
+    const addCandidate = candidate => {
+        if (!candidate) return;
+
+        const coordinatesKey = (
+            Number.isFinite(
+                Number(candidate.latitude_mairie)
+            )
+            && Number.isFinite(
+                Number(candidate.longitude_mairie)
+            )
+        )
+            ? `${Number(
+                candidate.latitude_mairie
+            ).toFixed(4)}:${Number(
+                candidate.longitude_mairie
+            ).toFixed(4)}`
+            : '';
+
+        const key = [
+            candidate.locality_match
+                ? 'locality'
+                : 'commune',
+            simplifyString(
+                candidate.nom_standard || ''
+            ),
+            candidate.code_insee || '',
+            coordinatesKey
+        ].join('|');
+
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(candidate);
+    };
+
+    (Array.isArray(communeResults)
+        ? communeResults
+        : []
+    ).forEach(addCandidate);
+
+    (Array.isArray(namedPlaceResults)
+        ? namedPlaceResults
+        : []
+    ).forEach(addCandidate);
+
+    return merged
+        .sort(
+            (a, b) =>
+                Number(a.score || 0)
+                    - Number(b.score || 0)
+                || (
+                    a.locality_match
+                        ? 1
+                        : 0
+                ) - (
+                    b.locality_match
+                        ? 1
+                        : 0
+                )
+                || String(
+                    a.nom_standard || ''
+                ).length
+                    - String(
+                        b.nom_standard || ''
+                    ).length
+        )
+        .slice(0, 10);
+}
+
+async function enrichCommuneSearchWithNamedPlaces({
+    rawSearch,
+    searchTerm,
+    departmentFilter,
+    searchWords,
+    localResults,
+    expectedSequence
+}) {
+    if (
+        simplifyString(searchTerm).length < 3
+        || !Array.isArray(searchWords)
+        || !searchWords.length
+    ) {
+        return;
+    }
+
+    if (namedPlacesSearchAbortController) {
+        namedPlacesSearchAbortController.abort();
+    }
+
+    const controller =
+        new AbortController();
+    namedPlacesSearchAbortController =
+        controller;
+
+    const remote = await fetchNamedPlacesSearch(
+        searchTerm,
+        departmentFilter,
+        searchWords,
+        controller.signal
+    );
+
+    if (
+        remote.aborted
+        || expectedSequence
+            !== namedPlacesSearchSequence
+    ) {
+        return;
+    }
+
+    const currentInput =
+        document.getElementById(
+            'search-input'
+        );
+    if (
+        !currentInput
+        || String(currentInput.value || '')
+            !== String(rawSearch || '')
+    ) {
+        return;
+    }
+
+    const merged =
+        mergeCommuneAndNamedPlaceResults(
+            localResults,
+            remote.results
+        );
+
+    displayResults(merged);
+}
+
 
 
 
@@ -3265,16 +4094,21 @@ function setupEventListeners() {
         selectedPelicanOACI = null;
         const rawSearch = searchInput.value;
         clearSearchBtn.style.display = rawSearch.length > 0 ? 'block' : 'none';
-        let departmentFilter = null;
-        let searchTerm = rawSearch;
-        const depRegex = /\s(\d{1,3}|2A|2B)$/i;
-        const match = rawSearch.match(depRegex);
-        if (match) {
-            departmentFilter = match[1].length === 1 ? '0' + match[1] : match[1].toUpperCase();
-            searchTerm = rawSearch.substring(0, match.index).trim();
-        }
+
+        const {
+            departmentFilter,
+            searchTerm
+        } = parseSearchDepartmentFilter(
+            rawSearch
+        );
         const simplifiedSearch = simplifyString(searchTerm);
         if (simplifiedSearch.length < 2) {
+            namedPlacesSearchSequence += 1;
+            if (namedPlacesSearchAbortController) {
+                namedPlacesSearchAbortController.abort();
+                namedPlacesSearchAbortController = null;
+            }
+
             if (rawSearch.trim().length === 0) {
                 displayFireHistory();
             } else {
@@ -3304,7 +4138,26 @@ function setupEventListeners() {
         });
 
         scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
-        displayResults(scoredResults.slice(0, 10));
+
+        const localResults =
+            scoredResults.slice(0, 10);
+        displayResults(localResults);
+
+        const sequence =
+            ++namedPlacesSearchSequence;
+
+        /*
+         * Le résultat local est affiché immédiatement. Le complément officiel
+         * arrive ensuite sans bloquer le clavier ni le calcul phonétique local.
+         */
+        enrichCommuneSearchWithNamedPlaces({
+            rawSearch,
+            searchTerm,
+            departmentFilter,
+            searchWords,
+            localResults,
+            expectedSequence: sequence
+        });
     };
 
     searchInput.addEventListener('input', keepKeyboardAfterSearchClear);
@@ -3756,7 +4609,33 @@ function displayResults(results) {
         resultsList.style.display = 'block';
         results.forEach(c => {
             const li = document.createElement('li');
-            li.textContent = `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
+
+            if (c.locality_match) {
+                const municipality =
+                    c.locality_commune_name
+                        ? ` — ${c.locality_commune_name}`
+                        : '';
+                const department =
+                    c.dep_code
+                        ? ` (${c.dep_code})`
+                        : '';
+
+                li.textContent =
+                    `${c.nom_standard}${municipality}${department}`;
+                li.classList.add(
+                    'search-result-locality'
+                );
+                li.title = [
+                    c.locality_type
+                        || 'Lieu nommé',
+                    c.dep_nom || '',
+                    c.locality_source || ''
+                ].filter(Boolean).join(' · ');
+            } else {
+                li.textContent =
+                    `${c.nom_standard} (${c.dep_nom} - ${c.dep_code})`;
+            }
+
             if (c.alias_match && c.alias_commune_actuelle) {
                 li.title = `Rattachée à ${c.alias_commune_actuelle}`;
             }
@@ -9852,6 +10731,35 @@ window.searchSafeSkyBeaconExact = searchSafeSkyBeaconExact;
 window.fetchSafeSkyBeaconById = fetchSafeSkyBeaconById;
 window.publishOwnSafeSkyPosition = publishOwnSafeSkyPosition;
 window.getTrackedTrafficIdentifiers = getTrackedTrafficIdentifiers;
+window.testNamedPlacesSearch = async (
+    query = 'Blagon 33'
+) => {
+    const {
+        departmentFilter,
+        searchTerm
+    } = parseSearchDepartmentFilter(query);
+    const searchWords =
+        simplifyString(searchTerm)
+            .split(' ')
+            .filter(Boolean);
+
+    return fetchNamedPlacesSearch(
+        searchTerm,
+        departmentFilter,
+        searchWords,
+        null
+    );
+};
+window.getNamedPlacesSearchStatus = () => ({
+    endpoint: NAMED_PLACES_GEOCODING_URL,
+    cacheKey: NAMED_PLACES_CACHE_KEY,
+    cacheTtlDays:
+        NAMED_PLACES_CACHE_TTL_MS
+        / (24 * 60 * 60 * 1000),
+    localPhoneticScoringRetained: true,
+    onlineFallbackEnabled: true
+});
+
 window.getSafeSkyIntegrationStatus = () => ({
     codeReady: true,
     mode: 'direct',
