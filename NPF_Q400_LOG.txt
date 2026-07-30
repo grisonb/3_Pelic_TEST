@@ -1,5 +1,62 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.41 TEST — recherche partielle d’identifiants SafeSky et suppression de la publication NPF
+
+Modifications apportées :
+- suppression du réglage « Publier ma position NPF vers SafeSky » dans les filtres trafic ;
+- suppression des champs d’indicatif et de catégorie associés à la publication ;
+- suppression du statut de publication dans la fenêtre SafeSky ;
+- neutralisation automatique des anciens réglages de publication éventuellement mémorisés ;
+- aucune publication de position NPF possible vers SafeSky ;
+- suppression de l’accès JavaScript public permettant de lancer manuellement la publication ;
+- ajout d’une recherche active par partie d’indicatif, par exemple MILAN ;
+- interrogation au moment de la recherche de toutes les zones SafeSky actuellement surveillées par NPF ;
+- zones concernées : position GPS, feu actif ou centre de carte selon les filtres en vigueur ;
+- recherche partielle effectuée sans appliquer le filtre d’altitude ni la restriction à la liste suivie ;
+- exclusion des trafics au sol pour présenter les aéronefs actifs en vol ;
+- fusion des résultats actifs avec les trafics déjà reçus et la recherche exacte SafeSky ;
+- priorité de classement : indicatif exact, indicatif commençant par la saisie, puis indicatif contenant la saisie ;
+- affichage de l’indicatif avant l’immatriculation dans les résultats ;
+- maximum de cinquante correspondances présentées ;
+- aucune modification du déplacement, du zoom, des calques, des tuiles ou du rendu de la carte ;
+- aucune modification du moteur d’animation et d’affichage des trafics ;
+- conservation intégrale de la base nationale offline de 179 402 localités ;
+- archive nationale renommée localites-france-v14.41.zip uniquement pour la cohérence du cache ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.41 TEST.
+
+v14.40 TEST — base nationale France 100 % offline pour villages, hameaux et lieux-dits
+
+Modifications apportées :
+- remplacement du prototype limité à la Gironde par une base nationale hors ligne ;
+- couverture de 102 départements et collectivités, métropole, Corse et outre-mer compris ;
+- 179 402 villages, hameaux et lieux-dits conservés après nettoyage et dédoublonnage ;
+- aucune requête vers Géoplateforme, BAN ou un autre service internet pendant la recherche ;
+- ajout d’une archive locale unique data/localites/localites-france-v14.40.zip ;
+- archive nationale obligatoire dans le service worker : l’installation de la nouvelle version échoue si elle manque ;
+- mise en cache complète de la base nationale lors de l’installation de la PWA ;
+- disponibilité dès la première recherche après passage en mode avion ;
+- découpage interne de la base en 2 807 fragments de recherche compressés ;
+- choix automatique du fragment selon les trois premiers caractères utiles de la saisie ;
+- suppression des articles et prépositions initiaux pour le choix du fragment, sans modifier le nom affiché ;
+- chargement en mémoire du seul fragment utile au lieu des 19,8 Mo de JSON national ;
+- cache mémoire limité aux douze fragments les plus récemment utilisés ;
+- recherche nationale avec ou sans numéro de département ;
+- filtre départemental compatible avec 01 à 95, 2A, 2B et 971 à 976 ;
+- conservation du classement phonétique Soundex et Levenshtein ;
+- conservation de la priorité au nom exact et de la limite à cinq localités ;
+- conservation de la fusion avec les communes et communes_aliases.json ;
+- ajout d’un message unique « Base localités France hors ligne prête » après installation réussie ;
+- ajout du diagnostic national window.getNamedPlacesSearchStatus() ;
+- diagnostic indiquant le nombre total de localités, les départements, les fragments chargés et l’absence de repli internet ;
+- contrôles automatiques Blagon et Anseillan conservés ;
+- base source générée avec succès par GitHub Actions avant intégration ;
+- maintien intégral des cartes offline existantes et de leurs bases IndexedDB ;
+- aucune suppression ni réimport des packs de cartes requis ;
+- maintien des fonctions SafeSky existantes ;
+- aucun fichier SAFESKY_DIRECT_NPF ni FORMAT_CALQUE_ROUTIER_NPF fourni ;
+- version applicative portée en v14.40 TEST.
+
 v14.39 TEST — base pilote Gironde 100 % offline pour villages, hameaux et lieux-dits
 
 Modifications apportées :
