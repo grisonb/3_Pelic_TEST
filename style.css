@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.41') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.41') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.42') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.42') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11802,3 +11802,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* v14.41 TEST — aucune modification du rendu ni du fonctionnement de la carte. */
+
+
+/* v14.42 TEST — filtres SafeSky uniquement ; rendu de la carte inchangé. */
