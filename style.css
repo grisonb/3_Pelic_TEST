@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.38') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.38') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.39') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.39') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11759,7 +11759,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 #results-list li.search-result-locality::after {
-    content: "Lieu nommé";
+    content: "Lieu nommé offline";
     display: inline-block;
     margin-left: 7px;
     padding: 1px 5px;
