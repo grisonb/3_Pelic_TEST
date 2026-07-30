@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Construit une base JSON compacte de lieux-dits BAN pour NPF-Q400.
+"""Construit une base JSON offline de lieux-dits BAN pour NPF-Q400.
 
 Usage :
     python tools/build_localites_offline.py --department 33
 
 Le script télécharge le fichier officiel BAN du département, conserve les
-localités géolocalisées, normalise les noms, filtre les voies évidentes et
-produit data/localites/localites-33.json.
+localités géolocalisées, supprime les voies et équipements évidents, regroupe
+les variantes directionnelles et produit un JSON lisible par lignes.
 """
 
 from __future__ import annotations
@@ -32,8 +32,34 @@ ROAD_PREFIXES = (
     "allée ", "allee ", "place ", "quai ", "lotissement ", "résidence ",
     "residence ", "voie ", "sentier ", "passage ", "cours ",
 )
+
+NON_LOCALITY_PREFIXES = (
+    "accès ", "acces ", "aire de ", "autoroute ", "bretelle ",
+    "centre commercial", "centre culturel", "centre de secours",
+    "centre de tri", "centre technique", "centre zone", "cimetière",
+    "cimetiere", "collège", "college", "complexe sportif",
+    "défibril", "defibril", "école", "ecole", "église", "eglise",
+    "ehpad", "embarcadère", "embarcadere", "espace ", "esplanade ",
+    "garderie", "gare ", "gendarmerie", "giratoire ", "groupe scolaire",
+    "hôpital", "hopital", "hyper ", "jardin ", "karting ", "mail ",
+    "mairie", "maison de retraite", "parking ", "parc de stationnement",
+    "parcours sportif", "parvis ", "piste cyclable", "ponton ",
+    "promenade ", "rond-point ", "rond point ", "salle des fêtes",
+    "salle des fetes", "services techniques", "skatepark", "square ",
+    "stade ", "station d'épuration", "station d epuration", "supérette",
+    "superette", "terrain de boule", "tennis club", "terrasse ",
+    "traverse ", "za ", "zae ", "zi ", "zone artisanale",
+    "zone commerciale", "zone d'activité", "zone d activite",
+)
+
+NON_LOCALITY_EXACT = {
+    "mairie", "ecole", "eglise", "college", "cimetiere", "gare",
+    "pharmacie", "stade", "square", "garderie", "petanque",
+    "boulodrome", "radioelectrique", "reserve incendie",
+}
+
 DIRECTION_SUFFIX = re.compile(
-    r"\s+(?:nord(?:[- ]?est|[- ]?ouest)?|sud(?:[- ]?est|[- ]?ouest)?|est|ouest)$",
+    r"(?:[-\s]+)(?:nord(?:[- ]?est|[- ]?ouest)?|sud(?:[- ]?est|[- ]?ouest)?|est|ouest)$",
     re.IGNORECASE,
 )
 
@@ -61,20 +87,25 @@ def parse_float(value: str) -> float | None:
         return None
 
 
-def is_road_name(name: str) -> bool:
+def is_non_locality_name(name: str) -> bool:
     normalized = simplify(name)
-    return any(normalized.startswith(simplify(prefix)) for prefix in ROAD_PREFIXES)
+    if not normalized:
+        return True
+    if normalized in NON_LOCALITY_EXACT:
+        return True
+    prefixes = ROAD_PREFIXES + NON_LOCALITY_PREFIXES
+    return any(normalized.startswith(simplify(prefix)) for prefix in prefixes)
 
 
 def canonical_name(name: str) -> str:
-    return DIRECTION_SUFFIX.sub("", name).strip()
+    return DIRECTION_SUFFIX.sub("", name).strip(" -_")
 
 
 def download_csv_gz(department: str) -> bytes:
     url = URL_TEMPLATE.format(department=department)
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "NPF-Q400-localites-builder/1.0"},
+        headers={"User-Agent": "NPF-Q400-localites-builder/1.1"},
     )
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()
@@ -98,7 +129,7 @@ def build_records(payload: bytes, department: str) -> list[dict[str, Any]]:
             "libelle_acheminement",
             "nom",
         )
-        if not name or is_road_name(name):
+        if not name or is_non_locality_name(name):
             continue
 
         lat = parse_float(pick(row, "lat", "latitude", "y"))
@@ -124,9 +155,8 @@ def build_records(payload: bytes, department: str) -> list[dict[str, Any]]:
             "k": normalized,
         }
 
-        # Une entrée principale remplace les variantes directionnelles.
         existing = records.get(key)
-        if existing is None or len(name) < len(existing["n"]):
+        if existing is None or len(primary) < len(existing["n"]):
             records[key] = candidate
 
     return sorted(records.values(), key=lambda item: (item["k"], item["c"], item["i"]))
@@ -145,14 +175,14 @@ def main() -> None:
     payload = download_csv_gz(department)
     records = build_records(payload, department)
     document = {
-        "version": 1,
+        "version": 2,
         "department": department,
         "source": URL_TEMPLATE.format(department=department),
         "count": len(records),
         "items": records,
     }
     output.write_text(
-        json.dumps(document, ensure_ascii=False, separators=(",", ":")),
+        json.dumps(document, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
