@@ -7,6 +7,10 @@ on:
     paths:
       - 'tools/build_localites_offline.py'
       - '.github/workflows/build-localites-offline-test.yml'
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
