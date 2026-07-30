@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-40_localites_france_100_pourcent_offline';
-const APP_VERSION = 'v14.41';
+const SW_VERSION = 'sw-v14-42_filtre_trafics_sol_centre_carte';
+const APP_VERSION = 'v14.42';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -28,7 +28,7 @@ const APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
-    './data/localites/localites-france-v14.41.zip',
+    './data/localites/localites-france-v14.42.zip',
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
     './icons/icon-192x192.png',
@@ -53,7 +53,7 @@ const CORE_APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
-    './data/localites/localites-france-v14.41.zip'
+    './data/localites/localites-france-v14.42.zip'
 ];
 
 
@@ -362,7 +362,7 @@ function isAppShellRequest(request) {
             'jszip.min.js',
             'communes.json',
             'communes_aliases.json',
-            'localites-france-v14.41.zip',
+            'localites-france-v14.42.zip',
             'lignes_ht_rte_simplifiees.geojson'
         ].includes(filename) || parsed.pathname.includes('/icons/');
     } catch (_) {
