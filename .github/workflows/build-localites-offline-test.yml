@@ -7,6 +7,9 @@ on:
     paths:
       - 'tools/build_localites_offline.py'
       - '.github/workflows/build-localites-offline-test.yml'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -43,7 +46,15 @@ jobs:
               raise SystemExit('Blagon absent de la base générée')
           PY
 
+      - name: Upload Gironde test database
+        uses: actions/upload-artifact@v4
+        with:
+          name: localites-offline-33
+          path: data/localites/localites-33.json
+          if-no-files-found: error
+
       - name: Commit generated test database
+        if: github.event_name == 'push'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
