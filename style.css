@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.42') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.42') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.44') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.44') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11804,15 +11804,17 @@ body.gaar-point-search-open .gaar-editing-banner {
 /* v14.41 TEST — aucune modification du rendu ni du fonctionnement de la carte. */
 
 
+/* v14.44 TEST — filtres SafeSky uniquement ; rendu de la carte inchangé. */
+
+
 /* ==========================================================================
-   v14.42 TEST — déplacement fluide continu des trafics
+   v14.44 TEST — déplacement fluide continu des trafics
    ========================================================================== */
 
 /*
- * Leaflet continue de piloter la translation géographique. Le navigateur
- * garde uniquement les éléments internes prêts pour les rotations fréquentes,
- * sans transition CSS qui pourrait retarder le marqueur pendant un déplacement
- * ou un zoom manuel de la carte.
+ * Leaflet pilote la translation géographique. Les éléments internes restent
+ * préparés pour les rotations fréquentes, sans transition CSS susceptible de
+ * créer un retard pendant un déplacement ou un zoom manuel de la carte.
  */
 .traffic-aircraft-icon,
 .traffic-aircraft-arrow,
