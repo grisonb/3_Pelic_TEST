@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.45') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.45') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.46') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.46') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11829,3 +11829,11 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 /* Aucun changement visuel : le positionnement du curseur reste géré nativement
    par Safari/iPadOS dans le champ de recherche des communes. */
+
+
+/* ==========================================================================
+   v14.46 TEST — heure sur feu et forfait plein retardant
+   ========================================================================== */
+
+/* Aucun changement visuel : la correction porte uniquement sur les calculs
+   temporels des onglets Prévi et Suivi rotations. */
