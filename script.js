@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.50.zip?appv=v14.50';
+    './data/localites/localites-france-v14.51.zip?appv=v14.51';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1953,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.50'
+                        !== 'v14.51'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.50'
+                        'v14.51'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -4851,6 +4851,10 @@ function updateCommuneDisplay(commune) {
         'airport-destination-active',
         !!selectedAirportDestination
     );
+    communeDisplay.classList.toggle(
+        'airport-destination-no-fire',
+        !!selectedAirportDestination && !currentCommune
+    );
 
     if (selectedAirportDestination) {
         const airport = selectedAirportDestination;
@@ -4859,23 +4863,48 @@ function updateCommuneDisplay(commune) {
         communeDisplay.innerHTML = `
             <span class="commune-name airport-destination-name" title="${airportName}">${airportOaci}</span>
             <div id="gps-feu-route-info" class="gps-feu-route-info" title="Route, distance et temps GPS vers ${airportOaci}">---° / -- Nm / -- min</div>
-            <span id="clear-airport-destination-btn" class="clear-commune-btn" title="Quitter la route vers ${airportOaci}">×</span>
+            <button type="button" id="clear-airport-destination-btn" class="clear-commune-btn clear-airport-destination-btn" title="Quitter la route vers ${airportOaci}" aria-label="Quitter la route vers ${airportOaci}">×</button>
         `;
         updateCommuneGpsRouteDisplay();
 
         const clearAirportButton = document.getElementById('clear-airport-destination-btn');
         if (clearAirportButton) {
-            ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
-                clearAirportButton.addEventListener(eventName, (event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }, { passive: false });
-            });
-            clearAirportButton.addEventListener('click', (event) => {
+            let airportClearHandled = false;
+            const stopAirportClearPropagation = (event) => {
+                event.stopPropagation();
+            };
+            const performAirportDestinationClear = (event) => {
                 event.preventDefault();
                 event.stopPropagation();
+                if (airportClearHandled) return;
+                airportClearHandled = true;
                 clearAirportDestination({ restoreFire: true, redraw: true });
+                setTimeout(() => {
+                    airportClearHandled = false;
+                }, 350);
+            };
+
+            ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
+                clearAirportButton.addEventListener(
+                    eventName,
+                    stopAirportClearPropagation,
+                    { passive: true }
+                );
             });
+            clearAirportButton.addEventListener(
+                'touchend',
+                performAirportDestinationClear,
+                { passive: false }
+            );
+            clearAirportButton.addEventListener(
+                'pointerup',
+                performAirportDestinationClear,
+                { passive: false }
+            );
+            clearAirportButton.addEventListener(
+                'click',
+                performAirportDestinationClear
+            );
         }
         return;
     }
@@ -11233,7 +11262,7 @@ function normalizeOaciCodeInput(value) {
 }
 
 /*
- * v14.50 TEST — destination aéroport temporaire depuis la recherche commune.
+ * v14.51 TEST — destination aéroport temporaire et fermeture tactile fiable.
  * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
  * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
  */
@@ -11305,6 +11334,11 @@ function selectAirportDestination(airport) {
     if (searchInput) searchInput.value = '';
     if (resultsList) resultsList.style.display = 'none';
     if (clearSearchButton) clearSearchButton.style.display = 'none';
+
+    if (!currentCommune) {
+        const bingoDisplay = document.getElementById('bingo-map-display');
+        if (bingoDisplay) bingoDisplay.style.display = 'none';
+    }
 
     updateCommuneDisplay(currentCommune);
     drawUserToTargetRoute();
