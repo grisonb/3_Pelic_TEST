@@ -551,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // VARIABLES GLOBALES
 // =========================================================================
 // v14.44 TEST — filtre trafics au sol et zone centrée sur la carte.
-let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null;
+let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null, selectedAirportDestination = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
 
@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.49.zip?appv=v14.49';
+    './data/localites/localites-france-v14.50.zip?appv=v14.50';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -756,7 +756,7 @@ let lastTrafficRenderMeta = null;
 const TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY =
     'safeSkyTrackedIdentifiersV1';
 /*
- * v14.49 TEST — l'identifiant du propre avion est volontairement temporaire.
+ * v14.48 TEST — l'identifiant du propre avion est volontairement temporaire.
  * sessionStorage le conserve pendant la session PWA courante, puis le navigateur
  * le supprime lorsqu'une nouvelle session réelle est créée.
  */
@@ -1407,6 +1407,7 @@ function buildActiveFireIcon(label = 'Feu') {
 }
 
 function selectFireFromHistoryMap(item) {
+    clearAirportDestination({ restoreFire: false, redraw: false });
     const normalized = normalizeHistoryCommune(item);
     if (!normalized) return;
 
@@ -1590,6 +1591,7 @@ function displayFireHistory() {
         });
 
         li.querySelector('.fire-history-select').addEventListener('click', () => {
+            clearAirportDestination({ restoreFire: false, redraw: false });
             currentCommune = item;
             localStorage.setItem('currentCommune', JSON.stringify(item));
             displayCommuneDetails(item);
@@ -1951,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.49'
+                        !== 'v14.50'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.49'
+                        'v14.50'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3816,6 +3818,7 @@ function setupBaseTileLayer() {
 
 function clearCurrentSelection(options = {}) {
     const preserveMapView = !!options.preserveMapView;
+    selectedAirportDestination = null;
     selectedPelicanOACI = null;
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -4001,7 +4004,6 @@ function setupEventListeners() {
     let searchInputDebounceTimer = null;
 
     const runCommuneSearch = () => {
-        selectedPelicanOACI = null;
         const rawSearch = searchInput.value;
         clearSearchBtn.style.display = rawSearch.length > 0 ? 'block' : 'none';
 
@@ -4208,6 +4210,7 @@ function setupEventListeners() {
         selectedPelicanOACI = null;
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
+                clearAirportDestination({ restoreFire: false, redraw: false });
                 const { latitude, longitude } = pos.coords;
                 const gpsCommune = await buildManualFireCommuneFromPointAsync(latitude, longitude, 'Feu GPS');
                 currentCommune = gpsCommune;
@@ -4251,19 +4254,22 @@ function setupEventListeners() {
         } else {
             uiOverlay.style.display = 'none';
             toggleSearchButton.classList.remove('active');
-            if (communeDisplay.innerHTML.trim() !== '' && currentCommune) {
+            if (communeDisplay.innerHTML.trim() !== '' && (currentCommune || selectedAirportDestination)) {
                 communeDisplay.style.display = 'flex';
             }
         }
     });
 
-    document.addEventListener('communeSelected', () => {
+    const closeSearchAfterTargetSelection = () => {
         document.getElementById('ui-overlay').style.display = 'none';
         document.getElementById('toggle-search-button').classList.remove('active');
-        if (currentCommune) {
+        if (currentCommune || selectedAirportDestination) {
             document.getElementById('commune-info-display').style.display = 'flex';
         }
-    });
+    };
+
+    document.addEventListener('communeSelected', closeSearchAfterTargetSelection);
+    document.addEventListener('airportDestinationSelected', closeSearchAfterTargetSelection);
 
     function openCalculatorTab(tabId) {
         if (!calculatorModal) return;
@@ -4502,9 +4508,26 @@ function setupEventListeners() {
 
 function displayResults(results) {
     const resultsList = document.getElementById('results-list');
+    const searchValue = document.getElementById('search-input')?.value || '';
+    const airportResults = searchAirportsByOaci(searchValue);
     resultsList.innerHTML = '';
-    if (results.length > 0) {
+
+    if (airportResults.length > 0 || results.length > 0) {
         resultsList.style.display = 'block';
+
+        airportResults.forEach((airport) => {
+            const li = document.createElement('li');
+            li.className = 'search-result-airport';
+            li.innerHTML = `<span class="search-result-airport-oaci">${escapeHtml(airport.oaci)}</span><span class="search-result-airport-name">${escapeHtml(airport.name)}</span>`;
+            li.title = `Tracer la route GPS vers ${airport.oaci} — sans modifier le feu ni le pélicandrome`;
+            li.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                selectAirportDestination(airport);
+            });
+            resultsList.appendChild(li);
+        });
+
         results.forEach(c => {
             const li = document.createElement('li');
 
@@ -4538,6 +4561,7 @@ function displayResults(results) {
                 li.title = `Rattachée à ${c.alias_commune_actuelle}`;
             }
             li.addEventListener('click', () => {
+                clearAirportDestination({ restoreFire: false, redraw: false });
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
                 displayCommuneDetails(c);
@@ -4552,6 +4576,7 @@ function displayResults(results) {
         }
     }
 }
+
 
 async function findOfflineTileZoomRange() {
     try {
@@ -4820,6 +4845,41 @@ function showUpdateReminderModal(timestamp = Date.now()) {
 
 function updateCommuneDisplay(commune) {
     const communeDisplay = document.getElementById('commune-info-display');
+    if (!communeDisplay) return;
+
+    communeDisplay.classList.toggle(
+        'airport-destination-active',
+        !!selectedAirportDestination
+    );
+
+    if (selectedAirportDestination) {
+        const airport = selectedAirportDestination;
+        const airportName = escapeHtml(airport.name || airport.oaci);
+        const airportOaci = escapeHtml(airport.oaci);
+        communeDisplay.innerHTML = `
+            <span class="commune-name airport-destination-name" title="${airportName}">${airportOaci}</span>
+            <div id="gps-feu-route-info" class="gps-feu-route-info" title="Route, distance et temps GPS vers ${airportOaci}">---° / -- Nm / -- min</div>
+            <span id="clear-airport-destination-btn" class="clear-commune-btn" title="Quitter la route vers ${airportOaci}">×</span>
+        `;
+        updateCommuneGpsRouteDisplay();
+
+        const clearAirportButton = document.getElementById('clear-airport-destination-btn');
+        if (clearAirportButton) {
+            ['touchstart', 'pointerdown', 'mousedown'].forEach((eventName) => {
+                clearAirportButton.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }, { passive: false });
+            });
+            clearAirportButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                clearAirportDestination({ restoreFire: true, redraw: true });
+            });
+        }
+        return;
+    }
+
     if (!commune) {
         communeDisplay.innerHTML = '';
         communeDisplay.style.display = 'none';
@@ -4898,6 +4958,7 @@ function updateCommuneDisplay(commune) {
     }
 }
 
+
 function getCurrentGpsGroundSpeedKt() {
     const speedMps = Number(lastPosition?.speedMps);
     if (!Number.isFinite(speedMps) || speedMps <= 0) return null;
@@ -4946,37 +5007,49 @@ function updateCommuneGpsRouteDisplay() {
     const rotationInfo = document.getElementById('gps-feu-rotation-info');
     if (!routeInfo && !rotationInfo) return;
 
-    if (!currentCommune || !userMarker || !userMarker.getLatLng) {
+    const target = selectedAirportDestination
+        ? {
+            lat: Number(selectedAirportDestination.lat),
+            lon: Number(selectedAirportDestination.lon),
+            airport: true
+        }
+        : (currentCommune
+            ? {
+                lat: Number(currentCommune.latitude_mairie),
+                lon: Number(currentCommune.longitude_mairie),
+                airport: false
+            }
+            : null);
+
+    if (!target || !userMarker || !userMarker.getLatLng) {
         if (routeInfo) {
             routeInfo.textContent = '---° / -- Nm / -- min';
             routeInfo.classList.add('gps-feu-route-info-empty');
         }
-        updateCommuneMapRotationInfo();
+        if (!selectedAirportDestination) updateCommuneMapRotationInfo();
         return;
     }
 
-    const targetLat = Number(currentCommune.latitude_mairie);
-    const targetLon = Number(currentCommune.longitude_mairie);
     const userLatLng = userMarker.getLatLng();
 
-    if (!Number.isFinite(targetLat) || !Number.isFinite(targetLon) || !userLatLng) {
+    if (!Number.isFinite(target.lat) || !Number.isFinite(target.lon) || !userLatLng) {
         if (routeInfo) {
             routeInfo.textContent = '---° / -- Nm / -- min';
             routeInfo.classList.add('gps-feu-route-info-empty');
         }
-        updateCommuneMapRotationInfo();
+        if (!selectedAirportDestination) updateCommuneMapRotationInfo();
         return;
     }
 
-    const distance = calculateDistanceInNm(userLatLng.lat, userLatLng.lng, targetLat, targetLon);
-    const trueBearingToTarget = calculateBearing(userLatLng.lat, userLatLng.lng, targetLat, targetLon);
+    const distance = calculateDistanceInNm(userLatLng.lat, userLatLng.lng, target.lat, target.lon);
+    const trueBearingToTarget = calculateBearing(userLatLng.lat, userLatLng.lng, target.lat, target.lon);
     const magneticBearing = (trueBearingToTarget - MAGNETIC_DECLINATION + 360) % 360;
 
     if (routeInfo) {
         routeInfo.textContent = `${formatRouteDegrees(magneticBearing)} / ${Math.round(distance)} Nm / ${formatGpsEtaMinutes(distance)}`;
         routeInfo.classList.remove('gps-feu-route-info-empty');
     }
-    updateCommuneMapRotationInfo();
+    if (!selectedAirportDestination) updateCommuneMapRotationInfo();
 }
 
 
@@ -11159,6 +11232,113 @@ function normalizeOaciCodeInput(value) {
     return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
 }
 
+/*
+ * v14.50 TEST — destination aéroport temporaire depuis la recherche commune.
+ * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
+ * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
+ */
+function getAllKnownAirportsForSearch() {
+    const unique = new Map();
+    [...pelicanAirports, ...otherAirports].forEach((airport) => {
+        const oaci = normalizeOaciCodeInput(airport?.oaci);
+        const lat = Number(airport?.lat);
+        const lon = Number(airport?.lon);
+        if (!oaci || oaci.length !== 4 || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        if (!unique.has(oaci)) {
+            unique.set(oaci, {
+                oaci,
+                name: String(airport?.name || oaci).trim(),
+                lat,
+                lon
+            });
+        }
+    });
+    return [...unique.values()];
+}
+
+function searchAirportsByOaci(rawSearch) {
+    const raw = String(rawSearch || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{2,4}$/.test(raw)) return [];
+
+    return getAllKnownAirportsForSearch()
+        .filter(airport => airport.oaci.startsWith(raw))
+        .sort((left, right) => {
+            const exactDifference = Number(right.oaci === raw) - Number(left.oaci === raw);
+            if (exactDifference) return exactDifference;
+            return left.oaci.localeCompare(right.oaci, 'fr');
+        })
+        .slice(0, 8);
+}
+
+function clearAirportDestination({ restoreFire = true, redraw = true } = {}) {
+    if (!selectedAirportDestination) return false;
+    selectedAirportDestination = null;
+
+    if (redraw) {
+        if (userToTargetLayer) userToTargetLayer.clearLayers();
+        updateCommuneDisplay(restoreFire ? currentCommune : null);
+        drawUserToTargetRoute();
+
+        const communeDisplay = document.getElementById('commune-info-display');
+        const searchOverlay = document.getElementById('ui-overlay');
+        if (communeDisplay && (!searchOverlay || searchOverlay.style.display === 'none')) {
+            communeDisplay.style.display = currentCommune ? 'flex' : 'none';
+        }
+    }
+    return true;
+}
+
+function selectAirportDestination(airport) {
+    const normalized = getAirportByOaci(airport?.oaci);
+    if (!normalized) return false;
+
+    selectedAirportDestination = {
+        oaci: normalized.oaci,
+        name: normalized.name,
+        lat: Number(normalized.lat),
+        lon: Number(normalized.lon)
+    };
+
+    const searchInput = document.getElementById('search-input');
+    const resultsList = document.getElementById('results-list');
+    const clearSearchButton = document.getElementById('clear-search');
+    if (searchInput) searchInput.value = '';
+    if (resultsList) resultsList.style.display = 'none';
+    if (clearSearchButton) clearSearchButton.style.display = 'none';
+
+    updateCommuneDisplay(currentCommune);
+    drawUserToTargetRoute();
+
+    if (!userMarker && typeof requestOneShotGps === 'function') {
+        requestOneShotGps({
+            silent: true,
+            highAccuracy: true,
+            timeout: 15000,
+            maximumAge: 600000
+        });
+    }
+
+    setTimeout(() => {
+        if (!map || !selectedAirportDestination) return;
+        const target = [selectedAirportDestination.lat, selectedAirportDestination.lon];
+        const gps = userMarker && typeof userMarker.getLatLng === 'function'
+            ? userMarker.getLatLng()
+            : null;
+        if (gps && Number.isFinite(gps.lat) && Number.isFinite(gps.lng)) {
+            map.fitBounds(L.latLngBounds([[gps.lat, gps.lng], target]).pad(0.25), {
+                animate: false
+            });
+        } else {
+            map.setView(target, Math.max(8, Number(map.getZoom()) || 8), {
+                animate: false
+            });
+        }
+    }, 250);
+
+    document.dispatchEvent(new Event('airportDestinationSelected'));
+    return true;
+}
+
 
 function normalizeBaseOaciLockedLfInput(value) {
     const raw = String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -13458,14 +13638,36 @@ function toggleLiveGps() {
 
 function drawUserToTargetRoute() {
     userToTargetLayer.clearLayers();
-    if (currentCommune && userMarker && userMarker.getLatLng()) {
-        const { latitude_mairie: lat, longitude_mairie: lon } = currentCommune;
+
+    const target = selectedAirportDestination
+        ? {
+            lat: Number(selectedAirportDestination.lat),
+            lon: Number(selectedAirportDestination.lon)
+        }
+        : (currentCommune
+            ? {
+                lat: Number(currentCommune.latitude_mairie),
+                lon: Number(currentCommune.longitude_mairie)
+            }
+            : null);
+
+    if (target && userMarker && userMarker.getLatLng()
+        && Number.isFinite(target.lat) && Number.isFinite(target.lon)) {
         const userLatLng = userMarker.getLatLng();
 
-        const trueBearingToTarget = calculateBearing(userLatLng.lat, userLatLng.lng, lat, lon);
+        const trueBearingToTarget = calculateBearing(
+            userLatLng.lat,
+            userLatLng.lng,
+            target.lat,
+            target.lon
+        );
         const magneticBearing = (trueBearingToTarget - MAGNETIC_DECLINATION + 360) % 360;
 
-        drawRoute([userLatLng.lat, userLatLng.lng], [lat, lon], { isUser: true, magneticBearing: magneticBearing });
+        drawRoute(
+            [userLatLng.lat, userLatLng.lng],
+            [target.lat, target.lon],
+            { isUser: true, magneticBearing }
+        );
     }
     updateCommuneGpsRouteDisplay();
 }
@@ -14937,7 +15139,7 @@ function closeFireSearchPanelForGaarPointEdit() {
         if (uiOverlay) uiOverlay.style.display = 'none';
         if (toggleSearchButton) toggleSearchButton.classList.remove('active');
 
-        if (communeDisplay && currentCommune && communeDisplay.innerHTML.trim() !== '') {
+        if (communeDisplay && (currentCommune || selectedAirportDestination) && communeDisplay.innerHTML.trim() !== '') {
             communeDisplay.style.display = 'flex';
         }
     } catch (_) {}
