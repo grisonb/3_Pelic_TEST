@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.56';
+    './data/localites/localites-france-v14.57.zip?appv=v14.57';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -765,7 +765,13 @@ const TRAFFIC_OWN_AIRCRAFT_SESSION_KEY =
 let ownTrafficAircraftSessionFallback = null;
 const TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY =
     'safeSkyPublishedBeaconIdV1';
-const TRAFFIC_MAX_TRACKED_IDENTIFIERS = 20;
+/*
+ * v14.57 TEST — la liste suivie n'est plus plafonnée à 20 entrées.
+ * La concurrence ne limite pas le nombre enregistré : elle évite seulement
+ * d'envoyer toutes les interrogations SafeSky individuelles simultanément.
+ */
+const TRAFFIC_TRACKED_FETCH_CONCURRENCY = 6;
+const TRAFFIC_VIEWPORT_IDENTIFIER_QUERY_LIMIT = 40;
 const TRAFFIC_TEMPORARY_SEARCH_RESULT_TTL_MS = 10 * 60 * 1000;
 const TRAFFIC_SMOOTH_FRAME_INTERVAL_MS = 50;
 const TRAFFIC_MAX_EXTRAPOLATION_SECONDS = 8;
@@ -1953,11 +1959,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.56'
+                        !== 'v14.57'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.56'
+                        'v14.57'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3427,6 +3433,7 @@ function initMap() {
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
     ensureTwoFingerRulerControl();
+    installTrafficPopupMapDismissInteraction();
     applyMapNoBackgroundStyle();
 
     if (map.createPane && !map.getPane('highVoltageLinesPane')) {
@@ -6515,8 +6522,7 @@ function loadTrackedTrafficIdentifiers() {
             result.push(cleanEntry);
         });
 
-        return sortTrackedTrafficIdentifiers(result)
-            .slice(0, TRAFFIC_MAX_TRACKED_IDENTIFIERS);
+        return sortTrackedTrafficIdentifiers(result);
     } catch (_) {
         return [];
     }
@@ -6533,17 +6539,16 @@ function saveTrackedTrafficIdentifiers(entries) {
         cleanEntries.push(cleanEntry);
     });
 
-    const limitedEntries = sortTrackedTrafficIdentifiers(cleanEntries)
-        .slice(0, TRAFFIC_MAX_TRACKED_IDENTIFIERS);
+    const sortedEntries = sortTrackedTrafficIdentifiers(cleanEntries);
 
     try {
         localStorage.setItem(
             TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY,
-            JSON.stringify(limitedEntries)
+            JSON.stringify(sortedEntries)
         );
     } catch (_) {}
 
-    return limitedEntries;
+    return sortedEntries;
 }
 
 function getTrackedTrafficIdentifiers() {
@@ -6860,9 +6865,10 @@ function refreshTrackedTrafficListUi() {
         'traffic-tracked-count'
     );
     if (countElement) {
-        countElement.textContent = entries.length
-            ? `${entries.length}/${TRAFFIC_MAX_TRACKED_IDENTIFIERS}`
-            : '0';
+        countElement.textContent = String(entries.length);
+        countElement.title = entries.length
+            ? `${entries.length} indicatif${entries.length > 1 ? 's' : ''} suivi${entries.length > 1 ? 's' : ''}`
+            : 'Aucun indicatif suivi';
     }
 
     if (!entries.length) {
@@ -8577,12 +8583,52 @@ async function focusTrafficAircraftResult(
     return aircraft;
 }
 
+async function settleTrackedTrafficWithConcurrency(
+    entries,
+    worker,
+    concurrency = TRAFFIC_TRACKED_FETCH_CONCURRENCY
+) {
+    const source = Array.isArray(entries) ? entries : [];
+    if (!source.length) return [];
+
+    const results = new Array(source.length);
+    let nextIndex = 0;
+    const workerCount = Math.max(
+        1,
+        Math.min(Number(concurrency) || 1, source.length)
+    );
+
+    const runners = Array.from({ length: workerCount }, async () => {
+        while (true) {
+            const index = nextIndex;
+            nextIndex += 1;
+            if (index >= source.length) return;
+
+            try {
+                results[index] = {
+                    status: 'fulfilled',
+                    value: await worker(source[index], index)
+                };
+            } catch (reason) {
+                results[index] = {
+                    status: 'rejected',
+                    reason
+                };
+            }
+        }
+    });
+
+    await Promise.all(runners);
+    return results;
+}
+
 async function fetchTrackedTrafficBeacons() {
     const entries = getTrackedTrafficIdentifiers();
     if (!entries.length) return [];
 
-    const settled = await Promise.allSettled(
-        entries.map(async entry => {
+    const settled = await settleTrackedTrafficWithConcurrency(
+        entries,
+        async entry => {
             if (!isPendingTrackedTrafficIdentifier(entry.id)) {
                 return {
                     entry,
@@ -8600,7 +8646,7 @@ async function fetchTrackedTrafficBeacons() {
             }) || null;
 
             return { entry, raw };
-        })
+        }
     );
 
     const rawResults = [];
@@ -8914,7 +8960,15 @@ function buildTrafficApiUrl(point, provider = null) {
         if (settings.onlyTrackedIdentifiers) {
             const identifiers = getResolvedTrackedTrafficIdentifiers();
 
-            if (identifiers.length) {
+            /*
+             * Une liste très longue dépasserait la taille raisonnable d'une URL.
+             * Les appareils suivis restent tous interrogés directement plus bas ;
+             * ce filtre viewport n'est utilisé que lorsqu'il tient dans une requête.
+             */
+            if (
+                identifiers.length
+                && identifiers.length <= TRAFFIC_VIEWPORT_IDENTIFIER_QUERY_LIMIT
+            ) {
                 url.searchParams.set(
                     'identifiers',
                     identifiers.join(',')
@@ -10908,6 +10962,195 @@ function installTrafficMarkerPopupInteraction(marker) {
                 setOwnTrafficAircraftSession(currentAircraft);
             };
         }
+    });
+}
+
+/*
+ * v14.57 TEST — fermeture de la fiche trafic par clic réel sur le fond de carte.
+ * Le déplacement, le zoom, le pincement et la molette ne ferment pas la fiche.
+ */
+function closeOpenTrafficAircraftPopup() {
+    let closedOne = false;
+
+    trafficMarkerRegistry.forEach(entry => {
+        const marker = entry?.marker;
+        if (
+            !marker
+            || typeof marker.isPopupOpen !== 'function'
+            || !marker.isPopupOpen()
+        ) {
+            return;
+        }
+
+        try {
+            marker.closePopup();
+            closedOne = true;
+        } catch (_) {}
+    });
+
+    return closedOne;
+}
+
+function installTrafficPopupMapDismissInteraction() {
+    if (
+        !map
+        || typeof map.getContainer !== 'function'
+        || map.__npfTrafficPopupMapDismissInstalled
+    ) {
+        return;
+    }
+
+    const container = map.getContainer();
+    if (!container) return;
+
+    map.__npfTrafficPopupMapDismissInstalled = true;
+
+    let startPoint = null;
+    let touchHadMultipleFingers = false;
+    let gestureMoved = false;
+    let suppressMapClickUntil = 0;
+    let pendingMapCloseTimer = null;
+
+    const cancelPendingMapClose = () => {
+        if (!pendingMapCloseTimer) return;
+        clearTimeout(pendingMapCloseTimer);
+        pendingMapCloseTimer = null;
+    };
+
+    const getEventPoint = event => {
+        const touch = event?.touches?.[0]
+            || event?.changedTouches?.[0]
+            || null;
+        const source = touch || event;
+        const x = Number(source?.clientX);
+        const y = Number(source?.clientY);
+        return Number.isFinite(x) && Number.isFinite(y)
+            ? { x, y }
+            : null;
+    };
+
+    const eventTargetsMapBackground = event => {
+        const target = event?.originalEvent?.target || event?.target;
+        if (!target || typeof target.closest !== 'function') return true;
+        return !target.closest(
+            '.leaflet-popup, .leaflet-marker-icon, .leaflet-control, button, input, select, textarea, a'
+        );
+    };
+
+    const beginGesture = event => {
+        touchHadMultipleFingers = Boolean(
+            event?.touches && event.touches.length > 1
+        );
+        gestureMoved = touchHadMultipleFingers;
+        startPoint = getEventPoint(event);
+
+        if (touchHadMultipleFingers) {
+            suppressMapClickUntil = Date.now() + 450;
+        }
+    };
+
+    const moveGesture = event => {
+        if (event?.touches && event.touches.length > 1) {
+            touchHadMultipleFingers = true;
+            gestureMoved = true;
+            suppressMapClickUntil = Date.now() + 450;
+            return;
+        }
+
+        if (!startPoint) return;
+        const point = getEventPoint(event);
+        if (!point) return;
+
+        if (
+            Math.hypot(
+                point.x - startPoint.x,
+                point.y - startPoint.y
+            ) > 8
+        ) {
+            gestureMoved = true;
+            suppressMapClickUntil = Date.now() + 350;
+        }
+    };
+
+    const endGesture = () => {
+        if (gestureMoved || touchHadMultipleFingers) {
+            suppressMapClickUntil = Math.max(
+                suppressMapClickUntil,
+                Date.now() + 300
+            );
+        }
+        startPoint = null;
+        gestureMoved = false;
+        touchHadMultipleFingers = false;
+    };
+
+    container.addEventListener('touchstart', beginGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('touchmove', moveGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('touchend', endGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('touchcancel', endGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('pointerdown', beginGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('pointermove', moveGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('pointerup', endGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('pointercancel', endGesture, {
+        passive: true,
+        capture: true
+    });
+    container.addEventListener('wheel', () => {
+        cancelPendingMapClose();
+        suppressMapClickUntil = Date.now() + 350;
+    }, {
+        passive: true,
+        capture: true
+    });
+
+    map.on('dragstart zoomstart', () => {
+        cancelPendingMapClose();
+        suppressMapClickUntil = Date.now() + 350;
+    });
+    map.on('dragend zoomend', () => {
+        suppressMapClickUntil = Math.max(
+            suppressMapClickUntil,
+            Date.now() + 220
+        );
+    });
+
+    map.on('dblclick', cancelPendingMapClose);
+
+    map.on('click', event => {
+        if (Date.now() < suppressMapClickUntil) return;
+        if (!eventTargetsMapBackground(event)) return;
+
+        /*
+         * Petit délai pour distinguer le clic simple d'un double appui de zoom.
+         * Tout début de déplacement ou de zoom annule cette fermeture.
+         */
+        cancelPendingMapClose();
+        pendingMapCloseTimer = setTimeout(() => {
+            pendingMapCloseTimer = null;
+            if (Date.now() < suppressMapClickUntil) return;
+            closeOpenTrafficAircraftPopup();
+        }, 320);
     });
 }
 
