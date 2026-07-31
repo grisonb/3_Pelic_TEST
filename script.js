@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.54.zip?appv=v14.54';
+    './data/localites/localites-france-v14.55.zip?appv=v14.55';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1953,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.54'
+                        !== 'v14.55'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.54'
+                        'v14.55'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6411,25 +6411,86 @@ function sanitizeTrafficSettings(candidate = {}) {
 }
 
 
+function normalizeTrackedTrafficCallsign(value) {
+    return String(value || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '');
+}
+
+function isPendingTrackedTrafficIdentifier(id) {
+    return String(id || '').toUpperCase().startsWith('CALLSIGN:');
+}
+
+function buildPendingTrackedTrafficIdentifier(callsign) {
+    const normalizedCallsign = normalizeTrackedTrafficCallsign(callsign);
+    return normalizedCallsign ? `CALLSIGN:${normalizedCallsign}` : '';
+}
+
+function getTrackedTrafficEntryAlphabeticalLabel(entry) {
+    return String(
+        entry?.callsign
+        || entry?.registration
+        || (
+            isPendingTrackedTrafficIdentifier(entry?.id)
+                ? String(entry.id).slice('CALLSIGN:'.length)
+                : entry?.id
+        )
+        || ''
+    ).trim().toUpperCase();
+}
+
+function sortTrackedTrafficIdentifiers(entries) {
+    return [...(Array.isArray(entries) ? entries : [])]
+        .sort((left, right) => {
+            const labelDifference = getTrackedTrafficEntryAlphabeticalLabel(left)
+                .localeCompare(
+                    getTrackedTrafficEntryAlphabeticalLabel(right),
+                    'fr',
+                    { numeric: true, sensitivity: 'base' }
+                );
+            if (labelDifference) return labelDifference;
+            return String(left?.id || '').localeCompare(
+                String(right?.id || ''),
+                'fr',
+                { numeric: true, sensitivity: 'base' }
+            );
+        });
+}
+
 function sanitizeTrackedTrafficIdentifierEntry(entry) {
     if (!entry) return null;
 
-    const id = String(entry.id || entry.hex || '')
+    const callsign = normalizeTrackedTrafficCallsign(
+        entry.callsign || entry.call_sign || ''
+    );
+    const registration = String(entry.registration || '')
         .trim()
         .toUpperCase();
+    let id = String(entry.id || entry.hex || '')
+        .trim()
+        .toUpperCase();
+
+    if (!id && callsign) {
+        id = buildPendingTrackedTrafficIdentifier(callsign);
+    }
     if (!id) return null;
 
     return {
         id,
-        callsign: String(entry.callsign || entry.call_sign || '')
-            .trim()
-            .toUpperCase(),
-        registration: String(entry.registration || '')
-            .trim()
-            .toUpperCase(),
+        callsign: callsign || (
+            isPendingTrackedTrafficIdentifier(id)
+                ? id.slice('CALLSIGN:'.length)
+                : ''
+        ),
+        registration,
         type: String(entry.type || entry.beaconType || '')
             .trim()
             .toUpperCase(),
+        pendingResolution: (
+            Boolean(entry.pendingResolution)
+            || isPendingTrackedTrafficIdentifier(id)
+        ),
         addedAt: Number(entry.addedAt) || Date.now()
     };
 }
@@ -6454,7 +6515,8 @@ function loadTrackedTrafficIdentifiers() {
             result.push(cleanEntry);
         });
 
-        return result.slice(0, TRAFFIC_MAX_TRACKED_IDENTIFIERS);
+        return sortTrackedTrafficIdentifiers(result)
+            .slice(0, TRAFFIC_MAX_TRACKED_IDENTIFIERS);
     } catch (_) {
         return [];
     }
@@ -6471,10 +6533,8 @@ function saveTrackedTrafficIdentifiers(entries) {
         cleanEntries.push(cleanEntry);
     });
 
-    const limitedEntries = cleanEntries.slice(
-        0,
-        TRAFFIC_MAX_TRACKED_IDENTIFIERS
-    );
+    const limitedEntries = sortTrackedTrafficIdentifiers(cleanEntries)
+        .slice(0, TRAFFIC_MAX_TRACKED_IDENTIFIERS);
 
     try {
         localStorage.setItem(
@@ -6490,12 +6550,126 @@ function getTrackedTrafficIdentifiers() {
     return loadTrackedTrafficIdentifiers();
 }
 
-function getTrackedTrafficIdentifierSet() {
-    return new Set(
-        getTrackedTrafficIdentifiers()
-            .map(entry => entry.id)
-            .filter(Boolean)
+function getResolvedTrackedTrafficIdentifiers() {
+    return getTrackedTrafficIdentifiers()
+        .map(entry => entry.id)
+        .filter(id => id && !isPendingTrackedTrafficIdentifier(id));
+}
+
+function trackedTrafficEntryMatchesAircraft(entry, aircraft) {
+    const normalized = aircraft?.lat !== undefined
+        ? aircraft
+        : normalizeTrafficAircraft(aircraft?.raw || aircraft);
+    if (!entry || !normalized) return false;
+
+    const aircraftId = String(normalized.hex || '')
+        .trim()
+        .toUpperCase();
+    const aircraftCallsign = normalizeTrackedTrafficCallsign(
+        normalized.callsign
     );
+    const aircraftRegistration = String(
+        normalized.registration || ''
+    ).trim().toUpperCase();
+
+    if (
+        entry.id
+        && !isPendingTrackedTrafficIdentifier(entry.id)
+        && aircraftId === entry.id
+    ) {
+        return true;
+    }
+
+    const entryCallsign = normalizeTrackedTrafficCallsign(entry.callsign);
+    if (entryCallsign && aircraftCallsign === entryCallsign) return true;
+
+    const entryRegistration = String(entry.registration || '')
+        .trim()
+        .toUpperCase();
+    return Boolean(
+        entryRegistration
+        && aircraftRegistration === entryRegistration
+    );
+}
+
+function findTrackedTrafficEntryForAircraft(aircraft) {
+    return getTrackedTrafficIdentifiers().find(
+        entry => trackedTrafficEntryMatchesAircraft(entry, aircraft)
+    ) || null;
+}
+
+function isTrafficAircraftTracked(aircraft) {
+    return Boolean(findTrackedTrafficEntryForAircraft(aircraft));
+}
+
+function addPendingTrackedTrafficCallsign(callsign) {
+    const normalizedCallsign = normalizeTrackedTrafficCallsign(callsign);
+    if (!/^[A-Z0-9][A-Z0-9._-]{1,23}$/.test(normalizedCallsign)) {
+        throw new Error(
+            'Indicatif invalide : utilise uniquement lettres, chiffres, point, tiret ou soulignement.'
+        );
+    }
+
+    const current = getTrackedTrafficIdentifiers();
+    const duplicate = current.find(entry => (
+        normalizeTrackedTrafficCallsign(entry.callsign) === normalizedCallsign
+        || entry.id === buildPendingTrackedTrafficIdentifier(normalizedCallsign)
+    ));
+    if (duplicate) {
+        throw new Error(
+            `${normalizedCallsign} est déjà présent dans la liste suivie.`
+        );
+    }
+
+    current.push({
+        id: buildPendingTrackedTrafficIdentifier(normalizedCallsign),
+        callsign: normalizedCallsign,
+        registration: '',
+        type: '',
+        pendingResolution: true,
+        addedAt: Date.now()
+    });
+
+    const saved = saveTrackedTrafficIdentifiers(current);
+    refreshTrackedTrafficListUi();
+
+    if (showTrafficLayer) {
+        refreshTrafficLayer({
+            force: true,
+            reason: 'tracked-pending-add'
+        });
+    }
+
+    return saved;
+}
+
+function mergeResolvedTrackedTrafficIdentity(entry, aircraft) {
+    const identity = extractTrackedTrafficIdentity(aircraft);
+    if (!entry || !identity.id) return false;
+
+    const entries = getTrackedTrafficIdentifiers();
+    const replacement = {
+        id: identity.id,
+        callsign: identity.callsign || entry.callsign,
+        registration: identity.registration || entry.registration,
+        type: identity.type || entry.type,
+        pendingResolution: false,
+        addedAt: entry.addedAt
+    };
+
+    const updated = entries
+        .filter(candidate => (
+            candidate.id !== entry.id
+            && candidate.id !== identity.id
+        ))
+        .concat(replacement);
+
+    saveTrackedTrafficIdentifiers(updated);
+    return true;
+}
+
+function getTrackedTrafficIdentifierSet() {
+    return new Set(getResolvedTrackedTrafficIdentifiers());
 }
 
 function isTrafficIdentifierTracked(id) {
@@ -6570,14 +6744,33 @@ function addTrackedTrafficIdentifier(aircraft) {
         );
     }
 
+    const identityCallsign = normalizeTrackedTrafficCallsign(
+        identity.callsign
+    );
+    const identityRegistration = String(identity.registration || '')
+        .trim()
+        .toUpperCase();
     const current = getTrackedTrafficIdentifiers()
-        .filter(entry => entry.id !== id);
+        .filter(entry => (
+            entry.id !== id
+            && !(
+                identityCallsign
+                && normalizeTrackedTrafficCallsign(entry.callsign)
+                    === identityCallsign
+            )
+            && !(
+                identityRegistration
+                && String(entry.registration || '').trim().toUpperCase()
+                    === identityRegistration
+            )
+        ));
 
-    current.unshift({
+    current.push({
         id,
         callsign: identity.callsign,
         registration: identity.registration,
         type: identity.type,
+        pendingResolution: false,
         addedAt: Date.now()
     });
 
@@ -6627,30 +6820,28 @@ function getCurrentlyDetectedTrackedTrafficMap() {
         return detected;
     }
 
-    const trackedSet = getTrackedTrafficIdentifierSet();
-    if (!trackedSet.size) return detected;
+    const entries = getTrackedTrafficIdentifiers();
+    if (!entries.length) return detected;
 
     const candidates = [
         ...(Array.isArray(lastTrafficAircraftSnapshot)
             ? lastTrafficAircraftSnapshot
             : []),
         ...getTemporaryGlobalTrafficRaw()
-    ];
-
-    candidates
+    ]
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
-        .forEach(aircraft => {
-            const id = String(aircraft.hex || '').trim().toUpperCase();
-            if (!id || !trackedSet.has(id)) return;
-            if (
-                Number.isFinite(aircraft.seenPos)
-                && aircraft.seenPos > TRAFFIC_MAX_SEEN_SECONDS
-            ) {
-                return;
-            }
-            detected.set(id, aircraft);
-        });
+        .filter(aircraft => (
+            !Number.isFinite(aircraft.seenPos)
+            || aircraft.seenPos <= TRAFFIC_MAX_SEEN_SECONDS
+        ));
+
+    entries.forEach(entry => {
+        const aircraft = candidates.find(candidate => (
+            trackedTrafficEntryMatchesAircraft(entry, candidate)
+        ));
+        if (aircraft) detected.set(entry.id, aircraft);
+    });
 
     return detected;
 }
@@ -6745,19 +6936,25 @@ function refreshTrackedTrafficListUi() {
 
         const primary = document.createElement('strong');
         primary.textContent = (
-            entry.registration
-            || entry.callsign
-            || entry.id
+            entry.callsign
+            || entry.registration
+            || (
+                isPendingTrackedTrafficIdentifier(entry.id)
+                    ? entry.id.slice('CALLSIGN:'.length)
+                    : entry.id
+            )
         );
 
         const secondary = document.createElement('span');
         secondary.textContent = [
-            entry.callsign
-                && entry.callsign !== primary.textContent
-                ? entry.callsign
+            entry.registration
+                && entry.registration !== primary.textContent
+                ? entry.registration
                 : '',
             entry.type,
-            entry.id
+            isPendingTrackedTrafficIdentifier(entry.id)
+                ? 'En attente de détection'
+                : entry.id
         ].filter(Boolean).join(' · ');
 
         label.append(primary, secondary);
@@ -7143,7 +7340,7 @@ function ensureTrafficSettingsModal() {
                     </button>
                 </div>
                 <div class="traffic-tools-note">
-                    « Ajouter » enregistre un indicatif exact existant dans SafeSky, même si l’avion n’est pas actuellement détecté.
+                    « Ajouter » enregistre immédiatement l’indicatif, même sans détection actuelle. L’identifiant SafeSky sera associé automatiquement à la première détection.
                     « Rechercher » accepte aussi une partie comme MILAN et affiche les trafics actifs correspondants autour du centre de la carte.
                 </div>
                 <div id="traffic-search-results" class="traffic-search-results"></div>
@@ -7948,12 +8145,10 @@ function renderTrafficSearchResults(modal, results, message = '') {
         const trackButton = document.createElement('button');
         trackButton.type = 'button';
         trackButton.className = 'traffic-tool-button';
-        trackButton.textContent = isTrafficIdentifierTracked(
-            aircraft.hex
-        ) ? 'Déjà suivi' : 'Ajouter à la liste';
-        trackButton.disabled = isTrafficIdentifierTracked(
-            aircraft.hex
-        );
+        trackButton.textContent = isTrafficAircraftTracked(aircraft)
+            ? 'Déjà suivi'
+            : 'Ajouter à la liste';
+        trackButton.disabled = isTrafficAircraftTracked(aircraft);
         trackButton.addEventListener('click', () => {
             try {
                 addTrackedTrafficIdentifier(aircraft);
@@ -8013,9 +8208,7 @@ async function addTrackedTrafficFromModal(modal) {
     const addButton = modal?.querySelector(
         '#traffic-global-add-button'
     );
-    const query = String(input?.value || '')
-        .trim()
-        .toUpperCase();
+    const query = normalizeTrackedTrafficCallsign(input?.value || '');
 
     if (!query) {
         renderTrafficSearchResults(
@@ -8036,65 +8229,67 @@ async function addTrackedTrafficFromModal(modal) {
     renderTrafficSearchResults(
         modal,
         [],
-        `Recherche exacte de « ${query} » dans SafeSky…`
+        `Ajout de « ${query} » à la liste suivie…`
     );
 
     try {
-        const rawCandidates = await searchSafeSkyIdentityExact(query);
-        const candidates = rawCandidates
-            .map(raw => ({
-                raw,
-                identity: extractTrackedTrafficIdentity(raw)
-            }))
-            .filter(candidate => candidate.identity.id)
-            .sort((left, right) => {
-                const rank = candidate => {
-                    const identity = candidate.identity;
-                    if (identity.callsign.toUpperCase() === query) return 0;
-                    if (identity.registration.toUpperCase() === query) return 1;
-                    if (identity.id === query) return 2;
-                    return 3;
-                };
-                return rank(left) - rank(right);
-            });
+        const alreadyTracked = getTrackedTrafficIdentifiers().find(entry => (
+            normalizeTrackedTrafficCallsign(entry.callsign) === query
+            || entry.id === query
+        ));
+        if (alreadyTracked) {
+            throw new Error(
+                `${query} est déjà présent dans la liste suivie.`
+            );
+        }
 
-        if (!candidates.length) {
+        let selectedRaw = null;
+        try {
+            const rawCandidates = await searchSafeSkyIdentityExact(query);
+            const exactCandidates = rawCandidates
+                .map(raw => ({
+                    raw,
+                    identity: extractTrackedTrafficIdentity(raw)
+                }))
+                .filter(candidate => (
+                    candidate.identity.id
+                    && (
+                        normalizeTrackedTrafficCallsign(
+                            candidate.identity.callsign
+                        ) === query
+                        || String(candidate.identity.registration || '')
+                            .trim().toUpperCase() === query
+                        || candidate.identity.id === query
+                    )
+                ));
+            selectedRaw = exactCandidates[0]?.raw || null;
+        } catch (searchError) {
+            console.warn(
+                'Résolution immédiate SafeSky indisponible, ajout en attente:',
+                searchError
+            );
+        }
+
+        if (selectedRaw) {
+            addTrackedTrafficIdentifier(selectedRaw);
             renderTrafficSearchResults(
                 modal,
                 [],
-                `Aucun avion existant avec l’indicatif exact « ${query} » n’a été trouvé dans SafeSky.`
+                `${query} a été ajouté et associé à son identifiant SafeSky.`
             );
-            return;
-        }
-
-        const selected = candidates[0];
-        const identity = selected.identity;
-        const displayLabel = (
-            identity.registration
-            || identity.callsign
-            || identity.id
-        );
-
-        if (isTrafficIdentifierTracked(identity.id)) {
+        } else {
+            addPendingTrackedTrafficCallsign(query);
             renderTrafficSearchResults(
                 modal,
                 [],
-                `${displayLabel} est déjà présent dans la liste suivie.`
+                `${query} a été ajouté. Il sera associé automatiquement à son identifiant SafeSky dès sa première détection.`
             );
-            return;
         }
-
-        addTrackedTrafficIdentifier(selected.raw);
-        renderTrafficSearchResults(
-            modal,
-            [],
-            `${displayLabel} a été ajouté à la liste suivie. La ligne passera en vert dès que l’avion sera détecté.`
-        );
     } catch (error) {
         renderTrafficSearchResults(
             modal,
             [],
-            error?.message || 'Ajout impossible depuis SafeSky.'
+            error?.message || 'Ajout impossible.'
         );
     } finally {
         if (addButton) {
@@ -8322,18 +8517,55 @@ async function fetchTrackedTrafficBeacons() {
     if (!entries.length) return [];
 
     const settled = await Promise.allSettled(
-        entries.map(entry => fetchSafeSkyBeaconById(entry.id))
+        entries.map(async entry => {
+            if (!isPendingTrackedTrafficIdentifier(entry.id)) {
+                return {
+                    entry,
+                    raw: await fetchSafeSkyBeaconById(entry.id)
+                };
+            }
+
+            const candidates = await searchSafeSkyIdentityExact(
+                entry.callsign
+            );
+            const raw = candidates.find(candidate => {
+                const identity = extractTrackedTrafficIdentity(candidate);
+                return normalizeTrackedTrafficCallsign(identity.callsign)
+                    === normalizeTrackedTrafficCallsign(entry.callsign);
+            }) || null;
+
+            return { entry, raw };
+        })
     );
 
-    return settled
+    const rawResults = [];
+    let resolvedOneEntry = false;
+
+    settled
         .filter(result => result.status === 'fulfilled')
         .map(result => result.value)
-        .filter(Boolean)
-        .map(raw => ({
-            ...raw,
-            _npfForceDisplay: true,
-            _npfTracked: true
-        }));
+        .forEach(({ entry, raw }) => {
+            if (!raw) return;
+
+            if (
+                isPendingTrackedTrafficIdentifier(entry.id)
+                && mergeResolvedTrackedTrafficIdentity(entry, raw)
+            ) {
+                resolvedOneEntry = true;
+            }
+
+            rawResults.push({
+                ...raw,
+                _npfForceDisplay: true,
+                _npfTracked: true
+            });
+        });
+
+    if (resolvedOneEntry) {
+        refreshTrackedTrafficListUi();
+    }
+
+    return rawResults;
 }
 
 /*
@@ -8615,9 +8847,7 @@ function buildTrafficApiUrl(point, provider = null) {
         });
 
         if (settings.onlyTrackedIdentifiers) {
-            const identifiers = getTrackedTrafficIdentifiers()
-                .map(entry => entry.id)
-                .filter(Boolean);
+            const identifiers = getResolvedTrackedTrafficIdentifiers();
 
             if (identifiers.length) {
                 url.searchParams.set(
@@ -10566,7 +10796,7 @@ function buildTrafficAircraftPopupHtml(
             <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
             ${useAroundAltitude ? `<div>Filtre altitude : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
             ${useGroundToAboveAltitude ? `<div>Filtre altitude : <b>sol / ${Math.round(groundToAboveMaxAltitudeFt)} ft</b></div>` : ''}
-            ${ac.hex ? `<button type="button" class="traffic-popup-track-button">${isTrafficIdentifierTracked(ac.hex) ? 'Retirer de la liste suivie' : 'Ajouter à la liste suivie'}</button>` : ''}
+            ${ac.hex ? `<button type="button" class="traffic-popup-track-button">${isTrafficAircraftTracked(ac) ? 'Retirer de la liste suivie' : 'Ajouter à la liste suivie'}</button>` : ''}
             ${ac.hex ? `<button type="button" class="traffic-popup-own-button">${isOwnTrafficAircraft(ac) ? 'Mon avion masqué' : 'Définir comme mon avion et masquer'}</button>` : ''}
             <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
         </div>`;
@@ -10591,8 +10821,11 @@ function installTrafficMarkerPopupInteraction(marker) {
                 const currentAircraft = marker._npfTrafficAircraft;
                 if (!currentAircraft?.hex) return;
 
-                if (isTrafficIdentifierTracked(currentAircraft.hex)) {
-                    removeTrackedTrafficIdentifier(currentAircraft.hex);
+                const trackedEntry = findTrackedTrafficEntryForAircraft(
+                    currentAircraft
+                );
+                if (trackedEntry) {
+                    removeTrackedTrafficIdentifier(trackedEntry.id);
                     trackButton.textContent =
                         'Ajouter à la liste suivie';
                 } else {
@@ -10749,6 +10982,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             || trackedIdentifierSet.has(
                 String(ac.hex || '').toUpperCase()
             )
+            || isTrafficAircraftTracked(ac)
         ))
         .forEach(ac => {
             const reference = getNearestTrafficReference(ac, points);
@@ -11635,7 +11869,7 @@ function normalizeOaciCodeInput(value) {
 }
 
 /*
- * v14.54 TEST — destination aéroport temporaire et fermeture tactile fiable.
+ * v14.55 TEST — destination aéroport temporaire et fermeture tactile fiable.
  * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
  * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
  */
