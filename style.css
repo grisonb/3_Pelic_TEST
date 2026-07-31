@@ -11928,3 +11928,63 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* v14.49 TEST — les cartouches M utilisent le style des routes départementales. */
+
+
+/* ========================================================================== 
+   v14.50 TEST — recherche OACI et destination aéroport temporaire
+   ========================================================================== */
+
+#results-list li.search-result-airport {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    border-left: 5px solid #005a9c;
+    background: linear-gradient(90deg, #eaf6ff 0%, #ffffff 72%);
+    color: #17324d;
+    font-weight: 800;
+}
+
+#results-list li.search-result-airport::before {
+    content: '✈';
+    flex: 0 0 auto;
+    color: #005a9c;
+    font-size: 18px;
+}
+
+.search-result-airport-oaci {
+    flex: 0 0 auto;
+    min-width: 50px;
+    color: #005a9c;
+    font-size: 17px;
+    font-weight: 950;
+    letter-spacing: .06em;
+}
+
+.search-result-airport-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 750;
+}
+
+#commune-info-display.airport-destination-active {
+    border-color: rgba(0, 90, 156, .42) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #edf7ff 100%) !important;
+}
+
+#commune-info-display.airport-destination-active > .airport-destination-name {
+    flex: 0 0 auto !important;
+    min-width: auto !important;
+    color: #005a9c !important;
+    font-weight: 950 !important;
+    letter-spacing: .06em;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+#commune-info-display.airport-destination-active .gps-feu-route-info {
+    background: #e6f3ff !important;
+    border-color: #9bc9ec !important;
+    color: #004f89 !important;
+}
