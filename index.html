@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.48.zip?appv=v14.48" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.48">
-    <link rel="manifest" href="manifest.json?appv=v14.48">
+    <link rel="preload" href="data/localites/localites-france-v14.49.zip?appv=v14.49" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.49">
+    <link rel="manifest" href="manifest.json?appv=v14.49">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.48';
+        const APP_VERSION = 'v14.49';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -430,8 +430,8 @@
             </span>
         </button>
         <button id="road-overlay-button" class="left-map-action-button road-overlay-map-button"
-                title="Afficher/Masquer le calque routier A / N / D"
-                aria-label="Afficher/Masquer le calque routier autoroutes, nationales et départementales">
+                title="Afficher/Masquer le calque routier A / N / D / M"
+                aria-label="Afficher/Masquer le calque routier autoroutes, nationales, départementales et métropolitaines">
             <span class="road-overlay-icon" aria-hidden="true">
                 <svg viewBox="0 0 72 72" focusable="false" role="img">
                     <path class="road-overlay-road-casing" d="M12 63 C20 50 20 35 31 23 C39 14 48 12 60 8"/>
@@ -610,7 +610,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.48"></script>
+    <script src="script.js?appv=v14.49"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -850,7 +850,7 @@
 
                     <div class="road-overlay-import-block">
                         <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
-                            Importer le calque routier A / N / D
+                            Importer le calque routier A / N / D / M
                         </label>
                         <input type="file" id="road-overlay-importer-input"
                                accept=".zip,.geojson,.json,application/geo+json,application/json"
