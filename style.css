@@ -9510,8 +9510,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     opacity: 1 !important;
     animation: none !important;
     transition: none !important;
-    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.46') !important;
-    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.46') !important;
+    -webkit-mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.47') !important;
+    mask-image: url('icons/safesky-traffic-monochrome.png?appv=v14.47') !important;
     -webkit-mask-repeat: no-repeat !important;
     mask-repeat: no-repeat !important;
     -webkit-mask-position: center !important;
@@ -11837,3 +11837,11 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 /* Aucun changement visuel : la correction porte uniquement sur les calculs
    temporels des onglets Prévi et Suivi rotations. */
+
+
+/* ==========================================================================
+   v14.47 TEST — correction de la source RLT du premier transit
+   ========================================================================== */
+
+/* Aucun changement visuel : la condition d’exemption des 10 minutes lit
+   désormais uniquement le champ RLT Départ de l’en-tête BLOC/FUEL. */
