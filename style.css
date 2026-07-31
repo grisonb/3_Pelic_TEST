@@ -12192,3 +12192,9 @@ body.gaar-point-search-open .gaar-editing-banner {
     background: #bbf7d0 !important;
     transform: scale(.995);
 }
+
+
+/* =========================================================================
+   v14.57 TEST — liste suivie sans plafond et fermeture de la fiche trafic
+   Aucun changement visuel : les comportements sont gérés en JavaScript.
+   ========================================================================= */
