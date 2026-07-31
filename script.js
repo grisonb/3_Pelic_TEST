@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.52.zip?appv=v14.52';
+    './data/localites/localites-france-v14.53.zip?appv=v14.53';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1953,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.52'
+                        !== 'v14.53'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.52'
+                        'v14.53'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6642,8 +6642,54 @@ function refreshTrackedTrafficListUi() {
         if (detectedAircraft) {
             row.classList.add('traffic-tracked-detected');
             row.title = detectedAircraft.isGrounded
-                ? 'Détecté par SafeSky — au sol'
-                : 'Détecté par SafeSky — en vol';
+                ? 'Détecté par SafeSky — appuyer pour afficher au sol'
+                : 'Détecté par SafeSky — appuyer pour afficher sur la carte';
+            row.setAttribute('role', 'button');
+            row.setAttribute('tabindex', '0');
+            row.setAttribute(
+                'aria-label',
+                `${entry.registration || entry.callsign || entry.id} — afficher sur la carte`
+            );
+
+            const openDetectedTraffic = async (event) => {
+                if (event?.target?.closest?.('button')) return;
+                if (row.dataset.trafficOpening === '1') return;
+
+                row.dataset.trafficOpening = '1';
+                row.classList.add('traffic-tracked-opening');
+
+                try {
+                    await focusTrafficAircraftResult(
+                        detectedAircraft.raw || detectedAircraft,
+                        { forceGroundDisplay: true }
+                    );
+
+                    const modal = document.getElementById(
+                        'traffic-settings-modal'
+                    );
+                    if (modal) {
+                        modal.classList.remove('open');
+                        modal.setAttribute('aria-hidden', 'true');
+                    }
+                } catch (error) {
+                    console.warn(
+                        'Affichage du trafic suivi impossible:',
+                        error
+                    );
+                    row.title = error?.message
+                        || 'Position du trafic indisponible';
+                } finally {
+                    delete row.dataset.trafficOpening;
+                    row.classList.remove('traffic-tracked-opening');
+                }
+            };
+
+            row.addEventListener('click', openDetectedTraffic);
+            row.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                openDetectedTraffic(event);
+            });
         }
 
         const label = document.createElement('div');
@@ -6682,7 +6728,8 @@ function refreshTrackedTrafficListUi() {
         removeButton.className =
             'traffic-tool-button traffic-tool-button-danger';
         removeButton.textContent = 'Retirer';
-        removeButton.addEventListener('click', () => {
+        removeButton.addEventListener('click', event => {
+            event.stopPropagation();
             removeTrackedTrafficIdentifier(entry.id);
         });
 
@@ -7938,7 +7985,10 @@ async function performTrafficSearchFromModal(modal) {
     renderTrafficSearchResults(modal, results, message);
 }
 
-function storeTemporaryGlobalTraffic(raw) {
+function storeTemporaryGlobalTraffic(
+    raw,
+    { forceGroundDisplay = false } = {}
+) {
     const normalized = normalizeTrafficAircraft(raw);
     const key = buildTrafficAircraftKey(normalized);
     if (!normalized || !key) return null;
@@ -7946,11 +7996,13 @@ function storeTemporaryGlobalTraffic(raw) {
     const rawCopy = {
         ...(normalized.raw || raw),
         _npfForceDisplay: true,
-        _npfSearchResult: true
+        _npfSearchResult: true,
+        _npfForceGroundDisplay: Boolean(forceGroundDisplay)
     };
 
     temporaryGlobalTrafficResults.set(key, {
         raw: rawCopy,
+        forceGroundDisplay: Boolean(forceGroundDisplay),
         expiresAt:
             Date.now() + TRAFFIC_TEMPORARY_SEARCH_RESULT_TTL_MS
     });
@@ -7973,7 +8025,31 @@ function getTemporaryGlobalTrafficRaw() {
     return result;
 }
 
-async function focusTrafficAircraftResult(raw) {
+function getTemporaryTrafficDisplayOverride(aircraft) {
+    const key = buildTrafficAircraftKey(aircraft);
+    if (!key) return null;
+
+    const entry = temporaryGlobalTrafficResults.get(key);
+    if (!entry) return null;
+
+    if (entry.expiresAt <= Date.now()) {
+        temporaryGlobalTrafficResults.delete(key);
+        return null;
+    }
+
+    return {
+        forceDisplay: true,
+        forceGroundDisplay: Boolean(
+            entry.forceGroundDisplay
+            || entry.raw?._npfForceGroundDisplay
+        )
+    };
+}
+
+async function focusTrafficAircraftResult(
+    raw,
+    { forceGroundDisplay = false } = {}
+) {
     let currentRaw = raw;
     const normalized = normalizeTrafficAircraft(raw);
     const identifier = normalized?.hex;
@@ -7986,7 +8062,10 @@ async function focusTrafficAircraftResult(raw) {
         } catch (_) {}
     }
 
-    const storedRaw = storeTemporaryGlobalTraffic(currentRaw);
+    const storedRaw = storeTemporaryGlobalTraffic(
+        currentRaw,
+        { forceGroundDisplay }
+    );
     const aircraft = normalizeTrafficAircraft(storedRaw);
 
     if (!aircraft) {
@@ -10411,8 +10490,22 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     (Array.isArray(aircraftList) ? aircraftList : [])
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
+        .map(ac => {
+            const temporaryOverride = getTemporaryTrafficDisplayOverride(ac);
+            if (temporaryOverride) {
+                ac.forceDisplay = true;
+                ac.forceGroundDisplay = Boolean(
+                    temporaryOverride.forceGroundDisplay
+                );
+            }
+            return ac;
+        })
         .filter(ac => !isOwnTrafficAircraft(ac))
-        .filter(ac => settings.showGroundTraffic || !ac.isGrounded)
+        .filter(ac => (
+            ac.forceGroundDisplay
+            || settings.showGroundTraffic
+            || !ac.isGrounded
+        ))
         .filter(ac => (
             ac.forceDisplay
             || !Number.isFinite(ac.seenPos)
@@ -11338,7 +11431,7 @@ function normalizeOaciCodeInput(value) {
 }
 
 /*
- * v14.52 TEST — destination aéroport temporaire et fermeture tactile fiable.
+ * v14.53 TEST — destination aéroport temporaire et fermeture tactile fiable.
  * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
  * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
  */
