@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.47 TEST — correction de la source RLT du premier transit
+Date : 30 juillet 2026
+
+Modifications apportées :
+- base fonctionnelle utilisée : v14.46 ;
+- correction de l’interprétation de l’exception au forfait de 10 min du premier transit ;
+- la masse contrôlée est désormais exclusivement celle du champ « RLT Départ » situé dans l’en-tête BLOC/FUEL, sur la ligne BLOC DÉPART / FUEL DÉPART / RLT / BASE / TMD / LIMITE HDV ;
+- les cellules « Masse RLT » des lignes du tableau BLOC/FUEL ne suppriment plus jamais le forfait du premier transit ;
+- onglet Prévi : si RLT Départ contient une masse, Heure sur Feu = BLOC DÉPART + transit ; sinon Heure sur Feu = BLOC DÉPART + 10 min + transit ;
+- onglet Suivi rotations, avant toute ligne BLOC/FUEL : même règle pilotée par RLT Départ ;
+- après chaque ligne BLOC/FUEL renseignée, maintien systématique du calcul heure de la ligne + 10 min + transit vers le feu, quelle que soit la masse RLT saisie dans cette ligne ;
+- maintien séparé des 10 min avant validation du premier largage pour les limites CS, TMD et HDV ;
+- aides de calcul Prévi et Suivi mises à jour pour afficher la valeur de RLT Départ et le motif exact d’application ou d’exemption ;
+- aucune modification des consommations, BINGO, rotations, trafic SafeSky, cartes offline ou recherche des communes ;
+- correction des références de version actives dans index.html et harmonisation complète en v14.47 ;
+- base nationale hors ligne conservée à l’identique et archive renommée localites-france-v14.47.zip pour la cohérence du cache ;
+- version applicative portée en v14.47 TEST.
+
+===============================================================================
+
 v14.46 TEST — heure sur feu avec forfait plein retardant
 Date : 30 juillet 2026
 
