@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.47.zip?appv=v14.47';
+    './data/localites/localites-france-v14.48.zip?appv=v14.48';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -755,6 +755,14 @@ let lastTrafficRenderMeta = null;
  */
 const TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY =
     'safeSkyTrackedIdentifiersV1';
+/*
+ * v14.48 TEST — l'identifiant du propre avion est volontairement temporaire.
+ * sessionStorage le conserve pendant la session PWA courante, puis le navigateur
+ * le supprime lorsqu'une nouvelle session réelle est créée.
+ */
+const TRAFFIC_OWN_AIRCRAFT_SESSION_KEY =
+    'safeSkyOwnAircraftSessionV1';
+let ownTrafficAircraftSessionFallback = null;
 const TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY =
     'safeSkyPublishedBeaconIdV1';
 const TRAFFIC_MAX_TRACKED_IDENTIFIERS = 20;
@@ -1943,11 +1951,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.47'
+                        !== 'v14.48'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.47'
+                        'v14.48'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6502,6 +6510,178 @@ function refreshTrackedTrafficListUi() {
 }
 
 
+function sanitizeOwnTrafficAircraftSessionEntry(entry) {
+    if (!entry) return null;
+
+    const id = String(entry.id || entry.hex || '')
+        .trim()
+        .toUpperCase();
+    if (!id) return null;
+
+    return {
+        id,
+        callsign: String(entry.callsign || entry.call_sign || '')
+            .trim()
+            .toUpperCase(),
+        registration: String(entry.registration || '')
+            .trim()
+            .toUpperCase(),
+        type: String(entry.type || entry.beaconType || '')
+            .trim()
+            .toUpperCase(),
+        selectedAt: Number(entry.selectedAt) || Date.now()
+    };
+}
+
+function loadOwnTrafficAircraftSession() {
+    try {
+        const cleanEntry = sanitizeOwnTrafficAircraftSessionEntry(
+            JSON.parse(
+                sessionStorage.getItem(
+                    TRAFFIC_OWN_AIRCRAFT_SESSION_KEY
+                ) || 'null'
+            )
+        );
+        ownTrafficAircraftSessionFallback = cleanEntry;
+        return cleanEntry;
+    } catch (_) {
+        return sanitizeOwnTrafficAircraftSessionEntry(
+            ownTrafficAircraftSessionFallback
+        );
+    }
+}
+
+function getOwnTrafficAircraftSession() {
+    return loadOwnTrafficAircraftSession();
+}
+
+function getTrafficAircraftIdentifier(aircraftOrId) {
+    if (typeof aircraftOrId === 'string') {
+        return aircraftOrId.trim().toUpperCase();
+    }
+
+    return String(
+        aircraftOrId?.hex
+        || aircraftOrId?.id
+        || aircraftOrId?.raw?.hex
+        || aircraftOrId?.raw?.id
+        || ''
+    ).trim().toUpperCase();
+}
+
+function isOwnTrafficAircraft(aircraftOrId) {
+    const ownAircraft = getOwnTrafficAircraftSession();
+    const identifier = getTrafficAircraftIdentifier(aircraftOrId);
+    return !!ownAircraft && !!identifier && ownAircraft.id === identifier;
+}
+
+function refreshOwnTrafficAircraftUi() {
+    const ownAircraft = getOwnTrafficAircraftSession();
+    const statusElement = document.getElementById(
+        'traffic-own-aircraft-status'
+    );
+    const resetButton = document.getElementById(
+        'traffic-own-aircraft-reset'
+    );
+
+    if (statusElement) {
+        if (ownAircraft) {
+            const mainLabel = (
+                ownAircraft.registration
+                || ownAircraft.callsign
+                || ownAircraft.id
+            );
+            const details = [
+                ownAircraft.callsign
+                    && ownAircraft.callsign !== mainLabel
+                    ? ownAircraft.callsign
+                    : '',
+                ownAircraft.type,
+                ownAircraft.id
+            ].filter(Boolean).join(' · ');
+
+            statusElement.innerHTML = '';
+            const title = document.createElement('strong');
+            title.textContent = `Mon avion masqué : ${mainLabel}`;
+            const detail = document.createElement('span');
+            detail.textContent = details;
+            statusElement.append(title, detail);
+            statusElement.classList.add('traffic-own-aircraft-active');
+        } else {
+            statusElement.textContent =
+                'Aucun avion défini pour cette session.';
+            statusElement.classList.remove('traffic-own-aircraft-active');
+        }
+    }
+
+    if (resetButton) {
+        resetButton.disabled = !ownAircraft;
+    }
+}
+
+function redrawTrafficAfterOwnAircraftChange(reason) {
+    refreshOwnTrafficAircraftUi();
+    redrawTrafficLayerFromSnapshot();
+
+    if (showTrafficLayer) {
+        refreshTrafficLayer({
+            force: true,
+            reason
+        });
+    }
+}
+
+function setOwnTrafficAircraftSession(aircraft) {
+    const normalized = normalizeTrafficAircraft(
+        aircraft?.raw || aircraft
+    );
+    const id = getTrafficAircraftIdentifier(
+        normalized || aircraft
+    );
+
+    if (!id) {
+        throw new Error(
+            'Ce trafic ne fournit pas d’identifiant SafeSky exploitable'
+        );
+    }
+
+    const entry = sanitizeOwnTrafficAircraftSessionEntry({
+        id,
+        callsign: normalized?.callsign || aircraft?.callsign || '',
+        registration:
+            normalized?.registration || aircraft?.registration || '',
+        type:
+            normalized?.beaconType
+            || normalized?.type
+            || aircraft?.type
+            || '',
+        selectedAt: Date.now()
+    });
+
+    ownTrafficAircraftSessionFallback = entry;
+    try {
+        sessionStorage.setItem(
+            TRAFFIC_OWN_AIRCRAFT_SESSION_KEY,
+            JSON.stringify(entry)
+        );
+    } catch (_) {}
+
+    redrawTrafficAfterOwnAircraftChange('own-aircraft-set');
+    return entry;
+}
+
+function clearOwnTrafficAircraftSession() {
+    ownTrafficAircraftSessionFallback = null;
+    try {
+        sessionStorage.removeItem(
+            TRAFFIC_OWN_AIRCRAFT_SESSION_KEY
+        );
+    } catch (_) {}
+
+    redrawTrafficAfterOwnAircraftChange('own-aircraft-reset');
+}
+
+
 function loadTrafficSettings() {
     try {
         const raw = localStorage.getItem(TRAFFIC_SETTINGS_STORAGE_KEY);
@@ -6640,6 +6820,25 @@ function ensureTrafficSettingsModal() {
 
             </div>
 
+            <div class="traffic-tools-section traffic-own-aircraft-section">
+                <div class="traffic-tools-title">Mon avion</div>
+                <div class="traffic-own-aircraft-row">
+                    <div id="traffic-own-aircraft-status" class="traffic-own-aircraft-status">
+                        Aucun avion défini pour cette session.
+                    </div>
+                    <button type="button"
+                            id="traffic-own-aircraft-reset"
+                            class="traffic-tool-button traffic-tool-button-danger"
+                            disabled>
+                        Réinitialiser
+                    </button>
+                </div>
+                <div class="traffic-tools-note">
+                    Sélectionne ton transpondeur depuis la fenêtre d’un trafic ou depuis la recherche.
+                    Son étiquette sera masquée uniquement pendant la session PWA en cours.
+                </div>
+            </div>
+
             <div class="traffic-tools-section">
                 <div class="traffic-tools-title">Recherche d’identifiants SafeSky</div>
                 <div class="traffic-search-row">
@@ -6768,6 +6967,8 @@ function ensureTrafficSettingsModal() {
     modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-cancel').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-reset').addEventListener('click', fillDefaults);
+    modal.querySelector('#traffic-own-aircraft-reset')
+        .addEventListener('click', clearOwnTrafficAircraftSession);
 
     modal.addEventListener('click', (event) => {
         if (event.target === modal) closeModal();
@@ -6809,6 +7010,7 @@ function ensureTrafficSettingsModal() {
     });
 
     refreshTrackedTrafficListUi();
+    refreshOwnTrafficAircraftUi();
 
     return modal;
 }
@@ -6829,6 +7031,7 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-only-tracked-input').checked = !!current.onlyTrackedIdentifiers;
 
     refreshTrackedTrafficListUi();
+    refreshOwnTrafficAircraftUi();
 
     try {
         const mode = current.altitudeFilterMode;
@@ -7417,7 +7620,39 @@ function renderTrafficSearchResults(modal, results, message = '') {
             }
         });
 
-        actions.append(showButton, trackButton);
+        const ownAircraftButton = document.createElement('button');
+        ownAircraftButton.type = 'button';
+        ownAircraftButton.className =
+            'traffic-tool-button traffic-own-aircraft-select-button';
+        ownAircraftButton.textContent = isOwnTrafficAircraft(aircraft)
+            ? 'Mon avion masqué'
+            : 'Définir comme mon avion';
+        ownAircraftButton.disabled = (
+            !aircraft.hex
+            || isOwnTrafficAircraft(aircraft)
+        );
+        ownAircraftButton.addEventListener('click', () => {
+            try {
+                setOwnTrafficAircraftSession(aircraft);
+                renderTrafficSearchResults(
+                    modal,
+                    results,
+                    'Ton avion est masqué pour cette session.'
+                );
+            } catch (error) {
+                renderTrafficSearchResults(
+                    modal,
+                    results,
+                    error.message
+                );
+            }
+        });
+
+        actions.append(
+            showButton,
+            trackButton,
+            ownAircraftButton
+        );
         row.append(description, actions);
         container.appendChild(row);
     });
@@ -9853,6 +10088,7 @@ function buildTrafficAircraftPopupHtml(
             ${useAroundAltitude ? `<div>Filtre altitude : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
             ${useGroundToAboveAltitude ? `<div>Filtre altitude : <b>sol / ${Math.round(groundToAboveMaxAltitudeFt)} ft</b></div>` : ''}
             ${ac.hex ? `<button type="button" class="traffic-popup-track-button">${isTrafficIdentifierTracked(ac.hex) ? 'Retirer de la liste suivie' : 'Ajouter à la liste suivie'}</button>` : ''}
+            ${ac.hex ? `<button type="button" class="traffic-popup-own-button">${isOwnTrafficAircraft(ac) ? 'Mon avion masqué' : 'Définir comme mon avion et masquer'}</button>` : ''}
             <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
         </div>`;
 }
@@ -9866,6 +10102,9 @@ function installTrafficMarkerPopupInteraction(marker) {
         const popupElement = marker.getPopup()?.getElement?.();
         const trackButton = popupElement?.querySelector(
             '.traffic-popup-track-button'
+        );
+        const ownAircraftButton = popupElement?.querySelector(
+            '.traffic-popup-own-button'
         );
 
         if (trackButton && ac?.hex) {
@@ -9882,6 +10121,14 @@ function installTrafficMarkerPopupInteraction(marker) {
                     trackButton.textContent =
                         'Retirer de la liste suivie';
                 }
+            };
+        }
+
+        if (ownAircraftButton && ac?.hex) {
+            ownAircraftButton.onclick = () => {
+                const currentAircraft = marker._npfTrafficAircraft;
+                if (!currentAircraft?.hex) return;
+                setOwnTrafficAircraftSession(currentAircraft);
             };
         }
     });
@@ -9968,6 +10215,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     (Array.isArray(aircraftList) ? aircraftList : [])
         .map(normalizeTrafficAircraft)
         .filter(Boolean)
+        .filter(ac => !isOwnTrafficAircraft(ac))
         .filter(ac => settings.showGroundTraffic || !ac.isGrounded)
         .filter(ac => (
             ac.forceDisplay
