@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.53.zip?appv=v14.53';
+    './data/localites/localites-france-v14.54.zip?appv=v14.54';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1953,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.53'
+                        !== 'v14.54'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.53'
+                        'v14.54'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6505,20 +6505,68 @@ function isTrafficIdentifierTracked(id) {
         : false;
 }
 
-function addTrackedTrafficIdentifier(aircraft) {
-    const normalized = normalizeTrafficAircraft(
-        aircraft?.raw || aircraft
-    );
+function extractTrackedTrafficIdentity(aircraft) {
+    const raw = aircraft?.raw || aircraft || {};
+    const normalized = normalizeTrafficAircraft(raw);
+
     const id = String(
         normalized?.hex
-        || aircraft?.id
-        || aircraft?.hex
+        || raw.hex
+        || raw.id
+        || raw.aircraft_id
+        || raw.aircraftId
         || ''
     ).trim().toUpperCase();
 
+    const cleanText = (...values) => {
+        for (const value of values) {
+            const text = String(value || '').trim();
+            if (
+                text
+                && !['N/A', 'UNKNOWN', '--', 'NULL'].includes(
+                    text.toUpperCase()
+                )
+            ) {
+                return text;
+            }
+        }
+        return '';
+    };
+
+    return {
+        id,
+        callsign: cleanText(
+            normalized?.callsign,
+            raw.call_sign,
+            raw.callsign,
+            raw.flight
+        ),
+        registration: cleanText(
+            normalized?.registration,
+            raw.registration,
+            raw.registration_number,
+            raw.tail_number,
+            raw.tail,
+            raw.r
+        ),
+        type: cleanText(
+            normalized?.beaconType,
+            normalized?.type,
+            raw.beacon_type,
+            raw.aircraft_type,
+            raw.type
+        ),
+        raw
+    };
+}
+
+function addTrackedTrafficIdentifier(aircraft) {
+    const identity = extractTrackedTrafficIdentity(aircraft);
+    const id = identity.id;
+
     if (!id) {
         throw new Error(
-            'Ce trafic ne fournit pas d’identifiant SafeSky exploitable'
+            'SafeSky ne fournit pas d’identifiant technique exploitable pour cet indicatif.'
         );
     }
 
@@ -6527,9 +6575,9 @@ function addTrackedTrafficIdentifier(aircraft) {
 
     current.unshift({
         id,
-        callsign: normalized?.callsign || '',
-        registration: normalized?.registration || '',
-        type: normalized?.beaconType || normalized?.type || '',
+        callsign: identity.callsign,
+        registration: identity.registration,
+        type: identity.type,
         addedAt: Date.now()
     });
 
@@ -7084,14 +7132,19 @@ function ensureTrafficSettingsModal() {
                            autocapitalize="characters"
                            placeholder="Indicatif entier ou partie, ex. MILAN">
                     <button type="button"
+                            id="traffic-global-add-button"
+                            class="traffic-tool-button traffic-tool-button-add">
+                        Ajouter
+                    </button>
+                    <button type="button"
                             id="traffic-global-search-button"
                             class="traffic-tool-button traffic-tool-button-primary">
                         Rechercher
                     </button>
                 </div>
                 <div class="traffic-tools-note">
-                    Un indicatif complet est recherché directement dans SafeSky.
-                    Une partie comme MILAN affiche les trafics actifs correspondants autour du centre de la carte.
+                    « Ajouter » enregistre un indicatif exact existant dans SafeSky, même si l’avion n’est pas actuellement détecté.
+                    « Rechercher » accepte aussi une partie comme MILAN et affiche les trafics actifs correspondants autour du centre de la carte.
                 </div>
                 <div id="traffic-search-results" class="traffic-search-results"></div>
             </div>
@@ -7186,6 +7239,11 @@ function ensureTrafficSettingsModal() {
     modal.querySelectorAll('input[name="traffic-altitude-mode"]').forEach(input => {
         input.addEventListener('change', updateAltitudeModeUi);
     });
+
+    modal.querySelector('#traffic-global-add-button')
+        .addEventListener('click', () => {
+            addTrackedTrafficFromModal(modal);
+        });
 
     modal.querySelector('#traffic-global-search-button')
         .addEventListener('click', () => {
@@ -7518,6 +7576,53 @@ async function fetchSafeSkyBeaconById(identifier) {
         { allowNotFound: true }
     );
     return extractSingleSafeSkyBeacon(data);
+}
+
+async function searchSafeSkyIdentityExact(query) {
+    const normalizedQuery = String(query || '')
+        .trim()
+        .toUpperCase();
+
+    if (!normalizedQuery) return [];
+
+    const requests = [
+        ['call_sign', normalizedQuery],
+        ['aircraft_id', normalizedQuery]
+    ].map(async ([parameter, value]) => {
+        const url = buildSafeSkyApiEndpoint('search');
+        url.searchParams.set(parameter, value);
+
+        try {
+            const data = await fetchSafeSkyJson(
+                url,
+                { allowNotFound: true }
+            );
+            return extractSingleSafeSkyBeacon(data);
+        } catch (error) {
+            console.warn(
+                `Recherche d’identité SafeSky ${parameter} impossible:`,
+                error
+            );
+            return null;
+        }
+    });
+
+    const results = await Promise.all(requests);
+    const uniqueResults = [];
+    const seen = new Set();
+
+    results.filter(Boolean).forEach(raw => {
+        const identity = extractTrackedTrafficIdentity(raw);
+        const key = identity.id || [
+            identity.callsign,
+            identity.registration
+        ].filter(Boolean).join('|').toUpperCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        uniqueResults.push(raw);
+    });
+
+    return uniqueResults;
 }
 
 async function searchSafeSkyBeaconExact(query) {
@@ -7899,6 +8004,105 @@ function renderTrafficSearchResults(modal, results, message = '') {
         row.append(description, actions);
         container.appendChild(row);
     });
+}
+
+async function addTrackedTrafficFromModal(modal) {
+    const input = modal?.querySelector(
+        '#traffic-global-search-input'
+    );
+    const addButton = modal?.querySelector(
+        '#traffic-global-add-button'
+    );
+    const query = String(input?.value || '')
+        .trim()
+        .toUpperCase();
+
+    if (!query) {
+        renderTrafficSearchResults(
+            modal,
+            [],
+            'Saisis l’indicatif exact de l’avion à ajouter.'
+        );
+        return;
+    }
+
+    if (addButton?.dataset.loading === '1') return;
+    if (addButton) {
+        addButton.dataset.loading = '1';
+        addButton.disabled = true;
+        addButton.textContent = 'Ajout…';
+    }
+
+    renderTrafficSearchResults(
+        modal,
+        [],
+        `Recherche exacte de « ${query} » dans SafeSky…`
+    );
+
+    try {
+        const rawCandidates = await searchSafeSkyIdentityExact(query);
+        const candidates = rawCandidates
+            .map(raw => ({
+                raw,
+                identity: extractTrackedTrafficIdentity(raw)
+            }))
+            .filter(candidate => candidate.identity.id)
+            .sort((left, right) => {
+                const rank = candidate => {
+                    const identity = candidate.identity;
+                    if (identity.callsign.toUpperCase() === query) return 0;
+                    if (identity.registration.toUpperCase() === query) return 1;
+                    if (identity.id === query) return 2;
+                    return 3;
+                };
+                return rank(left) - rank(right);
+            });
+
+        if (!candidates.length) {
+            renderTrafficSearchResults(
+                modal,
+                [],
+                `Aucun avion existant avec l’indicatif exact « ${query} » n’a été trouvé dans SafeSky.`
+            );
+            return;
+        }
+
+        const selected = candidates[0];
+        const identity = selected.identity;
+        const displayLabel = (
+            identity.registration
+            || identity.callsign
+            || identity.id
+        );
+
+        if (isTrafficIdentifierTracked(identity.id)) {
+            renderTrafficSearchResults(
+                modal,
+                [],
+                `${displayLabel} est déjà présent dans la liste suivie.`
+            );
+            return;
+        }
+
+        addTrackedTrafficIdentifier(selected.raw);
+        renderTrafficSearchResults(
+            modal,
+            [],
+            `${displayLabel} a été ajouté à la liste suivie. La ligne passera en vert dès que l’avion sera détecté.`
+        );
+    } catch (error) {
+        renderTrafficSearchResults(
+            modal,
+            [],
+            error?.message || 'Ajout impossible depuis SafeSky.'
+        );
+    } finally {
+        if (addButton) {
+            delete addButton.dataset.loading;
+            addButton.disabled = false;
+            addButton.textContent = 'Ajouter';
+        }
+    }
 }
 
 async function performTrafficSearchFromModal(modal) {
@@ -11431,7 +11635,7 @@ function normalizeOaciCodeInput(value) {
 }
 
 /*
- * v14.53 TEST — destination aéroport temporaire et fermeture tactile fiable.
+ * v14.54 TEST — destination aéroport temporaire et fermeture tactile fiable.
  * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
  * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
  */
