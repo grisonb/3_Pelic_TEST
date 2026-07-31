@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.57 TEST — liste suivie sans limite et fermeture de la fiche trafic sur clic carte
+
+Modifications apportées :
+- suppression complète du plafond de 20 appareils dans la liste SafeSky suivie ;
+- conservation de toutes les entrées valides dans le stockage local, sans suppression silencieuse après tri ;
+- compteur remplacé par le nombre total réel d’indicatifs enregistrés ;
+- tri alphabétique naturel conservé quelle que soit la longueur de la liste ;
+- interrogation de tous les appareils suivis avec une concurrence réseau contrôlée afin de ne pas lancer toutes les requêtes SafeSky simultanément ;
+- protection contre les URL SafeSky trop longues lorsque le filtre « uniquement la liste suivie » contient de nombreux identifiants ;
+- ajout d’une fermeture de la fiche détaillée d’un trafic lors d’un clic réel sur le fond de carte ;
+- fermeture limitée aux fiches de trafic : les autres fenêtres cartographiques ne sont pas visées par cette action ;
+- un déplacement de carte ne ferme pas la fiche trafic ;
+- un zoom par pincement, molette ou commandes de zoom ne ferme pas la fiche trafic ;
+- un double appui utilisé pour zoomer ne ferme pas la fiche : la fermeture par clic simple est annulée dès que le zoom commence ;
+- distinction tactile entre un appui bref et un geste dépassant 8 px pour éviter une fermeture après déplacement sur iPad ;
+- maintien de l’ouverture de la fiche pendant les rafraîchissements et déplacements fluides du trafic ;
+- maintien intégral du scroll tactile, de l’ajout d’indicatifs en attente, du tri alphabétique et de l’affichage forcé individuel au sol ;
+- version applicative portée en v14.57 TEST.
+
+
 v14.56 TEST — défilement tactile de la liste suivie
 
 Modifications apportées :
