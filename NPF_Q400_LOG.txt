@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.52 TEST — Go To aéroport, suivi détecté vert et commandes dupliquées
+
+Modifications apportées :
+- ajout d’un bouton « Go To » sous tous les autres boutons de la fiche d’un aéroport ;
+- ajout du même bouton dans la fiche de chaque pélicandrome permanent ou personnalisé ;
+- le bouton ferme la fenêtre de carte puis déclenche exactement la même destination temporaire que la sélection d’un code OACI dans la recherche commune ;
+- aucune activation automatique d’un pélicandrome proche ;
+- aucune modification du feu, de la base, du pélicandrome sélectionné ou des calculs mission ;
+- tracé de la route GPS vers l’aéroport et affichage du bandeau OACI / route / distance / temps ;
+- ajout d’un état vert dans la liste SafeSky suivie lorsque l’identifiant mémorisé est actuellement détecté ;
+- détection valable aussi bien pour un avion en vol que pour un avion au sol ;
+- affichage explicite « Détecté en vol » ou « Détecté au sol » dans la ligne verte ;
+- retour automatique à l’état neutre lorsque le trafic n’est plus reçu, devient trop ancien, rencontre une erreur ou lorsque le calque SafeSky est désactivé ;
+- duplication des boutons « Défaut », « Annuler » et « Appliquer » immédiatement sous la section « Mon avion » ;
+- conservation des trois boutons originaux en bas de la fenêtre ;
+- les deux séries commandent exactement les mêmes réglages et actions ;
+- maintien intégral de la recherche OACI et de la correction tactile de la v14.51 ;
+- version applicative portée en v14.52 TEST.
+
+
 v14.51 TEST — croix aéroport tactile et bandeau en haut sans feu
 
 Modifications apportées :
