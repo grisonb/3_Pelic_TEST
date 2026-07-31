@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.50 TEST — recherche OACI et route GPS vers un aéroport
+
+Modifications apportées :
+- la barre de recherche accepte désormais les codes OACI des aéroports connus de NPF ;
+- proposition dédiée « CODE OACI — nom de l’aéroport » dès deux caractères saisis ;
+- priorité au résultat exact lorsque les quatre caractères du code sont renseignés ;
+- sélection d’un aéroport sans création ni modification d’un feu ;
+- aucune activation des pélicandromes les plus proches ;
+- conservation stricte du pélicandrome, de la base et du feu déjà sélectionnés ;
+- création d’une destination cartographique temporaire indépendante des calculs mission ;
+- tracé de la route rouge depuis la position GPS vers l’aéroport ;
+- recalcul continu de la route magnétique, de la distance et du temps avec la position GPS ;
+- bandeau de carte au format « CODE OACI / route / distance / temps » ;
+- bouton × permettant de quitter la route aéroport et de restaurer automatiquement la route et le bandeau du feu ;
+- absence de mémorisation permanente de la destination aéroport ;
+- maintien intégral des routes métropolitaines M de la v14.49 ;
+- maintien intégral du masquage temporaire du propre avion de la v14.48 ;
+- version applicative portée en v14.50 TEST.
+
+
 v14.49 TEST — prise en charge des routes métropolitaines M
 
 Modifications apportées :
