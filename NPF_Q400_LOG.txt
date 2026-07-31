@@ -1,5 +1,26 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.48 TEST — masquage temporaire du propre avion SafeSky
+Date : 31 juillet 2026
+
+Modifications apportées :
+- base fonctionnelle utilisée : v14.47 ;
+- ajout dans la fenêtre d’un trafic du bouton « Définir comme mon avion et masquer » ;
+- ajout du même choix dans les résultats de recherche d’identifiants SafeSky afin de pouvoir sélectionner le transpondeur même lorsque son symbole recouvre exactement la position GPS ;
+- identification fondée exclusivement sur l’identifiant unique SafeSky/ICAO fourni par le transpondeur, sans masquage approximatif par proximité GPS ;
+- exclusion systématique de cet identifiant du calque trafic, y compris lorsqu’il correspond à un résultat de recherche forcé ou à un identifiant de la liste suivie ;
+- le trafic reste disponible dans les résultats de recherche afin de pouvoir être identifié ou remplacé ;
+- ajout dans « Filtres trafic » d’un bloc « Mon avion » affichant l’immatriculation, l’indicatif et l’identifiant masqué ;
+- ajout d’un bouton « Réinitialiser » permettant de réafficher immédiatement cet avion ;
+- mémorisation dans sessionStorage uniquement : le choix n’est pas enregistré dans les réglages permanents de la PWA ;
+- remise à zéro automatique lors de la création d’une nouvelle session réelle de la PWA ; une simple mise en arrière-plan par iPadOS peut conserver la session courante ;
+- mise à jour immédiate du calque et du compteur de trafics lors de la sélection ou de la réinitialisation ;
+- aucune modification des calculs Prévi/Suivi, des règles RLT, des cartes offline, de la recherche des communes ou du fonctionnement SafeSky restant ;
+- base nationale hors ligne conservée à l’identique et archive renommée localites-france-v14.48.zip pour la cohérence du cache ;
+- version applicative portée en v14.48 TEST.
+
+===============================================================================
+
 v14.47 TEST — correction de la source RLT du premier transit
 Date : 30 juillet 2026
 
