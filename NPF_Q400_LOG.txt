@@ -1,5 +1,22 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.51 TEST — croix aéroport tactile et bandeau en haut sans feu
+
+Modifications apportées :
+- correction de la croix × du bandeau de destination aéroport sur iPad/PWA ;
+- remplacement de l’ancienne zone texte par un véritable bouton tactile ;
+- suppression de l’annulation prématurée du clic provoquée par touchstart ;
+- traitement direct de touchend, pointerup et click avec protection contre les doubles déclenchements ;
+- fermeture immédiate de la destination temporaire et suppression de sa route ;
+- restauration automatique du bandeau et de la route du feu lorsqu’un feu reste sélectionné ;
+- masquage complet du bandeau lorsqu’aucun feu ne reste sélectionné ;
+- lorsque l’aéroport est sélectionné sans feu, placement du bandeau dans la rangée supérieure normalement occupée par les BINGO ;
+- masquage explicite de tout ancien bandeau BINGO résiduel dans ce cas ;
+- aucune modification du feu, de la base, du pélicandrome ou des calculs mission ;
+- maintien intégral de la recherche OACI de la v14.50 et des routes métropolitaines de la v14.49 ;
+- version applicative portée en v14.51 TEST.
+
+
 v14.50 TEST — recherche OACI et route GPS vers un aéroport
 
 Modifications apportées :
