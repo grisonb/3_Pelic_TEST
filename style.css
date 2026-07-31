@@ -12167,3 +12167,28 @@ body.gaar-point-search-open .gaar-editing-banner {
     overflow-wrap: anywhere;
 }
 
+
+
+/* ========================================================================== 
+   v14.56 TEST — défilement tactile de la liste suivie
+   ========================================================================== */
+
+.traffic-settings-card,
+.traffic-tracked-list {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
+}
+
+.traffic-tracked-row.traffic-tracked-detected {
+    touch-action: pan-y !important;
+}
+
+/* Ne pas appliquer d'effet d'appui pendant un geste de défilement. */
+.traffic-tracked-row.traffic-tracked-detected:active {
+    transform: none;
+}
+
+.traffic-tracked-row.traffic-tracked-detected.traffic-tracked-opening {
+    background: #bbf7d0 !important;
+    transform: scale(.995);
+}
