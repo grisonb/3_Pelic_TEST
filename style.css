@@ -10530,7 +10530,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.15 TEST — calque routier vectoriel offline A / N / D
+   v14.49 TEST — calque routier vectoriel offline A / N / D / M
    ========================================================================== */
 
 #road-overlay-button.active {
@@ -10667,7 +10667,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     color: #ffffff !important;
 }
 
-.road-overlay-ref-d {
+.road-overlay-ref-d,
+.road-overlay-ref-m {
     background: #f0c419 !important;
     color: #17212b !important;
 }
@@ -11924,3 +11925,6 @@ body.gaar-point-search-open .gaar-editing-banner {
         width: 100%;
     }
 }
+
+
+/* v14.49 TEST — les cartouches M utilisent le style des routes départementales. */
