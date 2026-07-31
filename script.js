@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.55.zip?appv=v14.55';
+    './data/localites/localites-france-v14.56.zip?appv=v14.56';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1953,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.55'
+                        !== 'v14.56'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.55'
+                        'v14.56'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6890,8 +6890,73 @@ function refreshTrackedTrafficListUi() {
                 `${entry.registration || entry.callsign || entry.id} — afficher sur la carte`
             );
 
+            /*
+             * v14.56 TEST — distinction appui / défilement dans la liste suivie.
+             *
+             * Aucun preventDefault n'est utilisé : Safari peut donc faire défiler
+             * naturellement la carte des filtres lorsque le doigt part verticalement.
+             * Si le déplacement dépasse quelques pixels, le clic synthétique suivant
+             * est neutralisé afin de ne pas ouvrir le trafic à la fin du scroll.
+             */
+            let trackedRowTouchStartX = 0;
+            let trackedRowTouchStartY = 0;
+            let trackedRowTouchMoved = false;
+
+            const suppressTrackedRowClickAfterScroll = () => {
+                row.dataset.trafficSuppressClickUntil = String(
+                    Date.now() + 700
+                );
+                window.setTimeout(() => {
+                    const suppressUntil = Number(
+                        row.dataset.trafficSuppressClickUntil || 0
+                    );
+                    if (Date.now() >= suppressUntil) {
+                        delete row.dataset.trafficSuppressClickUntil;
+                    }
+                }, 750);
+            };
+
+            row.addEventListener('touchstart', event => {
+                if (event?.target?.closest?.('button')) return;
+                const touch = event.touches?.[0];
+                if (!touch) return;
+
+                trackedRowTouchStartX = touch.clientX;
+                trackedRowTouchStartY = touch.clientY;
+                trackedRowTouchMoved = false;
+                delete row.dataset.trafficSuppressClickUntil;
+            }, { passive: true });
+
+            row.addEventListener('touchmove', event => {
+                const touch = event.touches?.[0];
+                if (!touch) return;
+
+                const deltaX = touch.clientX - trackedRowTouchStartX;
+                const deltaY = touch.clientY - trackedRowTouchStartY;
+                if (Math.hypot(deltaX, deltaY) >= 8) {
+                    trackedRowTouchMoved = true;
+                }
+            }, { passive: true });
+
+            row.addEventListener('touchend', () => {
+                if (trackedRowTouchMoved) {
+                    suppressTrackedRowClickAfterScroll();
+                }
+                trackedRowTouchMoved = false;
+            }, { passive: true });
+
+            row.addEventListener('touchcancel', () => {
+                suppressTrackedRowClickAfterScroll();
+                trackedRowTouchMoved = false;
+            }, { passive: true });
+
             const openDetectedTraffic = async (event) => {
                 if (event?.target?.closest?.('button')) return;
+                if (
+                    Date.now() < Number(
+                        row.dataset.trafficSuppressClickUntil || 0
+                    )
+                ) return;
                 if (row.dataset.trafficOpening === '1') return;
 
                 row.dataset.trafficOpening = '1';
