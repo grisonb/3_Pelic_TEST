@@ -1,5 +1,25 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.55 TEST — ajout d’un indicatif en attente et tri alphabétique
+
+Modifications apportées :
+- correction du refus d’ajout de MILAN80 et des autres indicatifs non actuellement détectés ;
+- le bouton « Ajouter » ne dépend plus d’une réponse immédiate de SafeSky ;
+- ajout direct de tout indicatif valide dans la liste suivie ;
+- création d’une entrée temporaire « En attente de détection » lorsque l’identifiant technique n’est pas encore connu ;
+- recherche automatique de cet indicatif à chaque actualisation SafeSky ;
+- association automatique et transparente à l’identifiant technique dès la première détection ;
+- passage en vert et clic vers la carte conservés dès que l’appareil est détecté, au sol ou en vol ;
+- compatibilité maintenue avec le filtre « liste suivie uniquement » ;
+- exclusion des identifiants temporaires CALLSIGN des paramètres techniques envoyés à l’API ;
+- remplacement automatique de l’entrée temporaire par l’identifiant réel, sans doublon ;
+- affichage de l’indicatif en première ligne pour rendre le classement immédiatement lisible ;
+- classement permanent de la liste suivie par ordre alphabétique des indicatifs, avec tri numérique naturel ;
+- tri également appliqué aux anciennes entrées déjà enregistrées ;
+- le retrait, l’affichage forcé au sol et les boutons SafeSky existants restent inchangés ;
+- version applicative portée en v14.55 TEST.
+
+
 v14.54 TEST — ajout manuel d’un indicatif dans la liste suivie
 
 Modifications apportées :
