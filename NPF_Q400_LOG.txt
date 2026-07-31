@@ -1,5 +1,19 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.56 TEST — défilement tactile de la liste suivie
+
+Modifications apportées :
+- correction du blocage du défilement lorsque le doigt démarre sur une ligne verte détectée ;
+- autorisation explicite du défilement vertical natif dans la liste et dans la fenêtre des filtres SafeSky ;
+- distinction entre un appui bref et un mouvement de défilement grâce à un seuil tactile de 8 px ;
+- aucun centrage sur le trafic n'est déclenché à la fin d'un geste de scroll ;
+- un appui bref sans déplacement conserve l'ouverture du trafic sur la carte ;
+- fonctionnement identique pour les trafics détectés en vol et au sol ;
+- le bouton « Retirer » conserve son fonctionnement indépendant ;
+- aucune modification de la liste, du tri alphabétique, des filtres ou de l'affichage forcé individuel ;
+- version applicative portée en v14.56 TEST.
+
+
 v14.55 TEST — ajout d’un indicatif en attente et tri alphabétique
 
 Modifications apportées :
