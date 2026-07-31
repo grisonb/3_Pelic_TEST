@@ -11845,3 +11845,82 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 /* Aucun changement visuel : la condition d’exemption des 10 minutes lit
    désormais uniquement le champ RLT Départ de l’en-tête BLOC/FUEL. */
+
+
+/* ==========================================================================
+   v14.48 TEST — masquage temporaire du propre avion SafeSky
+   ========================================================================== */
+
+.traffic-own-aircraft-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+}
+
+.traffic-own-aircraft-status {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.traffic-own-aircraft-status strong {
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 950;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.traffic-own-aircraft-status span {
+    overflow: hidden;
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.traffic-own-aircraft-status.traffic-own-aircraft-active {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.traffic-own-aircraft-select-button {
+    border-color: #d97706;
+    background: #fffbeb;
+    color: #92400e;
+}
+
+.traffic-popup-own-button {
+    width: 100%;
+    min-height: 38px;
+    margin-top: 8px;
+    border: 1px solid #d97706;
+    border-radius: 10px;
+    padding: 6px 10px;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 13px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+@media (max-width: 560px) {
+    .traffic-own-aircraft-row {
+        grid-template-columns: 1fr;
+    }
+
+    #traffic-own-aircraft-reset {
+        width: 100%;
+    }
+}
