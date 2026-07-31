@@ -1,5 +1,23 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.53 TEST — clic sur la liste suivie et affichage forcé individuel
+
+Modifications apportées :
+- les lignes vertes de la liste d’identifiants suivis deviennent directement sélectionnables ;
+- un appui sur une ligne verte ferme la fenêtre des filtres SafeSky ;
+- activation automatique du calque SafeSky s’il était masqué ;
+- centrage et zoom de la carte sur la dernière position reçue de l’appareil ;
+- ouverture automatique de sa fiche détaillée sur la carte ;
+- fonctionnement identique pour un trafic détecté en vol ou au sol ;
+- lorsqu’un trafic détecté au sol est sélectionné, son affichage est forcé même si « Afficher les trafics au sol » reste décoché ;
+- le filtre général n’est pas modifié et tous les autres trafics au sol restent masqués ;
+- l’autorisation temporaire est liée uniquement à l’identifiant SafeSky du trafic choisi ;
+- le bouton « Retirer » conserve son action propre et ne déclenche pas le centrage de la carte ;
+- prise en charge du toucher iPad ainsi que des touches Entrée et Espace ;
+- maintien intégral des fonctions Go To, de la coloration verte et des boutons dupliqués de la v14.52 ;
+- version applicative portée en v14.53 TEST.
+
+
 v14.52 TEST — Go To aéroport, suivi détecté vert et commandes dupliquées
 
 Modifications apportées :
