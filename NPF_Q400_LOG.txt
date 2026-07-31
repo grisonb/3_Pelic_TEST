@@ -1,5 +1,22 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+v14.54 TEST — ajout manuel d’un indicatif dans la liste suivie
+
+Modifications apportées :
+- ajout d’un bouton « Ajouter » immédiatement à gauche du bouton « Rechercher » dans les filtres SafeSky ;
+- saisie de l’indicatif exact dans le champ de recherche puis appui sur « Ajouter » ;
+- recherche globale exacte de l’indicatif dans SafeSky, sans exiger que l’avion soit actuellement détecté sur la carte ;
+- récupération et mémorisation de l’identifiant technique SafeSky associé à l’indicatif ;
+- ajout direct de l’appareil à la liste suivie lorsqu’il existe dans SafeSky ;
+- conservation d’une ligne neutre tant que l’appareil n’est pas détecté ;
+- passage automatique de cette ligne en vert dès que SafeSky reçoit l’appareil, au sol ou en vol ;
+- message explicite si l’indicatif est introuvable, déjà suivi ou dépourvu d’identifiant technique exploitable ;
+- le bouton « Rechercher » conserve son fonctionnement actuel avec recherche exacte ou partielle des trafics actifs ;
+- prise en charge des réponses SafeSky d’identité ne contenant pas de position géographique courante ;
+- aucune modification des filtres, de l’affichage forcé individuel ni des autres fonctions de la v14.53 ;
+- version applicative portée en v14.54 TEST.
+
+
 v14.53 TEST — clic sur la liste suivie et affichage forcé individuel
 
 Modifications apportées :
