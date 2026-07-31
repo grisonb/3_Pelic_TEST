@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.48.zip?appv=v14.48';
+    './data/localites/localites-france-v14.49.zip?appv=v14.49';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -607,7 +607,7 @@ let departmentsLayerLoadPromise = null;
 let highVoltageLinesLayer = null;
 let highVoltageLinesRenderer = null;
 
-/* v14.15 — calque routier vectoriel offline A / N / D. */
+/* v14.49 — calque routier vectoriel offline A / N / D / M. */
 let roadOverlayLayer = null;
 let roadOverlayCasingLayer = null;
 let roadOverlayLineLayer = null;
@@ -756,7 +756,7 @@ let lastTrafficRenderMeta = null;
 const TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY =
     'safeSkyTrackedIdentifiersV1';
 /*
- * v14.48 TEST — l'identifiant du propre avion est volontairement temporaire.
+ * v14.49 TEST — l'identifiant du propre avion est volontairement temporaire.
  * sessionStorage le conserve pendant la session PWA courante, puis le navigateur
  * le supprime lorsqu'une nouvelle session réelle est créée.
  */
@@ -1951,11 +1951,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.48'
+                        !== 'v14.49'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.48'
+                        'v14.49'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -4320,7 +4320,7 @@ function setupEventListeners() {
 
     if (deleteRoadOverlayButton) {
         deleteRoadOverlayButton.addEventListener('click', async () => {
-            if (!confirm('Supprimer le calque routier offline A / N / D de cet appareil ?')) {
+            if (!confirm('Supprimer le calque routier offline A / N / D / M de cet appareil ?')) {
                 return;
             }
             await deleteRoadOverlayData();
@@ -5232,7 +5232,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
-// v14.15 TEST — calque routier vectoriel offline A / N / D
+// v14.49 TEST — routes métropolitaines M
+// - import des références M613, M185, M5E14, RM613 et « Route métropolitaine » ;
+// - classe M affichée comme une route départementale, dès le niveau 1 NM ;
+// - conservation intégrale des classes A, N et D existantes.
+// =========================================================================
+
+// =========================================================================
+// v14.49 TEST — calque routier vectoriel offline A / N / D / M
 // =========================================================================
 
 function getRoadOverlayManifest() {
@@ -5280,6 +5287,8 @@ function normalizeRoadOverlayReferenceValue(value) {
         .replace(/\bNATIONALE\b/g, 'N')
         .replace(/\bROUTE\s*DEPARTEMENTALE\b/g, 'D')
         .replace(/\bDEPARTEMENTALE\b/g, 'D')
+        .replace(/\bROUTE\s*METROPOLITAINE\b/g, 'M')
+        .replace(/\bMETROPOLITAINE\b/g, 'M')
         .replace(/[\s._/]+/g, '');
 
     if (!normalized) return '';
@@ -5300,6 +5309,13 @@ function normalizeRoadOverlayReferenceValue(value) {
     if (match) return `D${match[1]}`;
 
     /*
+     * Formes métropolitaines administratives : RM613, RM 613.
+     */
+    match = normalized.match(/(?:^|[^A-Z0-9])RM(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/RM(\d+[A-Z0-9-]*)/);
+    if (match) return `M${match[1]}`;
+
+    /*
      * Formes nationales administratives : RN7, RN 7.
      */
     match = normalized.match(/(?:^|[^A-Z0-9])RN(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
@@ -5307,10 +5323,10 @@ function normalizeRoadOverlayReferenceValue(value) {
     if (match) return `N${match[1]}`;
 
     /*
-     * Formes directement exploitables : A8, N7, D559, D7N, D2007.
+     * Formes directement exploitables : A8, N7, D559, M613, D7N, D2007.
      */
-    match = normalized.match(/(?:^|[^A-Z0-9])([AND]\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
-    if (!match) match = normalized.match(/([AND]\d+[A-Z0-9-]*)/);
+    match = normalized.match(/(?:^|[^A-Z0-9])([ANDM]\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/([ANDM]\d+[A-Z0-9-]*)/);
     return match ? match[1] : '';
 }
 
@@ -5346,7 +5362,7 @@ function getRoadOverlayFeatureReference(feature) {
 
 function getRoadOverlayClassFromRef(ref) {
     const prefix = String(ref || '').trim().toUpperCase().charAt(0);
-    return prefix === 'A' || prefix === 'N' || prefix === 'D'
+    return prefix === 'A' || prefix === 'N' || prefix === 'D' || prefix === 'M'
         ? prefix
         : '';
 }
@@ -5432,7 +5448,7 @@ function normalizeRoadOverlayGeojson(rawGeojson) {
         .filter(Boolean);
 
     if (!features.length) {
-        throw new Error('Aucune route A, N ou D avec une référence exploitable n’a été trouvée.');
+        throw new Error('Aucune route A, N, D ou M avec une référence exploitable n’a été trouvée.');
     }
 
     const normalized = {
@@ -5665,14 +5681,14 @@ function refreshRoadOverlayButtonState() {
     button.disabled = isRoadOverlayLoading;
 
     if (status) {
-        status.textContent = hasData ? 'A/N/D' : '!';
+        status.textContent = hasData ? 'A/N/D/M' : '!';
     }
 
     button.title = isRoadOverlayLoading
         ? 'Chargement du calque routier…'
         : (
             hasData
-                ? 'Afficher/Masquer le calque routier A / N / D'
+                ? 'Afficher/Masquer le calque routier A / N / D / M'
                 : 'Aucun calque routier installé — ouvrir Gestion des Cartes'
         );
 }
@@ -5696,7 +5712,7 @@ function getRoadOverlayZoomTier() {
     /*
      * Niveau 0 : rien avant 2 NM.
      * Niveau 1 : autoroutes uniquement à partir de 2 NM.
-     * Niveau 2 : A + N + D à partir de 1 NM.
+     * Niveau 2 : A + N + D + M à partir de 1 NM.
      */
     if (zoom >= 12) return 2;
     if (zoom >= 11) return 1;
@@ -5709,7 +5725,7 @@ function shouldLoadRoadOverlayFeatureForTier(feature, tier) {
     ).toUpperCase();
 
     if (tier >= 2) {
-        return roadClass === 'A' || roadClass === 'N' || roadClass === 'D';
+        return roadClass === 'A' || roadClass === 'N' || roadClass === 'D' || roadClass === 'M';
     }
 
     if (tier === 1) {
@@ -5755,6 +5771,11 @@ function getRoadOverlayLineStyle(feature, casing = false) {
             color: '#f0a202',
             weight: zoom >= 13 ? 3.4 : 2.8,
             casingWeight: zoom >= 13 ? 6.0 : 5.2
+        },
+        M: {
+            color: '#f0a202',
+            weight: zoom >= 13 ? 3.4 : 2.8,
+            casingWeight: zoom >= 13 ? 6.0 : 5.2
         }
     };
 
@@ -5795,7 +5816,7 @@ function shouldDisplayRoadOverlayFeature(feature) {
      * environ, correspondant au niveau de zoom 12.
      */
     if (roadClass === 'N') return zoom >= 12;
-    if (roadClass === 'D') return zoom >= 12;
+    if (roadClass === 'D' || roadClass === 'M') return zoom >= 12;
     return false;
 }
 
@@ -5878,7 +5899,7 @@ function addRoadOverlayLabelsForGeojson(geojson, partKey) {
         if (!shouldDisplayRoadOverlayFeature(feature)) return;
 
         const roadClass = String(feature?.properties?.roadClass || '').toUpperCase();
-        if (roadClass === 'D' && zoom < 12) return;
+        if ((roadClass === 'D' || roadClass === 'M') && zoom < 12) return;
 
         const ref = String(feature?.properties?.ref || '').trim();
         if (!ref) return;
@@ -5946,7 +5967,7 @@ async function loadRoadOverlayPart(part, token, tier) {
     /*
      * Ne créer dans Leaflet que les classes utiles au niveau courant :
      * - niveau 1 : A seulement ;
-     * - niveau 2 : A, N et D.
+     * - niveau 2 : A, N, D et M.
      * Le changement de niveau détruit puis reconstruit entièrement les couches,
      * ce qui évite à la fois les étiquettes seules et les géométries invisibles
      * conservées en mémoire.
@@ -6148,7 +6169,7 @@ async function toggleRoadOverlayLayer(forceState = null, options = {}) {
                 modal.style.display = 'flex';
                 refreshRoadOverlayInstalledStatus();
             }
-            alert('Aucun calque routier n’est installé. Importe le pack A / N / D dans Gestion des Cartes.');
+            alert('Aucun calque routier n’est installé. Importe le pack A / N / D / M dans Gestion des Cartes.');
         }
         return;
     }
