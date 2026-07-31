@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.51.zip?appv=v14.51';
+    './data/localites/localites-france-v14.52.zip?appv=v14.52';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1953,11 +1953,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.51'
+                        !== 'v14.52'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.51'
+                        'v14.52'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -6566,6 +6566,47 @@ function removeTrackedTrafficIdentifier(id) {
     return saved;
 }
 
+function getCurrentlyDetectedTrackedTrafficMap() {
+    const detected = new Map();
+    const refreshAgeMs = Date.now() - Number(lastTrafficRefreshAt || 0);
+
+    if (
+        !showTrafficLayer
+        || lastTrafficError
+        || !Number.isFinite(refreshAgeMs)
+        || refreshAgeMs > Math.max(15000, TRAFFIC_MAX_SEEN_SECONDS * 1000)
+    ) {
+        return detected;
+    }
+
+    const trackedSet = getTrackedTrafficIdentifierSet();
+    if (!trackedSet.size) return detected;
+
+    const candidates = [
+        ...(Array.isArray(lastTrafficAircraftSnapshot)
+            ? lastTrafficAircraftSnapshot
+            : []),
+        ...getTemporaryGlobalTrafficRaw()
+    ];
+
+    candidates
+        .map(normalizeTrafficAircraft)
+        .filter(Boolean)
+        .forEach(aircraft => {
+            const id = String(aircraft.hex || '').trim().toUpperCase();
+            if (!id || !trackedSet.has(id)) return;
+            if (
+                Number.isFinite(aircraft.seenPos)
+                && aircraft.seenPos > TRAFFIC_MAX_SEEN_SECONDS
+            ) {
+                return;
+            }
+            detected.set(id, aircraft);
+        });
+
+    return detected;
+}
+
 function refreshTrackedTrafficListUi() {
     const listElement = document.getElementById(
         'traffic-tracked-list'
@@ -6573,6 +6614,7 @@ function refreshTrackedTrafficListUi() {
     if (!listElement) return;
 
     const entries = getTrackedTrafficIdentifiers();
+    const detectedTrafficMap = getCurrentlyDetectedTrackedTrafficMap();
     listElement.innerHTML = '';
 
     const countElement = document.getElementById(
@@ -6596,6 +6638,14 @@ function refreshTrackedTrafficListUi() {
         const row = document.createElement('div');
         row.className = 'traffic-tracked-row';
 
+        const detectedAircraft = detectedTrafficMap.get(entry.id);
+        if (detectedAircraft) {
+            row.classList.add('traffic-tracked-detected');
+            row.title = detectedAircraft.isGrounded
+                ? 'Détecté par SafeSky — au sol'
+                : 'Détecté par SafeSky — en vol';
+        }
+
         const label = document.createElement('div');
         label.className = 'traffic-tracked-label';
 
@@ -6617,6 +6667,15 @@ function refreshTrackedTrafficListUi() {
         ].filter(Boolean).join(' · ');
 
         label.append(primary, secondary);
+
+        if (detectedAircraft) {
+            const liveState = document.createElement('span');
+            liveState.className = 'traffic-tracked-live-state';
+            liveState.textContent = detectedAircraft.isGrounded
+                ? 'Détecté au sol'
+                : 'Détecté en vol';
+            label.appendChild(liveState);
+        }
 
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
@@ -6962,6 +7021,12 @@ function ensureTrafficSettingsModal() {
                 </div>
             </div>
 
+            <div class="traffic-settings-actions traffic-settings-actions-duplicate">
+                <button type="button" id="traffic-settings-reset-duplicate" class="traffic-settings-secondary">Défaut</button>
+                <button type="button" id="traffic-settings-cancel-duplicate" class="traffic-settings-secondary">Annuler</button>
+                <button type="button" id="traffic-settings-apply-duplicate" class="traffic-settings-primary">Appliquer</button>
+            </div>
+
             <div class="traffic-tools-section">
                 <div class="traffic-tools-title">Recherche d’identifiants SafeSky</div>
                 <div class="traffic-search-row">
@@ -7090,6 +7155,14 @@ function ensureTrafficSettingsModal() {
     modal.querySelector('#traffic-settings-close').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-cancel').addEventListener('click', closeModal);
     modal.querySelector('#traffic-settings-reset').addEventListener('click', fillDefaults);
+    modal.querySelector('#traffic-settings-cancel-duplicate')
+        .addEventListener('click', closeModal);
+    modal.querySelector('#traffic-settings-reset-duplicate')
+        .addEventListener('click', fillDefaults);
+    modal.querySelector('#traffic-settings-apply-duplicate')
+        .addEventListener('click', () => {
+            modal.querySelector('#traffic-settings-apply').click();
+        });
     modal.querySelector('#traffic-own-aircraft-reset')
         .addEventListener('click', clearOwnTrafficAircraftSession);
 
@@ -10509,6 +10582,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     }
 
     lastTrafficDisplayedCount = uniqueAircraft.length;
+    refreshTrackedTrafficListUi();
     refreshTrafficButtonState(uniqueAircraft.length);
     updateTrafficStatus({
         visible: showTrafficLayer,
@@ -10795,6 +10869,8 @@ function toggleTrafficLayer(forceState = null) {
         refreshTrafficButtonState(0);
         updateTrafficStatus({ visible: false });
     }
+
+    refreshTrackedTrafficListUi();
 }
 
 async function testSafeSkyApi() {
@@ -11262,7 +11338,7 @@ function normalizeOaciCodeInput(value) {
 }
 
 /*
- * v14.51 TEST — destination aéroport temporaire et fermeture tactile fiable.
+ * v14.52 TEST — destination aéroport temporaire et fermeture tactile fiable.
  * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
  * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
  */
@@ -11826,6 +11902,29 @@ function buildPelicPdfButtonsHtml(oaci) {
     return `<div class="popup-buttons popup-pdf-buttons"><button class="pdf-btn" onclick="window.openAirportPdf('${safeOaci}')">PDF Pélic</button><button class="pdf-btn fdf-reduced-pdf-btn" onclick="window.openFdfReducedPdf()">Doc PDF Réduite</button></div>`;
 }
 
+function buildAirportGoToButtonHtml(oaci) {
+    const safeOaci = String(oaci || '')
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
+    if (!safeOaci) return '';
+
+    return `<div class="popup-buttons popup-goto-buttons"><button type="button" class="goto-btn" onclick="window.goToAirportDestinationByOaci('${safeOaci}')">Go To</button></div>`;
+}
+
+function goToAirportDestinationByOaci(oaci) {
+    const airport = getAirportByOaci(oaci);
+    if (!airport) return false;
+
+    try {
+        if (map && typeof map.closePopup === 'function') map.closePopup();
+    } catch (_) {}
+
+    return selectAirportDestination(airport);
+}
+
+window.goToAirportDestinationByOaci = goToAirportDestinationByOaci;
+
 
 function addAirportTouchHitbox(airport, popupHtml) {
     /* v13.81 — icône visuelle ramenée à 16 px ; zone tactile invisible de 40 px inchangée. */
@@ -11865,7 +11964,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`;
+            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
@@ -11908,7 +12007,7 @@ function drawPermanentAirportMarkers() {
             color: 'transparent',
             weight: 1,
             opacity: 0
-        }).bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div></div>`);
+        }).bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildAirportGoToButtonHtml(airport.oaci)}</div>`);
         marker.addTo(permanentAirportLayer);
     });
 
@@ -11926,7 +12025,7 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
         marker.bindPopup(popupHtml);
         marker.addTo(permanentAirportLayer);
         addAirportTouchHitbox(airport, popupHtml);
