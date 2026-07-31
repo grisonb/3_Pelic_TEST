@@ -11931,7 +11931,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v14.50 TEST — recherche OACI et destination aéroport temporaire
+   v14.51 TEST — recherche OACI et destination aéroport temporaire
    ========================================================================== */
 
 #results-list li.search-result-airport {
@@ -11988,3 +11988,66 @@ body.gaar-point-search-open .gaar-editing-banner {
     border-color: #9bc9ec !important;
     color: #004f89 !important;
 }
+
+/* ==========================================================================
+   v14.51 TEST — croix aéroport tactile et bandeau haut sans feu
+   ========================================================================== */
+
+#clear-airport-destination-btn {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: transparent !important;
+    font-family: inherit !important;
+    line-height: 1 !important;
+    touch-action: manipulation !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+}
+
+#clear-airport-destination-btn:active {
+    background: rgba(0, 90, 156, .12) !important;
+    color: #003d6b !important;
+}
+
+/* En l'absence de feu, le bandeau aéroport prend exactement la rangée haute
+   normalement occupée par les BINGO. */
+#commune-info-display.airport-destination-active.airport-destination-no-fire {
+    top: calc(var(--safe-area-top) + 4px) !important;
+    min-height: 56px !important;
+    height: auto !important;
+    padding: 8px 14px 8px 22px !important;
+    border-radius: 18px !important;
+}
+
+@media (min-width: 761px) and (max-width: 1180px) {
+    #commune-info-display.airport-destination-active.airport-destination-no-fire {
+        top: calc(var(--safe-area-top) + 4px) !important;
+        min-height: 54px !important;
+        padding: 7px 12px 7px 18px !important;
+    }
+}
+
+@media (max-width: 760px) {
+    #commune-info-display.airport-destination-active.airport-destination-no-fire {
+        top: calc(var(--safe-area-top) + 4px) !important;
+        left: 8px !important;
+        right: 74px !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        padding: 0 5px 0 10px !important;
+        border-radius: 10px !important;
+    }
+
+    #clear-airport-destination-btn {
+        min-width: 34px !important;
+        min-height: 34px !important;
+    }
+}
+
