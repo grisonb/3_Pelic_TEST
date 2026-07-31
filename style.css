@@ -11931,7 +11931,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v14.54 TEST — recherche OACI et destination aéroport temporaire
+   v14.55 TEST — recherche OACI et destination aéroport temporaire
    ========================================================================== */
 
 #results-list li.search-result-airport {
@@ -11990,7 +11990,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
-   v14.54 TEST — croix aéroport tactile et bandeau haut sans feu
+   v14.55 TEST — croix aéroport tactile et bandeau haut sans feu
    ========================================================================== */
 
 #clear-airport-destination-btn {
@@ -12052,7 +12052,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.54 TEST — Go To, suivi détecté vert et commandes SafeSky dupliquées
+   v14.55 TEST — Go To, suivi détecté vert et commandes SafeSky dupliquées
    ========================================================================== */
 
 .airport-popup .popup-goto-buttons {
@@ -12111,7 +12111,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.54 TEST — clic sur trafic suivi et affichage forcé individuel
+   v14.55 TEST — clic sur trafic suivi et affichage forcé individuel
    ========================================================================== */
 
 .traffic-tracked-row.traffic-tracked-detected {
@@ -12132,7 +12132,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.54 TEST — ajout manuel d'un indicatif à la liste suivie
+   v14.55 TEST — ajout manuel d'un indicatif à la liste suivie
    ========================================================================== */
 
 .traffic-tool-button-add {
@@ -12156,5 +12156,14 @@ body.gaar-point-search-open .gaar-editing-banner {
         padding-right: 7px;
         font-size: 12px;
     }
+}
+
+/* ========================================================================== 
+   v14.55 TEST — indicatifs en attente et tri alphabétique
+   ========================================================================== */
+
+.traffic-tracked-row:not(.traffic-tracked-detected)
+.traffic-tracked-label span {
+    overflow-wrap: anywhere;
 }
 
