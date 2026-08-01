@@ -1,4 +1,46 @@
 ============================================================
+VERSION TEST v14.71 — TOUS LES AUTRES AÉRODROMES EN POINTS NOIRS
+============================================================
+
+DATE : 01/08/2026
+BASE : v14.70 TEST
+
+DEMANDE
+- Conserver les aérodromes déjà intégrés avec leur symbole actuel : point noir cerclé de blanc puis de noir.
+- Ajouter tous les autres aérodromes de la base officielle avec un simple point noir.
+- Au clic sur un nouveau point, afficher uniquement le code OACI et le nom, sans autre commande.
+
+SOURCE ET PÉRIMÈTRE
+- Table PIAF « Tous les aérodromes » publiée par la DGAC/STAC.
+- 446 aérodromes métropolitains et corses disposant d'un code OACI à quatre lettres LFxx intégrés dans la liste embarquée.
+- Exclusion automatique des 123 codes déjà présents dans pelicanAirports ou otherAirports.
+- 323 aérodromes complémentaires affichés par la nouvelle couche de points noirs.
+- Exclusion des identifiants locaux ne correspondant pas à un code OACI LFxx à quatre lettres et des aérodromes ultramarins hors emprise de la carte NPF.
+
+MODIFICATIONS
+- Ajout d'une liste embarquée `piafMetropolitanAerodromesData` dans script.js.
+- Génération automatique de `additionalAerodromes` avec validation du code, du nom et des coordonnées.
+- Déduplication stricte par code OACI avec les aérodromes et pélicandromes déjà présents.
+- Symbole des nouveaux aérodromes : point noir plein de 5,4 pixels de diamètre, sans cercle blanc ni contour.
+- Ajout d'une zone tactile transparente distincte afin de conserver un clic fiable sur iPad.
+- Popup volontairement limitée à deux informations : code OACI en gras et nom de l'aérodrome.
+- Aucun bouton BASE, PÉLIC, EAU/RETARDANT, Désactiver, Go To ou PDF.
+- Les nouveaux aérodromes restent purement informatifs et ne sont pas ajoutés aux calculs mission, à la sélection de base, aux pélicandromes ou à la recherche de destination.
+- Aucun changement du moteur de cartes Offline, de la lecture IndexedDB ou de l'alerte de mise à jour.
+- Maintien du mécanisme de mise à jour atomique v14.70 avec un cache propre à la v14.71.
+
+CONTRÔLES DE LIVRAISON
+- 446 lignes PIAF uniques contrôlées ; 446 codes OACI uniques.
+- 123 codes existants détectés et exclus ; 323 nouveaux points attendus.
+- Vérification que chaque popup complémentaire ne contient que le code OACI et le nom.
+- Versions index/script/manifest/service worker alignées sur v14.71.
+- Cache service worker unique `sw-v14-71_all_aerodromes_black_points`.
+- Syntaxe JavaScript contrôlée.
+- Manifeste JSON contrôlé.
+- Journal v14.70 repris intégralement sans suppression.
+- Intégrité et contenu du ZIP contrôlés après création.
+
+============================================================
 VERSION TEST v14.70 — MISE À JOUR ATOMIQUE ET VERSIONNEMENT VERROUILLÉ
 ============================================================
 
