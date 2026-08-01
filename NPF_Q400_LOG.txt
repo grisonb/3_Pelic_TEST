@@ -1,5 +1,44 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.66 — RESTAURATION AUTOMATIQUE DE LA CARTE OFFLINE AU DÉMARRAGE
+Date : 1 août 2026
+Base : v14.65 TEST — fin de la boucle du message de mise à jour
+
+CORRECTION PRINCIPALE
+- Correction de la carte Offline mémorisée qui restait vide à chaque ouverture de la PWA.
+- La carte et le mode Offline étaient correctement mémorisés, mais la première couche Leaflet pouvait être créée avant que Safari rende les bases IndexedDB du pack effectivement disponibles.
+- Le changement manuel vers une autre carte puis le retour sur la carte initiale déclenchait une reconstruction complète et constituait le contournement constaté.
+- Au démarrage en mode Offline, NPF recalcule désormais automatiquement les noms de bases IndexedDB et tous les alias de la carte mémorisée.
+- Les anciennes limites min/max de zoom éventuellement issues d’une autre carte ou d’un scan interrompu sont supprimées avant la reconstruction.
+- La couche Offline est reconstruite après stabilisation de l’interface, puis retentée à intervalles courts uniquement tant qu’aucune tuile locale n’a été lue.
+- Dès la première tuile IndexedDB chargée, toutes les tentatives de récupération suivantes sont annulées.
+- Le pack sélectionné par l’utilisateur n’est jamais modifié par cette récupération automatique.
+- Ajout d’un recalage explicite lorsque le zoom courant est inférieur au zoom minimal disponible de la carte Offline.
+
+COHÉRENCE DE VERSION
+- Correction d’une incohérence héritée du pack v14.65 : son index.html annonçait encore v14.64 alors que le manifeste et le service worker annonçaient v14.65.
+- En v14.66, index.html, script.js, manifest.json et sw.js utilisent tous la même référence v14.66.
+- Les paramètres appv des ressources et le start_url du manifeste sont alignés sur v14.66.
+
+CONSERVÉ
+- Démarrage PWA sans connexion de la v14.64/v14.65.
+- Lecture directe des tuiles Offline dans IndexedDB de la v14.63.
+- Fin de la boucle du message « Mise à jour installée » de la v14.65.
+- Toutes les cartes déjà téléchargées, les cartes actives et les bases IndexedDB existantes.
+- Toutes les fonctions SafeSky, recherche OACI, Go To, liste suivie et calque routier des versions précédentes.
+
+VALIDATIONS
+- Vérification syntaxique de script.js et sw.js avec Node.js.
+- Vérification JSON du manifeste.
+- Test unitaire de la récupération au démarrage avec une carte mémorisée, des métadonnées périmées et d’anciennes limites de zoom.
+- Vérification que la reconstruction complète s’arrête après la première tuile locale effectivement lue.
+- Vérification de l’alignement intégral des références v14.66.
+- Vérification que le présent journal reprend intégralement, octet pour octet, le journal cumulatif v14.65 après la nouvelle entrée.
+
+===============================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.65 — FIN DE LA BOUCLE « MISE À JOUR INSTALLÉE »
 Date : 1 août 2026
 Base : v14.64 TEST — démarrage PWA hors ligne fiabilisé
