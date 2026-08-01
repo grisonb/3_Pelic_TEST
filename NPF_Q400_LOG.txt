@@ -1,5 +1,43 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.67 — RESTAURATION DÉFINITIVE DE L’ALERTE DE MISE À JOUR UNIQUE
+Date : 1 août 2026
+Base : v14.66 TEST — restauration automatique de la carte Offline au démarrage
+
+CORRECTION PRINCIPALE
+- Correction du retour de la boucle permanente « Mise à jour installée » apparue en v14.66.
+- La v14.66 avait réutilisé par erreur dans index.html l’ancien mécanisme v14.64 : marqueur conservé sur deux ouvertures, message sans bouton de validation et consommation différée.
+- Restauration intégrale du mécanisme validé en v14.65 : le marqueur est consommé avant l’affichage et l’alerte ne peut donc plus réapparaître au lancement suivant.
+- Ajout conservé du bouton « Continuer » pour fermer immédiatement l’alerte sans fermer la PWA.
+- La clé persistante npfPostUpdateNoticeShownVersion mémorise la version déjà présentée.
+- Les marqueurs hérités npfPostUpdateRestartNoticeVersion, npfPostUpdateRestartNoticePending et npfPostUpdateRestartNoticeRemaining sont supprimés dès leur migration.
+- La détection controllerchange reste limitée à un seul rechargement protégé par session.
+- Aucun contrôle de mise à jour automatique n’est relancé sur pageshow ou visibilitychange.
+
+CONSERVÉ
+- Restauration automatique de la carte Offline mémorisée au démarrage de la v14.66.
+- Lecture directe des tuiles Offline dans IndexedDB de la v14.63.
+- Démarrage PWA sans connexion et app-shell sécurisé de la v14.64.
+- Toutes les cartes téléchargées, les bases IndexedDB et les choix de cartes mémorisés.
+- Toutes les fonctions SafeSky, recherche OACI, Go To, liste suivie et calque routier.
+
+COHÉRENCE DE VERSION
+- index.html, script.js, manifest.json et sw.js utilisent tous v14.67.
+- Les paramètres appv et le start_url du manifeste sont alignés sur v14.67.
+- Le moteur Offline de la v14.66 n’est pas modifié par cette correction.
+
+VALIDATIONS
+- Vérification syntaxique de script.js et sw.js avec Node.js.
+- Vérification JSON du manifeste.
+- Test automatisé du script d’amorçage avec anciens marqueurs bloqués : affichage unique, consommation immédiate et absence au second lancement.
+- Vérification de l’absence du mécanisme à deux ouvertures et des temporisations de consommation différée dans index.html.
+- Vérification que le service worker ne contient aucune navigation client forcée de transition.
+- Vérification que le présent journal reprend intégralement, octet pour octet, le journal cumulatif v14.66 après la nouvelle entrée.
+
+===============================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.66 — RESTAURATION AUTOMATIQUE DE LA CARTE OFFLINE AU DÉMARRAGE
 Date : 1 août 2026
 Base : v14.65 TEST — fin de la boucle du message de mise à jour
