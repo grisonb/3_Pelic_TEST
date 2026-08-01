@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-57_suivi_sans_limite_fermeture_popup';
-const APP_VERSION = 'v14.57';
+const SW_VERSION = 'sw-v14-58_reparation_offline';
+const APP_VERSION = 'v14.58';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -28,7 +28,7 @@ const APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
-    './data/localites/localites-france-v14.57.zip',
+    './data/localites/localites-france-v14.56.zip',
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
     './icons/icon-192x192.png',
@@ -53,7 +53,7 @@ const CORE_APP_SHELL_URLS = [
     './jszip.min.js',
     './communes.json',
     './communes_aliases.json',
-    './data/localites/localites-france-v14.57.zip'
+    './data/localites/localites-france-v14.56.zip'
 ];
 
 
@@ -248,6 +248,21 @@ self.addEventListener('message', event => {
         return;
     }
 
+    if (data.type === 'OFFLINE_HEALTH_CHECK') {
+        try {
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({
+                    type: 'OFFLINE_HEALTH_READY',
+                    version: APP_VERSION,
+                    offlineTilesEnabled,
+                    activeOfflinePacks: [...activeOfflinePacks],
+                    activeOfflinePackDatabases: [...activeOfflinePackDatabases]
+                });
+            }
+        } catch (_) {}
+        return;
+    }
+
     if (data.type === 'OFFLINE_ACTIVE_PACKS_CHANGED') {
         activeOfflinePacks = Array.isArray(data.value)
             ? data.value.filter(Boolean)
@@ -362,7 +377,7 @@ function isAppShellRequest(request) {
             'jszip.min.js',
             'communes.json',
             'communes_aliases.json',
-            'localites-france-v14.57.zip',
+            'localites-france-v14.56.zip',
             'lignes_ht_rte_simplifiees.geojson'
         ].includes(filename) || parsed.pathname.includes('/icons/');
     } catch (_) {
