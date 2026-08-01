@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.66';
+    './data/localites/localites-france-v14.56.zip?appv=v14.67';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1877,7 +1877,7 @@ async function initializeApp() {
             2200,
             'Timeout analyse initiale des cartes offline'
         ).then(() => {
-            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.66');
+            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.67');
         }).catch(error => {
             console.warn('[Offline] Plage de zoom initiale conservée:', error);
         });
@@ -1937,7 +1937,7 @@ async function initializeApp() {
     searchSection.style.display = 'block';
     initMap();
     scheduleRememberedOfflineMapStartupRecovery(
-        'initializeApp-v14.66'
+        'initializeApp-v14.67'
     );
     initializeTeamChat();
     try {
@@ -1974,11 +1974,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.66'
+                        !== 'v14.67'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.66'
+                        'v14.67'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3714,7 +3714,7 @@ function scheduleOfflineTileWake(reason = 'startup') {
 
 
 /*
- * v14.66 TEST — restauration automatique de la carte Offline mémorisée.
+ * v14.67 TEST — restauration automatique de la carte Offline mémorisée.
  *
  * Lors d'une ouverture directe en mode Offline, la première couche pouvait être
  * créée avant que Safari ait rendu les bases IndexedDB du pack réellement
@@ -17519,7 +17519,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.66'
+                        window.APP_VERSION || 'v14.67'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
@@ -17615,7 +17615,7 @@ async function setMapSourceMode(mode) {
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.66');
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.67');
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
@@ -17630,7 +17630,7 @@ async function setMapSourceMode(mode) {
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.66');
+            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.67');
         }).catch(error => {
             console.warn('[Offline] Synchronisation SW différée:', error);
         });
@@ -17642,7 +17642,7 @@ async function setMapSourceMode(mode) {
         'Timeout analyse des niveaux de zoom'
     ).then(() => {
         if (mapSourceMode === nextMode) {
-            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.66');
+            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.67');
         }
     }).catch(error => {
         console.warn('[Offline] Niveaux de zoom par défaut conservés:', error);
@@ -18746,7 +18746,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.66');
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.67');
     } catch (error) {
         console.error('Changement de carte offline impossible:', error);
         alert(`Impossible de changer de carte offline: ${error.message || error}`);
@@ -18768,7 +18768,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.66');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.67');
         }).catch(() => {});
     }
 
@@ -18778,7 +18778,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         'Timeout analyse carte sélectionnée'
     ).then(() => {
         if (token === offlineMapSwitchToken) {
-            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.66');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.67');
         }
     }).catch(() => {});
 
