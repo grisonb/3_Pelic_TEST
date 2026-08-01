@@ -1,26 +1,19 @@
-NPF-Q400 — TEST v14.62
+NPF-Q400 — TEST v14.63 — Lecture directe des cartes Offline
 
 CORRECTION PRINCIPALE
-- Le clic sur « Offline » ne dépend plus d’une réponse IndexedDB ni du contrôle préalable du service worker.
-- L’état Offline, la couleur du bouton et la reconstruction de la couche Leaflet sont appliqués immédiatement.
-- Le bouton est systématiquement réactivé après le clic ; il ne peut plus rester bloqué sur Online ou en état pastel à cause d’une promesse Safari non résolue.
+- La couche de carte Offline ne dépend plus du contrôle de la page par le service worker.
+- Leaflet lit directement les tuiles téléchargées dans les bases IndexedDB de NPF.
+- Compatibilité avec les bases isolées par groupe et avec l’ancienne base commune OfflineTilesDB_v13_70_clean.
+- Compatibilité avec les noms de packs actuels, normalisés et historiques.
+- Recherche des tuiles PNG, JPG et JPEG.
+- Le service worker reste conservé pour le démarrage de l’application sans réseau et comme compatibilité secondaire.
 
-MOTEUR DE TUILES
-- Le moteur de lecture des tuiles et le service worker restent ceux restaurés depuis la v14.56.
-- La base nationale réutilise toujours data/localites/localites-france-v14.56.zip.
-- Les packs actifs, leurs bases et leurs alias sont envoyés immédiatement au service worker.
-- Trois resynchronisations courtes sont prévues au démarrage pour couvrir le changement de contrôleur Safari.
-- Si aucun service worker ne contrôle encore la PWA, une seule relance protégée est programmée, sans empêcher la sélection Offline.
-
-INDEXEDDB
-- Les écritures des préférences et des packs sont effectuées en arrière-plan avec un délai maximal.
-- Un verrouillage IndexedDB ne bloque plus le démarrage, la sélection du pack ni la bascule Online/Offline.
-
-SÉLECTION D’UN PACK
-- Cocher un groupe de cartes applique également le mode Offline et la couche immédiatement.
-- L’analyse des niveaux de zoom est secondaire et ne peut plus annuler ou retarder le changement de carte.
+COMPORTEMENT
+- Le bouton Offline se sélectionne immédiatement.
+- Les tuiles locales peuvent s’afficher même si Safari n’a pas encore donné le contrôle de la page au nouveau service worker.
+- Un message indique si une première tuile locale a été trouvée ou si aucune tuile ne correspond à la zone et au zoom affichés.
 
 CONSERVÉ
-- Liste SafeSky sans limite.
-- Fermeture de la fiche trafic par clic réel sur le fond de carte.
-- Toutes les fonctions des v14.52 à v14.57.
+- Toutes les fonctions de la v14.62.
+- Les packs déjà téléchargés ne sont ni supprimés ni réimportés.
+- L’archive nationale de localités reste localites-france-v14.56.zip.
