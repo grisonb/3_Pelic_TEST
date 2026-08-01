@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-63_lecture_directe_indexeddb';
-const APP_VERSION = 'v14.63';
+const SW_VERSION = 'sw-v14-64_demarrage_pwa_hors_ligne';
+const APP_VERSION = 'v14.64';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -13,48 +13,47 @@ const OFFLINE_ACTIVE_PACK_ALIASES_KEY = 'offlineActivePackAliases';
 const OFFLINE_MAP_DATABASE_PREFIX = 'OfflineMap_';
 
 const APP_SHELL_CACHE = `npf-q400-app-shell-${SW_VERSION}`;
+const APP_DATA_CACHE = 'npf-q400-app-data-v1';
+const APP_SHELL_CACHE_PREFIX = 'npf-q400-app-shell-';
 const DEPARTMENTS_GEOJSON_URL = 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/departements-1000m.geojson';
 const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
-const APP_SHELL_URLS = [
-    './',
+
+/*
+ * v14.64 TEST — app-shell minimal et atomique.
+ * Seules les ressources indispensables à l'ouverture de l'interface bloquent
+ * l'installation. Les bases volumineuses et ressources métier sont mises en
+ * cache séparément, à la demande, et ne peuvent plus faire échouer le SW.
+ */
+const CORE_APP_SHELL_URLS = [
     './index.html',
     './style.css',
-    './icons/safesky-traffic-monochrome.png',
     './script.js',
     './manifest.json',
     './leaflet.css',
     './leaflet.min.js',
     './suncalc.js',
-    './jszip.min.js',
+    './jszip.min.js'
+];
+
+const APP_DATA_URLS = [
     './communes.json',
     './communes_aliases.json',
     './data/localites/localites-france-v14.56.zip',
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
+    './icons/safesky-traffic-monochrome.png',
     './icons/icon-192x192.png',
-    './icons/icon-512x512.png'
-,
+    './icons/icon-512x512.png',
     './icons/apple-touch-icon.png',
     './icons/maskable-icon-512x512.png',
-    './icons/bloc-fuel-shortcut-icon.png'    , './icons/calculator-fms-icon.png'
-    , './icons/search-commune-icon.png'
-    , './icons/center-gps-icon.png'
+    './icons/bloc-fuel-shortcut-icon.png',
+    './icons/calculator-fms-icon.png',
+    './icons/search-commune-icon.png',
+    './icons/center-gps-icon.png'
 ];
 
-const CORE_APP_SHELL_URLS = [
-    './',
-    './index.html',
-    './style.css',
-    './script.js',
-    './manifest.json',
-    './leaflet.css',
-    './leaflet.min.js',
-    './suncalc.js',
-    './jszip.min.js',
-    './communes.json',
-    './communes_aliases.json',
-    './data/localites/localites-france-v14.56.zip'
-];
+const APP_SHELL_URLS = [...CORE_APP_SHELL_URLS, ...APP_DATA_URLS];
+
 
 
 /*
@@ -81,41 +80,69 @@ const OFFLINE_MESSAGE_AUTHORITY_MS = 120000;
 const MEMORY_TILE_CACHE_MAX = 160;
 const memoryTileCache = new Map();
 
+async function fetchForAppShell(url, timeoutMs = 12000) {
+    const request = new Request(url, {
+        cache: 'reload',
+        mode: url === DEPARTMENTS_GEOJSON_URL ? 'cors' : 'same-origin'
+    });
+    return await swFetchWithTimeout(request, {}, timeoutMs);
+}
+
+async function copyExistingCachedAsset(url, targetCache) {
+    try {
+        const existing = await caches.match(url, { ignoreSearch: true });
+        if (!existing) return false;
+        await targetCache.put(url, existing.clone());
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
         const cache = await caches.open(APP_SHELL_CACHE);
         const failedCoreUrls = [];
 
-        await Promise.all(APP_SHELL_URLS.map(async (url) => {
+        /*
+         * Chaque ressource cœur est d'abord récupérée sur le réseau. En cas de
+         * coupure pendant la mise à jour, une copie de l'ancien app-shell est
+         * acceptée. Le SW actif n'est donc jamais remplacé par un shell vide.
+         */
+        for (const url of CORE_APP_SHELL_URLS) {
+            let stored = false;
             try {
-                const request = new Request(url, { cache: 'reload', mode: url === DEPARTMENTS_GEOJSON_URL ? 'cors' : 'same-origin' });
-                const response = await fetch(request);
-
-                /*
-                 * v12.38 :
-                 * - les fichiers cœur doivent obligatoirement être cachés ;
-                 * - les ressources optionnelles peuvent échouer sans casser l'installation ;
-                 * - cela évite d'activer un nouveau SW incomplet qui casserait le lancement hors ligne.
-                 */
-                if (response && (response.ok || response.type === 'opaque')) {
+                const response = await fetchForAppShell(url, 12000);
+                if (response && response.ok) {
                     await cache.put(url, response.clone());
-                    return;
+                    stored = true;
                 }
+            } catch (_) {}
 
-                if (CORE_APP_SHELL_URLS.includes(url)) {
-                    failedCoreUrls.push(url);
-                }
-            } catch (error) {
-                console.warn('[SW] Cache app shell ignoré pour', url, error);
-                if (CORE_APP_SHELL_URLS.includes(url)) {
-                    failedCoreUrls.push(url);
-                }
+            if (!stored) {
+                stored = await copyExistingCachedAsset(url, cache);
             }
-        }));
+            if (!stored) failedCoreUrls.push(url);
+        }
 
         if (failedCoreUrls.length) {
-            throw new Error(`[SW] Installation refusée, fichiers cœur absents: ${failedCoreUrls.join(', ')}`);
+            throw new Error(
+                `[SW] Installation refusée, app-shell incomplet: ${failedCoreUrls.join(', ')}`
+            );
         }
+
+        /*
+         * Migration locale non bloquante des données déjà cachées par une
+         * version antérieure. Aucun téléchargement volumineux n'est imposé à
+         * l'installation ; les absences et quotas sont simplement ignorés.
+         */
+        try {
+            const dataCache = await caches.open(APP_DATA_CACHE);
+            await Promise.allSettled(APP_DATA_URLS.map(async url => {
+                const existing = await caches.match(url, { ignoreSearch: true });
+                if (existing) await dataCache.put(url, existing.clone());
+            }));
+        } catch (_) {}
 
         await self.skipWaiting();
     })());
@@ -124,13 +151,27 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
     event.waitUntil((async () => {
         const cacheNames = await caches.keys();
-        await Promise.all(
-            cacheNames
-                .filter(name => name.startsWith('npf-q400-app-shell-') && name !== APP_SHELL_CACHE)
-                .map(name => caches.delete(name))
+        const previousShells = cacheNames.filter(
+            name => name.startsWith(APP_SHELL_CACHE_PREFIX)
+                && name !== APP_SHELL_CACHE
         );
 
-        await refreshOfflineSettingsFromDB({ force: true });
+        /*
+         * Conserver le shell précédent comme secours. Les shells plus anciens
+         * sont supprimés ; le cache stable des données n'est jamais touché.
+         */
+        const shellsToDelete = previousShells.slice(0, Math.max(0, previousShells.length - 1));
+        await Promise.all(shellsToDelete.map(name => caches.delete(name)));
+
+        /*
+         * L'ouverture de la grande base IndexedDB ne doit jamais retenir le
+         * service worker dans l'état « activating ». Safari peut conserver une
+         * transaction de cartes ouverte plusieurs secondes après fermeture.
+         */
+        await Promise.race([
+            refreshOfflineSettingsFromDB({ force: true }).catch(() => null),
+            swDelay(1500, null)
+        ]);
         await self.clients.claim();
 
         /*
@@ -200,6 +241,29 @@ async function closeOfflineDBForHeavyWrite() {
 
 self.addEventListener('message', event => {
     const data = event.data || {};
+
+    if (data.type === 'VERIFY_APP_SHELL') {
+        const verify = async () => {
+            const missing = [];
+            for (const url of CORE_APP_SHELL_URLS) {
+                const response = await caches.match(url, { ignoreSearch: true });
+                if (!response) missing.push(url);
+            }
+            try {
+                if (event.ports && event.ports[0]) {
+                    event.ports[0].postMessage({
+                        type: 'APP_SHELL_STATUS',
+                        ok: missing.length === 0,
+                        version: APP_VERSION,
+                        missing
+                    });
+                }
+            } catch (_) {}
+        };
+        if (event.waitUntil) event.waitUntil(verify());
+        else verify();
+        return;
+    }
 
     if (data.type === 'SKIP_WAITING') {
         self.skipWaiting();
@@ -315,8 +379,8 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    if (request.url === DEPARTMENTS_GEOJSON_URL) {
-        event.respondWith(handleCachedExternalRequest(request));
+    if (isAppDataRequest(request)) {
+        event.respondWith(handleAppDataRequest(request));
         return;
     }
 
@@ -343,15 +407,43 @@ function isTrafficApiRequest(url) {
     }
 }
 
+function getRequestFilename(request) {
+    try {
+        const parsed = new URL(request.url);
+        return parsed.pathname.split('/').pop() || '';
+    } catch (_) {
+        return '';
+    }
+}
+
+function isAppDataRequest(request) {
+    try {
+        const parsed = new URL(request.url);
+        if (
+            parsed.origin !== self.location.origin
+            && request.url !== DEPARTMENTS_GEOJSON_URL
+        ) return false;
+
+        const filename = parsed.pathname.split('/').pop() || '';
+        return [
+            'communes.json',
+            'communes_aliases.json',
+            'localites-france-v14.56.zip',
+            'lignes_ht_rte_simplifiees.geojson'
+        ].includes(filename)
+            || parsed.pathname.includes('/icons/')
+            || request.url === DEPARTMENTS_GEOJSON_URL;
+    } catch (_) {
+        return false;
+    }
+}
+
 function isAppShellRequest(request) {
     try {
         const parsed = new URL(request.url);
         if (parsed.origin !== self.location.origin) return false;
         if (request.mode === 'navigate') return true;
-
-        const filename = parsed.pathname.split('/').pop() || '';
         return [
-            '',
             'index.html',
             'style.css',
             'script.js',
@@ -359,12 +451,8 @@ function isAppShellRequest(request) {
             'leaflet.css',
             'leaflet.min.js',
             'suncalc.js',
-            'jszip.min.js',
-            'communes.json',
-            'communes_aliases.json',
-            'localites-france-v14.56.zip',
-            'lignes_ht_rte_simplifiees.geojson'
-        ].includes(filename) || parsed.pathname.includes('/icons/');
+            'jszip.min.js'
+        ].includes(getRequestFilename(request));
     } catch (_) {
         return false;
     }
@@ -373,104 +461,93 @@ function isAppShellRequest(request) {
 function isCriticalAppShellRequest(request) {
     try {
         if (request.mode === 'navigate') return true;
-        const parsed = new URL(request.url);
-        const filename = parsed.pathname.split('/').pop() || '';
-        return ['index.html', 'script.js', 'style.css', 'manifest.json'].includes(filename);
+        return [
+            'index.html',
+            'script.js',
+            'style.css',
+            'manifest.json',
+            'leaflet.css',
+            'leaflet.min.js',
+            'suncalc.js',
+            'jszip.min.js'
+        ].includes(getRequestFilename(request));
     } catch (_) {
         return false;
     }
 }
 
 async function handleAppShellRequest(request) {
-    const cached = await caches.match(request, { ignoreSearch: true });
     const cache = await caches.open(APP_SHELL_CACHE);
+    const isNavigation = request.mode === 'navigate';
+    const cacheKey = isNavigation ? './index.html' : request;
+    const cached = await caches.match(cacheKey, { ignoreSearch: true })
+        || await caches.match(request, { ignoreSearch: true });
+    const requestUrl = new URL(request.url);
+    const forcedTransition = isNavigation
+        && (requestUrl.searchParams.has('swrefresh')
+            || requestUrl.searchParams.has('ts'));
+
+    const refreshFromNetwork = async (timeoutMs = 4500) => {
+        try {
+            const freshRequest = new Request(request, { cache: 'reload' });
+            const fresh = await swFetchWithTimeout(freshRequest, {}, timeoutMs);
+            if (fresh && fresh.ok) {
+                await cache.put(cacheKey, fresh.clone());
+                return fresh;
+            }
+        } catch (_) {}
+        return null;
+    };
 
     /*
-     * v12.55 — fichiers critiques en réseau d'abord.
-     * Ancien comportement : index/script/style servis d'abord depuis l'ancien
-     * cache, ce qui pouvait bloquer une transition pérenne et laisser la carte
-     * blanche avec boutons inactifs. Nouveau comportement : si le réseau est
-     * disponible, index.html, script.js, style.css et manifest.json viennent du
-     * serveur ; le cache reste le secours hors ligne.
+     * Démarrage ordinaire : cache d'abord. Le réseau ne doit jamais retarder
+     * l'ouverture hors ligne. Une mise à jour explicite peut attendre le réseau,
+     * mais conserve toujours le shell mis en cache en secours.
      */
-    if (isCriticalAppShellRequest(request)) {
-        const cacheKey = request.mode === 'navigate' ? './index.html' : request;
-        const fallbackCached = cached || (request.mode === 'navigate' ? await caches.match('./index.html', { ignoreSearch: true }) : null);
-
-        const requestUrl = new URL(request.url);
-        const isForcedVersionTransition = request.mode === 'navigate' && requestUrl.searchParams.has('swrefresh');
-        const freshTimeoutMs = isForcedVersionTransition ? 5000 : 2200;
-
-        const freshPromise = (async () => {
-            try {
-                const freshRequest = new Request(request, { cache: 'reload' });
-                const fresh = await swFetchWithTimeout(freshRequest, {}, freshTimeoutMs);
-                if (fresh && fresh.ok) {
-                    await cache.put(cacheKey, fresh.clone());
-                    return fresh;
-                }
-            } catch (_) {}
-            return null;
-        })();
-
-        /*
-         * v13.91 — pendant la navigation forcée qui suit l'activation d'une MAJ,
-         * attendre réellement le nouvel index. Pour les lancements ordinaires,
-         * conserver le secours rapide de 900 ms sur réseau dégradé.
-         */
-        if (fallbackCached) {
-            if (isForcedVersionTransition) {
-                return await freshPromise || fallbackCached;
-            }
-            const freshOrTimeout = await Promise.race([freshPromise, swDelay(900, null)]);
-            return freshOrTimeout || fallbackCached;
-        }
-
-        return await freshPromise || new Response('', { status: 504, statusText: 'Offline critical asset unavailable' });
-    }
-
-    if (cached) {
-        fetch(request).then(async (fresh) => {
-            if (fresh && fresh.ok) {
-                await cache.put(request, fresh.clone());
-            }
-        }).catch(() => {});
+    if (cached && !forcedTransition) {
+        refreshFromNetwork(4500).catch(() => {});
         return cached;
     }
 
-    try {
-        const fresh = await fetch(request);
-        if (fresh && fresh.ok) {
-            await cache.put(request, fresh.clone());
-        }
-        return fresh;
-    } catch (_) {
-        return cached || new Response('', { status: 504, statusText: 'Offline asset unavailable' });
+    const fresh = await refreshFromNetwork(forcedTransition ? 6000 : 4500);
+    if (fresh) return fresh;
+    if (cached) return cached;
+
+    if (isNavigation) {
+        const fallbackIndex = await caches.match('./index.html', { ignoreSearch: true });
+        if (fallbackIndex) return fallbackIndex;
     }
+
+    return new Response('', {
+        status: 504,
+        statusText: 'Offline app shell unavailable'
+    });
 }
 
-async function handleCachedExternalRequest(request) {
+async function handleAppDataRequest(request) {
+    const dataCache = await caches.open(APP_DATA_CACHE);
     const cached = await caches.match(request, { ignoreSearch: true });
 
     if (cached) {
-        fetch(request).then(async (fresh) => {
+        fetch(request).then(async fresh => {
             if (fresh && (fresh.ok || fresh.type === 'opaque')) {
-                const cache = await caches.open(APP_SHELL_CACHE);
-                await cache.put(request, fresh.clone());
+                await dataCache.put(request, fresh.clone());
             }
         }).catch(() => {});
         return cached;
     }
 
     try {
-        const fresh = await fetch(request);
+        const fresh = await swFetchWithTimeout(request, {}, 12000);
         if (fresh && (fresh.ok || fresh.type === 'opaque')) {
-            const cache = await caches.open(APP_SHELL_CACHE);
-            await cache.put(request, fresh.clone());
+            await dataCache.put(request, fresh.clone());
         }
         return fresh;
     } catch (_) {
-        return new Response('', { status: 504, statusText: 'Offline external asset unavailable' });
+        return new Response('', {
+            status: 504,
+            statusText: 'Offline data unavailable'
+        });
     }
 }
 
