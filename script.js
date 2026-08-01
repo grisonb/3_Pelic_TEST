@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.64';
+    './data/localites/localites-france-v14.56.zip?appv=v14.65';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1876,7 +1876,7 @@ async function initializeApp() {
             2200,
             'Timeout analyse initiale des cartes offline'
         ).then(() => {
-            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.64');
+            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.65');
         }).catch(error => {
             console.warn('[Offline] Plage de zoom initiale conservée:', error);
         });
@@ -1970,11 +1970,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.64'
+                        !== 'v14.65'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.64'
+                        'v14.65'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -5041,84 +5041,14 @@ async function updateBaseTileNativeZoomFromAvailability({ forceScan = false } = 
 
 function showPostUpdateRestartNoticeIfNeeded() {
     try {
-        const pending = localStorage.getItem('npfPostUpdateRestartNoticePending') === '1';
-        const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
-        const currentVersion = (typeof window.APP_VERSION !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '';
-        const forcedByTransition = window.NPF_FORCE_POST_UPDATE_NOTICE === true;
-        if (!forcedByTransition && !pending && !noticeVersion) return;
-        // v12.92 — si pending=1, afficher même si le marqueur de version vient de l'ancienne version.
-        if (!pending && currentVersion && noticeVersion && noticeVersion !== currentVersion) return;
-        showPostUpdateRestartNoticeModal();
+        if (typeof window.showNpfPostUpdateNoticeOnce === 'function') {
+            window.showNpfPostUpdateNoticeOnce();
+        }
     } catch (_) {}
 }
 
 function showPostUpdateRestartNoticeModal() {
-    if (document.getElementById('post-update-restart-modal')) return;
-
-    const modal = document.createElement('div');
-    modal.id = 'post-update-restart-modal';
-    modal.className = 'update-reminder-modal post-update-restart-modal';
-    modal.style.cssText = [
-        'position:fixed',
-        'inset:0',
-        'z-index:2147483647',
-        'display:flex',
-        'align-items:center',
-        'justify-content:center',
-        'padding:24px',
-        'box-sizing:border-box',
-        'background:rgba(0,0,0,.58)'
-    ].join(';');
-    modal.innerHTML = `
-        <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
-            <h3 id="post-update-restart-title">Mise à jour installée</h3>
-            <p>Une nouvelle version de NPF-Q400 vient d’être chargée.</p>
-            <p>Ferme complètement l’application puis relance-la pour finaliser la mise à jour.</p>
-            <p>Ce message peut apparaître plusieurs fois : c’est normal. Relance simplement l’application à chaque demande jusqu’à disparition du message.</p>
-            <p>Si à un moment l’application devient anormalement lente à s’ouvrir ou reste bloquée au démarrage, supprime-la de l’écran d’accueil puis réinstalle-la depuis Safari.</p>
-        </div>
-    `;
-
-    const modalContent = modal.firstElementChild;
-    if (modalContent) {
-        modalContent.style.cssText = [
-            'width:min(620px,calc(100vw - 48px))',
-            'max-height:calc(100vh - 48px)',
-            'overflow:auto',
-            'box-sizing:border-box',
-            'padding:24px',
-            'border-radius:16px',
-            'background:#fff',
-            'color:#1f2937',
-            'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-            'box-shadow:0 18px 50px rgba(0,0,0,.35)'
-        ].join(';');
-    }
-    document.body.appendChild(modal);
-
-    /*
-     * v13.92 — même règle que l'alerte précoce : le marqueur n'est consommé
-     * qu'après deux secondes de visibilité réelle.
-     */
-    setTimeout(() => {
-        try {
-            if (!document.body || !document.body.contains(modal)) return;
-            if (document.visibilityState === 'hidden') return;
-
-            const remainingKey = 'npfPostUpdateRestartNoticeRemaining';
-            const remainingRaw = Number(localStorage.getItem(remainingKey) || '1');
-            const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
-            if (remaining > 1) {
-                localStorage.setItem(remainingKey, String(remaining - 1));
-                localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
-            } else {
-                localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-                localStorage.removeItem('npfPostUpdateRestartNoticePending');
-                localStorage.removeItem(remainingKey);
-                window.NPF_FORCE_POST_UPDATE_NOTICE = false;
-            }
-        } catch (_) {}
-    }, 2000);
+    showPostUpdateRestartNoticeIfNeeded();
 }
 
 function showUpdateReminderIfDue() {
@@ -17481,7 +17411,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.64'
+                        window.APP_VERSION || 'v14.65'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
@@ -17577,7 +17507,7 @@ async function setMapSourceMode(mode) {
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.64');
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.65');
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
@@ -17592,7 +17522,7 @@ async function setMapSourceMode(mode) {
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.64');
+            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.65');
         }).catch(error => {
             console.warn('[Offline] Synchronisation SW différée:', error);
         });
@@ -17604,7 +17534,7 @@ async function setMapSourceMode(mode) {
         'Timeout analyse des niveaux de zoom'
     ).then(() => {
         if (mapSourceMode === nextMode) {
-            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.64');
+            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.65');
         }
     }).catch(error => {
         console.warn('[Offline] Niveaux de zoom par défaut conservés:', error);
@@ -18708,7 +18638,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.64');
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.65');
     } catch (error) {
         console.error('Changement de carte offline impossible:', error);
         alert(`Impossible de changer de carte offline: ${error.message || error}`);
@@ -18730,7 +18660,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.64');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.65');
         }).catch(() => {});
     }
 
@@ -18740,7 +18670,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         'Timeout analyse carte sélectionnée'
     ).then(() => {
         if (token === offlineMapSwitchToken) {
-            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.64');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.65');
         }
     }).catch(() => {});
 
