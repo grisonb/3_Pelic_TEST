@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.63" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.63">
-    <link rel="manifest" href="manifest.json?appv=v14.63">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.64" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.64">
+    <link rel="manifest" href="manifest.json?appv=v14.64">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.63';
+        const APP_VERSION = 'v14.64';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         window.APP_VERSION = APP_VERSION;
@@ -177,15 +177,15 @@
 
         window.forceRecoveryReload = async () => {
             /*
-             * v11.98 — MAJ propre.
-             * Ancien comportement observé : 2 clics MAJ nécessaires, puis bouton
-             * qui tourne en boucle jusqu'à fermeture/réouverture de la PWA.
+             * v14.64 TEST — mise à jour sans trou de protection hors ligne.
              *
-             * Nouvelle stratégie :
-             * - supprimer uniquement les caches app-shell NPF-Q400 ;
-             * - désenregistrer l'ancien service worker ;
-             * - recharger une URL fraîche avec appv + ts.
-             * Les tuiles offline IndexedDB ne sont pas supprimées.
+             * L'ancienne procédure supprimait le cache app-shell et désinscrivait
+             * le service worker AVANT que le nouveau soit installé. Si l'installation
+             * suivante échouait (quota Safari, ressource lente, réseau interrompu),
+             * la PWA ne pouvait plus démarrer sans connexion.
+             *
+             * La nouvelle procédure conserve obligatoirement le service worker et
+             * l'app-shell actifs jusqu'à ce que leur remplaçant prenne le contrôle.
              */
             const forceButton = document.getElementById('force-update-button');
             if (forceButton) {
@@ -194,25 +194,25 @@
             }
 
             try {
-                if ('caches' in window) {
-                    const cacheNames = await caches.keys();
-                    await Promise.all(
-                        cacheNames
-                            .filter(name => name.startsWith('npf-q400-app-shell-'))
-                            .map(name => caches.delete(name))
-                    );
-                }
-            } catch (error) {
-                console.log('Nettoyage cache app-shell impossible:', error);
-            }
-
-            try {
                 if ('serviceWorker' in navigator) {
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    await Promise.all(registrations.map(registration => registration.unregister()));
+                    let registration = await navigator.serviceWorker.getRegistration('./');
+                    if (!registration) {
+                        registration = await navigator.serviceWorker.register('./sw.js', {
+                            updateViaCache: 'none'
+                        });
+                    }
+                    if (registration && typeof registration.update === 'function') {
+                        await Promise.race([
+                            registration.update(),
+                            new Promise(resolve => setTimeout(resolve, 4500))
+                        ]).catch(() => null);
+                    }
+                    if (registration?.waiting) {
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
                 }
             } catch (error) {
-                console.log('Désenregistrement service worker impossible:', error);
+                console.log('Mise à jour service worker différée:', error);
             }
 
             const refreshUrl = new URL(window.location.href);
@@ -610,7 +610,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.63"></script>
+    <script src="script.js?appv=v14.64"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
