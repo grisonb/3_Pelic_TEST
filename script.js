@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.58';
+    './data/localites/localites-france-v14.56.zip?appv=v14.59';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -766,7 +766,7 @@ let ownTrafficAircraftSessionFallback = null;
 const TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY =
     'safeSkyPublishedBeaconIdV1';
 /*
- * v14.58 TEST — la liste suivie n'est plus plafonnée à 20 entrées.
+ * v14.59 TEST — la liste suivie n'est plus plafonnée à 20 entrées.
  * La concurrence ne limite pas le nombre enregistré : elle évite seulement
  * d'envoyer toutes les interrogations SafeSky individuelles simultanément.
  */
@@ -1971,11 +1971,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.58'
+                        !== 'v14.59'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.58'
+                        'v14.59'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3445,7 +3445,7 @@ function initMap() {
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
     ensureTwoFingerRulerControl();
-    // v14.58 : la fermeture des popups trafic est installée après les contrôles UI.
+    // v14.59 : la fermeture des popups trafic est installée après les contrôles UI.
     applyMapNoBackgroundStyle();
 
     if (map.createPane && !map.getPane('highVoltageLinesPane')) {
@@ -3889,7 +3889,7 @@ function keepKeyboardAfterSearchClear() {
 }
 
 /*
- * v14.58 TEST — contrôles OFFLINE isolés du reste de l'interface.
+ * v14.59 TEST — contrôles OFFLINE isolés du reste de l'interface.
  *
  * Ces boutons sont installés immédiatement après la carte et une seconde fois
  * sans doublon dans setupEventListeners. Une erreur dans une fonction annexe
@@ -3973,7 +3973,7 @@ function bindOfflineCoreControls() {
 
             mapSourceOfflineBtn.disabled = true;
             try {
-                setOfflineMapSwitchBusy('Vérification du mode offline…');
+                setOfflineMapSwitchBusy('Activation du mode offline…');
                 await setMapSourceMode('offline');
             } catch (error) {
                 console.error('Erreur activation mode offline:', error);
@@ -11050,7 +11050,7 @@ function installTrafficMarkerPopupInteraction(marker) {
 }
 
 /*
- * v14.58 TEST — fermeture de la fiche trafic par clic réel sur le fond de carte.
+ * v14.59 TEST — fermeture de la fiche trafic par clic réel sur le fond de carte.
  * Le déplacement, le zoom, le pincement et la molette ne ferment pas la fiche.
  */
 function closeOpenTrafficAircraftPopup() {
@@ -17186,18 +17186,56 @@ async function ensureServiceWorkerControlsPageForOffline() {
 }
 
 async function activeOfflineStorageHasTiles() {
+    /*
+     * v14.59 TEST — diagnostic uniquement, jamais bloquant.
+     *
+     * La v14.58 ouvrait chaque base avec une version imposée. Sur Safari/iPadOS,
+     * cela pouvait déclencher une montée de version IndexedDB et rester bloqué
+     * par une connexion déjà ouverte côté page ou service worker. Le clic Offline
+     * attendait alors ce contrôle et la carte restait visuellement sur Online.
+     *
+     * Ici, les bases existantes sont ouvertes sans numéro de version. Le contrôle
+     * ne crée pas de dépendance pour l'activation du mode Offline.
+     */
     const databaseNames = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
-    if (!databaseNames.length) return false;
+    if (!databaseNames.length || typeof indexedDB === 'undefined') return false;
+
+    const knownDatabaseNames = (() => {
+        if (typeof indexedDB.databases !== 'function') return null;
+        return indexedDB.databases()
+            .then(items => new Set((items || []).map(item => String(item?.name || '')).filter(Boolean)))
+            .catch(() => null);
+    })();
+
+    const knownNames = await knownDatabaseNames;
 
     for (const databaseName of databaseNames) {
+        if (knownNames && !knownNames.has(databaseName)) continue;
+
         let openedDb = null;
+        let reuseMainConnection = false;
         try {
-            openedDb = await withTimeout(
-                openOfflineTileDatabaseByName(databaseName),
-                3500,
-                `Timeout ouverture ${databaseName}`
-            );
-            if (!openedDb.objectStoreNames.contains('tiles')) continue;
+            if (databaseName === OFFLINE_DB_NAME && isMainOfflineDatabaseUsable(db)) {
+                openedDb = db;
+                reuseMainConnection = true;
+            } else {
+                openedDb = await withTimeout(
+                    new Promise((resolve, reject) => {
+                        const request = indexedDB.open(String(databaseName || OFFLINE_DB_NAME));
+                        request.onsuccess = event => resolve(event.target.result);
+                        request.onerror = event => reject(event.target.error || new Error(`Erreur ouverture ${databaseName}`));
+                        request.onblocked = () => reject(new Error(`Base IndexedDB occupée : ${databaseName}`));
+                        request.onupgradeneeded = event => {
+                            /* Base absente : on annule le diagnostic pour ne pas créer une base vide. */
+                            try { event.target.transaction.abort(); } catch (_) {}
+                        };
+                    }),
+                    2200,
+                    `Timeout diagnostic ${databaseName}`
+                );
+            }
+
+            if (!openedDb || !openedDb.objectStoreNames.contains('tiles')) continue;
 
             const hasTile = await withTimeout(
                 new Promise(resolve => {
@@ -17217,84 +17255,161 @@ async function activeOfflineStorageHasTiles() {
                         finish(false);
                     }
                 }),
-                3500,
-                `Timeout lecture ${databaseName}`
+                2200,
+                `Timeout lecture diagnostic ${databaseName}`
             );
 
             if (hasTile) return true;
         } catch (error) {
-            console.warn(`[Offline] Contrôle ${databaseName} impossible:`, error);
+            console.warn(`[Offline] Diagnostic ${databaseName} non concluant:`, error);
         } finally {
-            try { openedDb?.close(); } catch (_) {}
+            if (!reuseMainConnection) {
+                try { openedDb?.close(); } catch (_) {}
+            }
         }
     }
 
     return false;
 }
 
-async function verifyOfflineModeReadiness() {
-    if (!Array.isArray(activeOfflinePacks) || !activeOfflinePacks.length) {
-        throw new Error('aucun pack de cartes actif');
+async function runOfflineModeHealthCheck({ updateUi = true } = {}) {
+    /*
+     * v14.59 TEST — contrôle après activation, sans retour automatique sur Online.
+     * Le diagnostic vérifie le stockage et le service worker, mais il ne peut plus
+     * empêcher le clic Offline ni modifier le choix de l'utilisateur.
+     */
+    const report = {
+        activePacks: Array.isArray(activeOfflinePacks) && activeOfflinePacks.length > 0,
+        storageReady: false,
+        hasTiles: false,
+        serviceWorkerControlled: !('serviceWorker' in navigator) || Boolean(navigator.serviceWorker.controller),
+        serviceWorkerAcknowledged: false
+    };
+
+    try {
+        if (!db) await withTimeout(initDB(), 5000, 'Timeout IndexedDB offline');
+        report.storageReady = Boolean(db);
+    } catch (error) {
+        console.warn('[Offline] Diagnostic IndexedDB:', error);
     }
 
     try {
-        if (!db) await withTimeout(initDB(), 6000, 'Timeout IndexedDB offline');
+        report.hasTiles = await activeOfflineStorageHasTiles();
     } catch (error) {
-        throw new Error(`stockage offline indisponible (${error.message || error})`);
+        console.warn('[Offline] Diagnostic présence tuiles:', error);
     }
 
-    const hasTiles = await activeOfflineStorageHasTiles();
-    if (!hasTiles) {
-        throw new Error('aucune tuile trouvée dans les packs actifs');
+    try {
+        report.serviceWorkerControlled = !('serviceWorker' in navigator)
+            || Boolean(navigator.serviceWorker.controller);
+        if (report.serviceWorkerControlled && 'serviceWorker' in navigator) {
+            report.serviceWorkerAcknowledged = await notifyServiceWorkerActivePacks(
+                activeOfflinePacks,
+                { waitForAck: true }
+            );
+        } else {
+            report.serviceWorkerAcknowledged = report.serviceWorkerControlled;
+        }
+    } catch (error) {
+        console.warn('[Offline] Diagnostic service worker:', error);
     }
 
-    const controlled = await ensureServiceWorkerControlsPageForOffline();
-    if (!controlled) {
-        throw new Error('le service worker ne contrôle pas encore la page');
+    if (updateUi && mapSourceMode === 'offline') {
+        const statusMessage = document.getElementById('import-status-message');
+        if (statusMessage) {
+            if (report.hasTiles && report.serviceWorkerControlled) {
+                statusMessage.textContent = 'Mode OFFLINE actif — cartes locales prêtes.';
+            } else if (report.activePacks) {
+                statusMessage.textContent = 'Mode OFFLINE actif — contrôle des cartes locales en arrière-plan.';
+            }
+        }
     }
 
-    const acknowledged = await notifyServiceWorkerActivePacks(
-        activeOfflinePacks,
-        { waitForAck: true }
-    );
-    if (!acknowledged) {
-        throw new Error('le service worker ne confirme pas les packs actifs');
-    }
-
-    return true;
+    console.info('[Offline] Contrôle v14.59:', report);
+    return report;
 }
 
 async function setMapSourceMode(mode) {
     if (isMapSourceSwitching) return;
+
     const previousMode = mapSourceMode;
     const nextMode = mode === 'offline' ? 'offline' : 'online';
-    if (nextMode === 'offline') {
-        await verifyOfflineModeReadiness();
+
+    if (
+        nextMode === 'offline'
+        && (!Array.isArray(activeOfflinePacks) || !activeOfflinePacks.length)
+    ) {
+        throw new Error('aucun pack de cartes actif');
     }
+
     if (previousMode === nextMode) {
         updateMapSourceButtons();
         updateOfflineStatus();
+        if (nextMode === 'offline') {
+            setTimeout(() => {
+                runOfflineModeHealthCheck({ updateUi: true }).catch(() => {});
+            }, 50);
+        }
         return;
     }
+
     isMapSourceSwitching = true;
+
+    /*
+     * v14.59 TEST — le choix visuel et local est appliqué avant les opérations
+     * asynchrones. Une vérification lente ou un IndexedDB occupé ne peut donc plus
+     * laisser le bouton Online sélectionné.
+     */
     mapSourceMode = nextMode;
     localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
     updateMapSourceButtons();
     updateOfflineStatus();
-    setOfflineMapSwitchBusy(nextMode === 'offline' ? 'Activation carte offline...' : 'Retour carte online...');
+    setOfflineMapSwitchBusy(
+        nextMode === 'offline'
+            ? 'Activation immédiate de la carte offline…'
+            : 'Retour carte online…'
+    );
+
     try {
-        await setOfflineTilesEnabled(mapSourceMode === 'offline');
+        await setOfflineTilesEnabled(nextMode === 'offline');
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
+
+        if (nextMode === 'offline') {
+            /* Le mode est déjà mémorisé avant une éventuelle relance de contrôle SW. */
+            await ensureServiceWorkerControlsPageForOffline();
+        }
+
         await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode');
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-v14.59');
+
+        if (nextMode === 'offline') {
+            setTimeout(() => {
+                runOfflineModeHealthCheck({ updateUi: true }).catch(error => {
+                    console.warn('[Offline] Contrôle post-activation impossible:', error);
+                });
+            }, 250);
+        } else {
+            setOfflineMapSwitchBusy('Mode ONLINE actif.');
+        }
     } catch (error) {
-        mapSourceMode = previousMode;
-        localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
-        try {
-            await setOfflineTilesEnabled(mapSourceMode === 'offline');
-        } catch (_) {}
-        throw error;
+        /*
+         * Le choix Offline reste conservé. Les erreurs de diagnostic/rafraîchissement
+         * sont signalées, mais ne doivent plus rebasculer silencieusement sur Online.
+         */
+        console.error(`Erreur activation mode ${nextMode}:`, error);
+        if (nextMode === 'offline') {
+            setOfflineMapSwitchBusy('Mode OFFLINE sélectionné — rafraîchissement des cartes locales en cours.');
+            setTimeout(() => {
+                rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-retry-v14.59');
+                scheduleOfflineTileWake('setMapSourceMode-retry-v14.59');
+            }, 500);
+        } else {
+            mapSourceMode = previousMode;
+            localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
+            try { await setOfflineTilesEnabled(mapSourceMode === 'offline'); } catch (_) {}
+            throw error;
+        }
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
