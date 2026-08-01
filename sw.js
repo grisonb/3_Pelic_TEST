@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-60_activation_offline_immediate';
-const APP_VERSION = 'v14.60';
+const SW_VERSION = 'sw-v14-61_restauration_moteur_offline_1456';
+const APP_VERSION = 'v14.61';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -239,36 +239,12 @@ self.addEventListener('message', event => {
     if (data.type === 'OFFLINE_TILES_ENABLED_CHANGED') {
         offlineTilesEnabled = !!data.value;
         offlineSettingsLoadedAt = Date.now();
-        try {
-            if (event.ports && event.ports[0]) {
-                event.ports[0].postMessage({
-                    type: 'OFFLINE_TILES_ENABLED_READY',
-                    value: offlineTilesEnabled,
-                    version: APP_VERSION
-                });
-            }
-        } catch (_) {}
         return;
     }
 
     if (data.type === 'OFFLINE_ONLINE_FALLBACK_CHANGED') {
         offlineOnlineFallback = !!data.value;
         offlineSettingsLoadedAt = Date.now();
-        return;
-    }
-
-    if (data.type === 'OFFLINE_HEALTH_CHECK') {
-        try {
-            if (event.ports && event.ports[0]) {
-                event.ports[0].postMessage({
-                    type: 'OFFLINE_HEALTH_READY',
-                    version: APP_VERSION,
-                    offlineTilesEnabled,
-                    activeOfflinePacks: [...activeOfflinePacks],
-                    activeOfflinePackDatabases: [...activeOfflinePackDatabases]
-                });
-            }
-        } catch (_) {}
         return;
     }
 
