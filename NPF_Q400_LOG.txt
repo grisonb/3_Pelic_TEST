@@ -1,167 +1,29 @@
-NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+NPF-Q400 — TEST v14.58 — RÉPARATION MODE OFFLINE
 
-v14.57 TEST — liste suivie sans limite et fermeture de la fiche trafic sur clic carte
+Base : v14.57 TEST.
 
-Modifications apportées :
-- suppression complète du plafond de 20 appareils dans la liste SafeSky suivie ;
-- conservation de toutes les entrées valides dans le stockage local, sans suppression silencieuse après tri ;
-- compteur remplacé par le nombre total réel d’indicatifs enregistrés ;
-- tri alphabétique naturel conservé quelle que soit la longueur de la liste ;
-- interrogation de tous les appareils suivis avec une concurrence réseau contrôlée afin de ne pas lancer toutes les requêtes SafeSky simultanément ;
-- protection contre les URL SafeSky trop longues lorsque le filtre « uniquement la liste suivie » contient de nombreux identifiants ;
-- ajout d’une fermeture de la fiche détaillée d’un trafic lors d’un clic réel sur le fond de carte ;
-- fermeture limitée aux fiches de trafic : les autres fenêtres cartographiques ne sont pas visées par cette action ;
-- un déplacement de carte ne ferme pas la fiche trafic ;
-- un zoom par pincement, molette ou commandes de zoom ne ferme pas la fiche trafic ;
-- un double appui utilisé pour zoomer ne ferme pas la fiche : la fermeture par clic simple est annulée dès que le zoom commence ;
-- distinction tactile entre un appui bref et un geste dépassant 8 px pour éviter une fermeture après déplacement sur iPad ;
-- maintien de l’ouverture de la fiche pendant les rafraîchissements et déplacements fluides du trafic ;
-- maintien intégral du scroll tactile, de l’ajout d’indicatifs en attente, du tri alphabétique et de l’affichage forcé individuel au sol ;
-- version applicative portée en v14.57 TEST.
+CORRECTIONS
+- Le bouton « Cartes » et les boutons Online / Offline sont désormais installés dans un bloc autonome, immédiatement après la création de la carte.
+- Une erreur provenant du trafic, du calculateur ou d’une autre fonction ne peut plus empêcher l’ouverture de la gestion des cartes.
+- La gestion du clic qui ferme la fiche trafic est déplacée après l’installation de l’interface et protégée par try/catch.
+- Avant d’activer le mode Offline, NPF vérifie désormais :
+  1. qu’au moins un pack est actif ;
+  2. que la base IndexedDB est accessible ;
+  3. qu’au moins une tuile existe réellement dans les bases actives ;
+  4. qu’un service worker contrôle la page ;
+  5. que le service worker confirme la liste des packs actifs.
+- En cas d’échec, un message explicite remplace une bascule silencieuse.
+- L’archive nationale des localités n’est plus renommée inutilement : la v14.58 réutilise le fichier inchangé localites-france-v14.56.zip, déjà utilisé dans la dernière version où le hors ligne fonctionnait. Cela évite qu’une ressource de 5,9 Mo manquante bloque l’installation du nouveau service worker.
+- La liste SafeSky sans limite et la fermeture de la fiche trafic par clic simple sont conservées.
 
+VALIDATIONS EFFECTUÉES
+- Syntaxe JavaScript de script.js et sw.js.
+- Validation JSON du manifeste.
+- Vérification des références de version.
+- Vérification de présence de l’archive locale nationale dans le ZIP.
+- Vérification du contenu et de l’intégrité du ZIP.
+- Test local du bouton Cartes, de l’ouverture de la fenêtre et de la bascule Offline avec service worker et IndexedDB simulés.
+- Test de relance sans réseau après mise en cache de l’app-shell.
 
-v14.56 TEST — défilement tactile de la liste suivie
-
-Modifications apportées :
-- correction du blocage du défilement lorsque le doigt démarre sur une ligne verte détectée ;
-- autorisation explicite du défilement vertical natif dans la liste et dans la fenêtre des filtres SafeSky ;
-- distinction entre un appui bref et un mouvement de défilement grâce à un seuil tactile de 8 px ;
-- aucun centrage sur le trafic n'est déclenché à la fin d'un geste de scroll ;
-- un appui bref sans déplacement conserve l'ouverture du trafic sur la carte ;
-- fonctionnement identique pour les trafics détectés en vol et au sol ;
-- le bouton « Retirer » conserve son fonctionnement indépendant ;
-- aucune modification de la liste, du tri alphabétique, des filtres ou de l'affichage forcé individuel ;
-- version applicative portée en v14.56 TEST.
-
-
-v14.55 TEST — ajout d’un indicatif en attente et tri alphabétique
-
-Modifications apportées :
-- correction du refus d’ajout de MILAN80 et des autres indicatifs non actuellement détectés ;
-- le bouton « Ajouter » ne dépend plus d’une réponse immédiate de SafeSky ;
-- ajout direct de tout indicatif valide dans la liste suivie ;
-- création d’une entrée temporaire « En attente de détection » lorsque l’identifiant technique n’est pas encore connu ;
-- recherche automatique de cet indicatif à chaque actualisation SafeSky ;
-- association automatique et transparente à l’identifiant technique dès la première détection ;
-- passage en vert et clic vers la carte conservés dès que l’appareil est détecté, au sol ou en vol ;
-- compatibilité maintenue avec le filtre « liste suivie uniquement » ;
-- exclusion des identifiants temporaires CALLSIGN des paramètres techniques envoyés à l’API ;
-- remplacement automatique de l’entrée temporaire par l’identifiant réel, sans doublon ;
-- affichage de l’indicatif en première ligne pour rendre le classement immédiatement lisible ;
-- classement permanent de la liste suivie par ordre alphabétique des indicatifs, avec tri numérique naturel ;
-- tri également appliqué aux anciennes entrées déjà enregistrées ;
-- le retrait, l’affichage forcé au sol et les boutons SafeSky existants restent inchangés ;
-- version applicative portée en v14.55 TEST.
-
-
-v14.54 TEST — ajout manuel d’un indicatif dans la liste suivie
-
-Modifications apportées :
-- ajout d’un bouton « Ajouter » immédiatement à gauche du bouton « Rechercher » dans les filtres SafeSky ;
-- saisie de l’indicatif exact dans le champ de recherche puis appui sur « Ajouter » ;
-- recherche globale exacte de l’indicatif dans SafeSky, sans exiger que l’avion soit actuellement détecté sur la carte ;
-- récupération et mémorisation de l’identifiant technique SafeSky associé à l’indicatif ;
-- ajout direct de l’appareil à la liste suivie lorsqu’il existe dans SafeSky ;
-- conservation d’une ligne neutre tant que l’appareil n’est pas détecté ;
-- passage automatique de cette ligne en vert dès que SafeSky reçoit l’appareil, au sol ou en vol ;
-- message explicite si l’indicatif est introuvable, déjà suivi ou dépourvu d’identifiant technique exploitable ;
-- le bouton « Rechercher » conserve son fonctionnement actuel avec recherche exacte ou partielle des trafics actifs ;
-- prise en charge des réponses SafeSky d’identité ne contenant pas de position géographique courante ;
-- aucune modification des filtres, de l’affichage forcé individuel ni des autres fonctions de la v14.53 ;
-- version applicative portée en v14.54 TEST.
-
-
-v14.53 TEST — clic sur la liste suivie et affichage forcé individuel
-
-Modifications apportées :
-- les lignes vertes de la liste d’identifiants suivis deviennent directement sélectionnables ;
-- un appui sur une ligne verte ferme la fenêtre des filtres SafeSky ;
-- activation automatique du calque SafeSky s’il était masqué ;
-- centrage et zoom de la carte sur la dernière position reçue de l’appareil ;
-- ouverture automatique de sa fiche détaillée sur la carte ;
-- fonctionnement identique pour un trafic détecté en vol ou au sol ;
-- lorsqu’un trafic détecté au sol est sélectionné, son affichage est forcé même si « Afficher les trafics au sol » reste décoché ;
-- le filtre général n’est pas modifié et tous les autres trafics au sol restent masqués ;
-- l’autorisation temporaire est liée uniquement à l’identifiant SafeSky du trafic choisi ;
-- le bouton « Retirer » conserve son action propre et ne déclenche pas le centrage de la carte ;
-- prise en charge du toucher iPad ainsi que des touches Entrée et Espace ;
-- maintien intégral des fonctions Go To, de la coloration verte et des boutons dupliqués de la v14.52 ;
-- version applicative portée en v14.53 TEST.
-
-
-v14.52 TEST — Go To aéroport, suivi détecté vert et commandes dupliquées
-
-Modifications apportées :
-- ajout d’un bouton « Go To » sous tous les autres boutons de la fiche d’un aéroport ;
-- ajout du même bouton dans la fiche de chaque pélicandrome permanent ou personnalisé ;
-- le bouton ferme la fenêtre de carte puis déclenche exactement la même destination temporaire que la sélection d’un code OACI dans la recherche commune ;
-- aucune activation automatique d’un pélicandrome proche ;
-- aucune modification du feu, de la base, du pélicandrome sélectionné ou des calculs mission ;
-- tracé de la route GPS vers l’aéroport et affichage du bandeau OACI / route / distance / temps ;
-- ajout d’un état vert dans la liste SafeSky suivie lorsque l’identifiant mémorisé est actuellement détecté ;
-- détection valable aussi bien pour un avion en vol que pour un avion au sol ;
-- affichage explicite « Détecté en vol » ou « Détecté au sol » dans la ligne verte ;
-- retour automatique à l’état neutre lorsque le trafic n’est plus reçu, devient trop ancien, rencontre une erreur ou lorsque le calque SafeSky est désactivé ;
-- duplication des boutons « Défaut », « Annuler » et « Appliquer » immédiatement sous la section « Mon avion » ;
-- conservation des trois boutons originaux en bas de la fenêtre ;
-- les deux séries commandent exactement les mêmes réglages et actions ;
-- maintien intégral de la recherche OACI et de la correction tactile de la v14.51 ;
-- version applicative portée en v14.52 TEST.
-
-
-v14.51 TEST — croix aéroport tactile et bandeau en haut sans feu
-
-Modifications apportées :
-- correction de la croix × du bandeau de destination aéroport sur iPad/PWA ;
-- remplacement de l’ancienne zone texte par un véritable bouton tactile ;
-- suppression de l’annulation prématurée du clic provoquée par touchstart ;
-- traitement direct de touchend, pointerup et click avec protection contre les doubles déclenchements ;
-- fermeture immédiate de la destination temporaire et suppression de sa route ;
-- restauration automatique du bandeau et de la route du feu lorsqu’un feu reste sélectionné ;
-- masquage complet du bandeau lorsqu’aucun feu ne reste sélectionné ;
-- lorsque l’aéroport est sélectionné sans feu, placement du bandeau dans la rangée supérieure normalement occupée par les BINGO ;
-- masquage explicite de tout ancien bandeau BINGO résiduel dans ce cas ;
-- aucune modification du feu, de la base, du pélicandrome ou des calculs mission ;
-- maintien intégral de la recherche OACI de la v14.50 et des routes métropolitaines de la v14.49 ;
-- version applicative portée en v14.51 TEST.
-
-
-v14.50 TEST — recherche OACI et route GPS vers un aéroport
-
-Modifications apportées :
-- la barre de recherche accepte désormais les codes OACI des aéroports connus de NPF ;
-- proposition dédiée « CODE OACI — nom de l’aéroport » dès deux caractères saisis ;
-- priorité au résultat exact lorsque les quatre caractères du code sont renseignés ;
-- sélection d’un aéroport sans création ni modification d’un feu ;
-- aucune activation des pélicandromes les plus proches ;
-- conservation stricte du pélicandrome, de la base et du feu déjà sélectionnés ;
-- création d’une destination cartographique temporaire indépendante des calculs mission ;
-- tracé de la route rouge depuis la position GPS vers l’aéroport ;
-- recalcul continu de la route magnétique, de la distance et du temps avec la position GPS ;
-- bandeau de carte au format « CODE OACI / route / distance / temps » ;
-- bouton × permettant de quitter la route aéroport et de restaurer automatiquement la route et le bandeau du feu ;
-- absence de mémorisation permanente de la destination aéroport ;
-- maintien intégral des routes métropolitaines M de la v14.49 ;
-- maintien intégral du masquage temporaire du propre avion de la v14.48 ;
-- version applicative portée en v14.50 TEST.
-
-
-v14.49 TEST — prise en charge des routes métropolitaines M
-
-Modifications apportées :
-- ajout de la classe routière M au moteur d’import du calque offline ;
-- reconnaissance des références simples M613, M185, M5, M5E14 et autres suffixes ;
-- reconnaissance des formes RM613, RM 613 et « Route métropolitaine 613 » ;
-- conservation de la véritable référence M dans les cartouches de la carte ;
-- affichage des routes M au même niveau de zoom que les départementales D ;
-- style jaune identique aux départementales afin de représenter le même niveau de réseau transféré ;
-- ajout de M dans le badge, les intitulés, les alertes d’import et les confirmations de suppression ;
-- maintien intégral du masquage temporaire de son propre avion introduit en v14.48 ;
-- maintien intégral des calculs d’heure sur feu de la v14.47 ;
-- maintien intégral des classes A, N et D et du stockage du pack existant ;
-- version applicative portée en v14.49 TEST.
-
-IMPORTANT :
-Le pack A/N/D actuel ne contient pas les géométries M, car elles ont été rejetées lors de sa génération.
-Il faut générer puis importer le nouveau pack avec le générateur v5 A/N/D/M fourni séparément.
-Le nouvel import remplace uniquement l’ancien calque routier. Il ne faut pas supprimer la PWA ni les cartes offline.
+RÈGLE POUR LES PROCHAINES VERSIONS
+Le contrôle OFFLINE fait désormais partie de la validation obligatoire avant livraison : bouton Cartes, ouverture de la fenêtre, détection des packs, bascule Offline, service worker actif et relance sans réseau.
