@@ -1,26 +1,22 @@
-NPF-Q400 — VERSION TEST v14.59
-Activation Offline non bloquante
+NPF-Q400 — TEST v14.60 — Activation Offline immédiate
 
-CORRECTION PRINCIPALE
-- Le clic sur « Offline » sélectionne et mémorise immédiatement le mode OFFLINE.
-- Le contrôle IndexedDB ajouté en v14.58 n'est plus exécuté avant le changement de mode.
-- Une base IndexedDB occupée, ancienne ou stockée sous un alias ne peut plus maintenir le bouton Online sélectionné.
-- Une erreur de diagnostic ou de rafraîchissement ne provoque plus de retour silencieux vers Online.
+Corrections :
+- suppression de toute attente IndexedDB avant la reconstruction de la carte ;
+- le bouton Offline ne reste plus désactivé/pastel pendant une transaction bloquée ;
+- reconstruction immédiate de la couche Leaflet avec le host logique du pack actif ;
+- écriture de la préférence Offline en arrière-plan avec délai maximal ;
+- suppression de l’attente infinie du service worker ;
+- relance automatique unique si la page n’est pas encore contrôlée par le service worker ;
+- nouvelle reconstruction de la couche lors de l’événement controllerchange ;
+- les diagnostics IndexedDB, zoom et service worker ne sont plus bloquants ;
+- conservation de l’archive nationale de localités v14.56, réellement présente.
 
-DIAGNOSTIC HORS LIGNE
-- Les contrôles des packs, des tuiles et du service worker sont exécutés après l'activation.
-- Ils sont informatifs et ne bloquent jamais le choix Offline.
-- Les bases de cartes sont ouvertes sans numéro de version imposé afin d'éviter un blocage Safari lors d'une tentative de mise à niveau IndexedDB.
-- Le mode Offline reste enregistré avant une éventuelle relance nécessaire au contrôle du service worker.
-
-COMPORTEMENT ATTENDU
-1. Ouvrir Cartes.
-2. Vérifier qu'au moins un pack est actif.
-3. Appuyer sur Offline.
-4. Le bouton Offline devient immédiatement sélectionné et l'état affiche « Mode OFFLINE ».
-5. La couche de carte est reconstruite avec les packs locaux.
-6. Les vérifications techniques se poursuivent ensuite sans modifier la sélection.
-
-CONSERVATION
-- Toutes les fonctions de la v14.58 sont conservées.
-- L'archive nationale de localités reste localites-france-v14.56.zip, inchangée.
+Contrôles de livraison :
+- syntaxe script.js et sw.js ;
+- changement Offline effectué avant toute promesse lente ;
+- bouton réactivé dans un bloc finally immédiat ;
+- couche Leaflet reconstruite avant contrôle IndexedDB ;
+- références app-shell présentes dans le pack ou conservées sur le serveur ;
+- archive localités v14.56 présente et référencée ;
+- manifeste JSON valide ;
+- intégrité ZIP.
