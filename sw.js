@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-64_demarrage_pwa_hors_ligne';
-const APP_VERSION = 'v14.64';
+const SW_VERSION = 'sw-v14-65_fin_boucle_message_maj';
+const APP_VERSION = 'v14.65';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -175,38 +175,11 @@ self.addEventListener('activate', event => {
         await self.clients.claim();
 
         /*
-         * v12.63 — transition PWA plus propre conservée.
-         * Après activation d'un nouveau service worker, on force une navigation
-         * des fenêtres ouvertes vers la même URL avec un paramètre de rafraîchissement.
-         * Objectif : éviter une page servie par l'ancien app-shell avec des scripts
-         * ou styles d'une autre version. Les bases IndexedDB des tuiles offline ne
-         * sont pas supprimées.
+         * v14.65 — aucune navigation forcée depuis le service worker.
+         * clients.claim() provoque controllerchange dans la page, qui effectue
+         * au maximum un rechargement protégé par session. La double navigation
+         * npfupdate de la v14.64 pouvait réarmer indéfiniment l'alerte de MAJ.
          */
-        /*
-         * v13.92 — la transition de version transporte un signal explicite
-         * npfupdate=v13.92. Deux passages espacés sécurisent le cas iPad où
-         * controllerchange recharge d'abord l'ancien URL avant client.navigate.
-         */
-        const navigateClientsToUpdatedVersion = async () => {
-            try {
-                const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-                await Promise.all(windowClients.map(async (client) => {
-                    try {
-                        if (!client || typeof client.navigate !== 'function') return;
-                        const url = new URL(client.url);
-                        if (url.origin !== self.location.origin) return;
-                        if (url.searchParams.get('npfupdate') === APP_VERSION) return;
-                        url.searchParams.set('swrefresh', SW_VERSION);
-                        url.searchParams.set('npfupdate', APP_VERSION);
-                        await client.navigate(url.toString());
-                    } catch (_) {}
-                }));
-            } catch (_) {}
-        };
-
-        await navigateClientsToUpdatedVersion();
-        await swDelay(900);
-        await navigateClientsToUpdatedVersion();
     })());
 });
 
