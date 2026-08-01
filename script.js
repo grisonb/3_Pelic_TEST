@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.62';
+    './data/localites/localites-france-v14.56.zip?appv=v14.63';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1864,7 +1864,7 @@ async function initializeApp() {
         }
 
         /*
-         * v14.62 TEST — l'interface ne doit jamais attendre IndexedDB ou le
+         * v14.63 TEST — l'interface ne doit jamais attendre IndexedDB ou le
          * service worker avant de créer la carte et de lier les boutons.
          */
         initializeOfflineTilePreference().catch(error => {
@@ -1876,7 +1876,7 @@ async function initializeApp() {
             2200,
             'Timeout analyse initiale des cartes offline'
         ).then(() => {
-            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.62');
+            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.63');
         }).catch(error => {
             console.warn('[Offline] Plage de zoom initiale conservée:', error);
         });
@@ -1970,11 +1970,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.62'
+                        !== 'v14.63'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.62'
+                        'v14.63'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3769,6 +3769,320 @@ function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
     }
 }
 
+
+/*
+ * v14.63 TEST — lecture directe des tuiles Offline depuis IndexedDB.
+ *
+ * La carte ne dépend plus du service worker pour afficher les packs téléchargés.
+ * Safari peut conserver une page sans contrôleur SW après une mise à jour : dans
+ * ce cas l'ancien système envoyait les requêtes vers un host fictif et la carte
+ * restait vide. Cette couche Leaflet lit maintenant directement les blobs dans
+ * les bases IndexedDB existantes. Le service worker reste utilisé pour le cache
+ * applicatif et comme chemin de compatibilité secondaire.
+ */
+const DIRECT_OFFLINE_TILE_CACHE_MAX = 240;
+const directOfflineTileBlobCache = new Map();
+const directOfflineDbPromises = new Map();
+let directOfflineTileHitCount = 0;
+let directOfflineTileMissCount = 0;
+
+function getOfflinePackLegacyGroupNameForDirectRead(packName) {
+    const name = String(packName || '')
+        .replace(/\.zip$/i, '')
+        .trim();
+    const cleaned = name
+        .replace(/\s*\(\d+\)\s*$/i, '')
+        .replace(/\s+(copy|copie)\s*$/i, '')
+        .trim();
+    const match = cleaned.match(
+        /^(.+?)(?:[\s_-]*(?:part|partie|zip)?[\s_-]*)(\d{1,3})$/i
+    );
+    if (match && match[1].trim().length >= 2) {
+        return match[1].replace(/[\s_-]+$/g, '').trim();
+    }
+    return cleaned;
+}
+
+function normalizeOfflineTileHostPrefixForDirectRead(packName, { legacy = false } = {}) {
+    const raw = String(packName || '').trim();
+    const groupName = legacy
+        ? getOfflinePackLegacyGroupNameForDirectRead(raw)
+        : (typeof getOfflinePackGroupName === 'function'
+            ? getOfflinePackGroupName(raw)
+            : raw);
+    const simplified = String(groupName || raw || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    if (!simplified || /open\s*street|openstreet|\bosm\b/.test(simplified)) return 'a';
+    if (/\bign\b|scan25|scan\s*25|oaci\s*ign/.test(simplified)) return 'ign';
+    if (/oaci|carte\s*oaci/.test(simplified)) return 'oaci';
+    return simplified.replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'pack';
+}
+
+function getDirectOfflineTileUrlCandidates(coords) {
+    const aliases = [
+        ...(Array.isArray(activeOfflinePacks) ? activeOfflinePacks : []),
+        ...(typeof getOfflineActivePackAliasesForPacks === 'function'
+            ? getOfflineActivePackAliasesForPacks(activeOfflinePacks)
+            : []),
+        ...(Array.isArray(activeOfflinePackAliases) ? activeOfflinePackAliases : [])
+    ];
+    const prefixes = [];
+    const addPrefix = value => {
+        const clean = String(value || '').trim();
+        if (clean && !prefixes.includes(clean)) prefixes.push(clean);
+    };
+    aliases.forEach(alias => {
+        addPrefix(normalizeOfflineTileHostPrefixForDirectRead(alias));
+        addPrefix(normalizeOfflineTileHostPrefixForDirectRead(alias, { legacy: true }));
+    });
+    if (!prefixes.length) addPrefix('a');
+    ['a', 'ign', 'oaci'].forEach(addPrefix);
+
+    const urls = [];
+    const addUrl = value => {
+        const clean = String(value || '').trim();
+        if (clean && !urls.includes(clean)) urls.push(clean);
+    };
+    prefixes.forEach(prefix => {
+        ['png', 'jpg', 'jpeg'].forEach(extension => {
+            addUrl(`https://${prefix}.tile.openstreetmap.org/${coords.z}/${coords.x}/${coords.y}.${extension}`);
+        });
+    });
+    return urls;
+}
+
+function getDirectOfflineDatabaseCandidates() {
+    const names = [];
+    const addName = value => {
+        const clean = String(value || '').trim();
+        if (clean && !names.includes(clean)) names.push(clean);
+    };
+    (Array.isArray(activeOfflinePackDatabases) ? activeOfflinePackDatabases : [])
+        .forEach(addName);
+    if (typeof getOfflineActivePackDatabasesForPacks === 'function') {
+        getOfflineActivePackDatabasesForPacks(activeOfflinePacks).forEach(addName);
+    }
+    addName(OFFLINE_DB_NAME);
+    return names;
+}
+
+function openDirectOfflineTileDatabase(dbName) {
+    const safeName = String(dbName || OFFLINE_DB_NAME);
+    if (directOfflineDbPromises.has(safeName)) {
+        return directOfflineDbPromises.get(safeName);
+    }
+    const promise = new Promise((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB indisponible'));
+            return;
+        }
+        const request = indexedDB.open(safeName);
+        let databaseDidNotExist = false;
+        request.onupgradeneeded = event => {
+            /* Ne pas créer silencieusement une base vide lors d'une simple lecture. */
+            databaseDidNotExist = true;
+            try { event.target.transaction.abort(); } catch (_) {}
+        };
+        request.onsuccess = event => {
+            const openedDb = event.target.result;
+            if (databaseDidNotExist || !openedDb.objectStoreNames.contains('tiles')) {
+                try { openedDb.close(); } catch (_) {}
+                reject(new Error(`Base de tuiles absente : ${safeName}`));
+                return;
+            }
+            try {
+                openedDb.onversionchange = () => {
+                    try { openedDb.close(); } catch (_) {}
+                    directOfflineDbPromises.delete(safeName);
+                };
+            } catch (_) {}
+            resolve(openedDb);
+        };
+        request.onerror = () => reject(request.error || new Error(`Ouverture impossible : ${safeName}`));
+        request.onblocked = () => reject(new Error(`Base bloquée : ${safeName}`));
+    }).catch(error => {
+        directOfflineDbPromises.delete(safeName);
+        throw error;
+    });
+    directOfflineDbPromises.set(safeName, promise);
+    return promise;
+}
+
+function isDirectOfflineTileRecordAllowed(record) {
+    const activeNames = new Set([
+        ...(Array.isArray(activeOfflinePacks) ? activeOfflinePacks : []),
+        ...(typeof getOfflineActivePackAliasesForPacks === 'function'
+            ? getOfflineActivePackAliasesForPacks(activeOfflinePacks)
+            : []),
+        ...(Array.isArray(activeOfflinePackAliases) ? activeOfflinePackAliases : [])
+    ].filter(Boolean));
+    if (!activeNames.size) return true;
+    const recordPack = String(record?.packName || '').trim();
+    if (!recordPack) return true; // anciennes bases sans champ packName
+    if (activeNames.has(recordPack)) return true;
+    const recordCanonical = typeof normalizeOfflinePackName === 'function'
+        ? normalizeOfflinePackName(recordPack)
+        : recordPack;
+    const recordGroup = typeof getOfflinePackGroupName === 'function'
+        ? getOfflinePackGroupName(recordPack)
+        : recordPack;
+    for (const activeName of activeNames) {
+        if (typeof normalizeOfflinePackName === 'function'
+            && normalizeOfflinePackName(activeName) === recordCanonical) return true;
+        if (typeof getOfflinePackGroupName === 'function'
+            && getOfflinePackGroupName(activeName) === recordGroup) return true;
+    }
+    return false;
+}
+
+function readDirectOfflineTileRecord(db, tileUrl) {
+    return new Promise((resolve, reject) => {
+        let tx;
+        let store;
+        try {
+            tx = db.transaction('tiles', 'readonly');
+            store = tx.objectStore('tiles');
+        } catch (error) {
+            reject(error);
+            return;
+        }
+
+        let request;
+        if (store.indexNames.contains('tileUrl')) {
+            request = store.index('tileUrl').openCursor(IDBKeyRange.only(tileUrl));
+        } else {
+            request = store.openCursor();
+        }
+        request.onsuccess = () => {
+            const cursor = request.result;
+            if (!cursor) {
+                resolve(null);
+                return;
+            }
+            const record = cursor.value || {};
+            const storedTileUrl = record.tileUrl || getTileUrlFromStoredKey(record.url);
+            if (storedTileUrl === tileUrl && isDirectOfflineTileRecordAllowed(record)) {
+                resolve(record);
+                return;
+            }
+            cursor.continue();
+        };
+        request.onerror = () => reject(request.error || new Error('Erreur lecture tuile'));
+        tx.onerror = () => reject(tx.error || new Error('Erreur transaction tuile'));
+        tx.onabort = () => reject(tx.error || new Error('Transaction tuile annulée'));
+    });
+}
+
+function rememberDirectOfflineTileBlob(cacheKey, blob) {
+    if (!blob) return;
+    directOfflineTileBlobCache.delete(cacheKey);
+    directOfflineTileBlobCache.set(cacheKey, blob);
+    while (directOfflineTileBlobCache.size > DIRECT_OFFLINE_TILE_CACHE_MAX) {
+        const oldestKey = directOfflineTileBlobCache.keys().next().value;
+        directOfflineTileBlobCache.delete(oldestKey);
+    }
+}
+
+async function findDirectOfflineTileBlob(coords) {
+    const cacheKey = [
+        coords.z,
+        coords.x,
+        coords.y,
+        ...(Array.isArray(activeOfflinePacks) ? activeOfflinePacks : [])
+    ].join('|');
+    if (directOfflineTileBlobCache.has(cacheKey)) {
+        const cachedBlob = directOfflineTileBlobCache.get(cacheKey);
+        directOfflineTileBlobCache.delete(cacheKey);
+        directOfflineTileBlobCache.set(cacheKey, cachedBlob);
+        return cachedBlob;
+    }
+
+    const dbNames = getDirectOfflineDatabaseCandidates();
+    const tileUrls = getDirectOfflineTileUrlCandidates(coords);
+    for (const dbName of dbNames) {
+        let tileDb;
+        try {
+            tileDb = await withTimeout(
+                openDirectOfflineTileDatabase(dbName),
+                1600,
+                `Timeout ouverture ${dbName}`
+            );
+        } catch (_) {
+            continue;
+        }
+        for (const tileUrl of tileUrls) {
+            try {
+                const record = await withTimeout(
+                    readDirectOfflineTileRecord(tileDb, tileUrl),
+                    1200,
+                    'Timeout lecture tuile'
+                );
+                if (!record?.tile) continue;
+                const blob = record.tile instanceof Blob
+                    ? record.tile
+                    : new Blob([record.tile], {
+                        type: /\.(jpg|jpeg)(?:\?.*)?$/i.test(tileUrl)
+                            ? 'image/jpeg'
+                            : 'image/png'
+                    });
+                rememberDirectOfflineTileBlob(cacheKey, blob);
+                directOfflineTileHitCount += 1;
+                if (directOfflineTileHitCount === 1) {
+                    setOfflineMapSwitchBusy('Mode OFFLINE — tuiles locales chargées.');
+                }
+                return blob;
+            } catch (_) {}
+        }
+    }
+    directOfflineTileMissCount += 1;
+    if (directOfflineTileHitCount === 0 && directOfflineTileMissCount === 6) {
+        setOfflineMapSwitchBusy(
+            'Mode OFFLINE actif — aucune tuile trouvée ici à ce niveau de zoom.'
+        );
+    }
+    return null;
+}
+
+function buildDirectOfflineLeafletLayer(options = {}) {
+    const DirectOfflineGridLayer = L.GridLayer.extend({
+        createTile(coords, done) {
+            const tile = document.createElement('img');
+            tile.alt = '';
+            tile.setAttribute('role', 'presentation');
+            tile.decoding = 'async';
+            tile.style.width = '100%';
+            tile.style.height = '100%';
+
+            findDirectOfflineTileBlob(coords).then(blob => {
+                if (!blob) {
+                    tile.onload = () => done(null, tile);
+                    tile.onerror = error => done(error || new Error('Tuile absente'), tile);
+                    tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
+                    return;
+                }
+                const blobUrl = URL.createObjectURL(blob);
+                tile.onload = () => {
+                    try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+                    done(null, tile);
+                };
+                tile.onerror = error => {
+                    try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+                    done(error || new Error('Décodage tuile impossible'), tile);
+                };
+                tile.src = blobUrl;
+            }).catch(error => {
+                tile.onload = () => done(null, tile);
+                tile.onerror = () => done(error, tile);
+                tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
+            });
+            return tile;
+        }
+    });
+    return new DirectOfflineGridLayer(options);
+}
+
 function setupBaseTileLayer() {
     if (!map) return;
     if (baseTileLayer) {
@@ -3813,7 +4127,7 @@ function setupBaseTileLayer() {
     const tileHostPrefix = offlineTilesMode ? normalizeOfflineTileHostPrefix(activeTilePackName) : 'a';
     const tileLayerUrl = `https://${tileHostPrefix}.tile.openstreetmap.org/{z}/{x}/{y}.png`;
 
-    baseTileLayer = L.tileLayer(tileLayerUrl, {
+    const tileLayerOptions = {
         minNativeZoom: effectiveMinZoom,
         maxNativeZoom: effectiveMaxZoom,
         minZoom: effectiveMinZoom,
@@ -3825,7 +4139,12 @@ function setupBaseTileLayer() {
         updateInterval: OFFLINE_TILE_UPDATE_INTERVAL_MS,
         noWrap: true,
         errorTileUrl: OFFLINE_TILE_PLACEHOLDER_DATA_URL
-    }).addTo(map);
+    };
+
+    baseTileLayer = offlineTilesMode
+        ? buildDirectOfflineLeafletLayer(tileLayerOptions)
+        : L.tileLayer(tileLayerUrl, tileLayerOptions);
+    baseTileLayer.addTo(map);
 
     enforceOfflineZoomLimit();
 
@@ -16920,7 +17239,7 @@ async function setOfflineTilesEnabled(enabled) {
     notifyServiceWorkerOfflineTilesPreference(offlineTilesMode);
 
     /*
-     * v14.62 TEST — persistance IndexedDB strictement en arrière-plan.
+     * v14.63 TEST — persistance IndexedDB strictement en arrière-plan.
      * Safari peut conserver une transaction ouverte sans déclencher oncomplete ;
      * cela ne doit plus bloquer le bouton ni la création de la couche Leaflet.
      */
@@ -17162,7 +17481,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.62'
+                        window.APP_VERSION || 'v14.63'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
@@ -17230,6 +17549,10 @@ async function setMapSourceMode(mode) {
     isMapSourceSwitching = true;
     mapSourceMode = nextMode;
     offlineTilesMode = nextMode === 'offline';
+    if (offlineTilesMode) {
+        directOfflineTileHitCount = 0;
+        directOfflineTileMissCount = 0;
+    }
 
     localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
     localStorage.setItem(
@@ -17247,14 +17570,14 @@ async function setMapSourceMode(mode) {
 
     try {
         /*
-         * v14.62 TEST — le changement visible et la couche sont appliqués
+         * v14.63 TEST — le changement visible et la couche sont appliqués
          * synchroniquement, avant tout accès IndexedDB ou attente du SW.
          */
         setOfflineTilesEnabled(offlineTilesMode);
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.62');
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.63');
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
@@ -17269,7 +17592,7 @@ async function setMapSourceMode(mode) {
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.62');
+            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.63');
         }).catch(error => {
             console.warn('[Offline] Synchronisation SW différée:', error);
         });
@@ -17281,7 +17604,7 @@ async function setMapSourceMode(mode) {
         'Timeout analyse des niveaux de zoom'
     ).then(() => {
         if (mapSourceMode === nextMode) {
-            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.62');
+            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.63');
         }
     }).catch(error => {
         console.warn('[Offline] Niveaux de zoom par défaut conservés:', error);
@@ -18385,7 +18708,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.62');
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.63');
     } catch (error) {
         console.error('Changement de carte offline impossible:', error);
         alert(`Impossible de changer de carte offline: ${error.message || error}`);
@@ -18407,7 +18730,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.62');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.63');
         }).catch(() => {});
     }
 
@@ -18417,7 +18740,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         'Timeout analyse carte sélectionnée'
     ).then(() => {
         if (token === offlineMapSwitchToken) {
-            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.62');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.63');
         }
     }).catch(() => {});
 
