@@ -1,5 +1,42 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.65 — FIN DE LA BOUCLE « MISE À JOUR INSTALLÉE »
+Date : 1 août 2026
+Base : v14.64 TEST — démarrage PWA hors ligne fiabilisé
+
+CORRECTION PRINCIPALE
+- Suppression de la boucle permanente du message « Mise à jour installée ».
+- La v14.64 demandait de fermer immédiatement la PWA mais ne consommait son marqueur qu’après deux secondes de visibilité ; une fermeture rapide conservait donc le marqueur pour le lancement suivant.
+- Le marqueur de mise à jour est désormais consommé avant l’affichage de la fenêtre.
+- L’alerte n’est affichée qu’une seule fois par version grâce à la clé persistante npfPostUpdateNoticeShownVersion.
+- Ajout d’un bouton « Continuer » permettant d’ouvrir immédiatement l’application.
+- Suppression de l’instruction demandant plusieurs fermetures et relances successives.
+- Migration automatique des marqueurs bloqués hérités de la v14.64.
+
+SERVICE WORKER
+- Suppression de la double navigation forcée client.navigate avec les paramètres npfupdate et swrefresh.
+- Le changement de contrôleur repose uniquement sur controllerchange avec un seul rechargement protégé par session.
+- La recherche de mise à jour automatique n’est plus relancée à chaque pageshow ou retour de visibilité ; elle s’exécute au démarrage ou sur action MAJ.
+- Le bouton MAJ ne crée plus artificiellement un message « nouvelle version » lorsqu’aucune nouvelle version n’a été installée.
+
+CONSERVÉ
+- Démarrage PWA hors ligne et app-shell sécurisé de la v14.64.
+- Lecture directe des cartes Offline depuis IndexedDB de la v14.63.
+- Toutes les fonctions SafeSky, recherche OACI, Go To et liste suivie des versions précédentes.
+- Toutes les cartes déjà téléchargées et toutes les bases IndexedDB.
+
+VALIDATIONS
+- Vérification syntaxique de index.html, script.js et sw.js.
+- Vérification de la disparition des temporisations de consommation à deux secondes.
+- Vérification de la présence du bouton « Continuer ».
+- Vérification que le service worker ne contient plus de client.navigate de transition.
+- Vérification du manifeste et de toutes les références v14.65.
+- Vérification que le journal reprend intégralement, octet pour octet, le journal cumulatif v14.64 après la nouvelle entrée.
+
+===============================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.64 — DÉMARRAGE PWA HORS LIGNE FIABILISÉ
 Date : 1 août 2026
 Base : v14.63 TEST — lecture directe des tuiles Offline depuis IndexedDB
