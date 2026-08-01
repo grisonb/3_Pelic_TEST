@@ -1,5 +1,44 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.68 — CHARGEMENT AUTOMATIQUE FIABLE DE LA CARTE OFFLINE MÉMORISÉE
+Date : 1 août 2026
+Base : v14.67 TEST — alerte de mise à jour unique restaurée
+
+CORRECTION PRINCIPALE
+- Correction du retour de la carte Offline vide à chaque ouverture de la PWA.
+- La reconstruction v14.66/v14.67 était bien présente, mais elle rejouait la couche avec les mêmes métadonnées déjà chargées et sans attendre que les bases IndexedDB de Safari soient réellement lisibles.
+- Le démarrage relit désormais la liste réelle des packs installés et réconcilie le groupe mémorisé avec tous ses fichiers ZIP installés, exactement comme une sélection manuelle dans la fenêtre Cartes.
+- Les noms de bases IndexedDB et les alias sont recalculés à partir des métadonnées installées avant toute reconstruction.
+- NPF vérifie qu’une base candidate contient effectivement des tuiles avant de recréer la couche Leaflet.
+- Les connexions IndexedDB de lecture éventuellement périmées sont fermées entre les tentatives, puis rouvertes proprement.
+- Les tentatives sont espacées sur une période maximale d’environ trente secondes et s’arrêtent immédiatement dès qu’une tuile locale est chargée.
+- La récupération est également relancée après un retour depuis l’arrière-plan ou une restauration de page Safari, uniquement si aucune tuile locale n’a encore été lue.
+- Le changement manuel de carte n’est plus nécessaire au démarrage.
+
+CONSERVÉ
+- Moteur de lecture directe des tuiles IndexedDB de la v14.63.
+- Démarrage de la PWA sans connexion de la v14.64.
+- Alerte de mise à jour unique avec bouton « Continuer » de la v14.67.
+- Toutes les cartes déjà téléchargées, leurs bases IndexedDB et la carte mémorisée.
+- Toutes les fonctions SafeSky, recherche OACI, Go To, liste suivie et calque routier.
+
+COHÉRENCE DE VERSION
+- index.html, script.js, manifest.json et sw.js utilisent tous v14.68.
+- Les paramètres appv et le start_url du manifeste sont alignés sur v14.68.
+- Le journal cumulatif reprend intégralement le journal v14.67 après cette nouvelle entrée.
+
+VALIDATIONS
+- Vérification syntaxique de script.js et sw.js avec Node.js.
+- Vérification JSON du manifeste.
+- Vérification statique de la conservation intégrale du mécanisme d’alerte unique v14.67.
+- Vérification que la récupération attend une base IndexedDB contenant réellement des tuiles avant la reconstruction.
+- Vérification que les packs mémorisés sont réconciliés avec les packs installés comme lors d’une sélection manuelle.
+- Vérification de l’intégrité du ZIP et de la présence de toutes les ressources de la v14.67.
+
+===============================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.67 — RESTAURATION DÉFINITIVE DE L’ALERTE DE MISE À JOUR UNIQUE
 Date : 1 août 2026
 Base : v14.66 TEST — restauration automatique de la carte Offline au démarrage
