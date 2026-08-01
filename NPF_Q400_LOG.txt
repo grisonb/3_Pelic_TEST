@@ -1,29 +1,26 @@
-NPF-Q400 — TEST v14.58 — RÉPARATION MODE OFFLINE
+NPF-Q400 — VERSION TEST v14.59
+Activation Offline non bloquante
 
-Base : v14.57 TEST.
+CORRECTION PRINCIPALE
+- Le clic sur « Offline » sélectionne et mémorise immédiatement le mode OFFLINE.
+- Le contrôle IndexedDB ajouté en v14.58 n'est plus exécuté avant le changement de mode.
+- Une base IndexedDB occupée, ancienne ou stockée sous un alias ne peut plus maintenir le bouton Online sélectionné.
+- Une erreur de diagnostic ou de rafraîchissement ne provoque plus de retour silencieux vers Online.
 
-CORRECTIONS
-- Le bouton « Cartes » et les boutons Online / Offline sont désormais installés dans un bloc autonome, immédiatement après la création de la carte.
-- Une erreur provenant du trafic, du calculateur ou d’une autre fonction ne peut plus empêcher l’ouverture de la gestion des cartes.
-- La gestion du clic qui ferme la fiche trafic est déplacée après l’installation de l’interface et protégée par try/catch.
-- Avant d’activer le mode Offline, NPF vérifie désormais :
-  1. qu’au moins un pack est actif ;
-  2. que la base IndexedDB est accessible ;
-  3. qu’au moins une tuile existe réellement dans les bases actives ;
-  4. qu’un service worker contrôle la page ;
-  5. que le service worker confirme la liste des packs actifs.
-- En cas d’échec, un message explicite remplace une bascule silencieuse.
-- L’archive nationale des localités n’est plus renommée inutilement : la v14.58 réutilise le fichier inchangé localites-france-v14.56.zip, déjà utilisé dans la dernière version où le hors ligne fonctionnait. Cela évite qu’une ressource de 5,9 Mo manquante bloque l’installation du nouveau service worker.
-- La liste SafeSky sans limite et la fermeture de la fiche trafic par clic simple sont conservées.
+DIAGNOSTIC HORS LIGNE
+- Les contrôles des packs, des tuiles et du service worker sont exécutés après l'activation.
+- Ils sont informatifs et ne bloquent jamais le choix Offline.
+- Les bases de cartes sont ouvertes sans numéro de version imposé afin d'éviter un blocage Safari lors d'une tentative de mise à niveau IndexedDB.
+- Le mode Offline reste enregistré avant une éventuelle relance nécessaire au contrôle du service worker.
 
-VALIDATIONS EFFECTUÉES
-- Syntaxe JavaScript de script.js et sw.js.
-- Validation JSON du manifeste.
-- Vérification des références de version.
-- Vérification de présence de l’archive locale nationale dans le ZIP.
-- Vérification du contenu et de l’intégrité du ZIP.
-- Test local du bouton Cartes, de l’ouverture de la fenêtre et de la bascule Offline avec service worker et IndexedDB simulés.
-- Test de relance sans réseau après mise en cache de l’app-shell.
+COMPORTEMENT ATTENDU
+1. Ouvrir Cartes.
+2. Vérifier qu'au moins un pack est actif.
+3. Appuyer sur Offline.
+4. Le bouton Offline devient immédiatement sélectionné et l'état affiche « Mode OFFLINE ».
+5. La couche de carte est reconstruite avec les packs locaux.
+6. Les vérifications techniques se poursuivent ensuite sans modifier la sélection.
 
-RÈGLE POUR LES PROCHAINES VERSIONS
-Le contrôle OFFLINE fait désormais partie de la validation obligatoire avant livraison : bouton Cartes, ouverture de la fenêtre, détection des packs, bascule Offline, service worker actif et relance sans réseau.
+CONSERVATION
+- Toutes les fonctions de la v14.58 sont conservées.
+- L'archive nationale de localités reste localites-france-v14.56.zip, inchangée.
