@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.67';
+    './data/localites/localites-france-v14.56.zip?appv=v14.68';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1877,7 +1877,7 @@ async function initializeApp() {
             2200,
             'Timeout analyse initiale des cartes offline'
         ).then(() => {
-            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.67');
+            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.68');
         }).catch(error => {
             console.warn('[Offline] Plage de zoom initiale conservée:', error);
         });
@@ -1937,7 +1937,7 @@ async function initializeApp() {
     searchSection.style.display = 'block';
     initMap();
     scheduleRememberedOfflineMapStartupRecovery(
-        'initializeApp-v14.67'
+        'initializeApp-v14.68'
     );
     initializeTeamChat();
     try {
@@ -1974,11 +1974,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.67'
+                        !== 'v14.68'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.67'
+                        'v14.68'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3714,20 +3714,70 @@ function scheduleOfflineTileWake(reason = 'startup') {
 
 
 /*
- * v14.67 TEST — restauration automatique de la carte Offline mémorisée.
+ * v14.68 TEST — restauration fiable de la carte Offline mémorisée.
  *
- * Lors d'une ouverture directe en mode Offline, la première couche pouvait être
- * créée avant que Safari ait rendu les bases IndexedDB du pack réellement
- * disponibles. Les tuiles absentes étaient alors remplacées par le fond neutre
- * et un simple redraw ne suffisait pas toujours. Changer de carte puis revenir
- * forçait une reconstruction complète, ce qui expliquait le contournement
- * observé sur iPad.
+ * Les v14.66/v14.67 reconstruisaient plusieurs fois la couche Leaflet, mais avec
+ * les mêmes informations de pack déjà présentes en mémoire. Sur Safari/iPadOS,
+ * les bases IndexedDB isolées peuvent ne devenir réellement lisibles que
+ * plusieurs secondes après l'ouverture. Dans ce cas, les premières lectures
+ * échouaient, Leaflet conservait les tuiles neutres et l'utilisateur devait
+ * sélectionner une autre carte puis revenir sur la carte voulue.
  *
- * Cette séquence rejoue automatiquement le même recalcul qu'une sélection
- * manuelle : bases/alias du pack, limites de zoom et reconstruction complète de
- * la couche. Elle s'arrête dès qu'une première tuile locale est effectivement
- * lue et ne modifie jamais le pack choisi par l'utilisateur.
+ * Cette version reproduit complètement la sélection manuelle :
+ * - relit la liste des packs installés depuis localStorage ;
+ * - réconcilie le groupe mémorisé avec tous ses fichiers réellement installés ;
+ * - recalcule bases et alias ;
+ * - attend qu'au moins une base de tuiles contienne effectivement des données ;
+ * - ferme les connexions de lecture périmées puis recrée la couche une seule fois
+ *   lorsque IndexedDB est prêt.
  */
+function reconcileRememberedOfflinePacksWithInstalledMetadata() {
+    if (!Array.isArray(activeOfflinePacks) || !activeOfflinePacks.length) {
+        return false;
+    }
+
+    const installed = getInstalledMapPacksSafe();
+    if (!installed.length) return false;
+
+    const rememberedGroup = getOfflinePackGroupName(activeOfflinePacks[0]);
+    const installedGroupPacks = installed
+        .filter(pack => (
+            pack
+            && getOfflinePackGroupName(pack.name) === rememberedGroup
+        ))
+        .map(pack => String(pack.name || '').trim())
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(
+            right,
+            'fr',
+            { numeric: true, sensitivity: 'base' }
+        ));
+
+    if (!installedGroupPacks.length) return false;
+
+    const current = [...activeOfflinePacks]
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(
+            right,
+            'fr',
+            { numeric: true, sensitivity: 'base' }
+        ));
+
+    if (JSON.stringify(current) !== JSON.stringify(installedGroupPacks)) {
+        activeOfflinePacks = installedGroupPacks;
+        try {
+            localStorage.setItem(
+                OFFLINE_ACTIVE_PACKS_KEY,
+                JSON.stringify(activeOfflinePacks)
+            );
+        } catch (_) {}
+    }
+
+    refreshRememberedOfflinePackRuntimeMetadata();
+    return true;
+}
+
 function refreshRememberedOfflinePackRuntimeMetadata() {
     if (!Array.isArray(activeOfflinePacks)) activeOfflinePacks = [];
 
@@ -3748,6 +3798,95 @@ function refreshRememberedOfflinePackRuntimeMetadata() {
     } catch (_) {}
 }
 
+function closeDirectOfflineDatabaseConnectionsForStartupRetry() {
+    try {
+        directOfflineDbPromises.forEach(promise => {
+            Promise.resolve(promise)
+                .then(openedDb => {
+                    try { openedDb?.close(); } catch (_) {}
+                })
+                .catch(() => {});
+        });
+        directOfflineDbPromises.clear();
+    } catch (_) {}
+}
+
+function countDirectOfflineTilesInDatabase(openedDb) {
+    return new Promise((resolve, reject) => {
+        let transaction;
+        let request;
+        try {
+            transaction = openedDb.transaction('tiles', 'readonly');
+            request = transaction.objectStore('tiles').count();
+        } catch (error) {
+            reject(error);
+            return;
+        }
+        request.onsuccess = () => resolve(Number(request.result) || 0);
+        request.onerror = () => reject(
+            request.error || new Error('Comptage des tuiles impossible')
+        );
+        transaction.onabort = () => reject(
+            transaction.error || new Error('Comptage des tuiles annulé')
+        );
+    });
+}
+
+async function waitForRememberedOfflineTileDatabaseReady() {
+    const databaseNames = getDirectOfflineDatabaseCandidates();
+
+    for (const dbName of databaseNames) {
+        let openedDb;
+        try {
+            openedDb = await withTimeout(
+                openDirectOfflineTileDatabase(dbName),
+                2800,
+                `Timeout ouverture ${dbName}`
+            );
+            const tileCount = await withTimeout(
+                countDirectOfflineTilesInDatabase(openedDb),
+                2200,
+                `Timeout comptage ${dbName}`
+            );
+            if (tileCount > 0) {
+                return { dbName, tileCount };
+            }
+        } catch (_) {
+            /* La tentative suivante rouvrira la base avec une connexion fraîche. */
+        }
+    }
+
+    return null;
+}
+
+function rebuildRememberedOfflineMapAfterDatabaseReady(reason, readyDatabase) {
+    if (mapSourceMode !== 'offline' || !map) return false;
+
+    directOfflineTileBlobCache.clear();
+    directOfflineTileHitCount = 0;
+    directOfflineTileMissCount = 0;
+    offlineTilesMode = true;
+    applyImmediateBaseTileZoomForMapSource('offline');
+
+    try {
+        setupBaseTileLayer();
+        map.invalidateSize?.({ animate: false, pan: false });
+        baseTileLayer?.redraw?.();
+        scheduleOfflineTileWake(`db-ready:${reason}`);
+        setOfflineMapSwitchBusy(
+            `Mode OFFLINE — carte locale prête (${readyDatabase.dbName}).`
+        );
+        return true;
+    } catch (error) {
+        console.warn(
+            '[Offline] Reconstruction après disponibilité IndexedDB impossible:',
+            reason,
+            error
+        );
+        return false;
+    }
+}
+
 function scheduleRememberedOfflineMapStartupRecovery(
     reason = 'startup-remembered-offline-map'
 ) {
@@ -3761,58 +3900,79 @@ function scheduleRememberedOfflineMapStartupRecovery(
         return false;
     }
 
-    const packSignature = JSON.stringify(activeOfflinePacks);
+    reconcileRememberedOfflinePacksWithInstalledMetadata();
     refreshRememberedOfflinePackRuntimeMetadata();
 
-    /*
-     * Une ancienne plage de zoom peut provenir d'une autre carte ou d'un scan
-     * interrompu. La sélection manuelle l'efface déjà ; le démarrage doit faire
-     * de même avant de reconstruire la carte mémorisée.
-     */
     try {
         localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
         localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
     } catch (_) {}
 
-    directOfflineTileBlobCache.clear();
-    directOfflineTileHitCount = 0;
-    directOfflineTileMissCount = 0;
+    offlineTilesMode = true;
     applyImmediateBaseTileZoomForMapSource('offline');
 
-    const recoveryDelays = [40, 420, 1200, 2800, 5200];
-    recoveryDelays.forEach((delay, index) => {
-        setTimeout(() => {
+    const rememberedGroup = getOfflinePackGroupName(activeOfflinePacks[0]);
+    const retryDelays = [80, 450, 1100, 2200, 4000, 6500, 9500, 14000, 21000, 30000];
+
+    retryDelays.forEach((delay, index) => {
+        setTimeout(async () => {
+            if (token !== offlineStartupLayerRecoveryToken) return;
+            if (mapSourceMode !== 'offline' || !map) return;
+            if (directOfflineTileHitCount > 0) return;
+
+            const currentGroup = getOfflinePackGroupName(
+                activeOfflinePacks?.[0] || ''
+            );
+            if (currentGroup !== rememberedGroup) return;
+
+            reconcileRememberedOfflinePacksWithInstalledMetadata();
+            refreshRememberedOfflinePackRuntimeMetadata();
+            closeDirectOfflineDatabaseConnectionsForStartupRetry();
+
+            const readyDatabase = await waitForRememberedOfflineTileDatabaseReady();
             if (token !== offlineStartupLayerRecoveryToken) return;
             if (mapSourceMode !== 'offline') return;
-            if (JSON.stringify(activeOfflinePacks) !== packSignature) return;
-            if (!map) return;
 
-            /* Dès qu'une tuile locale est lue, les tentatives suivantes cessent. */
-            if (directOfflineTileHitCount > 0 && index > 0) return;
-
-            refreshRememberedOfflinePackRuntimeMetadata();
-            applyImmediateBaseTileZoomForMapSource('offline');
-
-            try {
-                setupBaseTileLayer();
-                if (typeof map.invalidateSize === 'function') {
-                    map.invalidateSize({ animate: false, pan: false });
+            if (!readyDatabase) {
+                if (index === retryDelays.length - 1) {
+                    setOfflineMapSwitchBusy(
+                        'Mode OFFLINE actif — stockage local encore indisponible.'
+                    );
                 }
-                if (baseTileLayer && typeof baseTileLayer.redraw === 'function') {
-                    baseTileLayer.redraw();
-                }
-            } catch (error) {
-                console.warn(
-                    '[Offline] Restauration de la carte mémorisée impossible:',
-                    reason,
-                    error
-                );
+                return;
             }
+
+            rebuildRememberedOfflineMapAfterDatabaseReady(
+                `${reason}:attempt-${index + 1}`,
+                readyDatabase
+            );
         }, delay);
     });
 
     return true;
 }
+
+(function setupRememberedOfflineMapResumeRecovery() {
+    if (window.__npfRememberedOfflineMapResumeRecoveryInstalled) return;
+    window.__npfRememberedOfflineMapResumeRecoveryInstalled = true;
+
+    window.addEventListener('pageshow', () => {
+        setTimeout(() => {
+            if (mapSourceMode === 'offline' && directOfflineTileHitCount === 0) {
+                scheduleRememberedOfflineMapStartupRecovery('pageshow-v14.68');
+            }
+        }, 180);
+    }, { passive: true });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        setTimeout(() => {
+            if (mapSourceMode === 'offline' && directOfflineTileHitCount === 0) {
+                scheduleRememberedOfflineMapStartupRecovery('visibility-v14.68');
+            }
+        }, 250);
+    }, { passive: true });
+})();
 
 function scheduleStartupAuxiliaryLayers() {
     /*
@@ -17519,7 +17679,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.67'
+                        window.APP_VERSION || 'v14.68'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
@@ -17615,7 +17775,7 @@ async function setMapSourceMode(mode) {
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.67');
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.68');
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
@@ -17630,7 +17790,7 @@ async function setMapSourceMode(mode) {
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.67');
+            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.68');
         }).catch(error => {
             console.warn('[Offline] Synchronisation SW différée:', error);
         });
@@ -17642,7 +17802,7 @@ async function setMapSourceMode(mode) {
         'Timeout analyse des niveaux de zoom'
     ).then(() => {
         if (mapSourceMode === nextMode) {
-            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.67');
+            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.68');
         }
     }).catch(error => {
         console.warn('[Offline] Niveaux de zoom par défaut conservés:', error);
@@ -18746,7 +18906,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.67');
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.68');
     } catch (error) {
         console.error('Changement de carte offline impossible:', error);
         alert(`Impossible de changer de carte offline: ${error.message || error}`);
@@ -18768,7 +18928,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.67');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.68');
         }).catch(() => {});
     }
 
@@ -18778,7 +18938,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         'Timeout analyse carte sélectionnée'
     ).then(() => {
         if (token === offlineMapSwitchToken) {
-            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.67');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.68');
         }
     }).catch(() => {});
 
