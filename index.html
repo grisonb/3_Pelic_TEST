@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.66" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.66">
-    <link rel="manifest" href="manifest.json?appv=v14.66">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.67" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.67">
+    <link rel="manifest" href="manifest.json?appv=v14.67">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,79 +57,176 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.66';
+        const APP_VERSION = 'v14.67';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
-        window.APP_VERSION = APP_VERSION;
-        const shouldDisableServiceWorker = false;
-        window.SW_DISABLED_FOR_PLATFORM = shouldDisableServiceWorker;
-
-        // v13.34 — sur iPad/PWA la bascule de service worker peut nécessiter deux relances.
-        // On conserve donc volontairement l'alerte post-MAJ sur deux ouvertures.
+        const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
+        const POST_UPDATE_NOTICE_PENDING_KEY = 'npfPostUpdateRestartNoticePending';
         const POST_UPDATE_NOTICE_REMAINING_KEY = 'npfPostUpdateRestartNoticeRemaining';
-        function markPostUpdateRestartNotice(version = APP_VERSION, remaining = 2) {
+        const POST_UPDATE_NOTICE_SHOWN_VERSION_KEY = 'npfPostUpdateNoticeShownVersion';
+        const POST_UPDATE_TRANSITION_PARAM = 'npfupdate';
+
+        window.APP_VERSION = APP_VERSION;
+        window.SW_DISABLED_FOR_PLATFORM = false;
+        window.NPF_POST_UPDATE_NOTICE_MANAGED = true;
+
+        function clearLegacyPostUpdateNoticeMarkers() {
             try {
-                localStorage.setItem('npfPostUpdateRestartNoticeVersion', version);
-                localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
-                localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(Math.max(1, remaining)));
+                localStorage.removeItem(POST_UPDATE_NOTICE_VERSION_KEY);
+                localStorage.removeItem(POST_UPDATE_NOTICE_PENDING_KEY);
+                localStorage.removeItem(POST_UPDATE_NOTICE_REMAINING_KEY);
+            } catch (_) {}
+            window.NPF_FORCE_POST_UPDATE_NOTICE = false;
+        }
+
+        function markPostUpdateRestartNotice(version = APP_VERSION) {
+            try {
+                const shownVersion = localStorage.getItem(
+                    POST_UPDATE_NOTICE_SHOWN_VERSION_KEY
+                ) || '';
+                if (shownVersion === version) {
+                    clearLegacyPostUpdateNoticeMarkers();
+                    return;
+                }
+                localStorage.setItem(POST_UPDATE_NOTICE_VERSION_KEY, version);
+                localStorage.setItem(POST_UPDATE_NOTICE_PENDING_KEY, '1');
             } catch (_) {}
         }
 
+        function shouldShowPostUpdateNotice() {
+            try {
+                const shownVersion = localStorage.getItem(
+                    POST_UPDATE_NOTICE_SHOWN_VERSION_KEY
+                ) || '';
+                if (shownVersion === APP_VERSION) {
+                    clearLegacyPostUpdateNoticeMarkers();
+                    return false;
+                }
 
-        /*
-         * v13.92 TEST — signal explicite du nouveau service worker.
-         * Le paramètre npfupdate=v13.92 est ajouté par le SW lors de son activation.
-         * Il ne dépend donc ni de l'ancienne valeur appVersion, ni du moment où Safari
-         * décide de remplacer l'ancien index. Dès que le nouvel index est réellement
-         * chargé, l'alerte est armée avant DOMContentLoaded.
-         */
-        const POST_UPDATE_TRANSITION_PARAM = 'npfupdate';
-        let postUpdateTransitionAtBoot = false;
+                const pending = localStorage.getItem(
+                    POST_UPDATE_NOTICE_PENDING_KEY
+                ) === '1';
+                const noticeVersion = localStorage.getItem(
+                    POST_UPDATE_NOTICE_VERSION_KEY
+                ) || '';
+
+                return pending && (!noticeVersion || noticeVersion === APP_VERSION);
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function showNpfPostUpdateNoticeOnce() {
+            if (!document.body) return;
+            if (document.getElementById('post-update-restart-modal')) return;
+            if (!shouldShowPostUpdateNotice()) return;
+
+            /*
+             * v14.67 — le marqueur est consommé AVANT l'affichage.
+             * La v14.64 demandait de fermer immédiatement l'application mais ne
+             * supprimait le marqueur qu'après deux secondes : une fermeture rapide
+             * recréait donc la même alerte à chaque lancement.
+             */
+            try {
+                localStorage.setItem(
+                    POST_UPDATE_NOTICE_SHOWN_VERSION_KEY,
+                    APP_VERSION
+                );
+            } catch (_) {}
+            clearLegacyPostUpdateNoticeMarkers();
+
+            const modal = document.createElement('div');
+            modal.id = 'post-update-restart-modal';
+            modal.className = 'update-reminder-modal post-update-restart-modal';
+            modal.style.cssText = [
+                'position:fixed',
+                'inset:0',
+                'z-index:2147483647',
+                'display:flex',
+                'align-items:center',
+                'justify-content:center',
+                'padding:24px',
+                'box-sizing:border-box',
+                'background:rgba(0,0,0,.58)'
+            ].join(';');
+            modal.innerHTML = `
+                <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
+                    <h3 id="post-update-restart-title">Mise à jour installée</h3>
+                    <p>NPF-Q400 ${APP_VERSION} est prête.</p>
+                    <p>La mise à jour est terminée. Il n’est plus nécessaire de fermer puis relancer plusieurs fois l’application.</p>
+                    <div style="display:flex;justify-content:flex-end;margin-top:18px">
+                        <button id="post-update-continue-button" type="button" style="min-width:150px;padding:11px 18px;border:0;border-radius:10px;background:#0b5ed7;color:#fff;font:700 16px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">Continuer</button>
+                    </div>
+                </div>
+            `;
+
+            const content = modal.firstElementChild;
+            if (content) {
+                content.style.cssText = [
+                    'width:min(620px,calc(100vw - 48px))',
+                    'max-height:calc(100vh - 48px)',
+                    'overflow:auto',
+                    'box-sizing:border-box',
+                    'padding:24px',
+                    'border-radius:16px',
+                    'background:#fff',
+                    'color:#1f2937',
+                    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+                    'box-shadow:0 18px 50px rgba(0,0,0,.35)'
+                ].join(';');
+            }
+
+            const close = () => {
+                try { modal.remove(); } catch (_) {}
+            };
+            modal.addEventListener('click', event => {
+                if (event.target === modal) close();
+            });
+            document.addEventListener('keydown', function onNoticeKeydown(event) {
+                if (event.key !== 'Escape') return;
+                document.removeEventListener('keydown', onNoticeKeydown);
+                close();
+            });
+            document.body.appendChild(modal);
+            document.getElementById('post-update-continue-button')
+                ?.addEventListener('click', close, { once: true });
+        }
+        window.showNpfPostUpdateNoticeOnce = showNpfPostUpdateNoticeOnce;
+
+        // Migration immédiate des marqueurs bloqués laissés par la v14.64.
         try {
             const bootUrl = new URL(window.location.href);
-            const transitionVersion = bootUrl.searchParams.get(POST_UPDATE_TRANSITION_PARAM) || '';
+            const transitionVersion = bootUrl.searchParams.get(
+                POST_UPDATE_TRANSITION_PARAM
+            ) || '';
             if (transitionVersion === APP_VERSION) {
-                postUpdateTransitionAtBoot = true;
-                window.NPF_FORCE_POST_UPDATE_NOTICE = true;
-                markPostUpdateRestartNotice(APP_VERSION, 2);
-
-                /*
-                 * Le paramètre reste présent quelques secondes afin qu'une éventuelle
-                 * seconde navigation de sécurisation du SW ne relance pas la page.
-                 */
-                setTimeout(() => {
-                    try {
-                        const cleanUrl = new URL(window.location.href);
-                        cleanUrl.searchParams.delete(POST_UPDATE_TRANSITION_PARAM);
-                        cleanUrl.searchParams.delete('swrefresh');
-                        window.history.replaceState(
-                            null,
-                            '',
-                            `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`
-                        );
-                    } catch (_) {}
-                }, 3500);
+                markPostUpdateRestartNotice(APP_VERSION);
+            }
+            bootUrl.searchParams.delete(POST_UPDATE_TRANSITION_PARAM);
+            bootUrl.searchParams.delete('swrefresh');
+            if (bootUrl.toString() !== window.location.href) {
+                window.history.replaceState(
+                    null,
+                    '',
+                    `${bootUrl.pathname}${bootUrl.search}${bootUrl.hash}`
+                );
             }
         } catch (_) {}
 
-
-        /*
-         * v13.91 TEST — alerte post-MAJ conservée jusqu'à affichage réellement visible.
-         * Sur iPad/PWA, plusieurs navigations automatiques peuvent se succéder lors de
-         * l'activation du nouveau service worker. Le marqueur n'est plus consommé tant
-         * que la fenêtre n'est pas restée visible sur une page stable.
-         */
         try {
-            const storedVersionAtBoot = localStorage.getItem(APP_VERSION_STORAGE_KEY);
+            const storedVersionAtBoot = localStorage.getItem(
+                APP_VERSION_STORAGE_KEY
+            ) || '';
             if (storedVersionAtBoot && storedVersionAtBoot !== APP_VERSION) {
-                markPostUpdateRestartNotice(APP_VERSION, 2);
+                markPostUpdateRestartNotice(APP_VERSION);
+            }
+            if (storedVersionAtBoot !== APP_VERSION) {
                 localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
                 sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
             }
         } catch (_) {}
 
         // Sécurité : ne jamais laisser l'écran de démarrage bloquer indéfiniment.
-        // Ne remplace pas l'initialisation normale ; sert uniquement en secours si Safari/PWA rate un évènement.
         window.addEventListener('load', () => {
             setTimeout(() => {
                 try {
@@ -141,52 +238,18 @@
             }, 12000);
         }, { once: true });
 
-
-        /*
-         * v13.00 TEST — HUD commune survolée auto-réparant + trafic ADS-B v3/source de secours, basé sur v12.99.
-         * Quand un nouveau service worker prend le contrôle, on recharge une
-         * seule fois la page pour éviter un mélange ancien index / nouveau cache
-         * ou nouveau index / ancien script. Les tuiles offline IndexedDB ne sont
-         * pas touchées.
-         */
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 try {
                     const reloadKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:${APP_VERSION}`;
                     if (sessionStorage.getItem(reloadKey) === '1') return;
                     sessionStorage.setItem(reloadKey, '1');
-                    markPostUpdateRestartNotice(APP_VERSION, 2);
                 } catch (_) {}
-
                 window.location.reload();
             });
         }
 
-        /*
-         * v12.49 — correction démarrage hors ligne.
-         * Purge automatique désactivée.
-         *
-         * Le bloc précédent désenregistrait le service worker et supprimait les
-         * caches app-shell une fois par version. Hors ligne, cela cassait le
-         * lancement après modification.
-         *
-         * La récupération reste possible manuellement via le bouton MAJ /
-         * forceRecoveryReload, mais l'application ne supprime plus son cache
-         * toute seule au démarrage.
-         */
-
         window.forceRecoveryReload = async () => {
-            /*
-             * v14.66 TEST — mise à jour sans trou de protection hors ligne.
-             *
-             * L'ancienne procédure supprimait le cache app-shell et désinscrivait
-             * le service worker AVANT que le nouveau soit installé. Si l'installation
-             * suivante échouait (quota Safari, ressource lente, réseau interrompu),
-             * la PWA ne pouvait plus démarrer sans connexion.
-             *
-             * La nouvelle procédure conserve obligatoirement le service worker et
-             * l'app-shell actifs jusqu'à ce que leur remplaçant prenne le contrôle.
-             */
             const forceButton = document.getElementById('force-update-button');
             if (forceButton) {
                 forceButton.disabled = true;
@@ -207,9 +270,7 @@
                             new Promise(resolve => setTimeout(resolve, 4500))
                         ]).catch(() => null);
                     }
-                    if (registration?.waiting) {
-                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    }
+                    registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
                 }
             } catch (error) {
                 console.log('Mise à jour service worker différée:', error);
@@ -219,33 +280,26 @@
             refreshUrl.pathname = refreshUrl.pathname.replace(/[^/]*$/, 'index.html');
             refreshUrl.searchParams.set('appv', APP_VERSION);
             refreshUrl.searchParams.set('ts', Date.now().toString());
-            try {
-                markPostUpdateRestartNotice(APP_VERSION, 2);
-            } catch (_) {}
             window.location.replace(refreshUrl.toString());
         };
+
         if ('serviceWorker' in navigator) {
-            const activateWaitingServiceWorker = (registration) => {
+            const watchedRegistrations = new WeakSet();
+
+            const activateWaitingServiceWorker = registration => {
                 try {
-                    if (registration && registration.waiting) {
-                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    }
+                    registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
                 } catch (_) {}
             };
 
-            const watchServiceWorkerUpdate = (registration) => {
-                if (!registration || registration.datasetNpfWatched === '1') return;
-                registration.datasetNpfWatched = '1';
-
+            const watchServiceWorkerUpdate = registration => {
+                if (!registration || watchedRegistrations.has(registration)) return;
+                watchedRegistrations.add(registration);
                 registration.addEventListener('updatefound', () => {
                     const worker = registration.installing;
                     if (!worker) return;
-
                     worker.addEventListener('statechange', () => {
                         if (worker.state === 'installed') {
-                            try {
-                                markPostUpdateRestartNotice(APP_VERSION, 2);
-                            } catch (_) {}
                             worker.postMessage({ type: 'SKIP_WAITING' });
                         }
                     });
@@ -254,152 +308,51 @@
 
             const checkForServiceWorkerUpdate = async () => {
                 try {
-                    const reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-                    console.log('Service Worker enregistré:', reg);
-                    watchServiceWorkerUpdate(reg);
-                    activateWaitingServiceWorker(reg);
-                    if (typeof reg.update === 'function') {
-                        const updatedReg = await reg.update().catch(() => reg);
-                        watchServiceWorkerUpdate(updatedReg || reg);
-                        activateWaitingServiceWorker(updatedReg || reg);
+                    const registration = await navigator.serviceWorker.register(
+                        './sw.js',
+                        { updateViaCache: 'none' }
+                    );
+                    watchServiceWorkerUpdate(registration);
+                    activateWaitingServiceWorker(registration);
+                    if (typeof registration.update === 'function') {
+                        const updatedRegistration = await registration.update()
+                            .catch(() => registration);
+                        watchServiceWorkerUpdate(updatedRegistration || registration);
+                        activateWaitingServiceWorker(updatedRegistration || registration);
                     }
-                } catch (err) {
-                    console.log('Erreur enregistrement Service Worker:', err);
+                } catch (error) {
+                    console.log('Erreur enregistrement Service Worker:', error);
                 }
             };
 
             window.addEventListener('load', async () => {
-                try {
-                    const previousVersion = localStorage.getItem(APP_VERSION_STORAGE_KEY);
-                    if (previousVersion !== APP_VERSION) {
-                        if (previousVersion) {
-                            markPostUpdateRestartNotice(APP_VERSION, 2);
-                            // v13.20 — réafficher immédiatement la fenêtre post-MAJ au premier lancement de la nouvelle version.
-                            setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 0);
-                        }
-                        localStorage.setItem(APP_VERSION_STORAGE_KEY, APP_VERSION);
-                        sessionStorage.removeItem(SW_CONTROLLER_RELOAD_GUARD_KEY);
-                    }
-                } catch (e) {
-                    console.log('Version refresh warning:', e);
-                }
-
                 await checkForServiceWorkerUpdate();
-
-                // v13.79 — réparation mode hors ligne : après un reset profond, il faut
-                // impérativement qu'un service worker contrôle la PWA pour servir les tuiles IndexedDB.
                 try {
-                    if ('serviceWorker' in navigator && !navigator.serviceWorker.controller) {
+                    if (!navigator.serviceWorker.controller) {
                         const guardKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:offline:${APP_VERSION}`;
-                        await navigator.serviceWorker.ready.catch(() => null);
-                        if (!navigator.serviceWorker.controller && sessionStorage.getItem(guardKey) !== '1') {
+                        await Promise.race([
+                            navigator.serviceWorker.ready,
+                            new Promise(resolve => setTimeout(resolve, 2500))
+                        ]).catch(() => null);
+                        if (
+                            !navigator.serviceWorker.controller
+                            && sessionStorage.getItem(guardKey) !== '1'
+                        ) {
                             sessionStorage.setItem(guardKey, '1');
                             const refreshUrl = new URL(window.location.href);
                             refreshUrl.searchParams.set('appv', APP_VERSION);
                             refreshUrl.searchParams.set('swctl', Date.now().toString());
-                            markPostUpdateRestartNotice(APP_VERSION, 2);
                             window.location.replace(refreshUrl.toString());
-                            return;
                         }
                     }
                 } catch (_) {}
-            });
-
-            window.addEventListener('pageshow', () => {
-                checkForServiceWorkerUpdate();
-            }, { passive: true });
-
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) checkForServiceWorkerUpdate();
-            }, { passive: true });
-        }
-
-
-        function showEarlyPostUpdateRestartNoticeModalIfNeeded() {
-            try {
-                const pending = localStorage.getItem('npfPostUpdateRestartNoticePending') === '1';
-                const noticeVersion = localStorage.getItem('npfPostUpdateRestartNoticeVersion') || '';
-                if (!pending && !noticeVersion) return;
-                // Un marqueur pending doit afficher l'alerte même si la valeur enregistrée
-                // provient de l'ancienne version qui vient de demander la MAJ.
-                if (!pending && noticeVersion && noticeVersion !== APP_VERSION) return;
-                if (document.getElementById('post-update-restart-modal')) return;
-
-                const modal = document.createElement('div');
-                modal.id = 'post-update-restart-modal';
-                modal.className = 'update-reminder-modal post-update-restart-modal';
-                modal.style.cssText = [
-                    'position:fixed',
-                    'inset:0',
-                    'z-index:2147483647',
-                    'display:flex',
-                    'align-items:center',
-                    'justify-content:center',
-                    'padding:24px',
-                    'box-sizing:border-box',
-                    'background:rgba(0,0,0,.58)'
-                ].join(';');
-                modal.innerHTML = `
-                    <div class="update-reminder-modal-content post-update-restart-modal-content" role="dialog" aria-modal="true" aria-labelledby="post-update-restart-title">
-                        <h3 id="post-update-restart-title">Mise à jour installée</h3>
-                        <p>Une nouvelle version de NPF-Q400 vient d’être chargée.</p>
-                        <p>Ferme complètement l’application puis relance-la pour finaliser la mise à jour.</p>
-                        <p>Ce message peut apparaître plusieurs fois : c’est normal. Relance simplement l’application à chaque demande jusqu’à disparition du message.</p>
-                        <p>Si à un moment l’application devient anormalement lente à s’ouvrir ou reste bloquée au démarrage, supprime-la de l’écran d’accueil puis réinstalle-la depuis Safari.</p>
-                    </div>
-                `;
-                const modalContent = modal.firstElementChild;
-                if (modalContent) {
-                    modalContent.style.cssText = [
-                        'width:min(620px,calc(100vw - 48px))',
-                        'max-height:calc(100vh - 48px)',
-                        'overflow:auto',
-                        'box-sizing:border-box',
-                        'padding:24px',
-                        'border-radius:16px',
-                        'background:#fff',
-                        'color:#1f2937',
-                        'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
-                        'box-shadow:0 18px 50px rgba(0,0,0,.35)'
-                    ].join(';');
-                }
-                document.body.appendChild(modal);
-
-                /*
-                 * v13.91 : ne valider l'affichage qu'après 2 secondes de visibilité réelle.
-                 * Si l'activation du service worker provoque une navigation immédiate,
-                 * le marqueur reste intact et la fenêtre réapparaît sur la page stable.
-                 */
-                setTimeout(() => {
-                    try {
-                        if (!document.body || !document.body.contains(modal)) return;
-                        if (document.visibilityState === 'hidden') return;
-
-                        const remainingRaw = Number(localStorage.getItem(POST_UPDATE_NOTICE_REMAINING_KEY) || '1');
-                        const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 1;
-                        if (remaining > 1) {
-                            localStorage.setItem(POST_UPDATE_NOTICE_REMAINING_KEY, String(remaining - 1));
-                            localStorage.setItem('npfPostUpdateRestartNoticePending', '1');
-                        } else {
-                            localStorage.removeItem('npfPostUpdateRestartNoticeVersion');
-                            localStorage.removeItem('npfPostUpdateRestartNoticePending');
-                            localStorage.removeItem(POST_UPDATE_NOTICE_REMAINING_KEY);
-                        }
-                    } catch (_) {}
-                }, 2000);
-            } catch (_) {}
+            }, { once: true });
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            showEarlyPostUpdateRestartNoticeModalIfNeeded();
-            if (postUpdateTransitionAtBoot || window.NPF_FORCE_POST_UPDATE_NOTICE) {
-                setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 50);
-                setTimeout(showEarlyPostUpdateRestartNoticeModalIfNeeded, 500);
-            }
+            showNpfPostUpdateNoticeOnce();
             const mainVersionDisplay = document.getElementById('app-version-display');
-            if (mainVersionDisplay) {
-                mainVersionDisplay.textContent = APP_VERSION;
-            }
+            if (mainVersionDisplay) mainVersionDisplay.textContent = APP_VERSION;
 
             const earlyForceButton = document.getElementById('force-update-button');
             if (earlyForceButton) {
@@ -610,7 +563,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.66"></script>
+    <script src="script.js?appv=v14.67"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
