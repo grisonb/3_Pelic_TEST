@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.68';
+    './data/localites/localites-france-v14.56.zip?appv=v14.69';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1877,7 +1877,7 @@ async function initializeApp() {
             2200,
             'Timeout analyse initiale des cartes offline'
         ).then(() => {
-            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.68');
+            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.69');
         }).catch(error => {
             console.warn('[Offline] Plage de zoom initiale conservée:', error);
         });
@@ -1937,7 +1937,7 @@ async function initializeApp() {
     searchSection.style.display = 'block';
     initMap();
     scheduleRememberedOfflineMapStartupRecovery(
-        'initializeApp-v14.68'
+        'initializeApp-v14.69'
     );
     initializeTeamChat();
     try {
@@ -1974,11 +1974,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.68'
+                        !== 'v14.69'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.68'
+                        'v14.69'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3714,7 +3714,7 @@ function scheduleOfflineTileWake(reason = 'startup') {
 
 
 /*
- * v14.68 TEST — restauration fiable de la carte Offline mémorisée.
+ * v14.69 TEST — restauration fiable de la carte Offline mémorisée.
  *
  * Les v14.66/v14.67 reconstruisaient plusieurs fois la couche Leaflet, mais avec
  * les mêmes informations de pack déjà présentes en mémoire. Sur Safari/iPadOS,
@@ -3832,24 +3832,117 @@ function countDirectOfflineTilesInDatabase(openedDb) {
     });
 }
 
+function databaseHasTileForActiveOfflineSelection(openedDb) {
+    return new Promise((resolve, reject) => {
+        let tx;
+        let store;
+        try {
+            tx = openedDb.transaction('tiles', 'readonly');
+            store = tx.objectStore('tiles');
+        } catch (error) {
+            reject(error);
+            return;
+        }
+
+        const aliases = [];
+        const addAlias = value => {
+            const clean = String(value || '').replace(/\.zip$/i, '').trim();
+            if (clean && !aliases.includes(clean)) aliases.push(clean);
+        };
+        (Array.isArray(activeOfflinePacks) ? activeOfflinePacks : []).forEach(addAlias);
+        (Array.isArray(activeOfflinePackAliases) ? activeOfflinePackAliases : []).forEach(addAlias);
+
+        let settled = false;
+        const finish = value => {
+            if (settled) return;
+            settled = true;
+            resolve(!!value);
+        };
+        const fail = error => {
+            if (settled) return;
+            settled = true;
+            reject(error);
+        };
+
+        let aliasIndex = 0;
+        const tryAlias = () => {
+            if (settled) return;
+            if (!store.indexNames.contains('packName') || aliasIndex >= aliases.length) {
+                let cursorRequest;
+                try { cursorRequest = store.openCursor(); } catch (error) { fail(error); return; }
+                let inspected = 0;
+                cursorRequest.onsuccess = () => {
+                    const cursor = cursorRequest.result;
+                    if (!cursor || inspected >= 120) { finish(false); return; }
+                    inspected += 1;
+                    if (isDirectOfflineTileRecordAllowed(cursor.value || {})) { finish(true); return; }
+                    cursor.continue();
+                };
+                cursorRequest.onerror = () => fail(cursorRequest.error || new Error('Sondage tuiles impossible'));
+                return;
+            }
+
+            const alias = aliases[aliasIndex++];
+            let request;
+            try {
+                request = store.index('packName').openKeyCursor(IDBKeyRange.only(alias));
+            } catch (error) {
+                fail(error);
+                return;
+            }
+            request.onsuccess = () => {
+                if (request.result) { finish(true); return; }
+                tryAlias();
+            };
+            request.onerror = tryAlias;
+        };
+
+        tx.onerror = () => fail(tx.error || new Error('Sondage IndexedDB échoué'));
+        tx.onabort = () => fail(tx.error || new Error('Sondage IndexedDB annulé'));
+        tryAlias();
+    });
+}
+
+function getPreferredStartupOfflineDatabaseCandidates() {
+    const allCandidates = getDirectOfflineDatabaseCandidates();
+    if (!isNpfOfflinePackSelection()) return allCandidates;
+
+    const activeGroups = new Set(
+        (Array.isArray(activeOfflinePacks) ? activeOfflinePacks : [])
+            .map(name => getOfflinePackGroupName(name))
+            .filter(Boolean)
+    );
+    const explicitDatabases = getInstalledMapPacksSafe()
+        .filter(pack => (
+            pack
+            && pack.dbName
+            && activeGroups.has(getOfflinePackGroupName(pack.name))
+        ))
+        .map(pack => String(pack.dbName || '').trim())
+        .filter(Boolean);
+
+    if (!explicitDatabases.length) return allCandidates;
+    return [...new Set(explicitDatabases)];
+}
+
 async function waitForRememberedOfflineTileDatabaseReady() {
-    const databaseNames = getDirectOfflineDatabaseCandidates();
+    const databaseNames = getPreferredStartupOfflineDatabaseCandidates();
+    const isNpf = isNpfOfflinePackSelection();
 
     for (const dbName of databaseNames) {
-        let openedDb;
         try {
-            openedDb = await withTimeout(
+            const openedDb = await withTimeout(
                 openDirectOfflineTileDatabase(dbName),
-                2800,
+                isNpf ? 7500 : 3000,
                 `Timeout ouverture ${dbName}`
             );
-            const tileCount = await withTimeout(
-                countDirectOfflineTilesInDatabase(openedDb),
-                2200,
-                `Timeout comptage ${dbName}`
+            const hasActiveTile = await withTimeout(
+                databaseHasTileForActiveOfflineSelection(openedDb),
+                isNpf ? 6500 : 2600,
+                `Timeout sondage ${dbName}`
             );
-            if (tileCount > 0) {
-                return { dbName, tileCount };
+            if (hasActiveTile) {
+                return { dbName, tileCount: 1 };
             }
         } catch (_) {
             /* La tentative suivante rouvrira la base avec une connexion fraîche. */
@@ -3912,43 +4005,62 @@ function scheduleRememberedOfflineMapStartupRecovery(
     applyImmediateBaseTileZoomForMapSource('offline');
 
     const rememberedGroup = getOfflinePackGroupName(activeOfflinePacks[0]);
-    const retryDelays = [80, 450, 1100, 2200, 4000, 6500, 9500, 14000, 21000, 30000];
+    /*
+     * v14.69 — tentatives strictement séquentielles.
+     * Les anciens setTimeout parallèles pouvaient se chevaucher sur la grosse
+     * base NPF : une tentative fermait la connexion pendant qu'une autre lisait.
+     */
+    const retryWaits = [80, 450, 900, 1600, 2800, 4500, 7000];
 
-    retryDelays.forEach((delay, index) => {
-        setTimeout(async () => {
-            if (token !== offlineStartupLayerRecoveryToken) return;
-            if (mapSourceMode !== 'offline' || !map) return;
-            if (directOfflineTileHitCount > 0) return;
+    const runAttempt = async index => {
+        if (token !== offlineStartupLayerRecoveryToken) return;
+        if (mapSourceMode !== 'offline' || !map) return;
+        if (directOfflineTileHitCount > 0) return;
 
-            const currentGroup = getOfflinePackGroupName(
-                activeOfflinePacks?.[0] || ''
-            );
-            if (currentGroup !== rememberedGroup) return;
+        const currentGroup = getOfflinePackGroupName(
+            activeOfflinePacks?.[0] || ''
+        );
+        if (currentGroup !== rememberedGroup) return;
 
-            reconcileRememberedOfflinePacksWithInstalledMetadata();
-            refreshRememberedOfflinePackRuntimeMetadata();
+        reconcileRememberedOfflinePacksWithInstalledMetadata();
+        refreshRememberedOfflinePackRuntimeMetadata();
+        if (
+            index > 0
+            && directOfflineNpfActiveReads === 0
+            && directOfflineNpfReadQueue.length === 0
+        ) {
             closeDirectOfflineDatabaseConnectionsForStartupRetry();
+        }
 
-            const readyDatabase = await waitForRememberedOfflineTileDatabaseReady();
-            if (token !== offlineStartupLayerRecoveryToken) return;
-            if (mapSourceMode !== 'offline') return;
+        const readyDatabase = await waitForRememberedOfflineTileDatabaseReady();
+        if (token !== offlineStartupLayerRecoveryToken) return;
+        if (mapSourceMode !== 'offline') return;
 
-            if (!readyDatabase) {
-                if (index === retryDelays.length - 1) {
-                    setOfflineMapSwitchBusy(
-                        'Mode OFFLINE actif — stockage local encore indisponible.'
-                    );
-                }
-                return;
-            }
-
+        if (readyDatabase) {
             rebuildRememberedOfflineMapAfterDatabaseReady(
                 `${reason}:attempt-${index + 1}`,
                 readyDatabase
             );
-        }, delay);
-    });
+        }
 
+        if (directOfflineTileHitCount > 0) return;
+        const nextIndex = index + 1;
+        if (nextIndex >= retryWaits.length) {
+            setOfflineMapSwitchBusy(
+                readyDatabase
+                    ? 'Mode OFFLINE actif — carte NPF en cours de réveil.'
+                    : 'Mode OFFLINE actif — stockage local encore indisponible.'
+            );
+            return;
+        }
+
+        setTimeout(
+            () => runAttempt(nextIndex),
+            readyDatabase ? Math.max(3000, retryWaits[nextIndex]) : retryWaits[nextIndex]
+        );
+    };
+
+    setTimeout(() => runAttempt(0), retryWaits[0]);
     return true;
 }
 
@@ -3959,7 +4071,7 @@ function scheduleRememberedOfflineMapStartupRecovery(
     window.addEventListener('pageshow', () => {
         setTimeout(() => {
             if (mapSourceMode === 'offline' && directOfflineTileHitCount === 0) {
-                scheduleRememberedOfflineMapStartupRecovery('pageshow-v14.68');
+                scheduleRememberedOfflineMapStartupRecovery('pageshow-v14.69');
             }
         }, 180);
     }, { passive: true });
@@ -3968,7 +4080,7 @@ function scheduleRememberedOfflineMapStartupRecovery(
         if (document.hidden) return;
         setTimeout(() => {
             if (mapSourceMode === 'offline' && directOfflineTileHitCount === 0) {
-                scheduleRememberedOfflineMapStartupRecovery('visibility-v14.68');
+                scheduleRememberedOfflineMapStartupRecovery('visibility-v14.69');
             }
         }, 250);
     }, { passive: true });
@@ -4051,6 +4163,62 @@ const directOfflineTileBlobCache = new Map();
 const directOfflineDbPromises = new Map();
 let directOfflineTileHitCount = 0;
 let directOfflineTileMissCount = 0;
+
+/*
+ * v14.69 TEST — lecture NPF à froid stabilisée.
+ *
+ * La carte NPF est nettement plus volumineuse que la carte OACI. Safari peut
+ * mettre plusieurs secondes à ouvrir son index IndexedDB et supporte mal une
+ * rafale de transactions parallèles au premier affichage. On limite donc la
+ * concurrence uniquement pour le groupe NPF ; OACI conserve son chemin rapide.
+ */
+const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 3;
+let directOfflineNpfActiveReads = 0;
+const directOfflineNpfReadQueue = [];
+let directOfflineTileReadGeneration = 0;
+
+function resetPendingDirectOfflineNpfReads() {
+    directOfflineTileReadGeneration += 1;
+    while (directOfflineNpfReadQueue.length) {
+        const pending = directOfflineNpfReadQueue.shift();
+        try { pending.resolve(null); } catch (_) {}
+    }
+}
+
+function isNpfOfflinePackSelection(packs = activeOfflinePacks) {
+    return (Array.isArray(packs) ? packs : []).some(name => {
+        const simplified = String(
+            typeof getOfflinePackGroupName === 'function'
+                ? getOfflinePackGroupName(name)
+                : name || ''
+        ).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return /(^|[^a-z0-9])npf([^a-z0-9]|$)|npf[_\s-]*france|carte[_\s-]*npf/.test(simplified);
+    });
+}
+
+function runNextDirectOfflineNpfRead() {
+    while (
+        directOfflineNpfActiveReads < DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS
+        && directOfflineNpfReadQueue.length
+    ) {
+        const item = directOfflineNpfReadQueue.shift();
+        directOfflineNpfActiveReads += 1;
+        Promise.resolve()
+            .then(item.task)
+            .then(item.resolve, item.reject)
+            .finally(() => {
+                directOfflineNpfActiveReads = Math.max(0, directOfflineNpfActiveReads - 1);
+                runNextDirectOfflineNpfRead();
+            });
+    }
+}
+
+function enqueueDirectOfflineNpfRead(task) {
+    return new Promise((resolve, reject) => {
+        directOfflineNpfReadQueue.push({ task, resolve, reject });
+        runNextDirectOfflineNpfRead();
+    });
+}
 
 function getOfflinePackLegacyGroupNameForDirectRead(packName) {
     const name = String(packName || '')
@@ -4203,6 +4371,32 @@ function isDirectOfflineTileRecordAllowed(record) {
     return false;
 }
 
+function getDirectOfflineStoredKeyCandidates(tileUrl) {
+    const packNames = [];
+    const addPack = value => {
+        const clean = String(value || '').replace(/\.zip$/i, '').trim();
+        if (clean && !packNames.includes(clean)) packNames.push(clean);
+    };
+
+    (Array.isArray(activeOfflinePacks) ? activeOfflinePacks : []).forEach(addPack);
+    (Array.isArray(activeOfflinePackAliases) ? activeOfflinePackAliases : []).forEach(addPack);
+    if (typeof getOfflineActivePackAliasesForPacks === 'function') {
+        getOfflineActivePackAliasesForPacks(activeOfflinePacks).forEach(addPack);
+    }
+
+    const keys = [];
+    const addKey = value => {
+        const clean = String(value || '').trim();
+        if (clean && !keys.includes(clean)) keys.push(clean);
+    };
+
+    /* Clés pack-scopées utilisées par NPF/OACI depuis les imports récents. */
+    packNames.forEach(packName => addKey(buildStoredTileKey(tileUrl, packName)));
+    /* Compatibilité avec les anciens packs à clé URL simple. */
+    addKey(tileUrl);
+    return keys;
+}
+
 function readDirectOfflineTileRecord(db, tileUrl) {
     return new Promise((resolve, reject) => {
         let tx;
@@ -4215,29 +4409,79 @@ function readDirectOfflineTileRecord(db, tileUrl) {
             return;
         }
 
-        let request;
-        if (store.indexNames.contains('tileUrl')) {
-            request = store.index('tileUrl').openCursor(IDBKeyRange.only(tileUrl));
-        } else {
-            request = store.openCursor();
-        }
-        request.onsuccess = () => {
-            const cursor = request.result;
-            if (!cursor) {
-                resolve(null);
-                return;
-            }
-            const record = cursor.value || {};
-            const storedTileUrl = record.tileUrl || getTileUrlFromStoredKey(record.url);
-            if (storedTileUrl === tileUrl && isDirectOfflineTileRecordAllowed(record)) {
-                resolve(record);
-                return;
-            }
-            cursor.continue();
+        let settled = false;
+        const finish = value => {
+            if (settled) return;
+            settled = true;
+            resolve(value);
         };
-        request.onerror = () => reject(request.error || new Error('Erreur lecture tuile'));
-        tx.onerror = () => reject(tx.error || new Error('Erreur transaction tuile'));
-        tx.onabort = () => reject(tx.error || new Error('Transaction tuile annulée'));
+        const fail = error => {
+            if (settled) return;
+            settled = true;
+            reject(error);
+        };
+
+        const exactKeys = getDirectOfflineStoredKeyCandidates(tileUrl);
+        let keyIndex = 0;
+
+        const fallbackToTileUrlIndex = () => {
+            if (settled) return;
+            let request;
+            try {
+                if (store.indexNames.contains('tileUrl')) {
+                    request = store.index('tileUrl').openCursor(IDBKeyRange.only(tileUrl));
+                } else {
+                    request = store.openCursor();
+                }
+            } catch (error) {
+                fail(error);
+                return;
+            }
+            request.onsuccess = () => {
+                const cursor = request.result;
+                if (!cursor) {
+                    finish(null);
+                    return;
+                }
+                const record = cursor.value || {};
+                const storedTileUrl = record.tileUrl || getTileUrlFromStoredKey(record.url);
+                if (storedTileUrl === tileUrl && isDirectOfflineTileRecordAllowed(record)) {
+                    finish(record);
+                    return;
+                }
+                cursor.continue();
+            };
+            request.onerror = () => fail(request.error || new Error('Erreur lecture index tuile'));
+        };
+
+        const tryNextExactKey = () => {
+            if (settled) return;
+            if (keyIndex >= exactKeys.length) {
+                fallbackToTileUrlIndex();
+                return;
+            }
+            const key = exactKeys[keyIndex++];
+            let request;
+            try {
+                request = store.get(key);
+            } catch (error) {
+                fail(error);
+                return;
+            }
+            request.onsuccess = () => {
+                const record = request.result || null;
+                if (record && isDirectOfflineTileRecordAllowed(record)) {
+                    finish(record);
+                    return;
+                }
+                tryNextExactKey();
+            };
+            request.onerror = tryNextExactKey;
+        };
+
+        tx.onerror = () => fail(tx.error || new Error('Erreur transaction tuile'));
+        tx.onabort = () => fail(tx.error || new Error('Transaction tuile annulée'));
+        tryNextExactKey();
     });
 }
 
@@ -4251,7 +4495,7 @@ function rememberDirectOfflineTileBlob(cacheKey, blob) {
     }
 }
 
-async function findDirectOfflineTileBlob(coords) {
+async function findDirectOfflineTileBlobUnqueued(coords) {
     const cacheKey = [
         coords.z,
         coords.x,
@@ -4270,9 +4514,10 @@ async function findDirectOfflineTileBlob(coords) {
     for (const dbName of dbNames) {
         let tileDb;
         try {
+            const openTimeoutMs = isNpfOfflinePackSelection() ? 7000 : 2200;
             tileDb = await withTimeout(
                 openDirectOfflineTileDatabase(dbName),
-                1600,
+                openTimeoutMs,
                 `Timeout ouverture ${dbName}`
             );
         } catch (_) {
@@ -4280,9 +4525,10 @@ async function findDirectOfflineTileBlob(coords) {
         }
         for (const tileUrl of tileUrls) {
             try {
+                const readTimeoutMs = isNpfOfflinePackSelection() ? 5200 : 1800;
                 const record = await withTimeout(
                     readDirectOfflineTileRecord(tileDb, tileUrl),
-                    1200,
+                    readTimeoutMs,
                     'Timeout lecture tuile'
                 );
                 if (!record?.tile) continue;
@@ -4309,6 +4555,18 @@ async function findDirectOfflineTileBlob(coords) {
         );
     }
     return null;
+}
+
+async function findDirectOfflineTileBlob(coords) {
+    if (!isNpfOfflinePackSelection()) {
+        return findDirectOfflineTileBlobUnqueued(coords);
+    }
+    const generation = directOfflineTileReadGeneration;
+    return enqueueDirectOfflineNpfRead(async () => {
+        if (generation !== directOfflineTileReadGeneration) return null;
+        const blob = await findDirectOfflineTileBlobUnqueued(coords);
+        return generation === directOfflineTileReadGeneration ? blob : null;
+    });
 }
 
 function buildDirectOfflineLeafletLayer(options = {}) {
@@ -4351,6 +4609,7 @@ function buildDirectOfflineLeafletLayer(options = {}) {
 
 function setupBaseTileLayer() {
     if (!map) return;
+    resetPendingDirectOfflineNpfReads();
     if (baseTileLayer) {
         map.removeLayer(baseTileLayer);
     }
@@ -17679,7 +17938,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.68'
+                        window.APP_VERSION || 'v14.69'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
@@ -17775,7 +18034,7 @@ async function setMapSourceMode(mode) {
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.68');
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.69');
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
@@ -17790,7 +18049,7 @@ async function setMapSourceMode(mode) {
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.68');
+            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.69');
         }).catch(error => {
             console.warn('[Offline] Synchronisation SW différée:', error);
         });
@@ -17802,7 +18061,7 @@ async function setMapSourceMode(mode) {
         'Timeout analyse des niveaux de zoom'
     ).then(() => {
         if (mapSourceMode === nextMode) {
-            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.68');
+            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.69');
         }
     }).catch(error => {
         console.warn('[Offline] Niveaux de zoom par défaut conservés:', error);
@@ -18906,7 +19165,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
         applyImmediateBaseTileZoomForMapSource(nextMode);
-        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.68');
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.69');
     } catch (error) {
         console.error('Changement de carte offline impossible:', error);
         alert(`Impossible de changer de carte offline: ${error.message || error}`);
@@ -18928,7 +19187,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             if (!controlled || mapSourceMode !== 'offline') return;
             notifyServiceWorkerOfflineTilesPreference(true);
             notifyServiceWorkerActivePacks(activeOfflinePacks);
-            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.68');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.69');
         }).catch(() => {});
     }
 
@@ -18938,7 +19197,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         'Timeout analyse carte sélectionnée'
     ).then(() => {
         if (token === offlineMapSwitchToken) {
-            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.68');
+            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.69');
         }
     }).catch(() => {});
 
