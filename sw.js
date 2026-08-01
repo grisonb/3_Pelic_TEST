@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-68_attente_indexeddb_carte_memorisee';
-const APP_VERSION = 'v14.69';
+const SW_VERSION = 'sw-v14-70_atomic_update_verified';
+const APP_VERSION = 'v14.70';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -80,16 +80,64 @@ const OFFLINE_MESSAGE_AUTHORITY_MS = 120000;
 const MEMORY_TILE_CACHE_MAX = 160;
 const memoryTileCache = new Map();
 
+const VERSION_SENSITIVE_CORE_FILES = new Set([
+    'index.html',
+    'script.js',
+    'manifest.json'
+]);
+
+function getAppShellFilename(url) {
+    try {
+        return new URL(url, self.location.href).pathname.split('/').pop() || '';
+    } catch (_) {
+        return '';
+    }
+}
+
+function buildVersionedAppShellUrl(url) {
+    const parsed = new URL(url, self.location.href);
+    parsed.searchParams.set('appv', APP_VERSION);
+    parsed.searchParams.set('swinstall', SW_VERSION);
+    return parsed.toString();
+}
+
 async function fetchForAppShell(url, timeoutMs = 12000) {
-    const request = new Request(url, {
+    const request = new Request(buildVersionedAppShellUrl(url), {
         cache: 'reload',
         mode: url === DEPARTMENTS_GEOJSON_URL ? 'cors' : 'same-origin'
     });
     return await swFetchWithTimeout(request, {}, timeoutMs);
 }
 
+async function validateVersionSensitiveCoreResponse(url, response) {
+    const filename = getAppShellFilename(url);
+    if (!VERSION_SENSITIVE_CORE_FILES.has(filename)) return true;
+    if (!response || !response.ok) return false;
+
+    try {
+        const text = await response.clone().text();
+        if (filename === 'index.html') {
+            return text.includes(`const APP_VERSION = '${APP_VERSION}'`)
+                && text.includes(`script.js?appv=${APP_VERSION}`)
+                && text.includes(`style.css?appv=${APP_VERSION}`);
+        }
+        if (filename === 'script.js') {
+            return text.includes(`const NPF_SCRIPT_BUILD_VERSION = '${APP_VERSION}'`);
+        }
+        if (filename === 'manifest.json') {
+            const manifest = JSON.parse(text);
+            return String(manifest.start_url || '').includes(`appv=${APP_VERSION}`);
+        }
+    } catch (_) {
+        return false;
+    }
+    return false;
+}
+
 async function copyExistingCachedAsset(url, targetCache) {
     try {
+        const filename = getAppShellFilename(url);
+        if (VERSION_SENSITIVE_CORE_FILES.has(filename)) return false;
         const existing = await caches.match(url, { ignoreSearch: true });
         if (!existing) return false;
         await targetCache.put(url, existing.clone());
@@ -101,41 +149,34 @@ async function copyExistingCachedAsset(url, targetCache) {
 
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
+        await caches.delete(APP_SHELL_CACHE).catch(() => false);
         const cache = await caches.open(APP_SHELL_CACHE);
         const failedCoreUrls = [];
 
-        /*
-         * Chaque ressource cœur est d'abord récupérée sur le réseau. En cas de
-         * coupure pendant la mise à jour, une copie de l'ancien app-shell est
-         * acceptée. Le SW actif n'est donc jamais remplacé par un shell vide.
-         */
         for (const url of CORE_APP_SHELL_URLS) {
             let stored = false;
             try {
-                const response = await fetchForAppShell(url, 12000);
-                if (response && response.ok) {
+                const response = await fetchForAppShell(url, 15000);
+                const valid = response && response.ok
+                    && await validateVersionSensitiveCoreResponse(url, response);
+                if (valid) {
                     await cache.put(url, response.clone());
                     stored = true;
                 }
             } catch (_) {}
 
-            if (!stored) {
-                stored = await copyExistingCachedAsset(url, cache);
-            }
+            if (!stored) stored = await copyExistingCachedAsset(url, cache);
             if (!stored) failedCoreUrls.push(url);
         }
 
         if (failedCoreUrls.length) {
+            await caches.delete(APP_SHELL_CACHE).catch(() => false);
             throw new Error(
-                `[SW] Installation refusée, app-shell incomplet: ${failedCoreUrls.join(', ')}`
+                `[SW ${APP_VERSION}] Installation atomique refusée, app-shell `
+                + `incomplet ou incohérent: ${failedCoreUrls.join(', ')}`
             );
         }
 
-        /*
-         * Migration locale non bloquante des données déjà cachées par une
-         * version antérieure. Aucun téléchargement volumineux n'est imposé à
-         * l'installation ; les absences et quotas sont simplement ignorés.
-         */
         try {
             const dataCache = await caches.open(APP_DATA_CACHE);
             await Promise.allSettled(APP_DATA_URLS.map(async url => {
@@ -218,8 +259,9 @@ self.addEventListener('message', event => {
     if (data.type === 'VERIFY_APP_SHELL') {
         const verify = async () => {
             const missing = [];
+            const currentShellCache = await caches.open(APP_SHELL_CACHE);
             for (const url of CORE_APP_SHELL_URLS) {
-                const response = await caches.match(url, { ignoreSearch: true });
+                const response = await currentShellCache.match(url, { ignoreSearch: true });
                 if (!response) missing.push(url);
             }
             try {
@@ -453,8 +495,13 @@ async function handleAppShellRequest(request) {
     const cache = await caches.open(APP_SHELL_CACHE);
     const isNavigation = request.mode === 'navigate';
     const cacheKey = isNavigation ? './index.html' : request;
-    const cached = await caches.match(cacheKey, { ignoreSearch: true })
-        || await caches.match(request, { ignoreSearch: true });
+    /*
+     * v14.70 — ne jamais rechercher l'app-shell dans tous les caches.
+     * caches.match() pouvait renvoyer le cache v14.68 conservé en secours avant
+     * le cache courant v14.70. La version active lit exclusivement son cache.
+     */
+    const cached = await cache.match(cacheKey, { ignoreSearch: true })
+        || await cache.match(request, { ignoreSearch: true });
     const requestUrl = new URL(request.url);
     const forcedTransition = isNavigation
         && (requestUrl.searchParams.has('swrefresh')
@@ -465,6 +512,16 @@ async function handleAppShellRequest(request) {
             const freshRequest = new Request(request, { cache: 'reload' });
             const fresh = await swFetchWithTimeout(freshRequest, {}, timeoutMs);
             if (fresh && fresh.ok) {
+                const valid = await validateVersionSensitiveCoreResponse(
+                    request.url,
+                    fresh
+                );
+                /*
+                 * Une réponse réseau ancienne ne doit jamais écraser le cache
+                 * atomique courant. Ceci protège aussi contre la propagation
+                 * différée de GitHub Pages après activation de la v14.70.
+                 */
+                if (!valid) return null;
                 await cache.put(cacheKey, fresh.clone());
                 return fresh;
             }
