@@ -1,3 +1,6 @@
+const NPF_SCRIPT_BUILD_VERSION = 'v14.70';
+window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
 //  =========================================================================
 // INITIALISATION DE L'APPLICATION
 // =========================================================================
@@ -564,7 +567,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.69';
+    './data/localites/localites-france-v14.56.zip?appv=v14.70';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
