@@ -1,22 +1,33 @@
-NPF-Q400 — TEST v14.60 — Activation Offline immédiate
+NPF-Q400 — TEST v14.61
+Restauration du moteur Offline de la v14.56
 
-Corrections :
-- suppression de toute attente IndexedDB avant la reconstruction de la carte ;
-- le bouton Offline ne reste plus désactivé/pastel pendant une transaction bloquée ;
-- reconstruction immédiate de la couche Leaflet avec le host logique du pack actif ;
-- écriture de la préférence Offline en arrière-plan avec délai maximal ;
-- suppression de l’attente infinie du service worker ;
-- relance automatique unique si la page n’est pas encore contrôlée par le service worker ;
-- nouvelle reconstruction de la couche lors de l’événement controllerchange ;
-- les diagnostics IndexedDB, zoom et service worker ne sont plus bloquants ;
-- conservation de l’archive nationale de localités v14.56, réellement présente.
+Base fonctionnelle : v14.57 pour les fonctions SafeSky ajoutées.
+Moteur Offline : restauration exacte de la v14.56, dernière version confirmée fonctionnelle.
 
-Contrôles de livraison :
-- syntaxe script.js et sw.js ;
-- changement Offline effectué avant toute promesse lente ;
-- bouton réactivé dans un bloc finally immédiat ;
-- couche Leaflet reconstruite avant contrôle IndexedDB ;
-- références app-shell présentes dans le pack ou conservées sur le serveur ;
-- archive localités v14.56 présente et référencée ;
-- manifeste JSON valide ;
-- intégrité ZIP.
+CORRECTION PRINCIPALE
+- Suppression de toutes les surcouches Offline ajoutées en v14.58, v14.59 et v14.60.
+- Restauration de la bascule Online / Offline, de la création de la couche Leaflet,
+  de la transmission des packs actifs et de la lecture IndexedDB telles qu'elles
+  existaient en v14.56.
+- Restauration du service worker v14.56 pour le routage des tuiles, avec seulement
+  le numéro de cache mis à jour vers v14.61.
+- Réutilisation de l'archive stable :
+  data/localites/localites-france-v14.56.zip
+- Les caches de tuiles et bases IndexedDB existants ne sont ni effacés ni renommés.
+
+FONCTIONS CONSERVÉES
+- Liste SafeSky suivie sans limite de 20 appareils.
+- Tri alphabétique et indicatifs en attente de détection.
+- Clic sur une ligne verte pour afficher le trafic, y compris au sol.
+- Défilement tactile de la liste suivie.
+- Fermeture d'une fiche trafic par clic simple sur le fond de carte, sans fermeture
+  pendant un déplacement ou un zoom.
+
+CONTRÔLES OBLIGATOIRES EFFECTUÉS
+- Syntaxe JavaScript du script et du service worker.
+- Manifeste JSON.
+- Correspondance des versions index / manifeste / script / service worker.
+- Présence et intégrité de l'archive localités v14.56.
+- Comparaison du service worker avec la v14.56 : aucune modification du moteur de tuiles.
+- Test d’intégration du service worker : une tuile factice a été lue depuis IndexedDB en mode Offline, sans accès réseau.
+- Intégrité du ZIP.
