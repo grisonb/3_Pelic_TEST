@@ -1,3 +1,43 @@
+============================================================
+VERSION TEST v14.69 — LECTURE NPF INDEXEDDB STABILISÉE AU DÉMARRAGE
+============================================================
+
+DATE : 01/08/2026
+BASE : v14.68 TEST
+
+PROBLÈME SIGNALÉ
+- La carte OACI s'affiche correctement dès l'ouverture.
+- La carte NPF ne charge pas au lancement.
+- Après passage OACI → NPF, la carte NPF reste encore parfois vide.
+
+CAUSE TECHNIQUE
+- NPF utilise une base IndexedDB beaucoup plus volumineuse que la carte OACI.
+- La lecture directe v14.68 cherchait chaque tuile par l'index tileUrl, avec des délais trop courts.
+- Leaflet lançait simultanément de nombreuses transactions de lecture au premier affichage.
+- Safari/iPadOS pouvait saturer la file IndexedDB ou laisser expirer les premières lectures à froid.
+- Le contrôle de disponibilité comptait les tuiles de la base entière, opération coûteuse sur NPF.
+
+CORRECTIONS
+- Recherche prioritaire par clé primaire exacte `tileUrl::packName`.
+- Conservation de la recherche par index tileUrl comme compatibilité secondaire.
+- Limitation à 3 lectures IndexedDB simultanées uniquement pour la carte NPF.
+- Annulation des lectures NPF encore en attente lors d’un changement de carte ou d’une reconstruction de couche.
+- Remplacement des tentatives de réveil parallèles par une séquence stricte : aucune tentative ne peut plus fermer la base pendant qu’une autre lit NPF.
+- Une connexion IndexedDB n’est plus fermée pendant que des lectures de tuiles NPF sont actives.
+- Délais d'ouverture et de lecture adaptés au démarrage à froid de la grosse base NPF.
+- Contrôle de disponibilité par sondage d'une tuile du pack actif, sans comptage complet de la base.
+- Lorsque NPF dispose d'une base isolée enregistrée, le démarrage vérifie cette base précise et ne valide plus par erreur une autre carte présente dans la base historique commune.
+- Aucun changement du chemin rapide de la carte OACI.
+- Aucune modification de la logique d'alerte unique de mise à jour de la v14.67.
+- Journal cumulatif conservé par ajout de cette entrée avant l'historique v14.68.
+
+CONTRÔLES DE LIVRAISON
+- Versions index/script/manifest/service worker alignées sur v14.69.
+- Syntaxe JavaScript contrôlée.
+- Manifeste JSON contrôlé.
+- Journal v14.68 repris intégralement sans suppression.
+- Intégrité du ZIP contrôlée.
+
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 
 VERSION TEST v14.68 — CHARGEMENT AUTOMATIQUE FIABLE DE LA CARTE OFFLINE MÉMORISÉE
