@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-70_atomic_update_verified';
-const APP_VERSION = 'v14.70';
+const SW_VERSION = 'sw-v14-71_all_aerodromes_black_points';
+const APP_VERSION = 'v14.71';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
