@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-61_restauration_moteur_offline_1456';
-const APP_VERSION = 'v14.61';
+const SW_VERSION = 'sw-v14-62_bascule_offline_non_bloquante';
+const APP_VERSION = 'v14.62';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
