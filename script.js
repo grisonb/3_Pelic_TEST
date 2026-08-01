@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.57.zip?appv=v14.57';
+    './data/localites/localites-france-v14.56.zip?appv=v14.58';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -766,7 +766,7 @@ let ownTrafficAircraftSessionFallback = null;
 const TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY =
     'safeSkyPublishedBeaconIdV1';
 /*
- * v14.57 TEST — la liste suivie n'est plus plafonnée à 20 entrées.
+ * v14.58 TEST — la liste suivie n'est plus plafonnée à 20 entrées.
  * La concurrence ne limite pas le nombre enregistré : elle évite seulement
  * d'envoyer toutes les interrogations SafeSky individuelles simultanément.
  */
@@ -1924,12 +1924,24 @@ async function initializeApp() {
     statusMessage.style.display = 'none';
     searchSection.style.display = 'block';
     initMap();
+    try {
+        bindOfflineCoreControls();
+    } catch (offlineUiError) {
+        console.error('[Offline] Installation contrôles impossible:', offlineUiError);
+    }
     initializeTeamChat();
     try {
         setupEventListeners();
     } catch (uiError) {
         console.error('Erreur setupEventListeners:', uiError);
     }
+    setTimeout(() => {
+        try {
+            installTrafficPopupMapDismissInteraction();
+        } catch (trafficPopupError) {
+            console.warn('Interaction fermeture popup trafic non installée:', trafficPopupError);
+        }
+    }, 0);
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
     setTimeout(showUpdateReminderIfDue, 1700);
     setTimeout(() => {
@@ -1959,11 +1971,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.57'
+                        !== 'v14.58'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.57'
+                        'v14.58'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -3433,7 +3445,7 @@ function initMap() {
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
     ensureTwoFingerRulerControl();
-    installTrafficPopupMapDismissInteraction();
+    // v14.58 : la fermeture des popups trafic est installée après les contrôles UI.
     applyMapNoBackgroundStyle();
 
     if (map.createPane && !map.getPane('highVoltageLinesPane')) {
@@ -3876,6 +3888,106 @@ function keepKeyboardAfterSearchClear() {
     }, 80);
 }
 
+/*
+ * v14.58 TEST — contrôles OFFLINE isolés du reste de l'interface.
+ *
+ * Ces boutons sont installés immédiatement après la carte et une seconde fois
+ * sans doublon dans setupEventListeners. Une erreur dans une fonction annexe
+ * (trafic, calculateur, dessin, etc.) ne peut donc plus rendre le bouton
+ * « Cartes » ou la bascule Online/Offline inactifs.
+ */
+function bindOfflineCoreControls() {
+    const offlineMapsButton = document.getElementById('offline-maps-button');
+    const offlineMapModal = document.getElementById('offline-map-modal');
+    const closeOfflineMapButton = document.getElementById('close-offline-map-btn');
+    const mapSourceOnlineBtn = document.getElementById('map-source-online-btn');
+    const mapSourceOfflineBtn = document.getElementById('map-source-offline-btn');
+
+    if (
+        offlineMapsButton
+        && offlineMapModal
+        && offlineMapsButton.dataset.npfOfflineBound !== '1'
+    ) {
+        offlineMapsButton.dataset.npfOfflineBound = '1';
+        offlineMapsButton.addEventListener('click', () => {
+            offlineMapModal.style.display = 'flex';
+            try { displayInstalledMaps(); } catch (error) {
+                console.warn('[Offline] Affichage packs impossible:', error);
+            }
+            try { displayInstalledAirportPdfs(); } catch (_) {}
+            try { refreshSimulationModeButtonState(); } catch (_) {}
+            try { refreshRoadOverlayInstalledStatus(); } catch (_) {}
+            try { updateMapSourceButtons(); } catch (_) {}
+            try { updateOfflineStatus(); } catch (_) {}
+        });
+    }
+
+    if (
+        closeOfflineMapButton
+        && offlineMapModal
+        && closeOfflineMapButton.dataset.npfOfflineBound !== '1'
+    ) {
+        closeOfflineMapButton.dataset.npfOfflineBound = '1';
+        closeOfflineMapButton.addEventListener('click', () => {
+            offlineMapModal.style.display = 'none';
+        });
+    }
+
+    if (
+        offlineMapModal
+        && offlineMapModal.dataset.npfOfflineBackdropBound !== '1'
+    ) {
+        offlineMapModal.dataset.npfOfflineBackdropBound = '1';
+        offlineMapModal.addEventListener('click', event => {
+            if (event.target === offlineMapModal) {
+                offlineMapModal.style.display = 'none';
+            }
+        });
+    }
+
+    if (
+        mapSourceOnlineBtn
+        && mapSourceOnlineBtn.dataset.npfOfflineBound !== '1'
+    ) {
+        mapSourceOnlineBtn.dataset.npfOfflineBound = '1';
+        mapSourceOnlineBtn.addEventListener('click', async () => {
+            try {
+                await setMapSourceMode('online');
+            } catch (error) {
+                console.error('Erreur activation mode online:', error);
+                alert(`Impossible d'activer le mode online : ${error.message || error}`);
+            }
+        });
+    }
+
+    if (
+        mapSourceOfflineBtn
+        && mapSourceOfflineBtn.dataset.npfOfflineBound !== '1'
+    ) {
+        mapSourceOfflineBtn.dataset.npfOfflineBound = '1';
+        mapSourceOfflineBtn.addEventListener('click', async () => {
+            if (!Array.isArray(activeOfflinePacks) || !activeOfflinePacks.length) {
+                alert('Aucun pack offline actif. Active un pack avant de passer en mode offline.');
+                return;
+            }
+
+            mapSourceOfflineBtn.disabled = true;
+            try {
+                setOfflineMapSwitchBusy('Vérification du mode offline…');
+                await setMapSourceMode('offline');
+            } catch (error) {
+                console.error('Erreur activation mode offline:', error);
+                alert(`Impossible d'activer le mode offline : ${error.message || error}`);
+            } finally {
+                mapSourceOfflineBtn.disabled = false;
+                try { updateMapSourceButtons(); } catch (_) {}
+            }
+        });
+    }
+
+    return Boolean(offlineMapsButton && offlineMapModal);
+}
+
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -4292,16 +4404,12 @@ function setupEventListeners() {
     closeCalculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'none'; });
     calculatorModal.addEventListener('click', (e) => { if (e.target === calculatorModal) { calculatorModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && calculatorModal.style.display === 'flex') { calculatorModal.style.display = 'none'; } });
-    offlineMapsButton.addEventListener('click', () => {
-        offlineMapModal.style.display = 'flex';
-        displayInstalledMaps();
-        displayInstalledAirportPdfs();
-        refreshSimulationModeButtonState();
-        refreshRoadOverlayInstalledStatus();
+    bindOfflineCoreControls();
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && offlineMapModal?.style.display === 'flex') {
+            offlineMapModal.style.display = 'none';
+        }
     });
-    closeOfflineMapButton.addEventListener('click', () => { offlineMapModal.style.display = 'none'; });
-    offlineMapModal.addEventListener('click', (e) => { if (e.target === offlineMapModal) { offlineMapModal.style.display = 'none'; } });
-    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && offlineMapModal.style.display === 'flex') { offlineMapModal.style.display = 'none'; } });
     zipImporterInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         handleZipImport(file);
@@ -4356,31 +4464,7 @@ function setupEventListeners() {
         });
     }
 
-    if (mapSourceOnlineBtn) {
-        mapSourceOnlineBtn.addEventListener('click', async () => {
-            try {
-                await setMapSourceMode('online');
-            } catch (error) {
-                console.error('Erreur activation mode online:', error);
-                alert(`Impossible d'activer le mode online: ${error.message || error}`);
-            }
-        });
-    }
-
-    if (mapSourceOfflineBtn) {
-        mapSourceOfflineBtn.addEventListener('click', async () => {
-            if (!activeOfflinePacks.length) {
-                alert('Aucun pack offline actif. Activez (ou importez) un pack avant de passer en mode offline.');
-                return;
-            }
-            try {
-                await setMapSourceMode('offline');
-            } catch (error) {
-                console.error('Erreur activation mode offline:', error);
-                alert(`Impossible d'activer le mode offline: ${error.message || error}`);
-            }
-        });
-    }
+    bindOfflineCoreControls();
 
     if (purgeInactivePacksBtn) {
         purgeInactivePacksBtn.addEventListener('click', async () => {
@@ -10966,7 +11050,7 @@ function installTrafficMarkerPopupInteraction(marker) {
 }
 
 /*
- * v14.57 TEST — fermeture de la fiche trafic par clic réel sur le fond de carte.
+ * v14.58 TEST — fermeture de la fiche trafic par clic réel sur le fond de carte.
  * Le déplacement, le zoom, le pincement et la molette ne ferment pas la fiche.
  */
 function closeOpenTrafficAircraftPopup() {
@@ -17101,12 +17185,91 @@ async function ensureServiceWorkerControlsPageForOffline() {
     return !!navigator.serviceWorker.controller;
 }
 
+async function activeOfflineStorageHasTiles() {
+    const databaseNames = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
+    if (!databaseNames.length) return false;
+
+    for (const databaseName of databaseNames) {
+        let openedDb = null;
+        try {
+            openedDb = await withTimeout(
+                openOfflineTileDatabaseByName(databaseName),
+                3500,
+                `Timeout ouverture ${databaseName}`
+            );
+            if (!openedDb.objectStoreNames.contains('tiles')) continue;
+
+            const hasTile = await withTimeout(
+                new Promise(resolve => {
+                    let settled = false;
+                    const finish = value => {
+                        if (settled) return;
+                        settled = true;
+                        resolve(Boolean(value));
+                    };
+                    try {
+                        const transaction = openedDb.transaction('tiles', 'readonly');
+                        const request = transaction.objectStore('tiles').openCursor();
+                        request.onsuccess = () => finish(Boolean(request.result));
+                        request.onerror = () => finish(false);
+                        transaction.onabort = () => finish(false);
+                    } catch (_) {
+                        finish(false);
+                    }
+                }),
+                3500,
+                `Timeout lecture ${databaseName}`
+            );
+
+            if (hasTile) return true;
+        } catch (error) {
+            console.warn(`[Offline] Contrôle ${databaseName} impossible:`, error);
+        } finally {
+            try { openedDb?.close(); } catch (_) {}
+        }
+    }
+
+    return false;
+}
+
+async function verifyOfflineModeReadiness() {
+    if (!Array.isArray(activeOfflinePacks) || !activeOfflinePacks.length) {
+        throw new Error('aucun pack de cartes actif');
+    }
+
+    try {
+        if (!db) await withTimeout(initDB(), 6000, 'Timeout IndexedDB offline');
+    } catch (error) {
+        throw new Error(`stockage offline indisponible (${error.message || error})`);
+    }
+
+    const hasTiles = await activeOfflineStorageHasTiles();
+    if (!hasTiles) {
+        throw new Error('aucune tuile trouvée dans les packs actifs');
+    }
+
+    const controlled = await ensureServiceWorkerControlsPageForOffline();
+    if (!controlled) {
+        throw new Error('le service worker ne contrôle pas encore la page');
+    }
+
+    const acknowledged = await notifyServiceWorkerActivePacks(
+        activeOfflinePacks,
+        { waitForAck: true }
+    );
+    if (!acknowledged) {
+        throw new Error('le service worker ne confirme pas les packs actifs');
+    }
+
+    return true;
+}
+
 async function setMapSourceMode(mode) {
     if (isMapSourceSwitching) return;
     const previousMode = mapSourceMode;
     const nextMode = mode === 'offline' ? 'offline' : 'online';
     if (nextMode === 'offline') {
-        await ensureServiceWorkerControlsPageForOffline();
+        await verifyOfflineModeReadiness();
     }
     if (previousMode === nextMode) {
         updateMapSourceButtons();
