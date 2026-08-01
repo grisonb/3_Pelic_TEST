@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-59_activation_offline_non_bloquante';
-const APP_VERSION = 'v14.59';
+const SW_VERSION = 'sw-v14-60_activation_offline_immediate';
+const APP_VERSION = 'v14.60';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -239,6 +239,15 @@ self.addEventListener('message', event => {
     if (data.type === 'OFFLINE_TILES_ENABLED_CHANGED') {
         offlineTilesEnabled = !!data.value;
         offlineSettingsLoadedAt = Date.now();
+        try {
+            if (event.ports && event.ports[0]) {
+                event.ports[0].postMessage({
+                    type: 'OFFLINE_TILES_ENABLED_READY',
+                    value: offlineTilesEnabled,
+                    version: APP_VERSION
+                });
+            }
+        } catch (_) {}
         return;
     }
 
