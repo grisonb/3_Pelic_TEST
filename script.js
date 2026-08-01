@@ -564,7 +564,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.61';
+    './data/localites/localites-france-v14.56.zip?appv=v14.62';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1863,12 +1863,23 @@ async function initializeApp() {
             }, 0);
         }
 
-        await initializeOfflineTilePreference();
-        if (mapSourceMode === 'offline') {
-            setTimeout(() => { ensureServiceWorkerControlsPageForOffline().catch(() => {}); }, 400);
-        }
-        // v13.58 — démarrage rapide : pas de scan complet IndexedDB au lancement.
-        await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
+        /*
+         * v14.62 TEST — l'interface ne doit jamais attendre IndexedDB ou le
+         * service worker avant de créer la carte et de lier les boutons.
+         */
+        initializeOfflineTilePreference().catch(error => {
+            console.warn('[Offline] Initialisation différée:', error);
+        });
+        // Le scan de zoom est utile mais non bloquant pour l'ouverture de l'interface.
+        withTimeout(
+            updateBaseTileNativeZoomFromAvailability({ forceScan: false }),
+            2200,
+            'Timeout analyse initiale des cartes offline'
+        ).then(() => {
+            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.62');
+        }).catch(error => {
+            console.warn('[Offline] Plage de zoom initiale conservée:', error);
+        });
         displayInstalledMaps();
     } else {
         mapSourceMode = DEFAULT_MAP_SOURCE_MODE;
@@ -1959,11 +1970,11 @@ async function initializeApp() {
                     'npfNamedPlacesFranceReadyNoticeVersion';
                 if (
                     localStorage.getItem(noticeKey)
-                        !== 'v14.61'
+                        !== 'v14.62'
                 ) {
                     localStorage.setItem(
                         noticeKey,
-                        'v14.61'
+                        'v14.62'
                     );
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
@@ -16906,26 +16917,36 @@ async function setOfflineTilesEnabled(enabled) {
         OFFLINE_TILES_ENABLED_KEY,
         String(offlineTilesMode)
     );
-    notifyServiceWorkerOfflineTilesPreference(
-        offlineTilesMode
-    );
+    notifyServiceWorkerOfflineTilesPreference(offlineTilesMode);
 
-    try {
-        await runOfflineSettingsTransaction(
-            'readwrite',
-            store => {
-                store.put({
-                    key: OFFLINE_TILES_ENABLED_KEY,
-                    value: offlineTilesMode
-                });
-            }
-        );
-    } catch (error) {
-        console.warn(
-            '[Offline] Mode conservé en localStorage:',
-            error
-        );
-    }
+    /*
+     * v14.62 TEST — persistance IndexedDB strictement en arrière-plan.
+     * Safari peut conserver une transaction ouverte sans déclencher oncomplete ;
+     * cela ne doit plus bloquer le bouton ni la création de la couche Leaflet.
+     */
+    const valueToPersist = offlineTilesMode;
+    setTimeout(() => {
+        withTimeout(
+            runOfflineSettingsTransaction(
+                'readwrite',
+                store => {
+                    store.put({
+                        key: OFFLINE_TILES_ENABLED_KEY,
+                        value: valueToPersist
+                    });
+                }
+            ),
+            1800,
+            'Timeout persistance du mode Offline'
+        ).catch(error => {
+            console.warn(
+                '[Offline] Mode conservé en localStorage uniquement:',
+                error
+            );
+        });
+    }, 0);
+
+    return offlineTilesMode;
 }
 
 
@@ -17064,79 +17085,209 @@ function updateMapSourceButtons() {
 }
 
 
-async function ensureServiceWorkerControlsPageForOffline() {
-    /*
-     * v13.71 — restauration mode hors ligne après reset profond.
-     * Le reset v13.70 pouvait désinscrire le service worker : la carte offline
-     * se retrouvait avec des URLs de tuiles que personne n'interceptait. Ici,
-     * avant d'activer la carte offline, on vérifie qu'un service worker contrôle
-     * réellement la page. Si ce n'est pas le cas, on le réinstalle puis on force
-     * une seule relance propre.
-     */
-    if (!('serviceWorker' in navigator)) return true;
+async function synchronizeOfflineConfigurationWithServiceWorker({
+    scheduleReload = false,
+    timeoutMs = 2200
+} = {}) {
+    if (!('serviceWorker' in navigator)) return false;
+
+    const postConfiguration = worker => {
+        if (!worker || typeof worker.postMessage !== 'function') return false;
+        try {
+            worker.postMessage({
+                type: 'OFFLINE_TILES_ENABLED_CHANGED',
+                value: mapSourceMode === 'offline'
+            });
+            worker.postMessage({
+                type: 'OFFLINE_ONLINE_FALLBACK_CHANGED',
+                value: false
+            });
+            worker.postMessage({
+                type: 'OFFLINE_ACTIVE_PACKS_CHANGED',
+                value: Array.isArray(activeOfflinePacks)
+                    ? activeOfflinePacks.filter(Boolean)
+                    : [],
+                dbNames: getOfflineActivePackDatabasesForPacks(activeOfflinePacks),
+                aliases: getOfflineActivePackAliasesForPacks(activeOfflinePacks)
+            });
+            return true;
+        } catch (_) {
+            return false;
+        }
+    };
+
+    if (navigator.serviceWorker.controller) {
+        postConfiguration(navigator.serviceWorker.controller);
+        return true;
+    }
+
+    let registration = null;
+    try {
+        registration = await withTimeout(
+            navigator.serviceWorker.register('./sw.js', {
+                updateViaCache: 'none'
+            }),
+            timeoutMs,
+            'Timeout enregistrement service worker'
+        );
+    } catch (error) {
+        console.warn('[Offline] Enregistrement SW différé:', error);
+    }
+
+    if (!registration) {
+        try {
+            registration = await withTimeout(
+                navigator.serviceWorker.ready,
+                timeoutMs,
+                'Timeout attente service worker'
+            );
+        } catch (_) {}
+    }
+
+    postConfiguration(
+        navigator.serviceWorker.controller
+        || registration?.active
+        || registration?.waiting
+        || registration?.installing
+    );
+
     if (navigator.serviceWorker.controller) return true;
 
-    try {
-        const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
-        if (registration && typeof registration.update === 'function') {
-            await registration.update().catch(() => {});
-        }
-        await navigator.serviceWorker.ready.catch(() => null);
-    } catch (error) {
-        console.warn('[Offline] Service worker non prêt pour le mode hors ligne:', error);
+    if (scheduleReload && mapSourceMode === 'offline') {
+        try {
+            const guardKey = `npfOfflineSwControlReload:${window.APP_VERSION || 'unknown'}`;
+            if (sessionStorage.getItem(guardKey) !== '1') {
+                sessionStorage.setItem(guardKey, '1');
+                setTimeout(() => {
+                    const refreshUrl = new URL(window.location.href);
+                    refreshUrl.searchParams.set(
+                        'appv',
+                        window.APP_VERSION || 'v14.62'
+                    );
+                    refreshUrl.searchParams.set(
+                        'swctl',
+                        Date.now().toString()
+                    );
+                    window.location.replace(refreshUrl.toString());
+                }, 120);
+            }
+        } catch (_) {}
     }
 
-    if (!navigator.serviceWorker.controller) {
-        const guardKey = `npfOfflineSwControlReload:${window.APP_VERSION || 'unknown'}`;
-        if (sessionStorage.getItem(guardKey) !== '1') {
-            sessionStorage.setItem(guardKey, '1');
-            const refreshUrl = new URL(window.location.href);
-            refreshUrl.searchParams.set('appv', window.APP_VERSION || 'v13.73');
-            refreshUrl.searchParams.set('swctl', Date.now().toString());
-            window.location.replace(refreshUrl.toString());
-            await new Promise(() => {});
-        }
+    return false;
+}
+
+async function ensureServiceWorkerControlsPageForOffline(options = {}) {
+    return synchronizeOfflineConfigurationWithServiceWorker({
+        scheduleReload: options.scheduleReload !== false,
+        timeoutMs: Number(options.timeoutMs) || 2200
+    });
+}
+
+function applyImmediateBaseTileZoomForMapSource(mode) {
+    if (mode !== 'offline') {
+        baseTileMinNativeZoom = GLOBAL_MIN_ZOOM;
+        baseTileMaxNativeZoom = ONLINE_MAX_NATIVE_ZOOM;
+        return;
     }
 
-    return !!navigator.serviceWorker.controller;
+    const activeOfflineMaxZoomLimit =
+        getOfflinePackMaxNativeZoomLimitForPacks(activeOfflinePacks);
+    const storedMin = Number.parseInt(
+        localStorage.getItem(OFFLINE_TILES_MIN_ZOOM_KEY) || '',
+        10
+    );
+    const storedMax = Number.parseInt(
+        localStorage.getItem(OFFLINE_TILES_MAX_ZOOM_KEY) || '',
+        10
+    );
+
+    baseTileMinNativeZoom = Number.isFinite(storedMin)
+        ? Math.max(
+            GLOBAL_MIN_ZOOM,
+            Math.min(storedMin, activeOfflineMaxZoomLimit)
+        )
+        : GLOBAL_MIN_ZOOM;
+    baseTileMaxNativeZoom = Number.isFinite(storedMax)
+        ? Math.max(
+            baseTileMinNativeZoom,
+            Math.min(storedMax, activeOfflineMaxZoomLimit)
+        )
+        : activeOfflineMaxZoomLimit;
 }
 
 async function setMapSourceMode(mode) {
-    if (isMapSourceSwitching) return;
-    const previousMode = mapSourceMode;
+    if (isMapSourceSwitching) return false;
+
     const nextMode = mode === 'offline' ? 'offline' : 'online';
-    if (nextMode === 'offline') {
-        await ensureServiceWorkerControlsPageForOffline();
+    if (
+        nextMode === 'offline'
+        && (!Array.isArray(activeOfflinePacks) || !activeOfflinePacks.length)
+    ) {
+        throw new Error('Aucun pack de cartes actif');
     }
-    if (previousMode === nextMode) {
-        updateMapSourceButtons();
-        updateOfflineStatus();
-        return;
-    }
+
     isMapSourceSwitching = true;
     mapSourceMode = nextMode;
+    offlineTilesMode = nextMode === 'offline';
+
     localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
+    localStorage.setItem(
+        OFFLINE_TILES_ENABLED_KEY,
+        String(offlineTilesMode)
+    );
+
     updateMapSourceButtons();
     updateOfflineStatus();
-    setOfflineMapSwitchBusy(nextMode === 'offline' ? 'Activation carte offline...' : 'Retour carte online...');
+    setOfflineMapSwitchBusy(
+        offlineTilesMode
+            ? 'Mode OFFLINE sélectionné — chargement des tuiles…'
+            : 'Mode ONLINE actif.'
+    );
+
     try {
-        await setOfflineTilesEnabled(mapSourceMode === 'offline');
+        /*
+         * v14.62 TEST — le changement visible et la couche sont appliqués
+         * synchroniquement, avant tout accès IndexedDB ou attente du SW.
+         */
+        setOfflineTilesEnabled(offlineTilesMode);
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
-        await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
-        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode');
-    } catch (error) {
-        mapSourceMode = previousMode;
-        localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
-        try {
-            await setOfflineTilesEnabled(mapSourceMode === 'offline');
-        } catch (_) {}
-        throw error;
+        applyImmediateBaseTileZoomForMapSource(nextMode);
+        rebuildBaseTileLayerAfterOfflineSwitch('setMapSourceMode-immediate-v14.62');
     } finally {
         isMapSourceSwitching = false;
         updateMapSourceButtons();
         updateOfflineStatus();
     }
+
+    if (offlineTilesMode) {
+        synchronizeOfflineConfigurationWithServiceWorker({
+            scheduleReload: true,
+            timeoutMs: 2200
+        }).then(controlled => {
+            if (!controlled || mapSourceMode !== 'offline') return;
+            notifyServiceWorkerOfflineTilesPreference(true);
+            notifyServiceWorkerActivePacks(activeOfflinePacks);
+            rebuildBaseTileLayerAfterOfflineSwitch('sw-synchronized-v14.62');
+        }).catch(error => {
+            console.warn('[Offline] Synchronisation SW différée:', error);
+        });
+    }
+
+    withTimeout(
+        updateBaseTileNativeZoomFromAvailability({ forceScan: false }),
+        2400,
+        'Timeout analyse des niveaux de zoom'
+    ).then(() => {
+        if (mapSourceMode === nextMode) {
+            rebuildBaseTileLayerAfterOfflineSwitch('zoom-ready-v14.62');
+        }
+    }).catch(error => {
+        console.warn('[Offline] Niveaux de zoom par défaut conservés:', error);
+    });
+
+    return true;
 }
 
 function updateOfflineStatus() {
@@ -17147,16 +17298,20 @@ function updateOfflineStatus() {
 
 async function initializeOfflineTilePreference() {
     const enabled = mapSourceMode === 'offline';
-    await setOfflineTilesEnabled(enabled);
+    offlineTilesMode = enabled;
+
+    localStorage.setItem(
+        OFFLINE_TILES_ENABLED_KEY,
+        String(enabled)
+    );
+    applyImmediateBaseTileZoomForMapSource(mapSourceMode);
+    setOfflineTilesEnabled(enabled);
     setOfflineOnlineFallbackMode(false);
 
-    /*
-     * v13.78 — au démarrage avec une carte déjà installée, on réécrit les
-     * bases actives dans IndexedDB settings pour que le service worker puisse
-     * lancer la PWA et servir la bonne carte même après relance/offline.
-     */
     if (Array.isArray(activeOfflinePacks) && activeOfflinePacks.length) {
-        await persistSimpleActiveOfflinePacks(activeOfflinePacks);
+        persistSimpleActiveOfflinePacks(activeOfflinePacks).catch(error => {
+            console.warn('[Offline] Persistance des packs différée:', error);
+        });
     }
 
     notifyServiceWorkerOfflineTilesPreference(enabled);
@@ -17164,6 +17319,18 @@ async function initializeOfflineTilePreference() {
     notifyServiceWorkerActivePacks(activeOfflinePacks);
     updateMapSourceButtons();
     updateOfflineStatus();
+
+    /* Plusieurs envois courts couvrent le changement de contrôleur Safari. */
+    [0, 500, 1600].forEach((delay, index) => {
+        setTimeout(() => {
+            synchronizeOfflineConfigurationWithServiceWorker({
+                scheduleReload: enabled && index === 2,
+                timeoutMs: 1800
+            }).catch(() => {});
+        }, delay);
+    });
+
+    return enabled;
 }
 
 async function purgeInactivePacksCache() {
@@ -17942,13 +18109,9 @@ async function persistSimpleActiveOfflinePacks(packs) {
         ? packs.filter(Boolean)
         : [];
     activeOfflinePackDatabases =
-        getOfflineActivePackDatabasesForPacks(
-            activeOfflinePacks
-        );
+        getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
     activeOfflinePackAliases =
-        getOfflineActivePackAliasesForPacks(
-            activeOfflinePacks
-        );
+        getOfflineActivePackAliasesForPacks(activeOfflinePacks);
 
     localStorage.setItem(
         OFFLINE_ACTIVE_PACKS_KEY,
@@ -17964,49 +18127,45 @@ async function persistSimpleActiveOfflinePacks(packs) {
     );
 
     try {
-        localStorage.removeItem(
-            OFFLINE_TILES_MIN_ZOOM_KEY
-        );
-        localStorage.removeItem(
-            OFFLINE_TILES_MAX_ZOOM_KEY
-        );
+        localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
+        localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
     } catch (_) {}
 
-    /*
-     * La carte est configurée immédiatement par localStorage + postMessage.
-     * Une écriture settings fermée ne doit plus bloquer le changement de carte.
-     */
-    try {
-        await runOfflineSettingsTransaction(
-            'readwrite',
-            store => {
-                store.put({
-                    key: OFFLINE_ACTIVE_PACKS_KEY,
-                    value: activeOfflinePacks
-                });
-                store.put({
-                    key:
-                        OFFLINE_ACTIVE_PACK_DATABASES_KEY,
-                    value: activeOfflinePackDatabases
-                });
-                store.put({
-                    key:
-                        OFFLINE_ACTIVE_PACK_ALIASES_KEY,
-                    value: activeOfflinePackAliases
-                });
-            }
-        );
-    } catch (error) {
-        console.warn(
-            '[Offline] Réglages conservés en localStorage après fermeture IndexedDB:',
-            error
-        );
-    }
+    notifyServiceWorkerActivePacks(activeOfflinePacks);
 
-    await notifyServiceWorkerActivePacks(
-        activeOfflinePacks,
-        { waitForAck: true }
-    );
+    const packsToPersist = [...activeOfflinePacks];
+    const databasesToPersist = [...activeOfflinePackDatabases];
+    const aliasesToPersist = [...activeOfflinePackAliases];
+    setTimeout(() => {
+        withTimeout(
+            runOfflineSettingsTransaction(
+                'readwrite',
+                store => {
+                    store.put({
+                        key: OFFLINE_ACTIVE_PACKS_KEY,
+                        value: packsToPersist
+                    });
+                    store.put({
+                        key: OFFLINE_ACTIVE_PACK_DATABASES_KEY,
+                        value: databasesToPersist
+                    });
+                    store.put({
+                        key: OFFLINE_ACTIVE_PACK_ALIASES_KEY,
+                        value: aliasesToPersist
+                    });
+                }
+            ),
+            2000,
+            'Timeout persistance des packs Offline'
+        ).catch(error => {
+            console.warn(
+                '[Offline] Packs conservés en localStorage uniquement:',
+                error
+            );
+        });
+    }, 0);
+
+    return activeOfflinePacks;
 }
 
 
@@ -18197,11 +18356,6 @@ function displayInstalledMaps() {
 }
 
 async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packNames) {
-    /*
-     * v13.58 — changement de carte sans recharger toute la PWA.
-     * Le rechargement complet relançait service worker + IndexedDB + couches annexes,
-     * ce qui pouvait bloquer la fenêtre de sélection plusieurs dizaines de secondes sur iPad.
-     */
     const token = ++offlineMapSwitchToken;
     const nextPacks = checked ? packNames : [];
     const nextMode = checked ? 'offline' : 'online';
@@ -18210,39 +18364,32 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
     updateMapSourceButtons();
     setOfflineMapSwitchBusy(
         checked
-            ? `Carte ${groupName} sélectionnée (${packNames.length} fichier(s)). Chargement progressif...`
-            : 'Carte offline désactivée. Retour online...'
+            ? `Carte ${groupName} sélectionnée — chargement des tuiles…`
+            : 'Carte offline désactivée. Retour online…'
     );
     closeOfflineMapModalSoon(120);
 
     try {
-        if (checked) {
-            await ensureServiceWorkerControlsPageForOffline();
-        }
-
-        await persistSimpleActiveOfflinePacks(
-            nextPacks
-        );
-        if (token !== offlineMapSwitchToken) return;
-
-        try {
-            localStorage.removeItem(OFFLINE_TILES_MIN_ZOOM_KEY);
-            localStorage.removeItem(OFFLINE_TILES_MAX_ZOOM_KEY);
-        } catch (_) {}
+        await persistSimpleActiveOfflinePacks(nextPacks);
+        if (token !== offlineMapSwitchToken) return false;
 
         mapSourceMode = nextMode;
+        offlineTilesMode = nextMode === 'offline';
         localStorage.setItem(MAP_SOURCE_MODE_KEY, mapSourceMode);
-        await setOfflineTilesEnabled(mapSourceMode === 'offline');
+        localStorage.setItem(
+            OFFLINE_TILES_ENABLED_KEY,
+            String(offlineTilesMode)
+        );
+
+        setOfflineTilesEnabled(offlineTilesMode);
         setOfflineOnlineFallbackMode(false);
         notifyServiceWorkerActivePacks(activeOfflinePacks);
-        await updateBaseTileNativeZoomFromAvailability({ forceScan: false });
-        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup');
-
-        setTimeout(() => rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-second-pass'), 1200);
-        setTimeout(() => scheduleStartupAuxiliaryLayers(), 2500);
+        applyImmediateBaseTileZoomForMapSource(nextMode);
+        rebuildBaseTileLayerAfterOfflineSwitch('selectSimpleMapGroup-immediate-v14.62');
     } catch (error) {
         console.error('Changement de carte offline impossible:', error);
         alert(`Impossible de changer de carte offline: ${error.message || error}`);
+        return false;
     } finally {
         if (token === offlineMapSwitchToken) {
             isMapSourceSwitching = false;
@@ -18251,6 +18398,30 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             displayInstalledMaps();
         }
     }
+
+    if (checked) {
+        synchronizeOfflineConfigurationWithServiceWorker({
+            scheduleReload: true,
+            timeoutMs: 2200
+        }).then(controlled => {
+            if (!controlled || mapSourceMode !== 'offline') return;
+            notifyServiceWorkerOfflineTilesPreference(true);
+            notifyServiceWorkerActivePacks(activeOfflinePacks);
+            rebuildBaseTileLayerAfterOfflineSwitch('group-sw-ready-v14.62');
+        }).catch(() => {});
+    }
+
+    withTimeout(
+        updateBaseTileNativeZoomFromAvailability({ forceScan: false }),
+        2400,
+        'Timeout analyse carte sélectionnée'
+    ).then(() => {
+        if (token === offlineMapSwitchToken) {
+            rebuildBaseTileLayerAfterOfflineSwitch('group-zoom-ready-v14.62');
+        }
+    }).catch(() => {});
+
+    return true;
 }
 
 window.selectSimpleMapGroup = async function(groupName, checked = true) {
