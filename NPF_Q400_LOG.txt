@@ -1,4 +1,51 @@
 ============================================================
+VERSION TEST v14.70 — MISE À JOUR ATOMIQUE ET VERSIONNEMENT VERROUILLÉ
+============================================================
+
+DATE : 01/08/2026
+BASE : v14.69 TEST
+
+PROBLÈME SIGNALÉ
+- L'application reste sur l'ancienne version et ne passe pas à la v14.69.
+- Plusieurs régressions réapparaissent après les mises à jour successives.
+
+CAUSE TECHNIQUE CONFIRMÉE
+- Le service worker v14.69 conservait par erreur l'identifiant `sw-v14-68_attente_indexeddb_carte_memorisee`.
+- Les v14.68 et v14.69 utilisaient donc le même nom de cache d'app-shell.
+- Une installation pouvait écrire les nouveaux fichiers dans le cache encore utilisé par l'ancien service worker et créer un mélange de versions.
+- Le service worker acceptait aussi en secours un ancien index, un ancien script ou un ancien manifeste pendant l'installation de la nouvelle version.
+- Lors d'une propagation progressive des fichiers sur GitHub Pages, un service worker pouvait ainsi s'activer avant que tous les fichiers de la version soient réellement disponibles.
+
+CORRECTIONS
+- Nouveau service worker unique : `sw-v14-70_atomic_update_verified`.
+- Nouveau cache d'app-shell propre à la v14.70 ; aucune écriture dans le cache actif de la version précédente.
+- Téléchargement des fichiers cœur avec paramètres anti-cache v14.70.
+- Ajout d'un marqueur explicite `NPF_SCRIPT_BUILD_VERSION = v14.70` dans script.js.
+- Vérification obligatoire avant activation :
+  - index.html doit déclarer APP_VERSION v14.70 ;
+  - script.js doit déclarer NPF_SCRIPT_BUILD_VERSION v14.70 ;
+  - manifest.json doit contenir un start_url v14.70 ;
+  - chaque ressource cœur doit être réellement disponible.
+- Interdiction d'utiliser un ancien index, un ancien script ou un ancien manifeste comme secours pendant l'installation d'une nouvelle version.
+- Le service worker actif lit exclusivement le cache de sa propre version ; il ne peut plus récupérer par erreur l'app-shell d'un ancien cache conservé en secours.
+- Les actualisations réseau en arrière-plan sont vérifiées avant écriture et ne peuvent plus remplacer un cache v14.70 par une réponse v14.69 encore présente sur le CDN.
+- En cas de publication incomplète ou de propagation retardée, l'installation v14.70 échoue proprement et l'ancienne version reste active.
+- Une nouvelle tentative est effectuée au prochain lancement ou via MAJ ; la v14.70 ne prend le contrôle que lorsque l'ensemble des fichiers est cohérent.
+- Conservation sans modification fonctionnelle du moteur Offline et de la stabilisation NPF de la v14.69.
+- Conservation de l'alerte unique de mise à jour.
+
+CONTRÔLES DE LIVRAISON
+- Construction effectuée depuis le ZIP v14.69 réellement livré, et non depuis un répertoire intermédiaire.
+- Identifiants APP_VERSION, SW_VERSION, paramètres appv et start_url alignés.
+- Vérification que le cache v14.70 est différent du cache v14.68/v14.69.
+- Test du refus d'un app-shell simulé en v14.69.
+- Test de l'acceptation d'un app-shell complet en v14.70.
+- Syntaxe JavaScript contrôlée.
+- Manifeste JSON contrôlé.
+- Journal v14.69 repris intégralement sans suppression.
+- Intégrité et contenu réel du ZIP contrôlés après création.
+
+============================================================
 VERSION TEST v14.69 — LECTURE NPF INDEXEDDB STABILISÉE AU DÉMARRAGE
 ============================================================
 
