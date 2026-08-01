@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-67_restauration_carte_offline_demarrage';
-const APP_VERSION = 'v14.67';
+const SW_VERSION = 'sw-v14-68_attente_indexeddb_carte_memorisee';
+const APP_VERSION = 'v14.68';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
