@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.76';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.77';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -1893,6 +1893,112 @@ function getAdditionalAerodromeRunways(oaci) {
         String(oaci || '').trim().toUpperCase()
     ) || [];
 }
+
+
+/*
+ * v14.77 TEST — pistes des aérodromes déclarés comme pélicandromes.
+ *
+ * Les 27 pélicandromes permanents de la liste `pelicanAirports` disposent
+ * désormais de leurs pistes dans la même représentation cartographique que
+ * les aérodromes complémentaires. Les coordonnées exactes sont utilisées
+ * lorsqu'elles sont disponibles. Quelques pistes secondaires sont reconstruites
+ * sommairement autour de l'ARP et marquées `estimated: true`.
+ *
+ * Format :
+ * OACI|QFU|lat1|lon1|lat2|lon2|longueur_m|largeur_m|surface|géométrie_estimée
+ */
+const declaredPelicanRunwaysData = `
+LFLU|01/19|44.912201|4.968100|44.931000|4.971700|2100|45|ASP|0
+LFLU|01L/19R|44.915600|4.969680|44.926201|4.971700|1193|50|GRASS|0
+LFLU|01R/19L|44.919281|4.971359|44.922869|4.972071|403|60|GRASS|1
+LFMU|09/27|43.324200|3.342750|43.322899|3.365060|1820|45|ASP|0
+LFJR|08/26|47.558894|-0.324012|47.561705|-0.300388|1800|45|PAVED|1
+LFJR|08L/26R|47.560535|-0.317133|47.561659|-0.307683|720|45|GRASS|1
+LFJR|08R/26L|47.558644|-0.319210|47.560362|-0.304773|1100|100|GRASS|1
+LFHO|18/36|44.550598|4.372800|44.537800|4.371580|1425|30|PAVED|0
+LFLX|03/21|46.850601|1.719170|46.876900|1.744170|3500|45|CON|0
+LFBM|09/27|43.910702|-0.531778|43.912300|-0.486964|3603|45|PEM|0
+LFBL|03/21|45.852501|1.172540|45.871300|1.190200|2500|45|ASP|0
+LFAQ|08/26|49.969330|2.678670|49.971001|2.709330|2200|45|PAVED|0
+LFAQ|08R/26L|49.967445|2.678942|49.968185|2.692833|1000|80|GRASS|0
+LFBP|13/31|43.387699|-0.433261|43.374500|-0.408242|2500|45|ASP|0
+LFTH|05/23|43.094501|6.141120|43.106400|6.161470|2120|45|ASP|0
+LFTH|13/31|43.101799|6.139940|43.089699|6.156430|1902|50|ASP|0
+LFSG|08/26|48.324100|6.051820|48.326199|6.088100|2700|45|CON|0
+LFKC|18/36|42.541100|8.792920|42.520302|8.793340|2310|40|CON|0
+LFMD|04/22|43.543900|6.954110|43.548500|6.960830|760|18|ASP|0
+LFMD|17/35|43.554501|6.950420|43.540298|6.952940|1540|45|ASP|0
+LFMD|17L/35R|43.549921|6.951760|43.545050|6.952945|550|50|GRASS|1
+LFKB|16/34|42.563499|9.479190|42.541801|9.488270|2520|45|ASP|0
+LFMH|17/35|45.551201|4.295140|45.530499|4.297760|2300|45|ASP|0
+LFKF|05/23|41.494701|9.086010|41.509800|9.107930|2480|45|ASP|0
+LFCC|13/31|44.355598|1.467500|44.347198|1.481940|1500|30|ASP|0
+LFML|13L/31R|43.449100|5.197310|43.427299|5.228460|3500|45|ASP|0
+LFML|13R/31L|43.441299|5.203020|43.425900|5.224350|2370|45|ASP|0
+LFKJ|02/20|41.911598|8.795420|41.931301|8.807690|2300|45|ASP|0
+LFMK|09/27|43.217098|2.293170|43.215000|2.318230|2050|45|ASP|0
+LFRV|08/26|47.723999|-2.731310|47.725201|-2.717780|1025|60|GRASS|0
+LFTW|18/36|43.768398|4.415560|43.746399|4.417140|2440|45|CON|0
+LFMP|15/33|42.754101|2.861710|42.735001|2.877750|2500|45|ASP|0
+LFBD|05/23|44.819099|-0.728983|44.838699|-0.701000|3100|45|ASP|0
+LFBD|11/29|44.831600|-0.729242|44.825401|-0.699897|2415|45|ASP|0
+LFCR|13/31|44.413672|2.472636|44.402094|2.492636|2048|45|ASP|0
+LFBN|07/25|46.308336|-0.412097|46.314492|-0.390731|1760|30|ASP|0
+LFBN|07G/25G|46.309487|-0.405214|46.311778|-0.397005|680|80|GRASS|1
+LFSJ|05/23|47.033086|5.415342|47.044781|5.439189|2231|45|ASP|0
+`;
+
+const declaredPelicanRunwaysByOaci = (() => {
+    const byOaci = new Map();
+
+    declaredPelicanRunwaysData
+        .trim()
+        .split('\n')
+        .forEach(line => {
+            const [
+                oaci,
+                ident,
+                leLatText,
+                leLonText,
+                heLatText,
+                heLonText,
+                lengthText,
+                widthText,
+                surface,
+                estimatedText
+            ] = line.split('|');
+
+            const runway = {
+                oaci: String(oaci || '').trim().toUpperCase(),
+                ident: String(ident || '').trim(),
+                leLat: Number(leLatText),
+                leLon: Number(leLonText),
+                heLat: Number(heLatText),
+                heLon: Number(heLonText),
+                lengthM: Number(lengthText),
+                widthM: Number(widthText),
+                surface: String(surface || '').trim(),
+                estimated: estimatedText === '1'
+            };
+
+            if (
+                !/^[A-Z]{4}$/.test(runway.oaci)
+                || !Number.isFinite(runway.leLat)
+                || !Number.isFinite(runway.leLon)
+                || !Number.isFinite(runway.heLat)
+                || !Number.isFinite(runway.heLon)
+                || !Number.isFinite(runway.lengthM)
+                || runway.lengthM <= 0
+            ) return;
+
+            if (!byOaci.has(runway.oaci)) byOaci.set(runway.oaci, []);
+            byOaci.get(runway.oaci).push(runway);
+        });
+
+    return byOaci;
+})();
+
+const NPF_RUNWAY_MIN_ZOOM = 12; // Échelle cartographique NPF d'environ 1 NM.
 
 
 // =========================================================================
@@ -4504,6 +4610,7 @@ function initMap() {
     communesLayerGroup = L.layerGroup();
     communesLabelsLayer = L.layerGroup();
     drawNpfRunwayMapLayer();
+    map.on('zoomend', drawNpfRunwayMapLayer);
     drawPermanentAirportMarkers();
     drawFireHistoryMarkers();
     redrawGaarCircuits();
@@ -14841,45 +14948,56 @@ window.goToAirportDestinationByOaci = goToAirportDestinationByOaci;
 
 
 function drawNpfRunwayMapLayer() {
-    if (!npfRunwayMapLayer) return;
+    if (!npfRunwayMapLayer || !map) return;
     npfRunwayMapLayer.clearLayers();
 
     /*
-     * v14.76 — les pistes appartiennent à la carte NPF et non aux marqueurs.
-     * Elles ne sont ni cliquables ni effacées lorsque l'état d'un aéroport,
-     * d'une base ou d'un pélicandrome provoque le redessin des symboles.
+     * v14.77 — les pistes deviennent visibles uniquement à partir du niveau
+     * 1 NM de la carte NPF, correspondant au zoom Leaflet 12 déjà utilisé
+     * pour les routes nationales et départementales.
      */
-    additionalAerodromeRunwaysByOaci.forEach(runways => {
-        runways.forEach(runway => {
-            const endpoints = [
-                [runway.leLat, runway.leLon],
-                [runway.heLat, runway.heLon]
-            ];
+    const zoom = Number(map.getZoom());
+    if (!Number.isFinite(zoom) || zoom < NPF_RUNWAY_MIN_ZOOM) return;
 
-            /* Fin entourage blanc pour garder le trait lisible sur toute carte. */
-            L.polyline(endpoints, {
-                color: '#ffffff',
-                weight: 5,
-                opacity: 0.96,
-                lineCap: 'butt',
-                lineJoin: 'miter',
-                interactive: false,
-                pane: 'npfRunwaysPane',
-                renderer: npfRunwayRenderer || undefined
-            }).addTo(npfRunwayMapLayer);
+    const drawRunwayCollection = (runwaysByOaci) => {
+        runwaysByOaci.forEach(runways => {
+            runways.forEach(runway => {
+                const endpoints = [
+                    [runway.leLat, runway.leLon],
+                    [runway.heLat, runway.heLon]
+                ];
 
-            L.polyline(endpoints, {
-                color: '#111111',
-                weight: 2.4,
-                opacity: 1,
-                lineCap: 'butt',
-                lineJoin: 'miter',
-                interactive: false,
-                pane: 'npfRunwaysPane',
-                renderer: npfRunwayRenderer || undefined
-            }).addTo(npfRunwayMapLayer);
+                /* Fin entourage blanc pour garder le trait lisible sur toute carte. */
+                L.polyline(endpoints, {
+                    color: '#ffffff',
+                    weight: 5,
+                    opacity: 0.96,
+                    lineCap: 'butt',
+                    lineJoin: 'miter',
+                    interactive: false,
+                    pane: 'npfRunwaysPane',
+                    renderer: npfRunwayRenderer || undefined
+                }).addTo(npfRunwayMapLayer);
+
+                L.polyline(endpoints, {
+                    color: '#111111',
+                    weight: 2.4,
+                    opacity: 1,
+                    lineCap: 'butt',
+                    lineJoin: 'miter',
+                    interactive: false,
+                    pane: 'npfRunwaysPane',
+                    renderer: npfRunwayRenderer || undefined
+                }).addTo(npfRunwayMapLayer);
+            });
         });
-    });
+    };
+
+    /* 340 pistes complémentaires de la v14.76. */
+    drawRunwayCollection(additionalAerodromeRunwaysByOaci);
+
+    /* Pistes des 27 pélicandromes permanents ajoutées en v14.77. */
+    drawRunwayCollection(declaredPelicanRunwaysByOaci);
 }
 
 
