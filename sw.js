@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-74_permanent_tracked_callsigns';
-const APP_VERSION = 'v14.74';
+const SW_VERSION = 'sw-v14-75_scaled_runways_yellow_tracked_labels';
+const APP_VERSION = 'v14.75';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
