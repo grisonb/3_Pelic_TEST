@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.71';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.72';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -567,7 +567,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.71';
+    './data/localites/localites-france-v14.56.zip?appv=v14.72';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -777,9 +777,21 @@ const TRAFFIC_TRACKED_FETCH_CONCURRENCY = 6;
 const TRAFFIC_VIEWPORT_IDENTIFIER_QUERY_LIMIT = 40;
 const TRAFFIC_TEMPORARY_SEARCH_RESULT_TTL_MS = 10 * 60 * 1000;
 const TRAFFIC_SMOOTH_FRAME_INTERVAL_MS = 50;
-const TRAFFIC_MAX_EXTRAPOLATION_SECONDS = 8;
+/*
+ * v14.72 TEST — l'âge déjà accumulé par un point SafeSky ne doit plus
+ * consommer la totalité de la période de mouvement local. Deux horizons sont
+ * désormais séparés :
+ * - rattrapage limité de l'horodatage source jusqu'à la réception par NPF ;
+ * - extrapolation continue après réception, suffisamment longue pour couvrir
+ *   le rafraîchissement SafeSky de 5 s et ses éventuels retards réseau.
+ */
+const TRAFFIC_SOURCE_CATCHUP_MAX_SECONDS = 20;
+const TRAFFIC_MAX_EXTRAPOLATION_SECONDS = 15;
 const TRAFFIC_RECONCILIATION_DURATION_MS = 900;
 const TRAFFIC_RECONCILIATION_MAX_DISTANCE_NM = 3;
+const TRAFFIC_MOTION_ESTIMATION_MIN_SECONDS = 0.8;
+const TRAFFIC_MOTION_ESTIMATION_MAX_SECONDS = 30;
+const TRAFFIC_MOTION_ESTIMATION_MAX_SPEED_KNOTS = 750;
 const SAFESKY_OWN_PUBLISH_INTERVAL_MS = 5000;
 
 let trafficMarkerRegistry = new Map();
@@ -10838,6 +10850,7 @@ function normalizeTrafficAircraft(raw) {
         lon,
         seenPos,
         sourceTimestampMs,
+        receivedAtMs: normalizedAtMs,
         altitude,
         altitudeFeet,
         gs,
@@ -11694,13 +11707,25 @@ function extrapolateTrafficAircraft(
     const speedMps = Number(
         aircraft.groundSpeedKnots
     ) / 1.943844492;
-    const baseTrack = Number(aircraft.track);
+    const trackValue = aircraft.track;
+    const baseTrack = (
+        trackValue === null
+        || trackValue === undefined
+        || trackValue === ''
+    )
+        ? NaN
+        : Number(trackValue);
     const turnRate = Number(
         aircraft.turnRateDegPerSec
     ) || 0;
     const sourceTimestampMs = Number(
         aircraft.sourceTimestampMs
     ) || targetTimestampMs;
+    const receivedAtMs = Number.isFinite(
+        Number(aircraft.receivedAtMs)
+    )
+        ? Number(aircraft.receivedAtMs)
+        : sourceTimestampMs;
 
     if (
         aircraft.isGrounded
@@ -11719,16 +11744,33 @@ function extrapolateTrafficAircraft(
         };
     }
 
-    const elapsedSeconds = Math.max(
+    /*
+     * v14.72 — séparation des deux temps.
+     *
+     * Avant : la limite de 8 s partait de last_update SafeSky. Un point reçu
+     * avec 8 s d'âge avait donc déjà épuisé toute son extrapolation et restait
+     * immobile entre deux réponses.
+     *
+     * Maintenant :
+     * 1) on rattrape raisonnablement l'âge du point jusqu'à sa réception ;
+     * 2) on continue à le faire avancer pendant 15 s APRÈS cette réception.
+     */
+    const sourceCatchupSeconds = Math.max(
+        0,
+        Math.min(
+            TRAFFIC_SOURCE_CATCHUP_MAX_SECONDS,
+            (receivedAtMs - sourceTimestampMs) / 1000
+        )
+    );
+    const liveElapsedSeconds = Math.max(
         0,
         Math.min(
             TRAFFIC_MAX_EXTRAPOLATION_SECONDS,
-            (
-                targetTimestampMs
-                - sourceTimestampMs
-            ) / 1000
+            (targetTimestampMs - receivedAtMs) / 1000
         )
     );
+    const elapsedSeconds =
+        sourceCatchupSeconds + liveElapsedSeconds;
 
     if (elapsedSeconds <= 0) {
         return {
@@ -11799,6 +11841,137 @@ function interpolateTrafficLongitude(fromLongitude, toLongitude, progress) {
 
     const shortestDelta = ((to - from + 540) % 360) - 180;
     return ((from + shortestDelta * progress + 540) % 360) - 180;
+}
+
+
+function applyTrafficMotionFallbackFromHistory(
+    previousAircraft,
+    aircraft
+) {
+    if (
+        !previousAircraft
+        || !aircraft
+        || aircraft.isGrounded
+    ) {
+        return aircraft;
+    }
+
+    const previousLat = Number(previousAircraft.lat);
+    const previousLon = Number(previousAircraft.lon);
+    const currentLat = Number(aircraft.lat);
+    const currentLon = Number(aircraft.lon);
+
+    if (
+        !Number.isFinite(previousLat)
+        || !Number.isFinite(previousLon)
+        || !Number.isFinite(currentLat)
+        || !Number.isFinite(currentLon)
+    ) {
+        return aircraft;
+    }
+
+    const previousSourceAt = Number(
+        previousAircraft.sourceTimestampMs
+    );
+    const currentSourceAt = Number(
+        aircraft.sourceTimestampMs
+    );
+    const previousReceivedAt = Number(
+        previousAircraft.receivedAtMs
+    );
+    const currentReceivedAt = Number(
+        aircraft.receivedAtMs
+    );
+
+    let elapsedSeconds = (
+        Number.isFinite(previousSourceAt)
+        && Number.isFinite(currentSourceAt)
+    )
+        ? (currentSourceAt - previousSourceAt) / 1000
+        : NaN;
+
+    if (
+        !Number.isFinite(elapsedSeconds)
+        || elapsedSeconds < TRAFFIC_MOTION_ESTIMATION_MIN_SECONDS
+        || elapsedSeconds > TRAFFIC_MOTION_ESTIMATION_MAX_SECONDS
+    ) {
+        elapsedSeconds = (
+            Number.isFinite(previousReceivedAt)
+            && Number.isFinite(currentReceivedAt)
+        )
+            ? (currentReceivedAt - previousReceivedAt) / 1000
+            : NaN;
+    }
+
+    if (
+        !Number.isFinite(elapsedSeconds)
+        || elapsedSeconds < TRAFFIC_MOTION_ESTIMATION_MIN_SECONDS
+        || elapsedSeconds > TRAFFIC_MOTION_ESTIMATION_MAX_SECONDS
+    ) {
+        return aircraft;
+    }
+
+    const distanceNm = calculateDistanceInNm(
+        previousLat,
+        previousLon,
+        currentLat,
+        currentLon
+    );
+
+    if (
+        !Number.isFinite(distanceNm)
+        || distanceNm < 0.002
+    ) {
+        return aircraft;
+    }
+
+    const estimatedSpeedKnots =
+        distanceNm * 3600 / elapsedSeconds;
+
+    if (
+        !Number.isFinite(estimatedSpeedKnots)
+        || estimatedSpeedKnots <= 1
+        || estimatedSpeedKnots
+            > TRAFFIC_MOTION_ESTIMATION_MAX_SPEED_KNOTS
+    ) {
+        return aircraft;
+    }
+
+    const currentSpeedKnots = Number(
+        aircraft.groundSpeedKnots
+    );
+
+    /*
+     * Certaines balises SafeSky fournissent la position et la route sans
+     * ground_speed exploitable. Le déplacement entre les deux derniers points
+     * devient alors la vitesse locale de secours.
+     */
+    if (
+        !Number.isFinite(currentSpeedKnots)
+        || currentSpeedKnots <= 1
+    ) {
+        aircraft.groundSpeedKnots =
+            estimatedSpeedKnots;
+        aircraft.gs =
+            `${Math.round(estimatedSpeedKnots)} kt`;
+    }
+
+    const currentTrackValue = aircraft.track;
+    if (
+        currentTrackValue === null
+        || currentTrackValue === undefined
+        || currentTrackValue === ''
+        || !Number.isFinite(Number(currentTrackValue))
+    ) {
+        aircraft.track = calculateBearing(
+            previousLat,
+            previousLon,
+            currentLat,
+            currentLon
+        );
+    }
+
+    return aircraft;
 }
 
 function getTrafficReconciledPosition(entry, predicted, nowMs) {
@@ -12598,6 +12771,15 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         const aircraftKey = buildTrafficAircraftKey(ac);
         activeAircraftKeys.add(aircraftKey);
 
+        let entry = trafficMarkerRegistry.get(aircraftKey);
+
+        if (entry?.aircraft) {
+            applyTrafficMotionFallbackFromHistory(
+                entry.aircraft,
+                ac
+            );
+        }
+
         const popupHtml = buildTrafficAircraftPopupHtml(ac, {
             useAroundAltitude,
             relativeMinAltitudeFt,
@@ -12609,7 +12791,6 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         const nextIconSignature = String(
             nextIcon?.options?.html || ''
         );
-        let entry = trafficMarkerRegistry.get(aircraftKey);
 
         if (entry?.marker) {
             prepareTrafficMarkerReconciliation(
@@ -18454,7 +18635,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.71'
+                        window.APP_VERSION || 'v14.72'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
