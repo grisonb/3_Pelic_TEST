@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-73_larger_selectable_airport_icons';
-const APP_VERSION = 'v14.73';
+const SW_VERSION = 'sw-v14-74_permanent_tracked_callsigns';
+const APP_VERSION = 'v14.74';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
