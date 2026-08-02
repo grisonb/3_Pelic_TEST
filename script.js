@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.77';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.78';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -1997,6 +1997,224 @@ const declaredPelicanRunwaysByOaci = (() => {
 
     return byOaci;
 })();
+
+
+
+/*
+ * v14.78 TEST — couverture des pistes de tous les aéroports pouvant être
+ * déclarés comme pélicandromes depuis l'interface.
+ *
+ * La v14.77 ne contenait que les 27 pélicandromes permanents. Les 97 terrains
+ * de `otherAirports`, dont Montpellier, Nice et Tarbes, peuvent eux aussi être
+ * enregistrés dans `customPelicanAirports`. Leurs géométries sont donc
+ * embarquées localement afin que toute sélection PÉLIC dispose de sa ou ses
+ * pistes à partir du zoom 1 NM.
+ *
+ * Les codes historiques conservés par NPF sont associés à la géométrie du
+ * terrain correspondant par proximité géographique. Trois terrains dont les
+ * seuils ne sont pas disponibles dans la base locale utilisent une géométrie
+ * sommaire marquée `estimated: true`.
+ *
+ * Format :
+ * OACI_NPF|QFU|lat1|lon1|lat2|lon2|longueur_m|largeur_m|surface|géométrie_estimée
+ */
+const otherAirportRunwaysData = `
+LFBC|06/24|44.528000|-1.138010|44.540001|-1.112730|2408|45|ASP|0
+LFBH|09/27|46.179699|-1.211010|46.178799|-1.181810|2255|45|ASP|0
+LFBF|12/30|43.549099|1.357200|43.542301|1.377410|1800|45|ASP|0
+LFBG|05/23|45.648411|-0.324381|45.662518|-0.300686|2423|45|PEM|0
+LFBG|08/26|45.661861|-0.324158|45.663662|-0.301008|1814|60|MAC|0
+LFBI|03/21|46.579601|0.300117|46.597900|0.315761|2350|45|ASP|0
+LFBK|06/24|48.533100|-2.867380|48.543400|-2.841840|2200|45|ASP|0
+LFBO|14L/32R|43.637402|1.357620|43.615601|1.380220|3000|45|ASP|0
+LFBO|14R/32L|43.644100|1.345930|43.618999|1.372100|3500|45|ASP|0
+LFBS|18/36|45.647099|5.879480|45.629002|5.880960|2020|45|ASP|0
+LFBT|02/20|43.166000|-0.012750|43.191299|0.000069|3000|45|ASP|0
+LFBU|10/28|45.730499|0.207131|45.728500|0.230214|1810|45|ASP|0
+LFBV|11/29|45.043999|1.472240|45.036201|1.496520|2100|45|asphalt|0
+LFCU|06/24|47.047901|2.611770|47.063499|2.651840|3503|45|ASP|0
+LFLA|18/36|47.857700|3.498210|47.842999|3.496100|1650|30|ASP|0
+LFLC|08/26|45.784801|3.150820|45.788601|3.189160|3013|45|ASP|0
+LFLD|06/24|47.056599|2.359880|47.063801|2.377330|1550|45|ASP|0
+LFLL|17L/35R|45.734901|5.091870|45.710999|5.094780|2670|45|ASP|0
+LFLL|17R/35L|45.746601|5.085940|45.710701|5.090300|4000|45|ASP|0
+LFLN|15L/33R|46.422001|4.007120|46.406502|4.021100|2030|45|CON|0
+LFLN|15R/33L|46.416500|4.007180|46.404999|4.017600|1500|30|CON|0
+LFLS|09/27|45.362999|5.309910|45.362900|5.348840|3050|45|ASP|0
+LFLV|01/19|46.159901|3.401720|46.179501|3.405750|2200|45|ASP|0
+LFLW|15/33|44.897900|2.416940|44.884998|2.427440|1700|30|ASP|0
+LFLY|16/34|45.735001|4.940930|45.719299|4.947610|1820|45|ASP|0
+LFLZ|15/33|45.086300|3.758240|45.074902|3.767160|1393|30|Paved|0
+LFLZ|15R/33L|45.083599|3.759090|45.077499|3.763680|940|80|Unpaved|0
+LFMC|09/27|43.384499|6.378570|43.384701|6.388490|800|30|ASP|0
+LFMC|13/31|43.388599|6.380470|43.380501|6.393670|1400|30|ASP|0
+LFMI|15/33|43.537800|4.913300|43.507801|4.934620|3750|60|ASP|0
+LFMN|04L/22R|43.651798|7.204040|43.669498|7.228510|2628|45|ASP|0
+LFMN|04R/22L|43.646702|7.202490|43.665600|7.228440|2963|45|ASP|0
+LFMQ|12/30|43.256802|5.777519|43.248466|5.792753|1545|30|ASP|0
+LFMV|17/35|43.915600|4.899560|43.898998|4.904080|1880|45|ASP|0
+LFMY|16/34|43.615700|5.104410|43.598801|5.113040|2001|45|CON|0
+LFOA|06/24|47.047901|2.611770|47.063499|2.651840|3503|45|ASP|0
+LFOC|10/28|48.059601|1.361340|48.056702|1.391910|2302|45|ASP|0
+LFOE|04/22|49.018299|1.206710|49.039001|1.233020|2995|45|ASP|0
+LFOK|10/28|48.779598|4.158410|48.772800|4.209930|3860|45|CON|0
+LFOJ|07/25|47.983898|1.745560|47.991501|1.775690|2404|45|ASP|0
+LFOP|04/22|49.379501|1.168450|49.390999|1.183940|1700|45|ASP|0
+LFOQ|12/30|47.681599|1.202310|47.675999|1.215860|1250|30|ASP|0
+LFOR|09/27|48.457165|1.514192|48.456787|1.525586|840|25|ASPH|0
+LFOT|02/20|47.421799|0.723408|47.442699|0.731800|2404|45|CON|0
+LFOU|03/21|47.076500|-0.880908|47.087799|-0.873217|1380|30|ASP|0
+LFOV|14/32|48.038506|-0.751112|48.026672|-0.737479|1662|30|ASP|0
+LFPB|03/21|48.948700|2.426860|48.970501|2.442150|2395|45|ASP|0
+LFPB|07/25|48.963799|2.420290|48.973999|2.458250|3000|45|PEM|0
+LFPB|09/27|48.963699|2.420400|48.965099|2.445630|1847|45|ASP|0
+LFPC|07/25|49.249001|2.504170|49.258099|2.534090|2399|50|CON|0
+LFPG|08H/26H|49.015769|2.558572|49.016089|2.564603|440|30|GRASS|0
+LFPG|08L/26R|48.995701|2.552740|48.998798|2.610180|4215|45|ASP|0
+LFPG|08R/26L|48.992901|2.565660|48.994900|2.602430|2700|60|CON|0
+LFPG|09L/27R|49.024700|2.524890|49.026699|2.561690|2700|60|ASP|0
+LFPG|09R/27L|49.020599|2.513060|49.023701|2.570290|4200|45|ASP|0
+LFPO|02/20|48.717499|2.376700|48.737999|2.386970|2400|60|CON|0
+LFPO|06/24|48.720001|2.316920|48.735500|2.360680|3650|45|ASP|0
+LFPO|07/25|48.719398|2.358590|48.727402|2.402070|3320|45|CON|0
+LFPV|09/27|48.774101|2.189280|48.774601|2.213930|1813|45|ASP|0
+LFRB|07L/25R|48.449799|-4.422420|48.451900|-4.413410|700|18|ASP|0
+LFRB|07R/25L|48.443401|-4.438350|48.452301|-4.398690|3100|45|ASP|0
+LFRC|10/28|49.652199|-1.486860|49.648102|-1.453660|2440|45|ASP|0
+LFRD|12/30|48.590500|-2.088880|48.584999|-2.071300|1435|45|ASP|0
+LFRD|17/35|48.598099|-2.082680|48.578602|-2.077560|2200|45|ASP|0
+LFRE|11/29|47.290100|-2.351840|47.287601|-2.339830|950|25|ASP|0
+LFRF|06/24|48.880501|-1.571490|48.884201|-1.559650|960|30|ASP|0
+LFRG|12/30|49.370499|0.138714|49.360100|0.169933|2550|45|ASP|0
+LFRH|02/20|47.756199|-3.441810|47.770599|-3.435610|1670|45|CON|0
+LFRH|07/25|47.756302|-3.459170|47.763000|-3.428730|2403|45|CON|0
+LFRI|10/28|46.703300|-1.388560|46.700600|-1.368690|1550|30|ASP|0
+LFRJ|07/25|48.526699|-4.169170|48.533600|-4.134170|2700|45|CON|0
+LFRK|12/30|49.181000|-0.466417|49.171101|-0.445169|1900|45|ASP|0
+LFRK|12L/30R|49.179722|-0.457825|49.175571|-0.448881|800|50|GRASS|0
+LFRL|05/23|48.278599|-4.450960|48.284901|-4.439210|1108|40|ASP|0
+LFRL|13/31|48.283901|-4.446270|48.280201|-4.439340|650|54|GRS|0
+LFRM|02/20|47.941898|0.197989|47.953800|0.204592|1420|30|ASP|0
+LFRN|10/28|48.073700|-1.746100|48.070202|-1.718390|2100|45|ASP|0
+LFRN|14/32|48.069901|-1.740500|48.063900|-1.733530|850|30|ASP|0
+LFRO|11/29|48.756599|-3.482710|48.751999|-3.460770|1700|45|ASP|0
+LFRQ|09/27|47.975700|-4.185340|47.974499|-4.156600|2150|45|ASP|0
+LFRS|03/21|47.141602|-1.619540|47.164799|-1.601900|2900|45|ASP|0
+LFRT|07/25|47.309101|-2.164430|47.315300|-2.133930|2400|45|ASP|0
+LFRU|04/22|48.597698|-3.822940|48.608799|-3.808830|1617|36|ASP|0
+LFSD|01/19|47.266302|5.082896|47.276722|5.087014|1200|23|ASP|0
+LFSD|17/35|47.276600|5.093590|47.255100|5.096370|2400|45|ASP|0
+LFSF|04/22|48.973400|6.240540|48.990799|6.262100|2500|45|ASP|0
+LFSH|03/21|48.790401|7.814320|48.798302|7.820840|995|18|ASP|0
+LFSH|03L/21R|48.791000|7.813160|48.798599|7.819510|963|80|Turf|0
+LFSK|01/19|48.102600|7.356890|48.116699|7.361020|1610|30|ASP|0
+LFSO|02/20|48.573002|5.949090|48.593399|5.959950|2401|45|CON|0
+LFSQ|04/22|47.777199|6.357160|47.793701|6.376220|2315|36|ASP|0
+LFSQ|11/29|47.791599|6.334540|47.783001|6.364410|2433|45|ASP|0
+LFQA|07/25|49.206699|4.149810|49.210899|4.164290|1150|30|ASP|0
+LFST|05/23|48.531200|7.616030|48.545399|7.640440|2400|45|ASP|0
+LFSX|08/26|47.485600|6.779460|47.488400|6.801610|1700|20|ASP|0
+LFYR|04L/22R|47.324797|1.693338|47.317681|1.683200|1100|100|GRASS|1
+LFYR|04R/22L|47.323500|1.693887|47.317354|1.685132|950|100|GRASS|1
+LFYD|12/30|48.590500|-2.088880|48.584999|-2.071300|1435|45|ASP|0
+LFYD|17/35|48.598099|-2.082680|48.578602|-2.077560|2200|45|ASP|0
+LFSR|07/25|49.313816|4.065809|49.306182|4.033637|2482|48|ASP|1
+LFPM|01/19|48.606098|2.670980|48.617500|2.674850|1300|30|ASP|0
+LFPM|10/28|48.606499|2.663290|48.602299|2.689290|1975|45|ASP|0
+LFOB|04/22|49.454601|2.113020|49.462101|2.123270|1105|30|ASP|0
+LFOB|12/30|49.458302|2.103850|49.446201|2.131740|2430|45|ASP|0
+LFQN|03/21|50.729778|2.234035|50.725222|2.230326|570|100|GRASS|1
+LFQN|09/27|50.727659|2.236399|50.727341|2.227961|595|20|ASP|1
+LFKS|18/36|41.936199|9.405060|41.912601|9.405640|2627|45|CON|0
+LFBA|11/29|44.177700|0.580428|44.170300|0.605494|2165|30|ASP|0
+LFBE|09/27|44.825298|0.504950|44.823799|0.532603|2205|45|ASP|0
+LFDN|12/30|45.896198|-0.997261|45.885101|-0.972519|2280|45|ASP|0
+LFBZ|09/27|43.468201|-1.537230|43.468498|-1.509420|2250|45|ASP|0
+LFSL|11/29|45.043999|1.472240|45.036201|1.496520|2100|45|asphalt|0
+LFJL|04/22|48.973400|6.240540|48.990799|6.262100|2500|45|ASP|0
+LFSB|07/25|47.587943|7.516868|47.591429|7.539109|1715|60|CON|0
+LFSB|15/33|47.617699|7.509862|47.585933|7.531962|3900|60|CON|0
+LFGA|01/19|48.102600|7.356890|48.116699|7.361020|1610|30|ASP|0
+LFSI|11/29|48.640301|4.884360|48.631802|4.914470|2412|45|ASP|0
+LFOH|04/22|49.526501|0.077586|49.541599|0.099325|2300|40|ASP|0
+LFOI|02/20|50.138302|1.828650|50.148701|1.835130|1250|23|CON|0
+LFMO|15/33|44.148899|4.859740|44.131302|4.877360|2411|60|CON|0
+LFLB|18/36|45.647099|5.879480|45.629002|5.880960|2020|45|ASP|0
+LFLP|04/22|45.923500|6.092160|45.935001|6.105340|1630|30|ASP|0
+LFLP|04R/22L|45.925535|6.096976|45.931488|6.103766|845|59|grass|0
+LFLO|02/20|46.049400|3.998230|46.062099|4.003560|1475|30|Paved|0
+LFHP|15/33|45.086300|3.758240|45.074902|3.767160|1393|30|Paved|0
+LFHP|15R/33L|45.083599|3.759090|45.077499|3.763680|940|80|Unpaved|0
+LFMT|12L/30R|43.586102|3.955730|43.572800|3.982220|2600|50|ASP|0
+LFMT|12R/30L|43.575802|3.951890|43.570202|3.963090|1100|30|ASP|0
+LFQQ|01/19|50.560101|3.085460|50.573799|3.091140|1580|30|ASP|0
+LFQQ|08/26|50.562901|3.083010|50.568501|3.122230|2825|45|ASP|0
+LFRZ|07/25|47.309101|-2.164430|47.315300|-2.133930|2400|45|ASP|0
+`;
+
+const otherAirportRunwaysByOaci = (() => {
+    const byOaci = new Map();
+
+    otherAirportRunwaysData
+        .trim()
+        .split('\n')
+        .forEach(line => {
+            const [
+                oaci,
+                ident,
+                leLatText,
+                leLonText,
+                heLatText,
+                heLonText,
+                lengthText,
+                widthText,
+                surface,
+                estimatedText
+            ] = line.split('|');
+
+            const runway = {
+                oaci: String(oaci || '').trim().toUpperCase(),
+                ident: String(ident || '').trim(),
+                leLat: Number(leLatText),
+                leLon: Number(leLonText),
+                heLat: Number(heLatText),
+                heLon: Number(heLonText),
+                lengthM: Number(lengthText),
+                widthM: Number(widthText),
+                surface: String(surface || '').trim(),
+                estimated: estimatedText === '1'
+            };
+
+            if (
+                !/^[A-Z]{4}$/.test(runway.oaci)
+                || !Number.isFinite(runway.leLat)
+                || !Number.isFinite(runway.leLon)
+                || !Number.isFinite(runway.heLat)
+                || !Number.isFinite(runway.heLon)
+                || !Number.isFinite(runway.lengthM)
+                || runway.lengthM <= 0
+            ) return;
+
+            if (!byOaci.has(runway.oaci)) byOaci.set(runway.oaci, []);
+            byOaci.get(runway.oaci).push(runway);
+        });
+
+    return byOaci;
+})();
+
+const runwayCoverageMissingAirportCodes = [...pelicanAirports, ...otherAirports]
+    .map(airport => airport.oaci)
+    .filter(oaci => (
+        !declaredPelicanRunwaysByOaci.has(oaci)
+        && !otherAirportRunwaysByOaci.has(oaci)
+    ));
+
+if (runwayCoverageMissingAirportCodes.length) {
+    console.warn(
+        '[NPF v14.78] Aéroports sélectionnables sans piste :',
+        runwayCoverageMissingAirportCodes.join(', ')
+    );
+}
 
 const NPF_RUNWAY_MIN_ZOOM = 12; // Échelle cartographique NPF d'environ 1 NM.
 
@@ -14614,7 +14832,11 @@ function updateBaseLabels() {
         deroutFuelMiniPelicLabel.textContent = `Fuel mini 1 Lrg / Pélic (${pelicCode}) :`;
     }
 }
-function refreshUI() { drawPermanentAirportMarkers(); if (currentCommune) displayCommuneDetails(currentCommune, false); }
+function refreshUI() {
+    drawPermanentAirportMarkers();
+    drawNpfRunwayMapLayer();
+    if (currentCommune) displayCommuneDetails(currentCommune, false);
+}
 
 function initAirportPdfDB() {
     return new Promise((resolve, reject) => {
@@ -14952,7 +15174,7 @@ function drawNpfRunwayMapLayer() {
     npfRunwayMapLayer.clearLayers();
 
     /*
-     * v14.77 — les pistes deviennent visibles uniquement à partir du niveau
+     * v14.78 — toutes les pistes concernées restent visibles à partir du niveau
      * 1 NM de la carte NPF, correspondant au zoom Leaflet 12 déjà utilisé
      * pour les routes nationales et départementales.
      */
@@ -14998,6 +15220,20 @@ function drawNpfRunwayMapLayer() {
 
     /* Pistes des 27 pélicandromes permanents ajoutées en v14.77. */
     drawRunwayCollection(declaredPelicanRunwaysByOaci);
+
+    /*
+     * v14.78 — seuls les terrains de `otherAirports` actuellement déclarés
+     * PÉLIC dans le stockage local sont ajoutés. Une désélection retire donc
+     * immédiatement leur piste de la carte, sans modifier les 340 pistes
+     * complémentaires ni les 27 pélicandromes permanents.
+     */
+    customPelicanAirports.forEach(oaci => {
+        const runways = otherAirportRunwaysByOaci.get(
+            String(oaci || '').trim().toUpperCase()
+        );
+        if (!runways || !runways.length) return;
+        drawRunwayCollection(new Map([[oaci, runways]]));
+    });
 }
 
 
