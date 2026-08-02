@@ -1,4 +1,101 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.79 — PISTES TOUJOURS VISIBLES, REPÈRES PÉLICANDROMES CORRIGÉS ET VECTEUR PAR TRANCHES DE 50 KT
+Date : 02/08/2026
+Base : TEST v14.78
+
+PROBLÈMES SIGNALÉS
+- Malgré l’ajout des données en v14.78, les pistes de `LFBT`, `LFBO`, `LFBF`, `LFMQ`, `LFMN` et d’autres terrains restaient absentes de la carte.
+- Les ronds / symboles de 21 pélicandromes permanents devaient être repositionnés sur les coordonnées opérationnelles transmises par l’utilisateur.
+- Le vecteur vitesse SafeSky devait afficher un trait de 0 à 50 kt, puis un trait supplémentaire par tranche de 50 kt.
+
+CAUSE CONFIRMÉE POUR LES PISTES
+- La v14.78 contenait bien 131 géométries couvrant les 97 entrées de `otherAirports`.
+- Cependant, `drawNpfRunwayMapLayer()` ne dessinait ces pistes que si le code OACI était déjà présent dans `customPelicanAirports`.
+- Les pistes restaient donc invisibles dans l’état normal du rond cliquable, même si leurs données étaient correctement embarquées.
+- Le contrôle v14.78 vérifiait la présence des données mais pas leur rendu systématique ; le diagnostic précédent était donc incomplet.
+
+CORRECTIONS APPLIQUÉES — PISTES
+- Suppression du filtre de rendu par `customPelicanAirports`.
+- Les 131 pistes des 97 terrains de `otherAirports` sont désormais toujours dessinées à partir du zoom 12 / niveau 1 NM.
+- `LFBT`, `LFBO`, `LFBF`, `LFMQ`, `LFMN`, `LFMT` et tous les autres terrains sélectionnables comme PÉLIC apparaissent avec leur(s) piste(s), que leur statut PÉLIC soit actif ou non.
+- Les 38 pistes des 27 pélicandromes permanents et les 340 pistes complémentaires sont conservées.
+- Total maximal affichable à partir du zoom 12 : 509 tracés locaux.
+- Le rond / symbole cliquable reste au-dessus des pistes et conserve son comportement opérationnel.
+- Le statut PÉLIC continue à commander les fonctions EAU/RETARDANT, Activer/Désactiver et la sélection opérationnelle, mais ne conditionne plus l’affichage cartographique des pistes.
+
+REPOSITIONNEMENT DES 21 PÉLICANDROMES
+- Ajaccio `LFKJ` : 41°55'16.69"N / 8°48'12.67"E.
+- Bordeaux `LFBD` : 44°49'16.39"N / 0°42'39.18"O.
+- Bastia `LFKB` : 42°33'9.41"N / 9°28'49.06"E.
+- Béziers `LFMU` : 43°19'18.82"N / 3°21'6.36"E.
+- Cahors `LFCC` : 44°20'59.95"N / 1°28'32.80"E.
+- Calvi `LFKC` : 42°31'15.38"N / 8°47'29.90"E.
+- Cannes `LFMD` : 43°33'17.06"N / 6°57'3.72"E.
+- Carcassonne `LFMK` : 43°12'49.05"N / 2°18'55.81"E.
+- Châteauroux `LFLX` : 46°51'5.97"N / 1°42'55.60"E.
+- Épinal `LFSG` : 48°19'19.62"N / 6°3'50.61"E.
+- Figari `LFKF` : 41°30'8.88"N / 9°5'39.28"E.
+- Hyères `LFTH` : 43°5'59.68"N / 6°8'24.76"E.
+- Limoges `LFBL` : 45°51'36.61"N / 1°10'37.46"E.
+- Marseille `LFML` : 43°25'58.29"N / 5°12'24.98"E.
+- Mont-de-Marsan `LFBM` : 43°54'37.03"N / 0°30'18.71"O.
+- Nîmes `LFTW` : 43°44'58.23"N / 4°24'46.62"E.
+- Pau `LFBP` : 43°22'59.86"N / 0°25'5.83"O.
+- Perpignan `LFMP` : 42°44'10.45"N / 2°52'27.60"E.
+- Saint-Étienne `LFMH` : 45°31'50.77"N / 4°17'43.82"E.
+- Valence `LFLU` : 44°54'44.92"N / 4°57'56.81"E.
+- Vannes `LFRV` : 47°43'10.98"N / 2°43'28.24"O.
+- Les coordonnées ont été converties en degrés décimaux et appliquées uniquement au repère cliquable de `pelicanAirports`.
+- Les coordonnées de seuil et les dimensions des pistes ne sont pas déplacées.
+- Les six autres pélicandromes permanents non cités conservent leurs coordonnées précédentes.
+
+VECTEUR VITESSE DES TRAFICS
+- Remplacement de la longueur continue proportionnelle par un nombre discret de traits.
+- 0 à 50 kt inclus : 1 trait.
+- Plus de 50 à 100 kt : 2 traits.
+- Plus de 100 à 150 kt : 3 traits.
+- Puis un trait supplémentaire par tranche de 50 kt.
+- Exemples contrôlés : 180 kt = 4 traits ; 260 kt = 6 traits ; 750 kt = 15 traits.
+- La courbure liée au taux de virage SafeSky, la couleur selon l’altitude relative et l’orientation selon la route sont conservées.
+- Le canevas SVG a été agrandi pour éviter de couper les vecteurs comportant de nombreux traits.
+
+ÉLÉMENTS INCHANGÉS
+- Apparition des pistes uniquement à partir du zoom 12 / niveau 1 NM.
+- Ronds des aéroports, zones tactiles, popups et boutons existants.
+- Fond jaune des étiquettes des avions appartenant à la liste suivie.
+- Déplacement continu des trafics SafeSky et rafraîchissement de 5 secondes.
+- Cartes Offline, bases IndexedDB, démarrage PWA et mise à jour atomique.
+
+AUDIT ET CONTRÔLES TECHNIQUES
+- 27/27 codes de `pelicanAirports` couverts par 38 pistes.
+- 97/97 codes de `otherAirports` couverts par 131 pistes.
+- Couverture totale des aéroports sélectionnables comme pélicandromes : 124/124.
+- Vérification spécifique du rendu inconditionnel de `otherAirportRunwaysByOaci` dans `drawNpfRunwayMapLayer()`.
+- Vérification spécifique : `LFBO` = 2 pistes, `LFBT` = 1, `LFBF` = 1, `LFMQ` = 1, `LFMN` = 2, `LFMT` = 2.
+- Vérification des 21 conversions DMS vers degrés décimaux et de leur injection dans `pelicanAirports`.
+- Vérification des seuils de vecteur : 0, 50, 51, 100, 101, 180, 260 et 750 kt.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index/script/manifest/service worker alignées sur v14.79.
+- Cache service worker distinct : `sw-v14-79_runways_icons_speed_segments`.
+
+VÉRIFICATION DE L’UTILISATION HORS LIGNE
+- Toutes les géométries de pistes restent directement embarquées dans `script.js`.
+- Les 21 nouvelles positions sont également intégrées dans `script.js` et ne nécessitent aucune requête réseau.
+- Le calcul du vecteur vitesse est entièrement local.
+- Aucune nouvelle URL, API, bibliothèque ou ressource distante n’a été ajoutée.
+- Comparaison de `sw.js` avec la v14.78 : seules les lignes `SW_VERSION` et `APP_VERSION` changent ; le moteur Offline est inchangé.
+- Le cache du shell continue d’inclure `index.html`, `style.css`, `script.js`, `manifest.json`, Leaflet, SunCalc et JSZip.
+- Les noms des bases IndexedDB, les clés de configuration et la gestion des packs de cartes Offline sont inchangés.
+- Conclusion du contrôle statique : la v14.79 conserve le fonctionnement hors ligne de la v14.78. Le contrôle réel final reste à effectuer dans la PWA après mise en ligne, puis réseau coupé.
+
+- Journal cumulatif v14.78 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.78 — PISTES DE TOUS LES AÉROPORTS DÉCLARÉS PÉLICANDROMES
 Date : 02/08/2026
 Base : TEST v14.77
