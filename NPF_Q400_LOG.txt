@@ -1,3 +1,34 @@
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.73 — ICÔNES DES AÉROPORTS SÉLECTIONNABLES COMME PÉLICANDROME LÉGÈREMENT AGRANDIES
+Date : 02/08/2026
+Base : TEST v14.72 validée
+
+MODIFICATION DEMANDÉE
+- Augmenter légèrement la taille des symboles des aéroports susceptibles d’être sélectionnés comme pélicandrome.
+- Le symbole concerné est le point noir central entouré d’un cercle blanc puis d’un liseré noir.
+
+CORRECTION APPLIQUÉE
+- Rayon du cercle extérieur : 5 px → 6 px.
+- Rayon du point noir central : 3 px → 3,5 px.
+- Agrandissement visuel d’environ 20 %, sans rendre le symbole disproportionné.
+- Zone tactile transparente conservée à 10 px de rayon : aucun changement de comportement au clic.
+
+ÉLÉMENTS INCHANGÉS
+- Les 323 aérodromes informatifs ajoutés en v14.71 restent de simples points noirs.
+- Les pélicandromes déjà activés conservent leurs icônes opérationnelles avion/eau/indisponible.
+- Déplacement continu des trafics SafeSky v14.72 inchangé.
+- Cartes Offline, démarrage PWA et mise à jour atomique inchangés.
+
+CONTRÔLES
+- Modification limitée au rendu des aérodromes de la liste « PÉLIC possible ».
+- Cohérence des versions index/script/manifest/service worker : v14.73.
+- Cache service worker distinct : sw-v14-73_larger_selectable_airport_icons.
+- Journal cumulatif précédent conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 ============================================================
 VERSION TEST v14.72 — DÉPLACEMENT CONTINU DES TRAFICS SAFESKY
 ============================================================
