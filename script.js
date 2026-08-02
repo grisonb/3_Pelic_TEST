@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.72';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.73';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -567,7 +567,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.72';
+    './data/localites/localites-france-v14.56.zip?appv=v14.73';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -14304,9 +14304,13 @@ function drawPermanentAirportMarkers() {
          * - un cercle blanc ;
          * - un point noir central ;
          * - un cercle transparent séparé pour conserver une grande zone tactile.
+         *
+         * v14.73 TEST — symbole légèrement agrandi pour mieux distinguer les
+         * aérodromes pouvant être sélectionnés comme pélicandrome. La zone
+         * tactile transparente reste volontairement inchangée.
          */
         L.circleMarker([airport.lat, airport.lon], {
-            radius: 5,
+            radius: 6,
             color: '#111111',
             weight: 1,
             fillColor: '#ffffff',
@@ -14315,7 +14319,7 @@ function drawPermanentAirportMarkers() {
         }).addTo(permanentAirportLayer);
 
         L.circleMarker([airport.lat, airport.lon], {
-            radius: 3,
+            radius: 3.5,
             color: '#ffffff',
             weight: 1,
             fillColor: '#111111',
@@ -18635,7 +18639,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.72'
+                        window.APP_VERSION || 'v14.73'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
