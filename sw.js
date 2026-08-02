@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-71_all_aerodromes_black_points';
-const APP_VERSION = 'v14.71';
+const SW_VERSION = 'sw-v14-72_continuous_traffic_motion';
+const APP_VERSION = 'v14.72';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
