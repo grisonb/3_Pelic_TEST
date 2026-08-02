@@ -1,4 +1,4 @@
-/* v14.69 TEST — styles identiques à v14.67. */
+/* v14.75 TEST — pistes à l’échelle et étiquettes jaunes des trafics suivis. */
 /* NPF-Q400 TEST v13.58 — fluidité carte iPad : CSS inchangé depuis v13.54. */
  :root {
     --primary-color: #005a9c;
@@ -12200,3 +12200,29 @@ body.gaar-point-search-open .gaar-editing-banner {
    v14.57 TEST — liste suivie sans plafond et fermeture de la fiche trafic
    Aucun changement visuel : les comportements sont gérés en JavaScript.
    ========================================================================= */
+
+
+/* ==========================================================================
+   v14.75 TEST — pistes à l'échelle et étiquettes jaunes des trafics suivis
+   ========================================================================== */
+
+.additional-aerodrome-runway-details {
+    margin-top: 6px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+/*
+ * Seuls les aéronefs présents dans la liste suivie reçoivent ce fond jaune.
+ * La bordure continue d'indiquer l'écart d'altitude relatif.
+ */
+.traffic-aircraft-symbol-wrap.traffic-aircraft-tracked
+.traffic-aircraft-altitude-label {
+    background: #ffeb3b !important;
+    color: #111827 !important;
+    box-shadow:
+        0 1px 3px rgba(15, 23, 42, .38),
+        0 0 0 1px rgba(255, 255, 255, .78) !important;
+}
