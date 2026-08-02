@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.78';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.79';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -963,8 +963,15 @@ const CHAT_PUSH_API_URL = 'https://grisonb.synology.me:8443';
 const CHAT_PUSH_VAPID_PUBLIC_KEY = 'BAB6UkrM0OzfJPCKYux_BdLfQJbMo7qKoXPhIoTB99J93yCS69c5qk2VWYBz0aftsKwdpVrVm0JMmkdwrNRfBpY';
 let mqttLoaderPromise = null;
 
+/*
+ * v14.79 TEST — repositionnement des repères des pélicandromes permanents.
+ *
+ * Les coordonnées ci-dessous ont été relevées et transmises par l’utilisateur
+ * pour placer le rond / symbole cliquable au point opérationnel souhaité.
+ * Elles ne modifient pas les seuils ni la géométrie des pistes.
+ */
 const pelicanAirports = [
-    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.920, lon: 4.968 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.323, lon: 3.354 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.861, lon: 1.720 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.894, lon: -0.509 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.862, lon: 1.180 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.380, lon: -0.418 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.097, lon: 6.146 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.325, lon: 6.068 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.530, lon: 8.793 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.542, lon: 6.956 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.552, lon: 9.483 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.541, lon: 4.296 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.500, lon: 9.097 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.351, lon: 1.475 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.436, lon: 5.215 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.923, lon: 8.802 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.215, lon: 2.306 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.720, lon: -2.721 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.757, lon: 4.416 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.740, lon: 2.870 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.828, lon: -0.691 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }, { oaci: "LFSJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }
+    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.91247778, lon: 4.96578056 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.32189444, lon: 3.35176667 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.85165833, lon: 1.71544444 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.91028611, lon: -0.50519722 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.86016944, lon: 1.17707222 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.38329444, lon: -0.41828611 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.09991111, lon: 6.14021111 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.32211667, lon: 6.06405833 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.52093889, lon: 8.79163889 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.55473889, lon: 6.95103333 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.55261389, lon: 9.48029444 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.53076944, lon: 4.29550556 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.50246667, lon: 9.09424444 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.34998611, lon: 1.47577778 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.43285833, lon: 5.20693889 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.92130278, lon: 8.80351944 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.21362500, lon: 2.31550278 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.71971667, lon: -2.72451111 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.74950833, lon: 4.41295000 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.73623611, lon: 2.87433333 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.82121944, lon: -0.71088333 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }, { oaci: "LFSJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }
 ];
 
 
@@ -2211,7 +2218,7 @@ const runwayCoverageMissingAirportCodes = [...pelicanAirports, ...otherAirports]
 
 if (runwayCoverageMissingAirportCodes.length) {
     console.warn(
-        '[NPF v14.78] Aéroports sélectionnables sans piste :',
+        '[NPF v14.79] Aéroports sélectionnables sans piste :',
         runwayCoverageMissingAirportCodes.join(', ')
     );
 }
@@ -12453,38 +12460,48 @@ function getTrafficVerticalTrend(aircraft) {
     };
 }
 
-const TRAFFIC_VECTOR_MIN_LENGTH_PX = 12;
-const TRAFFIC_VECTOR_MAX_LENGTH_PX = 92;
-const TRAFFIC_VECTOR_BASE_LENGTH_PX = 10;
-const TRAFFIC_VECTOR_PX_PER_KNOT = 0.20;
+/*
+ * v14.79 — vecteur vitesse par traits de 50 kt.
+ * 0 à 50 kt : 1 trait ; puis un trait supplémentaire par tranche de 50 kt.
+ */
+const TRAFFIC_VECTOR_SPEED_STEP_KT = 50;
+const TRAFFIC_VECTOR_SEGMENT_LENGTH_PX = 8;
+const TRAFFIC_VECTOR_SEGMENT_GAP_PX = 5;
+const TRAFFIC_VECTOR_MAX_SEGMENTS = 20;
+const TRAFFIC_VECTOR_CANVAS_CENTER_PX = 280;
+const TRAFFIC_VECTOR_CANVAS_SIZE_PX = 560;
 
-function getTrafficSpeedVectorLengthPx(aircraft) {
-    const speedKnots = Number(aircraft?.groundSpeedKnots);
+function getTrafficSpeedVectorSegmentCount(aircraft) {
+    const rawSpeedKnots = aircraft?.groundSpeedKnots;
 
-    if (!Number.isFinite(speedKnots) || speedKnots < 1) {
+    if (
+        rawSpeedKnots === null
+        || rawSpeedKnots === undefined
+        || rawSpeedKnots === ''
+    ) {
         return 0;
     }
 
-    /*
-     * Longueur purement visuelle et proportionnelle à la vitesse sol :
-     *  30 kt ≈ 16 px
-     * 100 kt ≈ 30 px
-     * 200 kt ≈ 50 px
-     * 300 kt ≈ 70 px
-     * 410 kt et plus = 92 px maximum
-     */
-    const calculatedLength = (
-        TRAFFIC_VECTOR_BASE_LENGTH_PX
-        + speedKnots * TRAFFIC_VECTOR_PX_PER_KNOT
-    );
+    const speedKnots = Number(rawSpeedKnots);
+    if (!Number.isFinite(speedKnots)) return 0;
 
-    return Math.round(Math.max(
-        TRAFFIC_VECTOR_MIN_LENGTH_PX,
+    return Math.max(
+        1,
         Math.min(
-            TRAFFIC_VECTOR_MAX_LENGTH_PX,
-            calculatedLength
+            TRAFFIC_VECTOR_MAX_SEGMENTS,
+            Math.ceil(Math.max(0, speedKnots) / TRAFFIC_VECTOR_SPEED_STEP_KT)
         )
-    ));
+    );
+}
+
+function getTrafficSpeedVectorLengthPx(aircraft) {
+    const segmentCount = getTrafficSpeedVectorSegmentCount(aircraft);
+    if (!segmentCount) return 0;
+
+    return (
+        segmentCount * TRAFFIC_VECTOR_SEGMENT_LENGTH_PX
+        + (segmentCount - 1) * TRAFFIC_VECTOR_SEGMENT_GAP_PX
+    );
 }
 
 
@@ -12495,7 +12512,7 @@ function buildTrafficCurvedVectorPath(
     vectorLengthPx,
     turnRateDegPerSec
 ) {
-    const canvasCenter = 110;
+    const canvasCenter = TRAFFIC_VECTOR_CANVAS_CENTER_PX;
     const length = Math.max(
         0,
         Number(vectorLengthPx) || 0
@@ -12541,7 +12558,8 @@ function buildTrafficVectorHtml(
     track,
     vectorLengthPx
 ) {
-    if (vectorLengthPx <= 0) return '';
+    const segmentCount = getTrafficSpeedVectorSegmentCount(aircraft);
+    if (vectorLengthPx <= 0 || segmentCount <= 0) return '';
 
     const path = buildTrafficCurvedVectorPath(
         vectorLengthPx,
@@ -12550,14 +12568,20 @@ function buildTrafficVectorHtml(
 
     if (!path) return '';
 
+    /*
+     * `pathLength` calibre exactement le motif 8 px / 5 px : la longueur
+     * calculée se termine après le dernier trait, sans demi-segment final.
+     */
     return `
         <span class="traffic-aircraft-vector-wrap"
+              data-speed-segments="${segmentCount}"
               style="transform: rotate(${track}deg);">
             <svg class="traffic-speed-vector-svg"
-                 viewBox="0 0 220 220"
+                 viewBox="0 0 ${TRAFFIC_VECTOR_CANVAS_SIZE_PX} ${TRAFFIC_VECTOR_CANVAS_SIZE_PX}"
                  aria-hidden="true"
                  focusable="false">
                 <path class="traffic-speed-vector-path"
+                      pathLength="${vectorLengthPx}"
                       d="${path}"></path>
             </svg>
         </span>
@@ -15222,18 +15246,17 @@ function drawNpfRunwayMapLayer() {
     drawRunwayCollection(declaredPelicanRunwaysByOaci);
 
     /*
-     * v14.78 — seuls les terrains de `otherAirports` actuellement déclarés
-     * PÉLIC dans le stockage local sont ajoutés. Une désélection retire donc
-     * immédiatement leur piste de la carte, sans modifier les 340 pistes
-     * complémentaires ni les 27 pélicandromes permanents.
+     * v14.79 — les pistes des 97 terrains de `otherAirports` sont toujours
+     * intégrées au fond cartographique à partir du zoom 1 NM. La v14.78 les
+     * filtrait à tort avec `customPelicanAirports`, ce qui rendait invisibles
+     * LFBO, LFBT, LFBF, LFMQ, LFMN et les autres terrains tant qu’ils
+     * n’étaient pas activés manuellement comme PÉLIC dans le stockage local.
+     *
+     * Le statut PÉLIC continue uniquement à modifier le rond / symbole et les
+     * fonctions opérationnelles ; il ne conditionne plus la présence de la
+     * géométrie de piste sur la carte.
      */
-    customPelicanAirports.forEach(oaci => {
-        const runways = otherAirportRunwaysByOaci.get(
-            String(oaci || '').trim().toUpperCase()
-        );
-        if (!runways || !runways.length) return;
-        drawRunwayCollection(new Map([[oaci, runways]]));
-    });
+    drawRunwayCollection(otherAirportRunwaysByOaci);
 }
 
 
