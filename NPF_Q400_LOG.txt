@@ -1,4 +1,58 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.76 — PISTES INTÉGRÉES À LA CARTE ET RONDS D’AÉROPORT RESTAURÉS
+Date : 02/08/2026
+Base : TEST v14.75
+
+MODIFICATION DEMANDÉE
+- Revenir au rendu précédent des aéroports avec leurs symboles ronds.
+- Conserver les pistes, mais les intégrer à la carte NPF au lieu de les utiliser comme symboles d’aéroport.
+
+CORRECTIONS APPLIQUÉES
+- Restauration exacte du rendu v14.74 des 323 aérodromes complémentaires : petit point rond noir et zone tactile ronde invisible.
+- Restauration de leur popup simple avec uniquement le code OACI et le nom.
+- Les pistes ne remplacent plus aucun symbole d’aéroport.
+- Création d’une couche cartographique indépendante `npfRunwayMapLayer` placée sous les marqueurs d’aéroport.
+- Création d’un pane Leaflet dédié `npfRunwaysPane`, non interactif, afin que les pistes fassent partie du fond cartographique NPF sans intercepter les clics.
+- Les 340 pistes déjà intégrées en v14.75 sont conservées, avec leur orientation et leur longueur géographiques réelles.
+- Les pistes sont dessinées une seule fois au démarrage et ne sont plus effacées ou redessinées lors d’un changement de base, de pélicandrome ou d’état d’aéroport.
+- Les étiquettes jaunes des avions appartenant à la liste SafeSky suivie, ajoutées en v14.75, sont conservées sans modification.
+
+ÉLÉMENTS INCHANGÉS
+- Données et géométrie des 340 pistes de la v14.75.
+- Symboles et fonctions opérationnelles des pélicandromes, bases et aérodromes sélectionnables.
+- Popups, boutons BASE/PÉLIC/EAU/RETARDANT, PDF et Go To des aérodromes opérationnels.
+- Liste permanente des 23 indicatifs SafeSky suivis.
+- Filtres SafeSky, déplacement continu des trafics et rafraîchissement de 5 secondes.
+- Cartes Offline, démarrage PWA et mécanisme de mise à jour atomique.
+
+CONTRÔLES
+- 323 aérodromes complémentaires retrouvés sous forme de points ronds noirs.
+- 340 pistes réparties sur 261 aérodromes conservées dans la couche cartographique NPF.
+- Absence de piste interactive : les clics restent réservés aux ronds d’aéroport et aux autres fonctions de la carte.
+- Vérification que `drawPermanentAirportMarkers()` ne dessine plus aucune piste.
+- Vérification que `drawNpfRunwayMapLayer()` est appelée une seule fois à l’initialisation.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index/script/manifest/service worker alignées sur v14.76.
+- Cache service worker distinct : `sw-v14-76_runways_map_airport_circles`.
+
+VÉRIFICATION DE L’UTILISATION HORS LIGNE
+- Les données des pistes restent directement embarquées dans `script.js` ; aucun fichier ou appel réseau supplémentaire n’est introduit.
+- La couche `npfRunwayMapLayer` est construite exclusivement à partir de ces données locales.
+- Comparaison de `sw.js` avec la v14.75 : moteur Offline, ressources du shell, bases IndexedDB, réglages et stratégie de repli inchangés ; seuls `SW_VERSION` et `APP_VERSION` sont incrémentés.
+- Le cache applicatif continue d’inclure `index.html`, `style.css`, `script.js`, `manifest.json`, Leaflet, SunCalc, JSZip et les ressources métier déjà prévues.
+- Aucune URL de ressource supplémentaire n’est ajoutée dans `script.js`, `index.html`, `manifest.json` ou `sw.js`.
+- Les versions des quatre fichiers sensibles sont cohérentes en v14.76, permettant leur validation et leur installation atomique dans le nouveau cache.
+- Les bases de cartes Offline, leurs noms IndexedDB et leurs clés de configuration restent inchangés.
+- Conclusion du contrôle statique : la v14.76 conserve les capacités hors ligne de la v14.75. Le contrôle réel final reste à effectuer dans Safari/PWA après mise en ligne, puis en coupant complètement le réseau.
+
+- Journal cumulatif v14.75 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.75 — PISTES À L’ÉCHELLE ET ÉTIQUETTES JAUNES DES TRAFICS SUIVIS
 Date : 02/08/2026
 Base : TEST v14.74
