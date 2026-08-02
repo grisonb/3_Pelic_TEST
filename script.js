@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.75';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.76';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -555,7 +555,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // v14.44 TEST — filtre trafics au sol et zone centrée sur la carte.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null, selectedAirportDestination = null;
-let additionalAerodromeRunwayRenderer = null;
+let npfRunwayMapLayer = null;
+let npfRunwayRenderer = null;
 let communeAliases = [];
 let communesByCodeInsee = new Map();
 
@@ -568,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.75';
+    './data/localites/localites-france-v14.56.zip?appv=v14.76';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -1483,12 +1484,13 @@ const additionalAerodromes = piafMetropolitanAerodromesData
 
 
 /*
- * v14.75 TEST — pistes des aérodromes complémentaires à leur longueur réelle.
+ * v14.76 TEST — pistes intégrées à la carte NPF, indépendamment des symboles.
  *
- * Les extrémités géographiques sont intégrées dans l'application afin que
- * Leaflet affiche chaque piste selon sa vraie orientation et sa vraie longueur
- * à tous les niveaux de zoom. Seules les pistes sont dessinées : aucun taxiway,
- * parking ou bâtiment n'est ajouté.
+ * Les données de la v14.75 restent entièrement embarquées dans script.js.
+ * Les extrémités géographiques permettent à Leaflet d'afficher chaque piste
+ * selon sa vraie orientation et sa vraie longueur à tous les niveaux de zoom.
+ * Les pistes constituent désormais une couche cartographique non interactive,
+ * placée sous les ronds d'aérodrome restaurés depuis la v14.74.
  *
  * Format :
  * OACI|QFU|lat1|lon1|lat2|lon2|longueur_m|largeur_m|surface|géométrie_estimée
@@ -4442,9 +4444,20 @@ function initMap() {
         const trafficPane = map.getPane('trafficPane');
         if (trafficPane) trafficPane.style.zIndex = '690';
     }
+    if (map.createPane && !map.getPane('npfRunwaysPane')) {
+        map.createPane('npfRunwaysPane');
+        const runwayPane = map.getPane('npfRunwaysPane');
+        if (runwayPane) {
+            runwayPane.style.zIndex = '390';
+            runwayPane.style.pointerEvents = 'none';
+        }
+    }
     highVoltageLinesRenderer = L.canvas ? L.canvas({ padding: 0.35 }) : null;
-    additionalAerodromeRunwayRenderer = L.canvas
-        ? L.canvas({ padding: 0.35 })
+    npfRunwayRenderer = L.canvas
+        ? L.canvas({
+            padding: 0.35,
+            pane: 'npfRunwaysPane'
+        })
         : null;
 
     /*
@@ -4466,6 +4479,7 @@ function initMap() {
         : null;
 
     setupBaseTileLayer();
+    npfRunwayMapLayer = L.layerGroup().addTo(map);
     permanentAirportLayer = L.layerGroup().addTo(map);
     routesLayer = L.layerGroup().addTo(map);
     fireHistoryLayer = L.layerGroup().addTo(map);
@@ -4489,6 +4503,7 @@ function initMap() {
     trafficAdvisoryLayer.addTo(trafficLayer);
     communesLayerGroup = L.layerGroup();
     communesLabelsLayer = L.layerGroup();
+    drawNpfRunwayMapLayer();
     drawPermanentAirportMarkers();
     drawFireHistoryMarkers();
     redrawGaarCircuits();
@@ -14825,96 +14840,48 @@ window.goToAirportDestinationByOaci = goToAirportDestinationByOaci;
 
 
 
-function buildAdditionalAerodromePopupHtml(airport, runways = []) {
-    const runwayDetails = runways
-        .map(runway => {
-            const ident = runway.ident
-                ? `${escapeHtml(runway.ident)} · `
-                : '';
-            return `${ident}${Math.round(runway.lengthM)} m`;
-        })
-        .join('<br>');
+function drawNpfRunwayMapLayer() {
+    if (!npfRunwayMapLayer) return;
+    npfRunwayMapLayer.clearLayers();
 
-    return `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}${runwayDetails ? `<div class="additional-aerodrome-runway-details">${runwayDetails}</div>` : ''}</div>`;
-}
+    /*
+     * v14.76 — les pistes appartiennent à la carte NPF et non aux marqueurs.
+     * Elles ne sont ni cliquables ni effacées lorsque l'état d'un aéroport,
+     * d'une base ou d'un pélicandrome provoque le redessin des symboles.
+     */
+    additionalAerodromeRunwaysByOaci.forEach(runways => {
+        runways.forEach(runway => {
+            const endpoints = [
+                [runway.leLat, runway.leLon],
+                [runway.heLat, runway.heLon]
+            ];
 
-function drawAdditionalAerodromeRunways(airport) {
-    const runways = getAdditionalAerodromeRunways(airport.oaci);
-    const popupHtml = buildAdditionalAerodromePopupHtml(airport, runways);
+            /* Fin entourage blanc pour garder le trait lisible sur toute carte. */
+            L.polyline(endpoints, {
+                color: '#ffffff',
+                weight: 5,
+                opacity: 0.96,
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                interactive: false,
+                pane: 'npfRunwaysPane',
+                renderer: npfRunwayRenderer || undefined
+            }).addTo(npfRunwayMapLayer);
 
-    if (!runways.length) {
-        /*
-         * Source sans géométrie exploitable : le point historique reste visible
-         * uniquement pour ne pas faire disparaître l'aérodrome de la carte.
-         */
-        L.circleMarker([airport.lat, airport.lon], {
-            radius: 2.7,
-            stroke: false,
-            fillColor: '#111111',
-            fillOpacity: 1,
-            interactive: false,
-            renderer: additionalAerodromeRunwayRenderer || undefined
-        }).addTo(permanentAirportLayer);
-
-        L.circleMarker([airport.lat, airport.lon], {
-            radius: 10,
-            stroke: false,
-            fillColor: 'transparent',
-            fillOpacity: 0,
-            opacity: 0,
-            renderer: additionalAerodromeRunwayRenderer || undefined
-        })
-            .bindPopup(popupHtml, { maxWidth: 280 })
-            .addTo(permanentAirportLayer);
-        return;
-    }
-
-    runways.forEach(runway => {
-        const endpoints = [
-            [runway.leLat, runway.leLon],
-            [runway.heLat, runway.heLon]
-        ];
-
-        /*
-         * Deux traits superposés donnent une piste nette sur tous les fonds.
-         * La longueur reste strictement géographique : aucun minimum en pixels
-         * n'est imposé, donc les pistes sont réellement à l'échelle.
-         */
-        L.polyline(endpoints, {
-            color: '#ffffff',
-            weight: 5,
-            opacity: 0.96,
-            lineCap: 'butt',
-            lineJoin: 'miter',
-            interactive: false,
-            renderer: additionalAerodromeRunwayRenderer || undefined
-        }).addTo(permanentAirportLayer);
-
-        L.polyline(endpoints, {
-            color: '#111111',
-            weight: 2.4,
-            opacity: 1,
-            lineCap: 'butt',
-            lineJoin: 'miter',
-            interactive: false,
-            renderer: additionalAerodromeRunwayRenderer || undefined
-        }).addTo(permanentAirportLayer);
-
-        /*
-         * Zone tactile invisible plus large que le trait visible, utile sur iPad.
-         */
-        L.polyline(endpoints, {
-            color: '#000000',
-            weight: 18,
-            opacity: 0.001,
-            lineCap: 'butt',
-            interactive: true,
-            renderer: additionalAerodromeRunwayRenderer || undefined
-        })
-            .bindPopup(popupHtml, { maxWidth: 280 })
-            .addTo(permanentAirportLayer);
+            L.polyline(endpoints, {
+                color: '#111111',
+                weight: 2.4,
+                opacity: 1,
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                interactive: false,
+                pane: 'npfRunwaysPane',
+                renderer: npfRunwayRenderer || undefined
+            }).addTo(npfRunwayMapLayer);
+        });
     });
 }
+
 
 function addAirportTouchHitbox(airport, popupHtml) {
     /* v13.81 — icône visuelle ramenée à 16 px ; zone tactile invisible de 40 px inchangée. */
@@ -14938,11 +14905,30 @@ function drawPermanentAirportMarkers() {
     permanentAirportLayer.clearLayers();
 
     /*
-     * v14.75 — aérodromes complémentaires représentés par leurs seules pistes.
-     * Les segments utilisent les extrémités géographiques réelles : leur
-     * orientation et leur longueur restent donc à l'échelle avec la carte.
+     * v14.76 — retour au rendu de la v14.74 pour les aérodromes :
+     * un point rond noir cliquable reste affiché au-dessus de la couche de
+     * pistes intégrée à la carte NPF. Les pistes ne remplacent plus les ronds.
      */
-    additionalAerodromes.forEach(drawAdditionalAerodromeRunways);
+    additionalAerodromes.forEach(airport => {
+        L.circleMarker([airport.lat, airport.lon], {
+            radius: 2.7,
+            stroke: false,
+            fillColor: '#111111',
+            fillOpacity: 1,
+            interactive: false
+        }).addTo(permanentAirportLayer);
+
+        const popupHtml = `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}</div>`;
+        L.circleMarker([airport.lat, airport.lon], {
+            radius: 10,
+            stroke: false,
+            fillColor: 'transparent',
+            fillOpacity: 0,
+            opacity: 0
+        })
+            .bindPopup(popupHtml, { maxWidth: 260 })
+            .addTo(permanentAirportLayer);
+    });
 
     otherAirports.forEach(airport => {
         const isCustomPelic = customPelicanAirports.has(airport.oaci);
