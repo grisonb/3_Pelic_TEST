@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-76_runways_map_airport_circles';
-const APP_VERSION = 'v14.76';
+const SW_VERSION = 'sw-v14-77_pelican_runways_from_1nm';
+const APP_VERSION = 'v14.77';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
