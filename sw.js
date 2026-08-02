@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-75_scaled_runways_yellow_tracked_labels';
-const APP_VERSION = 'v14.75';
+const SW_VERSION = 'sw-v14-76_runways_map_airport_circles';
+const APP_VERSION = 'v14.76';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
