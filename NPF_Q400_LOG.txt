@@ -1,4 +1,76 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.74 — LISTE PERMANENTE D’IDENTIFIANTS SAFESKY SUIVIS
+Date : 02/08/2026
+Base : TEST v14.73
+
+MODIFICATION DEMANDÉE
+- Conserver une liste définie d’identifiants suivis après une réinstallation complète de la PWA.
+- Continuer à pouvoir ajouter et supprimer librement d’autres identifiants depuis l’interface existante.
+
+INDICATIFS PERMANENTS INTÉGRÉS — 23
+- BENGA96
+- BENGA97
+- BENGA98
+- MILAN73
+- MILAN74
+- MILAN75
+- MILAN76
+- MILAN77
+- MILAN78
+- MILAN79
+- MILAN80
+- PELIC31
+- PELIC32
+- PELIC33
+- PELIC34
+- PELIC35
+- PELIC37
+- PELIC38
+- PELIC39
+- PELIC42
+- PELIC44
+- PELIC45
+- PELIC48
+
+CORRECTIONS APPLIQUÉES
+- Ajout d’une liste permanente directement intégrée au code de NPF.
+- Fusion automatique de cette liste avec les identifiants enregistrés dans localStorage.
+- Recréation automatique des 23 indicatifs lorsque le stockage local est vide, notamment après réinstallation de la PWA.
+- Conservation de la fonction « Ajouter » pour enregistrer autant d’indicatifs personnels supplémentaires que nécessaire.
+- Conservation de la fonction « Retirer » pour les seuls indicatifs personnels.
+- Les indicatifs permanents sont signalés par la mention « Permanent » et leur bouton de retrait est désactivé.
+- Dans la popup d’un trafic permanent, le bouton affiche « Suivi permanent » et ne peut pas retirer l’indicatif.
+- Lorsqu’un indicatif permanent en attente est associé à son identifiant technique SafeSky, l’entrée résolue remplace l’entrée CALLSIGN sans créer de doublon.
+- L’association technique résolue conserve le statut permanent.
+- Classement alphabétique naturel conservé.
+
+COMPORTEMENT APRÈS RÉINSTALLATION
+- Les 23 indicatifs permanents réapparaissent automatiquement.
+- Les indicatifs personnels ajoutés uniquement dans le stockage local sont effacés par la réinstallation, ce qui correspond au fonctionnement normal de Safari/PWA.
+- De nouveaux indicatifs personnels peuvent être ajoutés immédiatement après la réinstallation.
+
+ÉLÉMENTS INCHANGÉS
+- Déplacement fluide continu des trafics SafeSky validé en v14.72.
+- Taille des icônes d’aéroports sélectionnables comme pélicandromes de la v14.73.
+- Cartes Offline, démarrage PWA et mise à jour atomique.
+- Fréquence de rafraîchissement SafeSky de 5 secondes.
+
+CONTRÔLES
+- Test stockage vide : 23 indicatifs permanents recréés.
+- Test ajout personnel : 24 entrées, dont une supprimable.
+- Test résolution de MILAN80 vers un identifiant SafeSky : une seule entrée conservée, statut permanent maintenu.
+- Test retrait d’un indicatif permanent : retrait refusé.
+- Test retrait d’un indicatif personnel : retrait effectué.
+- Test réinstallation simulée par effacement du localStorage : retour automatique aux 23 indicatifs permanents.
+- Cohérence des versions index/script/manifest/service worker : v14.74.
+- Cache service worker distinct : sw-v14-74_permanent_tracked_callsigns.
+- Journal cumulatif v14.73 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.73 — ICÔNES DES AÉROPORTS SÉLECTIONNABLES COMME PÉLICANDROME LÉGÈREMENT AGRANDIES
 Date : 02/08/2026
 Base : TEST v14.72 validée
