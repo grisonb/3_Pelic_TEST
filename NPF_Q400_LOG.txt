@@ -1,4 +1,84 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.78 — PISTES DE TOUS LES AÉROPORTS DÉCLARÉS PÉLICANDROMES
+Date : 02/08/2026
+Base : TEST v14.77
+
+PROBLÈME SIGNALÉ
+- Les pistes de Montpellier-Méditerranée, Nice-Côte d’Azur, Tarbes-Lourdes-Pyrénées et d’autres aéroports déclarés PÉLIC n’apparaissaient pas.
+- La demande est de vérifier que chaque aéroport pouvant être déclaré comme pélicandrome dispose de sa ou de ses pistes.
+
+CAUSE CONFIRMÉE
+- La v14.77 avait ajouté les pistes des 27 terrains de la liste permanente `pelicanAirports` uniquement.
+- Les 97 terrains de `otherAirports` peuvent également être déclarés PÉLIC depuis leur popup et sont conservés dans `customPelicanAirports`.
+- Aucune table de pistes n’était reliée à ces 97 sélections personnalisées ; leurs ronds changeaient donc bien d’état, mais aucune piste supplémentaire n’était dessinée.
+- Montpellier `LFMT`, Nice `LFMN` et Tarbes `LFBT` appartiennent à cette seconde liste, ce qui explique leur absence.
+
+CORRECTIONS APPLIQUÉES
+- Ajout d’une table locale `otherAirportRunwaysData` couvrant les 97 aéroports de `otherAirports`.
+- Ajout de 131 tracés de pistes pour ces 97 aéroports.
+- Montpellier `LFMT` : pistes 12L/30R et 12R/30L intégrées.
+- Nice `LFMN` : pistes 04L/22R et 04R/22L intégrées.
+- Tarbes `LFBT` : piste 02/20 intégrée.
+- Conservation des 38 pistes des 27 pélicandromes permanents de la v14.77.
+- Conservation des 340 pistes des aérodromes complémentaires de la v14.76.
+- Lorsqu’un terrain de `otherAirports` est déclaré PÉLIC, sa ou ses pistes sont ajoutées à la carte dès le rafraîchissement de l’interface.
+- Lorsqu’il n’est plus déclaré PÉLIC, ses pistes disparaissent immédiatement ; son rond d’aéroport reste disponible comme auparavant.
+- Les pistes permanentes, personnalisées et complémentaires restent non interactives, sous les ronds et symboles cliquables.
+- Le seuil commun reste `NPF_RUNWAY_MIN_ZOOM = 12`, correspondant au niveau 1 NM retenu dans NPF.
+- Les sélections PÉLIC déjà enregistrées dans `localStorage` sont conservées et profitent automatiquement des nouvelles géométries après mise à jour.
+- Les étiquettes jaunes des avions SafeSky suivis restent inchangées.
+
+AUDIT COMPLET DE COUVERTURE
+- 27/27 aéroports de `pelicanAirports` disposent d’au moins une piste : 38 tracés.
+- 97/97 aéroports de `otherAirports` disposent d’au moins une piste : 131 tracés.
+- Couverture totale des aéroports pouvant être déclarés PÉLIC : 124/124, aucune entrée sans piste.
+- Plusieurs codes historiques conservés par NPF sont reliés à la géométrie du terrain correspondant par proximité géographique, sans modifier les codes mémorisés dans l’application.
+- Pour trois terrains dont les coordonnées de seuil n’étaient pas disponibles dans la base locale, une géométrie sommaire à l’échelle est embarquée et marquée `estimated: true` : Romorantin-Pruniers `LFYR`, Saint-Omer-Wizernes `LFQN` et l’ancien Reims-Champagne `LFSR`.
+- Les pistes fermées signalées dans la base source ne sont pas reprises lorsque le terrain possède une piste ouverte.
+- Total maximal embarqué dans la représentation actuelle : 340 pistes complémentaires + 38 pistes permanentes + 131 pistes des terrains personnalisables, soit 509 tracés locaux.
+
+COMPORTEMENT ATTENDU
+- Au-dessous du zoom 12 : aucune piste n’est affichée.
+- À partir du zoom 12 : les 340 pistes complémentaires et les pistes des 27 pélicandromes permanents apparaissent.
+- À partir du zoom 12 : les pistes de chaque terrain de `otherAirports` apparaissent uniquement si ce terrain est actuellement déclaré PÉLIC.
+- Le rond ou symbole cliquable de l’aéroport reste au-dessus des pistes et conserve tous ses boutons.
+- Montpellier, Nice et Tarbes apparaissent avec leurs pistes dès lors qu’ils sont cochés PÉLIC dans la configuration déjà enregistrée.
+
+ÉLÉMENTS INCHANGÉS
+- Ronds noirs des aérodromes complémentaires et symboles opérationnels des pélicandromes.
+- Boutons EAU/RETARDANT, Activer/Désactiver, BASE, PÉLIC, PDF et Go To.
+- Liste permanente des 23 indicatifs SafeSky suivis et fond jaune de leurs étiquettes.
+- Filtres SafeSky, déplacement continu des trafics et rafraîchissement de 5 secondes.
+- Cartes Offline, bases IndexedDB, démarrage PWA et mise à jour atomique.
+
+CONTRÔLES TECHNIQUES
+- Vérification automatique des 124 codes sélectionnables : aucun code absent des tables de pistes.
+- Vérification des 169 pistes liées aux aéroports sélectionnables : coordonnées finies, longueurs positives et association OACI NPF valide.
+- Vérification spécifique : `LFMT` = 2 pistes, `LFMN` = 2 pistes, `LFBT` = 1 piste.
+- Vérification que `drawNpfRunwayMapLayer()` filtre les pistes personnalisables avec `customPelicanAirports`.
+- Vérification que `refreshUI()` redessine la couche après ajout ou retrait d’un PÉLIC personnalisé.
+- Vérification que les pistes restent masquées au zoom 11 et affichables au zoom 12 ou supérieur.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index/script/manifest/service worker alignées sur v14.78.
+- Cache service worker distinct : `sw-v14-78_all_declared_pelican_runways`.
+
+VÉRIFICATION DE L’UTILISATION HORS LIGNE
+- Les 131 nouvelles pistes sont directement embarquées dans `script.js` ; aucune API ni ressource distante n’est nécessaire pour leur affichage.
+- Aucune nouvelle URL n’a été ajoutée dans `index.html`, `script.js`, `manifest.json` ou `sw.js`.
+- Comparaison de `sw.js` avec la v14.77 : seules `SW_VERSION` et `APP_VERSION` changent ; le moteur Offline est strictement conservé.
+- Le cache applicatif conserve les mêmes fichiers de shell et les mêmes ressources métier.
+- Les noms des bases IndexedDB, les clés de configuration et la gestion des packs de cartes Offline restent inchangés.
+- Les pistes personnalisées sont déterminées depuis le `localStorage` déjà disponible hors ligne puis dessinées à partir des données locales embarquées.
+- Conclusion du contrôle statique : la v14.78 conserve les capacités hors ligne de la v14.77. Le contrôle réel final reste à effectuer dans Safari/PWA après mise en ligne, puis en coupant complètement le réseau.
+
+- Journal cumulatif v14.77 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.77 — PISTES DES PÉLICANDROMES ET AFFICHAGE À PARTIR DE 1 NM
 Date : 02/08/2026
 Base : TEST v14.76
