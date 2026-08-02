@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.73';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.74';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -567,7 +567,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.73';
+    './data/localites/localites-france-v14.56.zip?appv=v14.74';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
@@ -758,6 +758,44 @@ let lastTrafficRenderMeta = null;
  */
 const TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY =
     'safeSkyTrackedIdentifiersV1';
+
+/*
+ * v14.74 TEST — indicatifs suivis permanents.
+ *
+ * Cette liste est intégrée au code de NPF : elle est donc automatiquement
+ * recréée après une réinstallation ou un effacement du stockage local. Elle
+ * est fusionnée avec les indicatifs ajoutés par l'utilisateur, sans doublon,
+ * et reste permanente même lorsqu'un indicatif est associé ultérieurement à
+ * son identifiant technique SafeSky.
+ */
+const TRAFFIC_PERMANENT_TRACKED_CALLSIGNS = Object.freeze([
+    'BENGA96',
+    'BENGA97',
+    'BENGA98',
+    'MILAN73',
+    'MILAN74',
+    'MILAN75',
+    'MILAN76',
+    'MILAN77',
+    'MILAN78',
+    'MILAN79',
+    'MILAN80',
+    'PELIC31',
+    'PELIC32',
+    'PELIC33',
+    'PELIC34',
+    'PELIC35',
+    'PELIC37',
+    'PELIC38',
+    'PELIC39',
+    'PELIC42',
+    'PELIC44',
+    'PELIC45',
+    'PELIC48'
+]);
+const TRAFFIC_PERMANENT_TRACKED_CALLSIGN_SET = new Set(
+    TRAFFIC_PERMANENT_TRACKED_CALLSIGNS
+);
 /*
  * v14.48 TEST — l'identifiant du propre avion est volontairement temporaire.
  * sessionStorage le conserve pendant la session PWA courante, puis le navigateur
@@ -7714,6 +7752,62 @@ function normalizeTrackedTrafficCallsign(value) {
         .replace(/\s+/g, '');
 }
 
+function isPermanentTrackedTrafficCallsign(value) {
+    return TRAFFIC_PERMANENT_TRACKED_CALLSIGN_SET.has(
+        normalizeTrackedTrafficCallsign(value)
+    );
+}
+
+function isPermanentTrackedTrafficEntry(entry) {
+    if (!entry) return false;
+    if (entry.permanent === true) return true;
+
+    const callsign = normalizeTrackedTrafficCallsign(
+        entry.callsign
+        || (
+            isPendingTrackedTrafficIdentifier(entry.id)
+                ? String(entry.id).slice('CALLSIGN:'.length)
+                : ''
+        )
+    );
+    return isPermanentTrackedTrafficCallsign(callsign);
+}
+
+function buildPermanentTrackedTrafficEntry(callsign) {
+    const normalizedCallsign = normalizeTrackedTrafficCallsign(callsign);
+    return {
+        id: buildPendingTrackedTrafficIdentifier(normalizedCallsign),
+        callsign: normalizedCallsign,
+        registration: '',
+        type: '',
+        pendingResolution: true,
+        permanent: true,
+        addedAt: 0
+    };
+}
+
+function mergePermanentTrackedTrafficIdentifiers(entries) {
+    const merged = Array.isArray(entries) ? [...entries] : [];
+
+    TRAFFIC_PERMANENT_TRACKED_CALLSIGNS.forEach(callsign => {
+        const existing = merged.find(entry => (
+            normalizeTrackedTrafficCallsign(entry?.callsign) === callsign
+            || String(entry?.id || '').toUpperCase()
+                === buildPendingTrackedTrafficIdentifier(callsign)
+        ));
+
+        if (existing) {
+            existing.callsign = callsign;
+            existing.permanent = true;
+            return;
+        }
+
+        merged.push(buildPermanentTrackedTrafficEntry(callsign));
+    });
+
+    return merged;
+}
+
 function isPendingTrackedTrafficIdentifier(id) {
     return String(id || '').toUpperCase().startsWith('CALLSIGN:');
 }
@@ -7787,41 +7881,86 @@ function sanitizeTrackedTrafficIdentifierEntry(entry) {
             Boolean(entry.pendingResolution)
             || isPendingTrackedTrafficIdentifier(id)
         ),
+        permanent: (
+            Boolean(entry.permanent)
+            || isPermanentTrackedTrafficCallsign(callsign)
+        ),
         addedAt: Number(entry.addedAt) || Date.now()
     };
 }
 
 function loadTrackedTrafficIdentifiers() {
+    let parsed = [];
     try {
-        const parsed = JSON.parse(
+        const stored = JSON.parse(
             localStorage.getItem(
                 TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY
             ) || '[]'
         );
-
-        if (!Array.isArray(parsed)) return [];
-
-        const result = [];
-        const seen = new Set();
-
-        parsed.forEach(entry => {
-            const cleanEntry = sanitizeTrackedTrafficIdentifierEntry(entry);
-            if (!cleanEntry || seen.has(cleanEntry.id)) return;
-            seen.add(cleanEntry.id);
-            result.push(cleanEntry);
-        });
-
-        return sortTrackedTrafficIdentifiers(result);
+        parsed = Array.isArray(stored) ? stored : [];
     } catch (_) {
-        return [];
+        parsed = [];
     }
+
+    const result = [];
+    const seenIds = new Set();
+    const seenCallsigns = new Set();
+
+    mergePermanentTrackedTrafficIdentifiers(parsed).forEach(entry => {
+        const cleanEntry = sanitizeTrackedTrafficIdentifierEntry(entry);
+        if (!cleanEntry) return;
+
+        const callsign = normalizeTrackedTrafficCallsign(cleanEntry.callsign);
+        if (seenIds.has(cleanEntry.id)) return;
+
+        /*
+         * Un indicatif permanent peut avoir été résolu en identifiant SafeSky.
+         * Dans ce cas, l'entrée résolue remplace l'entrée CALLSIGN:... et évite
+         * de faire réapparaître un doublon « en attente » au lancement suivant.
+         */
+        if (callsign && seenCallsigns.has(callsign)) {
+            const existingIndex = result.findIndex(candidate => (
+                normalizeTrackedTrafficCallsign(candidate.callsign)
+                    === callsign
+            ));
+            const existing = result[existingIndex];
+            const preferCurrent = (
+                existing
+                && isPendingTrackedTrafficIdentifier(existing.id)
+                && !isPendingTrackedTrafficIdentifier(cleanEntry.id)
+            );
+            if (preferCurrent) {
+                cleanEntry.permanent = (
+                    cleanEntry.permanent
+                    || existing.permanent
+                    || isPermanentTrackedTrafficCallsign(callsign)
+                );
+                seenIds.delete(existing.id);
+                result[existingIndex] = cleanEntry;
+                seenIds.add(cleanEntry.id);
+            }
+            return;
+        }
+
+        if (isPermanentTrackedTrafficCallsign(callsign)) {
+            cleanEntry.permanent = true;
+        }
+
+        seenIds.add(cleanEntry.id);
+        if (callsign) seenCallsigns.add(callsign);
+        result.push(cleanEntry);
+    });
+
+    return sortTrackedTrafficIdentifiers(result);
 }
 
 function saveTrackedTrafficIdentifiers(entries) {
     const cleanEntries = [];
     const seen = new Set();
 
-    (Array.isArray(entries) ? entries : []).forEach(entry => {
+    mergePermanentTrackedTrafficIdentifiers(
+        Array.isArray(entries) ? entries : []
+    ).forEach(entry => {
         const cleanEntry = sanitizeTrackedTrafficIdentifierEntry(entry);
         if (!cleanEntry || seen.has(cleanEntry.id)) return;
         seen.add(cleanEntry.id);
@@ -7948,6 +8087,7 @@ function mergeResolvedTrackedTrafficIdentity(entry, aircraft) {
         registration: identity.registration || entry.registration,
         type: identity.type || entry.type,
         pendingResolution: false,
+        permanent: isPermanentTrackedTrafficEntry(entry),
         addedAt: entry.addedAt
     };
 
@@ -8083,6 +8223,14 @@ function addTrackedTrafficIdentifier(aircraft) {
 
 function removeTrackedTrafficIdentifier(id) {
     const normalizedId = String(id || '').trim().toUpperCase();
+    const currentEntry = getTrackedTrafficIdentifiers().find(
+        entry => entry.id === normalizedId
+    );
+
+    if (isPermanentTrackedTrafficEntry(currentEntry)) {
+        return getTrackedTrafficIdentifiers();
+    }
+
     const saved = saveTrackedTrafficIdentifiers(
         getTrackedTrafficIdentifiers().filter(
             entry => entry.id !== normalizedId
@@ -8312,6 +8460,9 @@ function refreshTrackedTrafficListUi() {
                 ? entry.registration
                 : '',
             entry.type,
+            isPermanentTrackedTrafficEntry(entry)
+                ? 'Permanent'
+                : '',
             isPendingTrackedTrafficIdentifier(entry.id)
                 ? 'En attente de détection'
                 : entry.id
@@ -8332,11 +8483,18 @@ function refreshTrackedTrafficListUi() {
         removeButton.type = 'button';
         removeButton.className =
             'traffic-tool-button traffic-tool-button-danger';
-        removeButton.textContent = 'Retirer';
-        removeButton.addEventListener('click', event => {
-            event.stopPropagation();
-            removeTrackedTrafficIdentifier(entry.id);
-        });
+        const permanentEntry = isPermanentTrackedTrafficEntry(entry);
+        removeButton.textContent = permanentEntry ? 'Permanent' : 'Retirer';
+        removeButton.disabled = permanentEntry;
+        if (permanentEntry) {
+            removeButton.title = 'Indicatif permanent intégré à NPF';
+            removeButton.setAttribute('aria-label', 'Indicatif permanent');
+        } else {
+            removeButton.addEventListener('click', event => {
+                event.stopPropagation();
+                removeTrackedTrafficIdentifier(entry.id);
+            });
+        }
 
         row.append(label, removeButton);
         listElement.appendChild(row);
@@ -8712,8 +8870,8 @@ function ensureTrafficSettingsModal() {
                     <span id="traffic-tracked-count" class="traffic-tracked-count"></span>
                 </div>
                 <div class="traffic-tools-note">
-                    La liste se crée depuis les résultats de recherche ou depuis la fenêtre d’un trafic.
-                    NPF mémorise l’identifiant SafeSky, pas seulement l’indicatif.
+                    Les indicatifs permanents intégrés à NPF sont recréés automatiquement après une réinstallation.
+                    Tu peux continuer à ajouter et retirer librement les autres indicatifs. NPF mémorise l’identifiant SafeSky, pas seulement l’indicatif.
                 </div>
                 <div id="traffic-tracked-list" class="traffic-tracked-list"></div>
             </div>
@@ -12341,6 +12499,10 @@ function buildTrafficAircraftPopupHtml(
         ? escapeHtml(reference.point.label)
         : '';
     const altitudeState = getTrafficRelativeAltitudeState(ac);
+    const trackedTrafficEntry = findTrackedTrafficEntryForAircraft(ac);
+    const permanentTrackedTraffic = isPermanentTrackedTrafficEntry(
+        trackedTrafficEntry
+    );
     const relativeAltitudeText = Number.isFinite(altitudeState.deltaFt)
         ? `${altitudeState.deltaFt > 0 ? '+' : ''}${altitudeState.deltaFt} ft`
         : '--';
@@ -12365,7 +12527,7 @@ function buildTrafficAircraftPopupHtml(
             <div>Âge position : <b>${escapeHtml(formatTrafficAge(ac.seenPos))}</b></div>
             ${useAroundAltitude ? `<div>Filtre altitude : <b>${Math.round(relativeMinAltitudeFt)} / ${Math.round(relativeMaxAltitudeFt)} ft</b></div>` : ''}
             ${useGroundToAboveAltitude ? `<div>Filtre altitude : <b>sol / ${Math.round(groundToAboveMaxAltitudeFt)} ft</b></div>` : ''}
-            ${ac.hex ? `<button type="button" class="traffic-popup-track-button">${isTrafficAircraftTracked(ac) ? 'Retirer de la liste suivie' : 'Ajouter à la liste suivie'}</button>` : ''}
+            ${ac.hex ? `<button type="button" class="traffic-popup-track-button"${permanentTrackedTraffic ? ' disabled title="Indicatif permanent intégré à NPF"' : ''}>${permanentTrackedTraffic ? 'Suivi permanent' : (trackedTrafficEntry ? 'Retirer de la liste suivie' : 'Ajouter à la liste suivie')}</button>` : ''}
             ${ac.hex ? `<button type="button" class="traffic-popup-own-button">${isOwnTrafficAircraft(ac) ? 'Mon avion masqué' : 'Définir comme mon avion et masquer'}</button>` : ''}
             <div class="traffic-popup-warning">Trafic SafeSky/ADS-B indicatif — non certifié</div>
         </div>`;
@@ -12386,6 +12548,27 @@ function installTrafficMarkerPopupInteraction(marker) {
         );
 
         if (trackButton && ac?.hex) {
+            const updateTrackButtonState = () => {
+                const currentAircraft = marker._npfTrafficAircraft;
+                const trackedEntry = findTrackedTrafficEntryForAircraft(
+                    currentAircraft
+                );
+                const permanentEntry = isPermanentTrackedTrafficEntry(
+                    trackedEntry
+                );
+
+                trackButton.disabled = permanentEntry;
+                trackButton.textContent = permanentEntry
+                    ? 'Suivi permanent'
+                    : (trackedEntry
+                        ? 'Retirer de la liste suivie'
+                        : 'Ajouter à la liste suivie');
+                trackButton.title = permanentEntry
+                    ? 'Indicatif permanent intégré à NPF'
+                    : '';
+            };
+
+            updateTrackButtonState();
             trackButton.onclick = () => {
                 const currentAircraft = marker._npfTrafficAircraft;
                 if (!currentAircraft?.hex) return;
@@ -12393,15 +12576,17 @@ function installTrafficMarkerPopupInteraction(marker) {
                 const trackedEntry = findTrackedTrafficEntryForAircraft(
                     currentAircraft
                 );
+                if (isPermanentTrackedTrafficEntry(trackedEntry)) {
+                    updateTrackButtonState();
+                    return;
+                }
+
                 if (trackedEntry) {
                     removeTrackedTrafficIdentifier(trackedEntry.id);
-                    trackButton.textContent =
-                        'Ajouter à la liste suivie';
                 } else {
                     addTrackedTrafficIdentifier(currentAircraft);
-                    trackButton.textContent =
-                        'Retirer de la liste suivie';
                 }
+                updateTrackButtonState();
             };
         }
 
@@ -18639,7 +18824,7 @@ async function synchronizeOfflineConfigurationWithServiceWorker({
                     const refreshUrl = new URL(window.location.href);
                     refreshUrl.searchParams.set(
                         'appv',
-                        window.APP_VERSION || 'v14.73'
+                        window.APP_VERSION || 'v14.74'
                     );
                     refreshUrl.searchParams.set(
                         'swctl',
