@@ -1,4 +1,4 @@
-/* v14.75 TEST — pistes à l’échelle et étiquettes jaunes des trafics suivis. */
+/* v14.76 TEST — pistes intégrées à la carte, ronds d’aéroport restaurés, étiquettes jaunes conservées. */
 /* NPF-Q400 TEST v13.58 — fluidité carte iPad : CSS inchangé depuis v13.54. */
  :root {
     --primary-color: #005a9c;
@@ -12203,18 +12203,12 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.75 TEST — pistes à l'échelle et étiquettes jaunes des trafics suivis
+   v14.76 TEST — pistes cartographiques et étiquettes jaunes conservées
    ========================================================================== */
 
-.additional-aerodrome-runway-details {
-    margin-top: 6px;
-    color: #475569;
-    font-size: 12px;
-    font-weight: 800;
-    line-height: 1.35;
-}
-
 /*
+ * Les pistes sont rendues par le Canvas Leaflet dédié `npfRunwaysPane`.
+ * Aucun style DOM supplémentaire n'est nécessaire pour cette couche.
  * Seuls les aéronefs présents dans la liste suivie reçoivent ce fond jaune.
  * La bordure continue d'indiquer l'écart d'altitude relatif.
  */
