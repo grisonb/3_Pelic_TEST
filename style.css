@@ -11557,7 +11557,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     color: #b91c1c;
 }
 
-.traffic-tool-button:disabled {
+.traffic-tool-button:disabled,
+.traffic-popup-track-button:disabled {
     opacity: .52;
     cursor: default;
 }
