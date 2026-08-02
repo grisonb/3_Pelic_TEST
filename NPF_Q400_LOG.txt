@@ -1,4 +1,57 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.75 — PISTES À L’ÉCHELLE ET ÉTIQUETTES JAUNES DES TRAFICS SUIVIS
+Date : 02/08/2026
+Base : TEST v14.74
+
+MODIFICATIONS DEMANDÉES
+- Pour les aérodromes complémentaires, afficher uniquement les pistes, avec leur longueur réellement à l’échelle sur la carte.
+- Afficher sur fond jaune les étiquettes cartographiques des avions appartenant à la liste SafeSky suivie.
+
+CORRECTIONS APPLIQUÉES
+- Remplacement du point noir des aérodromes complémentaires par le tracé de chaque piste disponible.
+- Chaque piste utilise ses deux extrémités géographiques : orientation et longueur évoluent naturellement avec le zoom Leaflet, sans longueur minimale artificielle en pixels.
+- Aucun taxiway, parking, bâtiment ou emprise aéroportuaire n’est ajouté.
+- Tracé visuel noir avec fin entourage blanc pour rester lisible sur les fonds clairs et foncés.
+- Ajout d’une zone tactile invisible le long de chaque piste pour conserver l’ouverture de la popup sur iPad.
+- Rendu regroupé sur Canvas Leaflet afin de limiter le nombre d’éléments SVG et préserver la fluidité sur iPad.
+- 340 pistes intégrées pour 261 des 323 aérodromes complémentaires.
+- Pour les 62 aérodromes dont aucune géométrie de piste exploitable n’est disponible dans la source, maintien du petit point noir existant afin qu’ils ne disparaissent pas de la carte.
+- Ajout automatique de la classe `traffic-aircraft-tracked` aux trafics présents dans la liste suivie.
+- Fond jaune appliqué uniquement à leur étiquette permanente sur la carte ; le code couleur de bordure lié à l’altitude relative reste conservé.
+- Les lignes de la liste suivie dans la fenêtre SafeSky ne sont pas recolorées.
+
+ÉLÉMENTS INCHANGÉS
+- Les symboles et fonctions opérationnelles des pélicandromes, bases et aérodromes sélectionnables.
+- Les popups, boutons BASE/PÉLIC/EAU/RETARDANT, PDF et Go To.
+- Les filtres SafeSky, le déplacement continu des trafics et le rafraîchissement de 5 secondes.
+- Les cartes Offline, le démarrage PWA et la mise à jour atomique.
+
+CONTRÔLES
+- Géométrie de piste validée : coordonnées finies, longueur positive et association OACI.
+- 340 tracés de piste uniques après déduplication.
+- 261 aérodromes complémentaires disposent d’au moins une piste.
+- 62 aérodromes conservent le point de secours faute de géométrie disponible.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index/script/manifest/service worker alignées sur v14.75.
+- Cache service worker distinct : `sw-v14-75_scaled_runways_yellow_tracked_labels`.
+
+VÉRIFICATION DE L’UTILISATION HORS LIGNE
+- Comparaison de `sw.js` avec la v14.74 : aucune modification du moteur Offline, des listes de ressources mises en cache, de la lecture IndexedDB ni de la stratégie de repli ; seuls `SW_VERSION` et `APP_VERSION` sont incrémentés.
+- Le cache applicatif continue d’inclure `index.html`, `style.css`, `script.js`, `manifest.json`, Leaflet, SunCalc et JSZip.
+- Les données des pistes sont embarquées directement dans `script.js` : aucun téléchargement, appel API ou fichier supplémentaire n’est nécessaire pour les afficher hors ligne.
+- Comparaison des URL entre les scripts v14.74 et v14.75 : aucune URL ajoutée ou supprimée.
+- Les noms et versions d’`index.html`, `manifest.json`, `script.js` et `sw.js` sont cohérents en v14.75, ce qui permet leur installation dans un nouveau cache applicatif.
+- Les bases de cartes Offline, leurs clés IndexedDB et leurs réglages restent inchangés.
+- Conclusion du contrôle statique : la v14.75 conserve les capacités hors ligne de la v14.74. Le contrôle réel final reste à effectuer dans Safari/PWA après mise en ligne, avec le réseau coupé.
+
+- Journal cumulatif v14.74 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.74 — LISTE PERMANENTE D’IDENTIFIANTS SAFESKY SUIVIS
 Date : 02/08/2026
 Base : TEST v14.73
