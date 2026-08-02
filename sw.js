@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-77_pelican_runways_from_1nm';
-const APP_VERSION = 'v14.77';
+const SW_VERSION = 'sw-v14-78_all_declared_pelican_runways';
+const APP_VERSION = 'v14.78';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
