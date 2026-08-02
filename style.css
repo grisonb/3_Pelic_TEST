@@ -1,4 +1,4 @@
-/* v14.78 TEST — pistes de tous les aéroports déclarés PÉLIC, visibles à partir de 1 NM. */
+/* v14.79 TEST — pistes complètes, repères pélicandromes corrigés et vecteurs par tranches de 50 kt. */
 /* NPF-Q400 TEST v13.58 — fluidité carte iPad : CSS inchangé depuis v13.54. */
  :root {
     --primary-color: #005a9c;
@@ -11670,10 +11670,10 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 .traffic-speed-vector-svg {
     position: absolute;
-    left: -110px;
-    top: -110px;
-    width: 220px;
-    height: 220px;
+    left: -280px;
+    top: -280px;
+    width: 560px;
+    height: 560px;
     overflow: visible;
     pointer-events: none;
 }
@@ -11684,7 +11684,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     stroke-width: 4px;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-dasharray: 2 8;
+    stroke-dasharray: 8 5;
     vector-effect: non-scaling-stroke;
     filter:
         drop-shadow(1px 0 0 rgba(255,255,255,.98))
@@ -12220,3 +12220,9 @@ body.gaar-point-search-open .gaar-editing-banner {
         0 1px 3px rgba(15, 23, 42, .38),
         0 0 0 1px rgba(255, 255, 255, .78) !important;
 }
+
+
+/* ==========================================================================
+   v14.79 TEST — vecteur vitesse segmenté par tranches de 50 kt
+   ========================================================================== */
+/* La géométrie et le nombre exact de traits sont calculés dans script.js. */
