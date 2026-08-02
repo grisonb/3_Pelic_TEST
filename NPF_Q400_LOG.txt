@@ -1,4 +1,54 @@
 ============================================================
+VERSION TEST v14.72 — DÉPLACEMENT CONTINU DES TRAFICS SAFESKY
+============================================================
+
+DATE : 02/08/2026
+BASE : v14.71 TEST
+
+PROBLÈME SIGNALÉ
+- Les positions SafeSky sont renouvelées toutes les cinq secondes.
+- À chaque renouvellement, les symboles se déplacent de façon fluide pendant un court instant.
+- Ils restent ensuite immobiles jusqu'au rafraîchissement suivant, au lieu de se déplacer continuellement.
+
+CAUSE TECHNIQUE CONFIRMÉE
+- L'extrapolation locale était plafonnée à 8 secondes à partir de l'horodatage `last_update` fourni par SafeSky.
+- Un point reçu par NPF avec plusieurs secondes d'âge avait donc déjà consommé tout ou partie de cette durée avant même son affichage.
+- Lorsque l'âge atteignait le plafond, seul le raccord progressif de 0,9 seconde vers la nouvelle position restait visible ; le symbole s'arrêtait ensuite jusqu'à la réponse SafeSky suivante.
+- Certaines balises ne fournissent pas toujours une vitesse sol exploitable, ce qui empêchait également toute extrapolation entre deux positions.
+
+CORRECTIONS
+- Ajout de l'heure réelle de réception par NPF à chaque trafic normalisé.
+- Séparation du temps de mouvement en deux parties :
+  - rattrapage limité de l'âge du point SafeSky jusqu'à sa réception ;
+  - extrapolation continue après réception.
+- L'extrapolation après réception est autorisée pendant 15 secondes, soit largement au-delà du cycle SafeSky normal de 5 secondes.
+- Maintien du rendu à 20 images par seconde et du raccord doux de 0,9 seconde à chaque nouvelle position.
+- Ajout d'un calcul de vitesse et de route de secours à partir des deux dernières positions lorsqu'une balise ne fournit pas de `ground_speed` ou de `course` exploitable.
+- Rejet des estimations incohérentes : intervalle inférieur à 0,8 seconde, supérieur à 30 secondes ou vitesse supérieure à 750 kt.
+- Correction du traitement d'une route absente : une valeur `null` n'est plus interprétée à tort comme une route 000°.
+- Aucun changement de la fréquence des requêtes SafeSky, qui reste fixée à 5 secondes.
+- Aucun changement des filtres trafic, des cartes Offline, des aérodromes, de l'alerte de mise à jour ou du mécanisme atomique v14.70.
+
+COMPORTEMENT ATTENDU
+- Un trafic disposant d'une vitesse et d'une route continue à avancer entre deux réponses SafeSky.
+- La nouvelle position reçue sert de recalage doux sans arrêt du symbole.
+- En cas de retard ponctuel d'une réponse, le mouvement peut se poursuivre jusqu'à 15 secondes avant d'être volontairement figé afin d'éviter une extrapolation indéfinie.
+- Une balise sans vitesse commence à être animée dès que deux positions successives permettent d'estimer son mouvement.
+
+CONTRÔLES DE LIVRAISON
+- Simulation d'un trafic à 180 kt dont le point SafeSky est déjà âgé de 9 secondes à la réception.
+- Déplacement supplémentaire mesuré pendant les 5 secondes suivant la réception : 0,250 NM, conforme à 180 kt.
+- Simulation d'une balise sans vitesse à partir de deux positions espacées de 5 secondes : vitesse estimée 100 kt et route estimée 090°.
+- Syntaxe de `script.js` et `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index/script/manifest/service worker alignées sur v14.72.
+- Cache service worker distinct `sw-v14-72_continuous_traffic_motion`.
+- Journal v14.71 repris intégralement sans suppression.
+- Intégrité et contenu du ZIP contrôlés après création.
+- Le comportement réel sur Safari/iPadOS reste à confirmer par essai dans la PWA.
+
+
+============================================================
 VERSION TEST v14.71 — TOUS LES AUTRES AÉRODROMES EN POINTS NOIRS
 ============================================================
 
