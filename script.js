@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.80';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.81';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,10 +569,13 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.76';
+    './data/localites/localites-france-v14.56.zip?appv=v14.81';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
-const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 12;
+// v14.81 — la recherche phonétique charge tous les fragments partageant
+// les deux premières lettres, puis applique Soundex et Levenshtein.
+const NAMED_PLACES_OFFLINE_PHONETIC_PREFIX_LENGTH = 2;
+const NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX = 64;
 
 let namedPlacesSearchSequence = 0;
 let namedPlacesOfflineArchive = null;
@@ -580,6 +583,7 @@ let namedPlacesOfflineIndex = null;
 let namedPlacesOfflineLoadPromise = null;
 let namedPlacesOfflineLoadError = '';
 let namedPlacesOfflineLoadedCount = 0;
+let namedPlacesOfflineShardIdsByPrefix = new Map();
 const namedPlacesOfflineShardCache = new Map();
 const namedPlacesOfflineShardPromises = new Map();
 let disabledAirports = new Set(), waterAirports = new Set(), customPelicanAirports = new Set();
@@ -3780,6 +3784,15 @@ function normalizeNamedPlacesShardSearchKey(value) {
     return stripped || original;
 }
 
+function encodeNamedPlacesShardPrefix(prefix) {
+    return Array.from(String(prefix || ''))
+        .map(character => character
+            .charCodeAt(0)
+            .toString(16)
+            .padStart(2, '0'))
+        .join('');
+}
+
 function getNamedPlacesShardId(searchTerm) {
     const normalized = normalizeNamedPlacesShardSearchKey(searchTerm);
     let prefix = normalized.slice(
@@ -3790,12 +3803,61 @@ function getNamedPlacesShardId(searchTerm) {
         NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH,
         '_'
     );
-    return Array.from(prefix)
-        .map(character => character
-            .charCodeAt(0)
-            .toString(16)
-            .padStart(2, '0'))
-        .join('');
+    return encodeNamedPlacesShardPrefix(prefix);
+}
+
+function buildNamedPlacesShardPrefixIndex(archive) {
+    const index = new Map();
+    if (!archive || !archive.files) return index;
+
+    Object.keys(archive.files).forEach(path => {
+        const match = String(path).match(
+            /^shards\/([0-9a-f]+)\.json$/i
+        );
+        if (!match) return;
+
+        const shardId = match[1].toLowerCase();
+        const prefixId = shardId.slice(
+            0,
+            NAMED_PLACES_OFFLINE_PHONETIC_PREFIX_LENGTH * 2
+        );
+        if (!prefixId) return;
+
+        if (!index.has(prefixId)) {
+            index.set(prefixId, []);
+        }
+        index.get(prefixId).push(shardId);
+    });
+
+    index.forEach(shardIds => shardIds.sort());
+    return index;
+}
+
+function getNamedPlacesShardIds(searchTerm) {
+    const normalized = normalizeNamedPlacesShardSearchKey(searchTerm);
+    if (
+        normalized.length
+            < NAMED_PLACES_OFFLINE_PHONETIC_PREFIX_LENGTH
+    ) {
+        return [getNamedPlacesShardId(searchTerm)];
+    }
+
+    const broadPrefix = normalized.slice(
+        0,
+        NAMED_PLACES_OFFLINE_PHONETIC_PREFIX_LENGTH
+    );
+    const broadPrefixId = encodeNamedPlacesShardPrefix(
+        broadPrefix
+    );
+    const shardIds = namedPlacesOfflineShardIdsByPrefix.get(
+        broadPrefixId
+    );
+
+    if (Array.isArray(shardIds) && shardIds.length) {
+        return shardIds;
+    }
+
+    return [getNamedPlacesShardId(searchTerm)];
 }
 
 function showNamedPlacesOfflineStatus(
@@ -3834,6 +3896,7 @@ async function loadNamedPlacesOfflineDatabase({
     if (force) {
         namedPlacesOfflineArchive = null;
         namedPlacesOfflineIndex = null;
+        namedPlacesOfflineShardIdsByPrefix = new Map();
         namedPlacesOfflineShardCache.clear();
         namedPlacesOfflineShardPromises.clear();
         namedPlacesOfflineLoadedCount = 0;
@@ -3887,6 +3950,8 @@ async function loadNamedPlacesOfflineDatabase({
 
                 namedPlacesOfflineArchive = archive;
                 namedPlacesOfflineIndex = indexPayload;
+                namedPlacesOfflineShardIdsByPrefix =
+                    buildNamedPlacesShardPrefixIndex(archive);
                 return archive;
             })()
                 .catch(error => {
@@ -3916,70 +3981,85 @@ async function loadNamedPlacesOfflineDatabase({
         return [];
     }
 
-    const shardId = getNamedPlacesShardId(searchTerm);
-    if (namedPlacesOfflineShardCache.has(shardId)) {
-        const cached = namedPlacesOfflineShardCache.get(shardId);
-        namedPlacesOfflineShardCache.delete(shardId);
-        namedPlacesOfflineShardCache.set(shardId, cached);
-        return cached;
-    }
-
-    if (namedPlacesOfflineShardPromises.has(shardId)) {
-        return namedPlacesOfflineShardPromises.get(shardId);
-    }
-
-    const loadPromise = (async () => {
-        const shardFile = namedPlacesOfflineArchive.file(
-            `shards/${shardId}.json`
-        );
-        if (!shardFile) return [];
-
-        const payload = JSON.parse(
-            await shardFile.async('string')
-        );
-        const records = Array.isArray(payload?.items)
-            ? payload.items
-                .map(buildOfflineNamedPlaceCandidate)
-                .filter(Boolean)
-            : [];
-
-        namedPlacesOfflineShardCache.set(
-            shardId,
-            records
-        );
-        namedPlacesOfflineLoadedCount += records.length;
-
-        while (
-            namedPlacesOfflineShardCache.size
-                > NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX
-        ) {
-            const oldestKey =
-                namedPlacesOfflineShardCache.keys()
-                    .next().value;
-            namedPlacesOfflineShardCache.delete(oldestKey);
+    const loadShard = async shardId => {
+        if (namedPlacesOfflineShardCache.has(shardId)) {
+            const cached = namedPlacesOfflineShardCache.get(shardId);
+            namedPlacesOfflineShardCache.delete(shardId);
+            namedPlacesOfflineShardCache.set(shardId, cached);
+            return cached;
         }
 
-        return records;
-    })()
-        .catch(error => {
-            namedPlacesOfflineLoadError =
-                error?.message || String(error);
-            console.warn(
-                '[Localités France offline] Fragment impossible:',
-                shardId,
-                error
-            );
-            return [];
-        })
-        .finally(() => {
-            namedPlacesOfflineShardPromises.delete(shardId);
-        });
+        if (namedPlacesOfflineShardPromises.has(shardId)) {
+            return namedPlacesOfflineShardPromises.get(shardId);
+        }
 
-    namedPlacesOfflineShardPromises.set(
-        shardId,
-        loadPromise
+        const loadPromise = (async () => {
+            const shardFile = namedPlacesOfflineArchive.file(
+                `shards/${shardId}.json`
+            );
+            if (!shardFile) return [];
+
+            const payload = JSON.parse(
+                await shardFile.async('string')
+            );
+            const records = Array.isArray(payload?.items)
+                ? payload.items
+                    .map(buildOfflineNamedPlaceCandidate)
+                    .filter(Boolean)
+                : [];
+
+            namedPlacesOfflineShardCache.set(
+                shardId,
+                records
+            );
+            namedPlacesOfflineLoadedCount += records.length;
+
+            while (
+                namedPlacesOfflineShardCache.size
+                    > NAMED_PLACES_OFFLINE_SHARD_CACHE_MAX
+            ) {
+                const oldestKey =
+                    namedPlacesOfflineShardCache.keys()
+                        .next().value;
+                namedPlacesOfflineShardCache.delete(oldestKey);
+            }
+
+            return records;
+        })()
+            .catch(error => {
+                namedPlacesOfflineLoadError =
+                    error?.message || String(error);
+                console.warn(
+                    '[Localités France offline] Fragment impossible:',
+                    shardId,
+                    error
+                );
+                return [];
+            })
+            .finally(() => {
+                namedPlacesOfflineShardPromises.delete(shardId);
+            });
+
+        namedPlacesOfflineShardPromises.set(
+            shardId,
+            loadPromise
+        );
+        return loadPromise;
+    };
+
+    /*
+     * v14.81 — un fragment unique sur trois lettres empêchait la recherche
+     * phonétique lorsqu'une faute modifiait la troisième lettre :
+     * « Abartelo » chargeait `aba`, jamais `abb` ; « Baye Argent » chargeait
+     * `bay`, jamais `bai`. Tous les fragments partageant les deux premières
+     * lettres sont maintenant chargés avant le classement phonétique local.
+     */
+    const shardIds = getNamedPlacesShardIds(searchTerm);
+    const shardGroups = await Promise.all(
+        shardIds.map(loadShard)
     );
-    return loadPromise;
+
+    return shardGroups.flat();
 }
 
 function isDirectionalSearchTerm(searchTerm) {
@@ -14278,6 +14358,10 @@ window.getNamedPlacesSearchStatus = () => ({
         ),
     loadedShardCount:
         namedPlacesOfflineShardCache.size,
+    phoneticShardPrefixLength:
+        NAMED_PLACES_OFFLINE_PHONETIC_PREFIX_LENGTH,
+    phoneticShardGroupCount:
+        namedPlacesOfflineShardIdsByPrefix.size,
     loadedRecordCount:
         namedPlacesOfflineLoadedCount,
     loadError:
