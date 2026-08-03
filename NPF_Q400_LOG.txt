@@ -1,4 +1,58 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.80 — SUPPRESSION DE L’ANCIEN CODE LFBV POUR BRIVE
+Date : 03/08/2026
+Base : TEST v14.79
+
+MODIFICATION DEMANDÉE
+- Supprimer l’entrée `LFBV` associée à Brive.
+- Conserver uniquement `LFSL` pour Brive-Vallée de la Dordogne.
+
+CORRECTIONS APPLIQUÉES
+- Suppression de `LFBV` dans la liste `otherAirports`.
+- Suppression de la géométrie de piste dupliquée sous le code `LFBV`.
+- Conservation de `LFSL` avec le nom « Brive-Vallée de la Dordogne », son rond cliquable et sa piste 11/29.
+- Ajout d’un nettoyage générique du stockage local : tout code absent des listes aéroportuaires actives est retiré des pélicandromes personnalisés, terrains désactivés, terrains EAU/RETARDANT et de la base sélectionnée.
+- Aucune modification des coordonnées, de la piste ou du comportement opérationnel de `LFSL`.
+
+CONSÉQUENCES SUR LES COMPTAGES
+- `pelicanAirports` : 27 terrains, inchangé.
+- `otherAirports` : 97 → 96 terrains.
+- Aéroports sélectionnables comme pélicandromes : 124 → 123.
+- Pistes liées à `otherAirports` : 131 → 130 tracés.
+- Total des pistes liées aux 123 terrains sélectionnables : 168 tracés.
+- Total maximal des tracés locaux avec les 340 pistes complémentaires : 509 → 508.
+
+ÉLÉMENTS INCHANGÉS
+- Affichage des pistes à partir du zoom 12 / niveau 1 NM.
+- Ronds et symboles cliquables des aéroports.
+- Repositionnement des 21 pélicandromes transmis en v14.79.
+- Vecteur vitesse par tranches de 50 kt.
+- Fond jaune des étiquettes des avions suivis.
+- Cartes Offline, bases IndexedDB, démarrage PWA et mise à jour atomique.
+
+AUDIT ET CONTRÔLES TECHNIQUES
+- Recherche dans les fichiers exécutables : aucune occurrence de `LFBV` dans index, manifeste, script, style ou service worker.
+- Vérification de `LFSL` dans `otherAirports` et dans la table locale des pistes.
+- Couverture des pistes : 27/27 codes de `pelicanAirports` et 96/96 codes de `otherAirports`.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index/script/manifest/service worker alignées sur v14.80.
+- Cache service worker distinct : `sw-v14-80_brive_lfsl_only`.
+
+VÉRIFICATION DE L’UTILISATION HORS LIGNE
+- La suppression de `LFBV` et la migration du stockage sont entièrement intégrées dans `script.js`.
+- Aucune nouvelle URL, API, bibliothèque ou ressource distante n’a été ajoutée.
+- Comparaison de `sw.js` avec la v14.79 : seules les lignes `SW_VERSION` et `APP_VERSION` changent ; le moteur Offline reste identique.
+- Le cache du shell, les noms des bases IndexedDB, les clés Offline et la gestion des packs cartographiques sont inchangés.
+- Conclusion du contrôle statique : la v14.80 conserve le fonctionnement hors ligne de la v14.79. Le contrôle réel final reste à effectuer dans la PWA après mise en ligne, puis réseau coupé.
+
+- Journal cumulatif v14.79 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.79 — PISTES TOUJOURS VISIBLES, REPÈRES PÉLICANDROMES CORRIGÉS ET VECTEUR PAR TRANCHES DE 50 KT
 Date : 02/08/2026
 Base : TEST v14.78
