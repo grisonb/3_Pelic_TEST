@@ -1,4 +1,59 @@
 NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
+VERSION TEST v14.81 — RECHERCHE PHONÉTIQUE NATIONALE ÉLARGIE
+Date : 03/08/2026
+Base : TEST v14.80
+
+PROBLÈME SIGNALÉ
+- La base nationale de localités est correctement chargée en ligne et hors ligne.
+- `Abbartelo 2A` retrouvait `Abbartello`, mais `Abartelo 2A` ne renvoyait aucun résultat.
+- `Baille Argen 971` retrouvait `Baille Argent`, mais `Baye Argent 971` ne renvoyait aucun résultat malgré une prononciation très proche.
+
+CAUSE IDENTIFIÉE
+- La base nationale est découpée en fragments selon les trois premières lettres du nom normalisé.
+- La recherche ne chargeait qu’un seul fragment avant d’appliquer Soundex et la distance de Levenshtein.
+- Une faute sur la troisième lettre sélectionnait donc le mauvais fragment : `aba` au lieu de `abb`, ou `bay` au lieu de `bai`.
+- Le bon candidat n’était jamais transmis au moteur phonétique, même si son score aurait ensuite été pertinent.
+
+CORRECTIONS APPLIQUÉES
+- Conservation du découpage physique existant de la base sur trois lettres : aucune reconstruction de l’archive nationale.
+- Création en mémoire d’un index des fragments regroupés selon leurs deux premières lettres.
+- Pour une recherche phonétique, chargement de tous les fragments partageant les deux premières lettres de la saisie.
+- Application ensuite du filtre départemental, de Soundex, de la clé consonantique française et de la distance de Levenshtein.
+- Conservation de la priorité au nom exact, de la limite à cinq résultats et du dédoublonnage existant.
+- Conservation d’un repli vers le fragment historique sur trois lettres si aucun groupe sur deux lettres n’est disponible.
+- Cache mémoire des fragments porté de 12 à 64 afin d’éviter de recharger immédiatement les groupes les plus volumineux.
+- Ajout au diagnostic `window.getNamedPlacesSearchStatus()` de la longueur du préfixe phonétique et du nombre de groupes disponibles.
+
+CAS DE VALIDATION CIBLÉS
+- `Abartelo 2A` doit retrouver `Abbartello — Olmeto (2A)`.
+- `Abbartelo 2A` doit continuer à retrouver `Abbartello — Olmeto (2A)`.
+- `Baye Argent 971` doit retrouver `Baille Argent — Pointe-Noire (971)`.
+- `Baille Argen 971` doit continuer à retrouver `Baille Argent — Pointe-Noire (971)`.
+- Les recherches exactes `Abbartello 2A` et `Baille Argent 971` restent prioritaires.
+
+VÉRIFICATION DE L’UTILISATION HORS LIGNE
+- L’archive reste `data/localites/localites-france-v14.56.zip`, déjà intégrée au dépôt TEST.
+- La recherche élargie lit uniquement plusieurs fragments à l’intérieur de cette archive locale.
+- Aucune nouvelle URL, API, bibliothèque ni ressource distante n’est ajoutée.
+- Le service worker conserve sa logique de cache de données ; seules les versions applicative et de cache sont incrémentées.
+- Les cartes Offline, bases IndexedDB et packs cartographiques ne sont pas modifiés.
+
+AUDIT ET CONTRÔLES TECHNIQUES
+- Syntaxe de `script.js` et de `sw.js` contrôlée avec Node.js.
+- Manifeste JSON contrôlé.
+- Versions index, manifeste, script et service worker alignées sur v14.81.
+- Contrôle de l’archive nationale : 2 807 fragments et 179 402 localités.
+- Contrôle statique des groupes : `ab` couvre 10 fragments dont `abb`; `ba` couvre 24 fragments dont `bai` et `bay`.
+- Vérification que les données sources de `Abbartello — Olmeto (2A)` et `Baille Argent — Pointe-Noire (971)` sont présentes dans les fragments désormais chargés.
+- Le test final réel doit être effectué dans la PWA TEST avec Internet, puis en mode avion.
+
+- Journal cumulatif v14.80 conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — JOURNAL CUMULATIF DES MODIFICATIONS
 VERSION TEST v14.80 — SUPPRESSION DE L’ANCIEN CODE LFBV POUR BRIVE
 Date : 03/08/2026
 Base : TEST v14.79
