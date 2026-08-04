@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.82';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.83';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.82';
+    './data/localites/localites-france-v14.56.zip?appv=v14.83';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -7509,6 +7509,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
+// v14.83 TEST — cartouches routiers lisibles
+// - suppression à l'affichage des suffixes techniques girondins U / Uxxxx ;
+// - un seul cartouche par référence dans l'emprise visible ;
+// - priorité aux axes principaux et rejet des cartouches qui se chevauchent ;
+// - limitation automatique du nombre de cartouches selon le zoom et la taille de l'écran.
+// =========================================================================
+
+// =========================================================================
 // v14.82 TEST — routes territoriales T / RT et cartouches sur la portion visible
 // - import et affichage des références T10, RT10 et « Route territoriale 10 » ;
 // - classe T affichée comme une route nationale à partir du niveau 1 NM ;
@@ -7626,6 +7634,29 @@ function normalizeRoadOverlayReferenceValue(value) {
     return match ? match[1] : '';
 }
 
+function normalizeRoadOverlayDisplayReference(value) {
+    let ref = String(value || '').trim().toUpperCase();
+    if (!ref) return '';
+
+    /*
+     * Le complément routier girondin utilise U, U1, U002, U451, etc. comme
+     * identifiants techniques d'unités routières. Ils ne font pas partie du
+     * numéro opérationnel affiché sur la carte.
+     *
+     * Exemples :
+     * D211U451       -> D211
+     * D1215E1U002    -> D1215E1
+     * D211E3U951     -> D211E3
+     *
+     * Les suffixes routiers officiels E1, E2, E3, N, etc. sont conservés.
+     */
+    if (/^D\d/.test(ref)) {
+        ref = ref.replace(/U\d*$/i, '');
+    }
+
+    return ref;
+}
+
 function getRoadOverlayFeatureReference(feature) {
     const props = feature?.properties || {};
     const candidates = [
@@ -7649,7 +7680,9 @@ function getRoadOverlayFeatureReference(feature) {
     ];
 
     for (const value of candidates) {
-        const ref = normalizeRoadOverlayReferenceValue(value);
+        const ref = normalizeRoadOverlayDisplayReference(
+            normalizeRoadOverlayReferenceValue(value)
+        );
         if (ref) return ref;
     }
 
@@ -8304,11 +8337,77 @@ function getRoadOverlayFeatureLabelPoint(feature, bounds = null) {
     return null;
 }
 
-function addRoadOverlayLabelsForGeojson(geojson, partKey, seenGridKeys = new Set()) {
-    if (!roadOverlayLabelsLayer || !map) return;
+function getRoadOverlayLabelClassPriority(roadClass) {
+    const priorities = {
+        A: 0,
+        N: 1,
+        T: 1,
+        M: 2,
+        D: 3
+    };
+    return priorities[String(roadClass || '').toUpperCase()] ?? 4;
+}
+
+function getRoadOverlayLabelBranchPriority(ref) {
+    /*
+     * À classe identique, afficher d'abord les axes principaux D211, D1215,
+     * M35, etc., avant leurs branches D211E1, D1215E1 ou autres suffixes.
+     */
+    return /^[ANDMT]\d+$/.test(String(ref || '').toUpperCase()) ? 0 : 1;
+}
+
+function getRoadOverlayMinimumLabelLength(roadClass, zoom) {
+    if (roadClass === 'A' || roadClass === 'N' || roadClass === 'T') {
+        return zoom >= 13 ? 90 : 180;
+    }
+    if (roadClass === 'M') {
+        return zoom >= 13 ? 120 : 260;
+    }
+    return zoom >= 14 ? 120 : (zoom >= 13 ? 260 : 520);
+}
+
+function getRoadOverlayMaximumLabelCount() {
+    if (!map) return 0;
+
+    const zoom = map.getZoom();
+    const size = map.getSize();
+    const area = Math.max(1, Number(size.x) * Number(size.y));
+
+    const absoluteLimit = zoom >= 14 ? 30 : (zoom >= 13 ? 22 : 14);
+    const areaPerLabel = zoom >= 14 ? 39000 : (zoom >= 13 ? 52000 : 76000);
+    const areaLimit = Math.max(8, Math.floor(area / areaPerLabel));
+
+    return Math.max(8, Math.min(absoluteLimit, areaLimit));
+}
+
+function getRoadOverlayLabelCollisionBox(point, ref) {
+    const screenPoint = map.latLngToContainerPoint(point);
+    const width = Math.max(36, Math.min(106, 18 + String(ref || '').length * 8));
+    const height = 24;
+    const padding = 8;
+
+    return {
+        left: screenPoint.x - width / 2 - padding,
+        right: screenPoint.x + width / 2 + padding,
+        top: screenPoint.y - height / 2 - padding,
+        bottom: screenPoint.y + height / 2 + padding
+    };
+}
+
+function roadOverlayLabelBoxesIntersect(first, second) {
+    return !(
+        first.right < second.left
+        || first.left > second.right
+        || first.bottom < second.top
+        || first.top > second.bottom
+    );
+}
+
+function addRoadOverlayLabelsForGeojson(geojson, partKey, candidatesByRef = new Map()) {
+    if (!map) return candidatesByRef;
+
     const zoom = map.getZoom();
     const bounds = getRoadOverlayLabelBounds() || map.getBounds();
-    const gridSize = zoom >= 13 ? 0.035 : (zoom >= 12 ? 0.075 : 0.18);
 
     (geojson?.features || []).forEach(feature => {
         if (!shouldDisplayRoadOverlayFeature(feature)) return;
@@ -8319,31 +8418,108 @@ function addRoadOverlayLabelsForGeojson(geojson, partKey, seenGridKeys = new Set
             && zoom < 12
         ) return;
 
-        const ref = String(feature?.properties?.ref || '').trim();
+        const ref = normalizeRoadOverlayDisplayReference(
+            feature?.properties?.ref
+        );
         if (!ref) return;
 
-        const point = getRoadOverlayFeatureLabelPoint(feature, bounds);
+        const segments = getRoadOverlayVisibleSegments(feature, bounds);
+        const visibleLength = segments.reduce(
+            (sum, segment) => sum + (Number(segment?.length) || 0),
+            0
+        );
+
+        if (
+            !Number.isFinite(visibleLength)
+            || visibleLength < getRoadOverlayMinimumLabelLength(roadClass, zoom)
+        ) {
+            return;
+        }
+
+        const point = getRoadOverlayMidpointOnSegments(segments)
+            || getRoadOverlayFeatureLabelPoint(feature, bounds);
         if (!point || !map.getBounds().contains(point)) return;
 
-        const gridX = Math.round(point.lng / gridSize);
-        const gridY = Math.round(point.lat / gridSize);
-        const key = `${ref}:${gridX}:${gridY}`;
-        if (seenGridKeys.has(key)) return;
-        seenGridKeys.add(key);
+        const candidate = {
+            ref,
+            roadClass,
+            point,
+            visibleLength,
+            partKey,
+            classPriority: getRoadOverlayLabelClassPriority(roadClass),
+            branchPriority: getRoadOverlayLabelBranchPriority(ref)
+        };
 
-        const marker = L.marker(point, {
+        const existing = candidatesByRef.get(ref);
+        if (
+            !existing
+            || candidate.classPriority < existing.classPriority
+            || (
+                candidate.classPriority === existing.classPriority
+                && candidate.branchPriority < existing.branchPriority
+            )
+            || (
+                candidate.classPriority === existing.classPriority
+                && candidate.branchPriority === existing.branchPriority
+                && candidate.visibleLength > existing.visibleLength
+            )
+        ) {
+            candidatesByRef.set(ref, candidate);
+        }
+    });
+
+    return candidatesByRef;
+}
+
+function renderRoadOverlayLabelCandidates(candidatesByRef) {
+    if (!roadOverlayLabelsLayer || !map || !(candidatesByRef instanceof Map)) return;
+
+    const maximumLabels = getRoadOverlayMaximumLabelCount();
+    if (maximumLabels <= 0) return;
+
+    const candidates = Array.from(candidatesByRef.values()).sort((first, second) => (
+        first.classPriority - second.classPriority
+        || first.branchPriority - second.branchPriority
+        || second.visibleLength - first.visibleLength
+        || String(first.ref).localeCompare(String(second.ref), 'fr', {
+            numeric: true,
+            sensitivity: 'base'
+        })
+    ));
+
+    const occupiedBoxes = [];
+    let displayed = 0;
+
+    for (const candidate of candidates) {
+        if (displayed >= maximumLabels) break;
+
+        const box = getRoadOverlayLabelCollisionBox(
+            candidate.point,
+            candidate.ref
+        );
+        if (occupiedBoxes.some(existing => (
+            roadOverlayLabelBoxesIntersect(box, existing)
+        ))) {
+            continue;
+        }
+
+        occupiedBoxes.push(box);
+
+        const marker = L.marker(candidate.point, {
             pane: 'roadOverlayLabelPane',
             interactive: false,
             keyboard: false,
             icon: L.divIcon({
                 className: 'road-overlay-label-marker',
-                html: `<span class="road-overlay-ref road-overlay-ref-${roadClass.toLowerCase()}">${escapeHtml(ref)}</span>`,
+                html: `<span class="road-overlay-ref road-overlay-ref-${candidate.roadClass.toLowerCase()}">${escapeHtml(candidate.ref)}</span>`,
                 iconSize: null
             })
         });
-        marker.__npfRoadPartKey = partKey;
+        marker.__npfRoadPartKey = candidate.partKey;
+        marker.__npfRoadRef = candidate.ref;
         marker.addTo(roadOverlayLabelsLayer);
-    });
+        displayed += 1;
+    }
 }
 
 function clearRoadOverlayRenderedParts(options = {}) {
@@ -8418,7 +8594,6 @@ async function loadRoadOverlayPart(part, token, tier) {
 
     casing.addTo(roadOverlayCasingLayer);
     lines.addTo(roadOverlayLineLayer);
-    addRoadOverlayLabelsForGeojson(geojson, part.key);
 
     const record = { casing, lines, geojson, tier };
     loadedRoadOverlayParts.set(part.key, record);
@@ -8428,7 +8603,13 @@ async function loadRoadOverlayPart(part, token, tier) {
 function rebuildRoadOverlayLabels() {
     if (!roadOverlayLabelsLayer) return;
     roadOverlayLabelsLayer.clearLayers();
-    const seenGridKeys = new Set();
+
+    /*
+     * v14.83 — préparer d'abord tous les candidats des parties visibles.
+     * Le meilleur tronçon de chaque référence est retenu, puis les cartouches
+     * sont triés et filtrés globalement pour éviter les amas illisibles.
+     */
+    const candidatesByRef = new Map();
 
     loadedRoadOverlayParts.forEach((record, partKey) => {
         if (
@@ -8437,12 +8618,15 @@ function rebuildRoadOverlayLabels() {
         ) {
             return;
         }
+
         addRoadOverlayLabelsForGeojson(
             record.geojson,
             partKey,
-            seenGridKeys
+            candidatesByRef
         );
     });
+
+    renderRoadOverlayLabelCandidates(candidatesByRef);
 }
 
 async function refreshRoadOverlayVisibleParts(source = 'refresh') {
