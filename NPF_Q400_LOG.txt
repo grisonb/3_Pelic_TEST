@@ -1,5 +1,84 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.83 — CARTOUCHES ROUTIERS LISIBLES
+Date : 04/08/2026
+Base : TEST v14.82
+
+PROBLÈME SIGNALÉ
+- Après import du pack routier v6, la carte devenait illisible dans la région bordelaise.
+- Des dizaines de cartouches étaient affichés simultanément sur un même axe.
+- Les références telles que `D211U451`, `D1215E1U002` ou `D211E3U951` contenaient des identifiants techniques issus du complément routier girondin.
+- Le dédoublonnage de la v14.82 considérait ces identifiants comme des routes différentes.
+
+CAUSE IDENTIFIÉE
+- Le suffixe `U` suivi éventuellement d’un numéro désigne une unité ou un tronçon technique de la source locale.
+- Il ne fait pas partie du numéro routier destiné à être affiché.
+- Chaque valeur technique différente créait donc son propre cartouche.
+- La sélection des cartouches était effectuée partie GeoJSON par partie GeoJSON, sans arbitrage global suffisant entre tous les axes visibles.
+
+CORRECTIONS INTÉGRÉES
+1. Nettoyage des références affichées
+- `D211U451` devient `D211`.
+- `D1215E1U002` devient `D1215E1`.
+- `D211E3U951` devient `D211E3`.
+- Suppression uniquement du suffixe technique final `U` ou `Uxxxx`.
+- Conservation des suffixes routiers officiels `E1`, `E2`, `E3`, `N` et autres branches.
+- Nettoyage appliqué à l’affichage des données déjà importées et lors des prochains imports.
+
+2. Dédoublonnage global
+- Un seul candidat conservé par référence dans l’emprise visible.
+- Sélection du tronçon offrant la plus grande longueur visible.
+- Dédoublonnage partagé entre toutes les parties GeoJSON chargées.
+- Suppression de la création provisoire de cartouches pendant le chargement partie par partie.
+
+3. Réduction de la densité
+- Priorité aux autoroutes, puis aux nationales et territoriales, aux métropolitaines et enfin aux départementales.
+- Priorité aux axes principaux sans suffixe avant leurs branches.
+- Rejet des tronçons visibles trop courts.
+- Détection des collisions en coordonnées écran.
+- Suppression de tout cartouche qui chevaucherait un cartouche déjà retenu.
+- Limitation automatique du nombre maximal de cartouches selon le zoom et la surface de l’écran :
+  - niveau proche du zoom 12 : maximum 14 ;
+  - zoom 13 : maximum 22 ;
+  - zoom 14 et plus : maximum 30.
+- Les lignes routières restent toutes affichées ; seule la quantité de cartouches est réduite.
+
+4. Compatibilité et fonctionnement offline
+- Le pack routier v6 déjà importé reste utilisable.
+- Il n’est pas nécessaire de régénérer le pack.
+- Aucune nouvelle API, bibliothèque ou ressource distante.
+- Stockage Cache API, cartes offline, base nationale de localités et service worker conservés.
+- Toutes les autres fonctions de la v14.82 sont conservées.
+
+CONTRÔLES TECHNIQUES
+- Versions index, manifeste, script et service worker alignées sur v14.83.
+- Syntaxe de `script.js` et `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé.
+- Cas de normalisation contrôlés :
+  - `D211U451` → `D211` ;
+  - `D1215E1U002` → `D1215E1` ;
+  - `D211E3U951` → `D211E3` ;
+  - `D1215E1` reste `D1215E1` ;
+  - `D7N` reste `D7N`.
+- Vérification de la sélection d’un seul candidat par référence.
+- Vérification de la priorité donnée aux axes principaux.
+- Vérification de l’absence de dépendance réseau supplémentaire.
+- Intégrité des archives de livraison contrôlée.
+
+VALIDATION À EFFECTUER DANS NPF TEST
+- Mettre à jour les fichiers applicatifs vers v14.83.
+- Ouvrir le calque A/N/D/M/T déjà installé.
+- Contrôler la lisibilité autour de Bordeaux, Mérignac, Saint-Médard-en-Jalles et Eysines.
+- Vérifier que les cartouches affichent `D211`, `D1215`, `D1215E1`, etc., sans suffixe `Uxxxx`.
+- Déplacer et zoomer la carte pour contrôler le renouvellement raisonnable des cartouches.
+- Fermer la PWA puis répéter le contrôle en mode avion.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.82 — ROUTES TERRITORIALES ET CARTOUCHES SUR LA PORTION VISIBLE
 Date : 04/08/2026
 Base : TEST v14.81
