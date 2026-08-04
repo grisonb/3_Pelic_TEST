@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-82_road_t_visible_labels';
-const APP_VERSION = 'v14.82';
+const SW_VERSION = 'sw-v14-83_readable_road_labels';
+const APP_VERSION = 'v14.83';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
