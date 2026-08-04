@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-81_phonetic_two_letter_shards';
-const APP_VERSION = 'v14.81';
+const SW_VERSION = 'sw-v14-82_road_t_visible_labels';
+const APP_VERSION = 'v14.82';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
