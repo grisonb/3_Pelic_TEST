@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.81';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.82';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.81';
+    './data/localites/localites-france-v14.56.zip?appv=v14.82';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -616,7 +616,7 @@ let departmentsLayerLoadPromise = null;
 let highVoltageLinesLayer = null;
 let highVoltageLinesRenderer = null;
 
-/* v14.49 — calque routier vectoriel offline A / N / D / M. */
+/* v14.49 — calque routier vectoriel offline A / N / D / M / T. */
 let roadOverlayLayer = null;
 let roadOverlayCasingLayer = null;
 let roadOverlayLineLayer = null;
@@ -6571,7 +6571,7 @@ function setupEventListeners() {
 
     if (deleteRoadOverlayButton) {
         deleteRoadOverlayButton.addEventListener('click', async () => {
-            if (!confirm('Supprimer le calque routier offline A / N / D / M de cet appareil ?')) {
+            if (!confirm('Supprimer le calque routier offline A / N / D / M / T de cet appareil ?')) {
                 return;
             }
             await deleteRoadOverlayData();
@@ -7509,6 +7509,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
+// v14.82 TEST — routes territoriales T / RT et cartouches sur la portion visible
+// - import et affichage des références T10, RT10 et « Route territoriale 10 » ;
+// - classe T affichée comme une route nationale à partir du niveau 1 NM ;
+// - cartouches calculés sur les segments réellement visibles dans la fenêtre ;
+// - conservation intégrale des classes A, N, D et M.
+// =========================================================================
+
+// =========================================================================
 // v14.49 TEST — routes métropolitaines M
 // - import des références M613, M185, M5E14, RM613 et « Route métropolitaine » ;
 // - classe M affichée comme une route départementale, dès le niveau 1 NM ;
@@ -7516,7 +7524,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.49 TEST — calque routier vectoriel offline A / N / D / M
+// v14.49 TEST — calque routier vectoriel offline A / N / D / M / T
 // =========================================================================
 
 function getRoadOverlayManifest() {
@@ -7566,6 +7574,8 @@ function normalizeRoadOverlayReferenceValue(value) {
         .replace(/\bDEPARTEMENTALE\b/g, 'D')
         .replace(/\bROUTE\s*METROPOLITAINE\b/g, 'M')
         .replace(/\bMETROPOLITAINE\b/g, 'M')
+        .replace(/\bROUTE\s*TERRITORIALE\b/g, 'T')
+        .replace(/\bTERRITORIALE\b/g, 'T')
         .replace(/[\s._/]+/g, '');
 
     if (!normalized) return '';
@@ -7593,6 +7603,14 @@ function normalizeRoadOverlayReferenceValue(value) {
     if (match) return `M${match[1]}`;
 
     /*
+     * Formes territoriales corses administratives : RT10, RT 10.
+     * Elles sont normalisées en T10 pour utiliser une classe unique dans NPF.
+     */
+    match = normalized.match(/(?:^|[^A-Z0-9])RT(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/RT(\d+[A-Z0-9-]*)/);
+    if (match) return `T${match[1]}`;
+
+    /*
      * Formes nationales administratives : RN7, RN 7.
      */
     match = normalized.match(/(?:^|[^A-Z0-9])RN(\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
@@ -7600,10 +7618,11 @@ function normalizeRoadOverlayReferenceValue(value) {
     if (match) return `N${match[1]}`;
 
     /*
-     * Formes directement exploitables : A8, N7, D559, M613, D7N, D2007.
+     * Formes directement exploitables : A8, N7, D559, M613, T10,
+     * D7N et D2007.
      */
-    match = normalized.match(/(?:^|[^A-Z0-9])([ANDM]\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
-    if (!match) match = normalized.match(/([ANDM]\d+[A-Z0-9-]*)/);
+    match = normalized.match(/(?:^|[^A-Z0-9])([ANDMT]\d+[A-Z0-9-]*)(?:$|[^A-Z0-9])/);
+    if (!match) match = normalized.match(/([ANDMT]\d+[A-Z0-9-]*)/);
     return match ? match[1] : '';
 }
 
@@ -7639,7 +7658,11 @@ function getRoadOverlayFeatureReference(feature) {
 
 function getRoadOverlayClassFromRef(ref) {
     const prefix = String(ref || '').trim().toUpperCase().charAt(0);
-    return prefix === 'A' || prefix === 'N' || prefix === 'D' || prefix === 'M'
+    return prefix === 'A'
+        || prefix === 'N'
+        || prefix === 'D'
+        || prefix === 'M'
+        || prefix === 'T'
         ? prefix
         : '';
 }
@@ -7725,7 +7748,7 @@ function normalizeRoadOverlayGeojson(rawGeojson) {
         .filter(Boolean);
 
     if (!features.length) {
-        throw new Error('Aucune route A, N, D ou M avec une référence exploitable n’a été trouvée.');
+        throw new Error('Aucune route A, N, D, M ou T avec une référence exploitable n’a été trouvée.');
     }
 
     const normalized = {
@@ -7958,14 +7981,14 @@ function refreshRoadOverlayButtonState() {
     button.disabled = isRoadOverlayLoading;
 
     if (status) {
-        status.textContent = hasData ? 'A/N/D/M' : '!';
+        status.textContent = hasData ? 'A/N/D/M/T' : '!';
     }
 
     button.title = isRoadOverlayLoading
         ? 'Chargement du calque routier…'
         : (
             hasData
-                ? 'Afficher/Masquer le calque routier A / N / D / M'
+                ? 'Afficher/Masquer le calque routier A / N / D / M / T'
                 : 'Aucun calque routier installé — ouvrir Gestion des Cartes'
         );
 }
@@ -7989,7 +8012,7 @@ function getRoadOverlayZoomTier() {
     /*
      * Niveau 0 : rien avant 2 NM.
      * Niveau 1 : autoroutes uniquement à partir de 2 NM.
-     * Niveau 2 : A + N + D + M à partir de 1 NM.
+     * Niveau 2 : A + N + D + M + T à partir de 1 NM.
      */
     if (zoom >= 12) return 2;
     if (zoom >= 11) return 1;
@@ -8002,7 +8025,11 @@ function shouldLoadRoadOverlayFeatureForTier(feature, tier) {
     ).toUpperCase();
 
     if (tier >= 2) {
-        return roadClass === 'A' || roadClass === 'N' || roadClass === 'D' || roadClass === 'M';
+        return roadClass === 'A'
+            || roadClass === 'N'
+            || roadClass === 'D'
+            || roadClass === 'M'
+            || roadClass === 'T';
     }
 
     if (tier === 1) {
@@ -8040,6 +8067,11 @@ function getRoadOverlayLineStyle(feature, casing = false) {
             casingWeight: zoom >= 12 ? 8.2 : 7.2
         },
         N: {
+            color: '#d62828',
+            weight: zoom >= 12 ? 4.5 : 3.7,
+            casingWeight: zoom >= 12 ? 7.4 : 6.4
+        },
+        T: {
             color: '#d62828',
             weight: zoom >= 12 ? 4.5 : 3.7,
             casingWeight: zoom >= 12 ? 7.4 : 6.4
@@ -8092,97 +8124,206 @@ function shouldDisplayRoadOverlayFeature(feature) {
      * v14.20 — nationales et départementales à partir de l'échelle 1 NM
      * environ, correspondant au niveau de zoom 12.
      */
-    if (roadClass === 'N') return zoom >= 12;
+    if (roadClass === 'N' || roadClass === 'T') return zoom >= 12;
     if (roadClass === 'D' || roadClass === 'M') return zoom >= 12;
     return false;
 }
 
-function getRoadOverlayLongestLineCoordinates(feature) {
+function getRoadOverlayGeometryLines(feature) {
     const geometry = feature?.geometry;
-    if (!geometry) return null;
+    if (!geometry) return [];
 
     if (geometry.type === 'LineString') {
-        return Array.isArray(geometry.coordinates) ? geometry.coordinates : null;
+        return Array.isArray(geometry.coordinates)
+            ? [geometry.coordinates]
+            : [];
     }
 
     if (geometry.type === 'MultiLineString' && Array.isArray(geometry.coordinates)) {
-        return geometry.coordinates.reduce((longest, line) => (
-            Array.isArray(line) && line.length > (longest?.length || 0)
-                ? line
-                : longest
-        ), null);
+        return geometry.coordinates.filter(Array.isArray);
+    }
+
+    return [];
+}
+
+function getRoadOverlayLongestLineCoordinates(feature) {
+    return getRoadOverlayGeometryLines(feature).reduce((longest, line) => (
+        Array.isArray(line) && line.length > (longest?.length || 0)
+            ? line
+            : longest
+    ), null);
+}
+
+function getRoadOverlayLabelBounds() {
+    if (!map) return null;
+
+    try {
+        const size = map.getSize();
+        const margin = Math.max(
+            18,
+            Math.min(42, Math.round(Math.min(size.x, size.y) * 0.045))
+        );
+
+        if (size.x > margin * 2 + 20 && size.y > margin * 2 + 20) {
+            const northWest = map.containerPointToLatLng([margin, margin]);
+            const southEast = map.containerPointToLatLng([
+                size.x - margin,
+                size.y - margin
+            ]);
+            return L.latLngBounds(
+                [southEast.lat, northWest.lng],
+                [northWest.lat, southEast.lng]
+            );
+        }
+    } catch (_) {}
+
+    return map.getBounds();
+}
+
+function clipRoadOverlaySegmentToBounds(start, end, bounds) {
+    if (!Array.isArray(start) || !Array.isArray(end) || !bounds) return null;
+
+    const x0 = Number(start[0]);
+    const y0 = Number(start[1]);
+    const x1 = Number(end[0]);
+    const y1 = Number(end[1]);
+
+    if (![x0, y0, x1, y1].every(Number.isFinite)) return null;
+
+    const west = Number(bounds.getWest());
+    const east = Number(bounds.getEast());
+    const south = Number(bounds.getSouth());
+    const north = Number(bounds.getNorth());
+
+    if (![west, east, south, north].every(Number.isFinite)) return null;
+
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const p = [-dx, dx, -dy, dy];
+    const q = [x0 - west, east - x0, y0 - south, north - y0];
+
+    let uStart = 0;
+    let uEnd = 1;
+
+    for (let index = 0; index < 4; index += 1) {
+        if (Math.abs(p[index]) < 1e-12) {
+            if (q[index] < 0) return null;
+            continue;
+        }
+
+        const ratio = q[index] / p[index];
+        if (p[index] < 0) {
+            uStart = Math.max(uStart, ratio);
+        } else {
+            uEnd = Math.min(uEnd, ratio);
+        }
+
+        if (uStart > uEnd) return null;
+    }
+
+    return [
+        [x0 + uStart * dx, y0 + uStart * dy],
+        [x0 + uEnd * dx, y0 + uEnd * dy]
+    ];
+}
+
+function getRoadOverlayVisibleSegments(feature, bounds) {
+    const segments = [];
+
+    getRoadOverlayGeometryLines(feature).forEach(line => {
+        if (!Array.isArray(line) || line.length < 2) return;
+
+        for (let index = 1; index < line.length; index += 1) {
+            const clipped = clipRoadOverlaySegmentToBounds(
+                line[index - 1],
+                line[index],
+                bounds
+            );
+            if (!clipped) continue;
+
+            const start = L.latLng(Number(clipped[0][1]), Number(clipped[0][0]));
+            const end = L.latLng(Number(clipped[1][1]), Number(clipped[1][0]));
+            const length = start.distanceTo(end);
+
+            if (!Number.isFinite(length) || length <= 0) continue;
+            segments.push({ start, end, length });
+        }
+    });
+
+    return segments;
+}
+
+function getRoadOverlayMidpointOnSegments(segments) {
+    if (!Array.isArray(segments) || !segments.length) return null;
+
+    const totalLength = segments.reduce(
+        (sum, segment) => sum + (Number(segment?.length) || 0),
+        0
+    );
+    if (!Number.isFinite(totalLength) || totalLength <= 0) return null;
+
+    const target = totalLength / 2;
+    let walked = 0;
+
+    for (const segment of segments) {
+        const length = Number(segment?.length) || 0;
+        if (walked + length >= target) {
+            const ratio = length > 0 ? (target - walked) / length : 0;
+            return L.latLng(
+                segment.start.lat + (segment.end.lat - segment.start.lat) * ratio,
+                segment.start.lng + (segment.end.lng - segment.start.lng) * ratio
+            );
+        }
+        walked += length;
+    }
+
+    return segments[segments.length - 1]?.end || null;
+}
+
+function getRoadOverlayFeatureLabelPoint(feature, bounds = null) {
+    /*
+     * v14.82 — placer le cartouche sur la portion de route réellement visible.
+     * Une marge intérieure en pixels évite qu'il soit coupé par le bord de la
+     * carte. Si aucune portion n'entre dans cette zone, on réessaie sur toute
+     * l'emprise visible avant d'abandonner.
+     */
+    const preferredBounds = bounds || getRoadOverlayLabelBounds();
+    const preferredSegments = preferredBounds
+        ? getRoadOverlayVisibleSegments(feature, preferredBounds)
+        : [];
+    const preferredPoint = getRoadOverlayMidpointOnSegments(preferredSegments);
+    if (preferredPoint) return preferredPoint;
+
+    const fullBounds = map?.getBounds?.();
+    if (fullBounds && fullBounds !== preferredBounds) {
+        const fullSegments = getRoadOverlayVisibleSegments(feature, fullBounds);
+        const fullPoint = getRoadOverlayMidpointOnSegments(fullSegments);
+        if (fullPoint) return fullPoint;
     }
 
     return null;
 }
 
-function getRoadOverlayFeatureLabelPoint(feature) {
-    const coordinates = getRoadOverlayLongestLineCoordinates(feature);
-    if (!Array.isArray(coordinates) || !coordinates.length) return null;
-
-    if (coordinates.length === 1) {
-        const coord = coordinates[0];
-        return L.latLng(Number(coord[1]), Number(coord[0]));
-    }
-
-    let totalLength = 0;
-    const segmentLengths = [];
-
-    for (let index = 1; index < coordinates.length; index += 1) {
-        const previous = coordinates[index - 1];
-        const current = coordinates[index];
-        const previousLatLng = L.latLng(Number(previous[1]), Number(previous[0]));
-        const currentLatLng = L.latLng(Number(current[1]), Number(current[0]));
-        const length = previousLatLng.distanceTo(currentLatLng);
-        segmentLengths.push(length);
-        totalLength += length;
-    }
-
-    if (!Number.isFinite(totalLength) || totalLength <= 0) {
-        const middle = coordinates[Math.floor(coordinates.length / 2)];
-        return L.latLng(Number(middle[1]), Number(middle[0]));
-    }
-
-    const target = totalLength / 2;
-    let walked = 0;
-
-    for (let index = 1; index < coordinates.length; index += 1) {
-        const segmentLength = segmentLengths[index - 1];
-        if (walked + segmentLength >= target) {
-            const ratio = segmentLength > 0
-                ? (target - walked) / segmentLength
-                : 0;
-            const start = coordinates[index - 1];
-            const end = coordinates[index];
-            const lon = Number(start[0]) + (Number(end[0]) - Number(start[0])) * ratio;
-            const lat = Number(start[1]) + (Number(end[1]) - Number(start[1])) * ratio;
-            return L.latLng(lat, lon);
-        }
-        walked += segmentLength;
-    }
-
-    const last = coordinates[coordinates.length - 1];
-    return L.latLng(Number(last[1]), Number(last[0]));
-}
-
-function addRoadOverlayLabelsForGeojson(geojson, partKey) {
+function addRoadOverlayLabelsForGeojson(geojson, partKey, seenGridKeys = new Set()) {
     if (!roadOverlayLabelsLayer || !map) return;
     const zoom = map.getZoom();
-    const bounds = map.getBounds().pad(0.18);
-    const seenGridKeys = new Set();
+    const bounds = getRoadOverlayLabelBounds() || map.getBounds();
     const gridSize = zoom >= 13 ? 0.035 : (zoom >= 12 ? 0.075 : 0.18);
 
     (geojson?.features || []).forEach(feature => {
         if (!shouldDisplayRoadOverlayFeature(feature)) return;
 
         const roadClass = String(feature?.properties?.roadClass || '').toUpperCase();
-        if ((roadClass === 'D' || roadClass === 'M') && zoom < 12) return;
+        if (
+            (roadClass === 'D' || roadClass === 'M' || roadClass === 'T')
+            && zoom < 12
+        ) return;
 
         const ref = String(feature?.properties?.ref || '').trim();
         if (!ref) return;
 
-        const point = getRoadOverlayFeatureLabelPoint(feature);
-        if (!point || !bounds.contains(point)) return;
+        const point = getRoadOverlayFeatureLabelPoint(feature, bounds);
+        if (!point || !map.getBounds().contains(point)) return;
 
         const gridX = Math.round(point.lng / gridSize);
         const gridY = Math.round(point.lat / gridSize);
@@ -8244,7 +8385,7 @@ async function loadRoadOverlayPart(part, token, tier) {
     /*
      * Ne créer dans Leaflet que les classes utiles au niveau courant :
      * - niveau 1 : A seulement ;
-     * - niveau 2 : A, N, D et M.
+     * - niveau 2 : A, N, D, M et T.
      * Le changement de niveau détruit puis reconstruit entièrement les couches,
      * ce qui évite à la fois les étiquettes seules et les géométries invisibles
      * conservées en mémoire.
@@ -8287,6 +8428,7 @@ async function loadRoadOverlayPart(part, token, tier) {
 function rebuildRoadOverlayLabels() {
     if (!roadOverlayLabelsLayer) return;
     roadOverlayLabelsLayer.clearLayers();
+    const seenGridKeys = new Set();
 
     loadedRoadOverlayParts.forEach((record, partKey) => {
         if (
@@ -8295,7 +8437,11 @@ function rebuildRoadOverlayLabels() {
         ) {
             return;
         }
-        addRoadOverlayLabelsForGeojson(record.geojson, partKey);
+        addRoadOverlayLabelsForGeojson(
+            record.geojson,
+            partKey,
+            seenGridKeys
+        );
     });
 }
 
@@ -8446,7 +8592,7 @@ async function toggleRoadOverlayLayer(forceState = null, options = {}) {
                 modal.style.display = 'flex';
                 refreshRoadOverlayInstalledStatus();
             }
-            alert('Aucun calque routier n’est installé. Importe le pack A / N / D / M dans Gestion des Cartes.');
+            alert('Aucun calque routier n’est installé. Importe le pack A / N / D / M / T dans Gestion des Cartes.');
         }
         return;
     }
