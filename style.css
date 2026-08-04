@@ -1,3 +1,4 @@
+/* v14.82 TEST — routes territoriales T/RT et cartouches routiers sur la portion visible. */
 /* v14.81 TEST — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 TEST — Brive conservé uniquement sous LFSL. */
 /* NPF-Q400 TEST v13.58 — fluidité carte iPad : CSS inchangé depuis v13.54. */
@@ -10532,7 +10533,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.49 TEST — calque routier vectoriel offline A / N / D / M
+   v14.49 TEST — calque routier vectoriel offline A / N / D / M / T
    ========================================================================== */
 
 #road-overlay-button.active {
@@ -10664,7 +10665,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     color: #ffffff !important;
 }
 
-.road-overlay-ref-n {
+.road-overlay-ref-n,
+.road-overlay-ref-t {
     background: #d62828 !important;
     color: #ffffff !important;
 }
