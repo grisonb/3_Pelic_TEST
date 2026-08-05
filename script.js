@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.84';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.85';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.84';
+    './data/localites/localites-france-v14.56.zip?appv=v14.85';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -629,7 +629,7 @@ let roadOverlayLoadedZoomTier = -1;
 const loadedRoadOverlayParts = new Map();
 
 /*
- * v14.84 — état de rafraîchissement du calque routier.
+ * v14.85 — état de rafraîchissement du calque routier.
  * En suivi GPS, Leaflet déclenche un moveend à chaque recentrage. Les routes
  * déjà chargées se déplacent naturellement avec la carte : il est donc inutile
  * de reparcourir les GeoJSON, de réappliquer tous les styles et de reconstruire
@@ -5562,7 +5562,7 @@ let directOfflineTileHitCount = 0;
 let directOfflineTileMissCount = 0;
 
 /*
- * v14.84 — récupération automatique après panne temporaire d'IndexedDB.
+ * v14.85 — récupération automatique après panne temporaire d'IndexedDB.
  * Safari peut invalider une connexion pendant un usage long ou sous pression
  * mémoire. Les erreurs techniques ne doivent plus être assimilées à des tuiles
  * réellement absentes.
@@ -6376,6 +6376,7 @@ function setupEventListeners() {
     const folderImporterInput = document.getElementById('folder-importer-input');
     const tilesImporterInput = document.getElementById('tiles-importer-input');
     const airportPdfImporterInput = document.getElementById('airport-pdf-importer-input');
+    const deleteAllAirportPdfsButton = document.getElementById('delete-all-airport-pdfs-button');
     const roadOverlayImporterInput = document.getElementById('road-overlay-importer-input');
     const deleteRoadOverlayButton = document.getElementById('delete-road-overlay-button');
     const mapSourceOnlineBtn = document.getElementById('map-source-online-btn');
@@ -6781,6 +6782,12 @@ function setupEventListeners() {
             const files = Array.from(event.target.files || []);
             await importAirportPdfFiles(files);
             event.target.value = '';
+        });
+    }
+
+    if (deleteAllAirportPdfsButton) {
+        deleteAllAirportPdfsButton.addEventListener('click', async () => {
+            await deleteAllAirportPdfs();
         });
     }
 
@@ -7738,6 +7745,15 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 }
 
 
+
+// =========================================================================
+// v14.85 TEST — réorganisation de Gestion des Cartes et suppression groupée des PDF
+// - section Cartes Offline regroupée avec son bouton d'import ;
+// - section Calque Routier placée immédiatement sous les cartes offline ;
+// - libellés d'import simplifiés ;
+// - boutons de suppression redimensionnés ;
+// - suppression simultanée de tous les PDF offline avec confirmation.
+// =========================================================================
 
 // =========================================================================
 // v14.84 TEST — stabilité cartes offline pendant un vol prolongé
@@ -8938,7 +8954,7 @@ function rebuildRoadOverlayLabels() {
     roadOverlayLabelsLayer.clearLayers();
 
     /*
-     * v14.84 — préparer d'abord tous les candidats des parties visibles.
+     * v14.85 — préparer d'abord tous les candidats des parties visibles.
      * Le meilleur tronçon de chaque référence est retenu, puis les cartouches
      * sont triés et filtrés globalement pour éviter les amas illisibles.
      */
@@ -15808,6 +15824,7 @@ async function getInstalledAirportPdfRecords() {
 
 async function displayInstalledAirportPdfs() {
     const list = document.getElementById('installed-airport-pdfs-list');
+    const deleteAllButton = document.getElementById('delete-all-airport-pdfs-button');
     if (!list) return;
 
     const records = await getInstalledAirportPdfRecords();
@@ -15815,8 +15832,11 @@ async function displayInstalledAirportPdfs() {
 
     if (!records.length) {
         list.innerHTML = '<li class="no-pdfs-placeholder">Aucun PDF FDF/aérodrome/OPS stocké.</li>';
+        if (deleteAllButton) deleteAllButton.style.display = 'none';
         return;
     }
+
+    if (deleteAllButton) deleteAllButton.style.display = 'inline-flex';
 
     records.forEach(record => {
         const li = document.createElement('li');
@@ -15852,6 +15872,44 @@ async function deleteAirportPdf(oaci) {
         displayInstalledAirportPdfs();
     } catch (error) {
         alert(`Suppression PDF impossible : ${error.message || error}`);
+    }
+}
+
+async function deleteAllAirportPdfs() {
+    const records = await getInstalledAirportPdfRecords();
+    if (!records.length) {
+        alert('Aucun PDF offline à supprimer.');
+        await displayInstalledAirportPdfs();
+        return false;
+    }
+
+    const count = records.length;
+    const confirmed = confirm(
+        `Supprimer en une seule fois les ${count} PDF offline FDF, aérodromes et OPS de cet appareil ?\n\nCette action est définitive.`
+    );
+    if (!confirmed) return false;
+
+    try {
+        const pdfDb = await initAirportPdfDB();
+        await new Promise((resolve, reject) => {
+            const tx = pdfDb.transaction(AIRPORT_PDF_STORE_NAME, 'readwrite');
+            tx.objectStore(AIRPORT_PDF_STORE_NAME).clear();
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(
+                tx.error || new Error('Suppression de tous les PDF impossible')
+            );
+            tx.onabort = () => reject(
+                tx.error || new Error('Suppression de tous les PDF interrompue')
+            );
+        });
+
+        await displayInstalledAirportPdfs();
+        alert(`${count} PDF offline supprimé(s).`);
+        return true;
+    } catch (error) {
+        console.error('Suppression groupée des PDF impossible:', error);
+        alert(`Suppression de tous les PDF impossible : ${error.message || error}`);
+        return false;
     }
 }
 
@@ -15941,6 +15999,7 @@ window.openAirportPdf = openAirportPdf;
 window.openFdfReducedPdf = openFdfReducedPdf;
 window.openOpsFrequenciesPdf = openOpsFrequenciesPdf;
 window.deleteAirportPdf = deleteAirportPdf;
+window.deleteAllAirportPdfs = deleteAllAirportPdfs;
 
 
 function buildPermanentAirportDotIcon() {
