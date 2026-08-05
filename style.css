@@ -12229,3 +12229,93 @@ body.gaar-point-search-open .gaar-editing-banner {
    v14.79 TEST — vecteur vitesse segmenté par tranches de 50 kt
    ========================================================================== */
 /* La géométrie et le nombre exact de traits sont calculés dans script.js. */
+
+
+/* ==========================================================================
+   v14.85 TEST — réorganisation Gestion des Cartes
+   ========================================================================== */
+
+#offline-map-modal .offline-maps-management-section,
+#offline-map-modal .road-overlay-import-block,
+#offline-map-modal .airport-pdf-section {
+    margin-top: 0 !important;
+    padding: 14px !important;
+    border: 1px solid #d6e0ea !important;
+    border-radius: 12px !important;
+    background: #f8fbff !important;
+    box-sizing: border-box !important;
+}
+
+#offline-map-modal .offline-maps-management-section h3,
+#offline-map-modal .road-overlay-import-block h3,
+#offline-map-modal .airport-pdf-section h3 {
+    margin: 0 0 10px !important;
+    color: var(--primary-color) !important;
+    font-size: 18px !important;
+}
+
+#offline-map-modal .offline-maps-management-section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+}
+
+#offline-map-modal .road-overlay-import-block {
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+    padding-top: 14px !important;
+    border-top: 1px solid #d6e0ea !important;
+}
+
+#offline-map-modal .road-overlay-delete-button {
+    align-self: flex-start !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 9px 14px !important;
+    white-space: normal !important;
+}
+
+#offline-map-modal .airport-pdf-toolbar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    margin-bottom: 10px !important;
+}
+
+#offline-map-modal .airport-pdf-toolbar .pdf-import-button {
+    width: auto !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 12px 14px !important;
+}
+
+#offline-map-modal .airport-pdf-delete-all-button {
+    display: inline-flex;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 9px 14px !important;
+}
+
+@media (max-width: 640px) {
+    #offline-map-modal .airport-pdf-toolbar {
+        align-items: stretch !important;
+    }
+
+    #offline-map-modal .airport-pdf-toolbar .pdf-import-button,
+    #offline-map-modal .airport-pdf-delete-all-button {
+        width: 100% !important;
+    }
+
+    #offline-map-modal .road-overlay-delete-button {
+        width: auto !important;
+    }
+}
