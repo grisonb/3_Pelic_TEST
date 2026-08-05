@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-83_readable_road_labels';
-const APP_VERSION = 'v14.83';
+const SW_VERSION = 'sw-v14-84_flight_offline_recovery';
+const APP_VERSION = 'v14.84';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
