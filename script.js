@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.83';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.84';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.83';
+    './data/localites/localites-france-v14.56.zip?appv=v14.84';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -627,6 +627,22 @@ let roadOverlayRefreshTimer = null;
 let roadOverlayRefreshToken = 0;
 let roadOverlayLoadedZoomTier = -1;
 const loadedRoadOverlayParts = new Map();
+
+/*
+ * v14.84 — état de rafraîchissement du calque routier.
+ * En suivi GPS, Leaflet déclenche un moveend à chaque recentrage. Les routes
+ * déjà chargées se déplacent naturellement avec la carte : il est donc inutile
+ * de reparcourir les GeoJSON, de réappliquer tous les styles et de reconstruire
+ * tous les cartouches à chaque position reçue.
+ */
+let roadOverlayLastVisiblePartSignature = '';
+let roadOverlayLastStyleBand = -1;
+let roadOverlayLastLabelCenter = null;
+let roadOverlayLastLabelZoom = -1;
+let roadOverlayLastLabelRefreshAt = 0;
+const ROAD_OVERLAY_LABEL_REFRESH_MAX_INTERVAL_MS = 60000;
+const ROAD_OVERLAY_LABEL_REFRESH_VIEWPORT_RATIO = 0.24;
+
 let areDepartmentsVisible = false;
 let hasLoadedDepartments = false;
 let communesLayerGroup = null;
@@ -5546,6 +5562,20 @@ let directOfflineTileHitCount = 0;
 let directOfflineTileMissCount = 0;
 
 /*
+ * v14.84 — récupération automatique après panne temporaire d'IndexedDB.
+ * Safari peut invalider une connexion pendant un usage long ou sous pression
+ * mémoire. Les erreurs techniques ne doivent plus être assimilées à des tuiles
+ * réellement absentes.
+ */
+const DIRECT_OFFLINE_READ_ERROR_THRESHOLD = 4;
+const DIRECT_OFFLINE_RECOVERY_COOLDOWN_MS = 12000;
+let directOfflineConsecutiveReadErrors = 0;
+let directOfflineRecoveryInProgress = false;
+let directOfflineLastRecoveryAt = 0;
+let directOfflineRecoveryCount = 0;
+let directOfflineLastRecoveryReason = '';
+
+/*
  * v14.69 TEST — lecture NPF à froid stabilisée.
  *
  * La carte NPF est nettement plus volumineuse que la carte OACI. Safari peut
@@ -5876,6 +5906,165 @@ function rememberDirectOfflineTileBlob(cacheKey, blob) {
     }
 }
 
+function isPrimaryDirectOfflineDatabaseCandidate(dbName) {
+    const activeNames = Array.isArray(activeOfflinePackDatabases)
+        ? activeOfflinePackDatabases.filter(Boolean).map(String)
+        : [];
+
+    if (activeNames.length) {
+        return activeNames.includes(String(dbName || ''));
+    }
+
+    return String(dbName || '') === String(OFFLINE_DB_NAME || '');
+}
+
+function isRecoverableDirectOfflineReadError(error) {
+    const message = String(error?.message || error || '');
+    if (!message) return false;
+
+    /*
+     * Une base candidate inexistante est normale pour certaines anciennes
+     * configurations. Elle ne doit pas déclencher de récupération.
+     */
+    if (
+        /Base de tuiles absente/i.test(message)
+        || /object store.*absent/i.test(message)
+        || /NotFoundError/i.test(message)
+    ) {
+        return false;
+    }
+
+    return /timeout|bloqu|blocked|transaction|annul|abort|InvalidState|DatabaseClosed|closing|inactive|unknownerror|operationerror/i.test(
+        message
+    );
+}
+
+function resetDirectOfflineReadErrorCounter() {
+    directOfflineConsecutiveReadErrors = 0;
+}
+
+async function recoverDirectOfflineTileReader(reason = 'read-error') {
+    if (
+        directOfflineRecoveryInProgress
+        || mapSourceMode !== 'offline'
+        || !Array.isArray(activeOfflinePacks)
+        || !activeOfflinePacks.length
+    ) {
+        return false;
+    }
+
+    const now = Date.now();
+    if (
+        now - directOfflineLastRecoveryAt
+        < DIRECT_OFFLINE_RECOVERY_COOLDOWN_MS
+    ) {
+        return false;
+    }
+
+    directOfflineRecoveryInProgress = true;
+    directOfflineLastRecoveryAt = now;
+    directOfflineLastRecoveryReason = String(reason || 'read-error');
+    directOfflineRecoveryCount += 1;
+
+    try {
+        setOfflineMapSwitchBusy(
+            'Mode OFFLINE — réouverture automatique du stockage local…'
+        );
+
+        resetPendingDirectOfflineNpfReads();
+        closeDirectOfflineDatabaseConnectionsForStartupRetry();
+        directOfflineTileBlobCache.clear();
+        directOfflineTileMissCount = 0;
+
+        await new Promise(resolve => setTimeout(resolve, 180));
+
+        reconcileRememberedOfflinePacksWithInstalledMetadata();
+        refreshRememberedOfflinePackRuntimeMetadata();
+
+        const readyDatabase =
+            await waitForRememberedOfflineTileDatabaseReady();
+
+        if (readyDatabase) {
+            const rebuilt = rebuildRememberedOfflineMapAfterDatabaseReady(
+                `automatic-read-recovery:${directOfflineLastRecoveryReason}`,
+                readyDatabase
+            );
+            if (rebuilt) {
+                setOfflineMapSwitchBusy(
+                    'Mode OFFLINE — accès aux cartes locales rétabli.'
+                );
+                return true;
+            }
+        }
+
+        /*
+         * Chemin de secours : reconstruire quand même la couche ; les tentatives
+         * de réveil déjà présentes poursuivront l'ouverture de la base.
+         */
+        if (map && mapSourceMode === 'offline') {
+            setupBaseTileLayer();
+            scheduleOfflineTileWake('automatic-read-recovery-fallback');
+            scheduleRememberedOfflineMapStartupRecovery(
+                'automatic-read-recovery-fallback'
+            );
+        }
+        return false;
+    } catch (error) {
+        console.warn(
+            '[Offline] Récupération automatique IndexedDB impossible:',
+            error
+        );
+        return false;
+    } finally {
+        directOfflineConsecutiveReadErrors = 0;
+        directOfflineRecoveryInProgress = false;
+    }
+}
+
+function registerDirectOfflineReadError(error, context = '') {
+    if (
+        mapSourceMode !== 'offline'
+        || !isRecoverableDirectOfflineReadError(error)
+    ) {
+        return false;
+    }
+
+    directOfflineConsecutiveReadErrors += 1;
+    console.warn(
+        '[Offline] Erreur lecture tuile locale:',
+        context,
+        error
+    );
+
+    if (
+        directOfflineConsecutiveReadErrors
+        >= DIRECT_OFFLINE_READ_ERROR_THRESHOLD
+        && !directOfflineRecoveryInProgress
+    ) {
+        /*
+         * Décaler la fermeture des connexions pour laisser la transaction
+         * courante sortir proprement de sa pile d'exécution.
+         */
+        setTimeout(() => {
+            recoverDirectOfflineTileReader(
+                context || 'consecutive-read-errors'
+            ).catch(() => {});
+        }, 120);
+    }
+
+    return true;
+}
+
+window.getNpfOfflineRecoveryStatus = function getNpfOfflineRecoveryStatus() {
+    return {
+        consecutiveReadErrors: directOfflineConsecutiveReadErrors,
+        recoveryInProgress: directOfflineRecoveryInProgress,
+        recoveryCount: directOfflineRecoveryCount,
+        lastRecoveryAt: directOfflineLastRecoveryAt,
+        lastRecoveryReason: directOfflineLastRecoveryReason
+    };
+};
+
 async function findDirectOfflineTileBlobUnqueued(coords) {
     const cacheKey = [
         coords.z,
@@ -5883,15 +6072,19 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
         coords.y,
         ...(Array.isArray(activeOfflinePacks) ? activeOfflinePacks : [])
     ].join('|');
+
     if (directOfflineTileBlobCache.has(cacheKey)) {
         const cachedBlob = directOfflineTileBlobCache.get(cacheKey);
         directOfflineTileBlobCache.delete(cacheKey);
         directOfflineTileBlobCache.set(cacheKey, cachedBlob);
+        resetDirectOfflineReadErrorCounter();
         return cachedBlob;
     }
 
     const dbNames = getDirectOfflineDatabaseCandidates();
     const tileUrls = getDirectOfflineTileUrlCandidates(coords);
+    let hadRecoverableTechnicalError = false;
+
     for (const dbName of dbNames) {
         let tileDb;
         try {
@@ -5901,9 +6094,19 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
                 openTimeoutMs,
                 `Timeout ouverture ${dbName}`
             );
-        } catch (_) {
+        } catch (error) {
+            if (
+                isPrimaryDirectOfflineDatabaseCandidate(dbName)
+                && registerDirectOfflineReadError(
+                    error,
+                    `ouverture ${dbName}`
+                )
+            ) {
+                hadRecoverableTechnicalError = true;
+            }
             continue;
         }
+
         for (const tileUrl of tileUrls) {
             try {
                 const readTimeoutMs = isNpfOfflinePackSelection() ? 5200 : 1800;
@@ -5913,6 +6116,7 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
                     'Timeout lecture tuile'
                 );
                 if (!record?.tile) continue;
+
                 const blob = record.tile instanceof Blob
                     ? record.tile
                     : new Blob([record.tile], {
@@ -5920,17 +6124,44 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
                             ? 'image/jpeg'
                             : 'image/png'
                     });
+
                 rememberDirectOfflineTileBlob(cacheKey, blob);
+                resetDirectOfflineReadErrorCounter();
                 directOfflineTileHitCount += 1;
+
                 if (directOfflineTileHitCount === 1) {
-                    setOfflineMapSwitchBusy('Mode OFFLINE — tuiles locales chargées.');
+                    setOfflineMapSwitchBusy(
+                        'Mode OFFLINE — tuiles locales chargées.'
+                    );
                 }
                 return blob;
-            } catch (_) {}
+            } catch (error) {
+                if (
+                    isPrimaryDirectOfflineDatabaseCandidate(dbName)
+                    && registerDirectOfflineReadError(
+                        error,
+                        `lecture ${dbName}`
+                    )
+                ) {
+                    hadRecoverableTechnicalError = true;
+                }
+            }
         }
     }
+
+    /*
+     * Ne pas annoncer une tuile absente lorsque la lecture a échoué pour une
+     * raison technique : la récupération automatique est déjà en cours.
+     */
+    if (hadRecoverableTechnicalError) {
+        return null;
+    }
+
     directOfflineTileMissCount += 1;
-    if (directOfflineTileHitCount === 0 && directOfflineTileMissCount === 6) {
+    if (
+        directOfflineTileHitCount === 0
+        && directOfflineTileMissCount === 6
+    ) {
         setOfflineMapSwitchBusy(
             'Mode OFFLINE actif — aucune tuile trouvée ici à ce niveau de zoom.'
         );
@@ -7509,6 +7740,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
+// v14.84 TEST — stabilité cartes offline pendant un vol prolongé
+// - le calque routier ne reconstruit plus toutes ses couches à chaque recentrage GPS ;
+// - les cartouches ne sont recalculés qu'après un déplacement significatif ;
+// - les connexions IndexedDB sont rouvertes automatiquement après plusieurs erreurs ;
+// - la couche de tuiles locale est reconstruite sans relancer la PWA.
+// =========================================================================
+
+// =========================================================================
 // v14.83 TEST — cartouches routiers lisibles
 // - suppression à l'affichage des suffixes techniques girondins U / Uxxxx ;
 // - un seul cartouche par référence dans l'emprise visible ;
@@ -8522,6 +8761,98 @@ function renderRoadOverlayLabelCandidates(candidatesByRef) {
     }
 }
 
+function getRoadOverlayStyleBand() {
+    const zoom = map?.getZoom?.() ?? 0;
+    if (zoom >= 13) return 3;
+    if (zoom >= 12) return 2;
+    if (zoom >= 11) return 1;
+    return 0;
+}
+
+function getRoadOverlayPartSignature(parts, tier) {
+    const keys = (Array.isArray(parts) ? parts : [])
+        .map(part => String(part?.key || ''))
+        .filter(Boolean)
+        .sort((left, right) => left.localeCompare(
+            right,
+            'fr',
+            { numeric: true, sensitivity: 'base' }
+        ));
+    return `${Number(tier) || 0}|${keys.join('|')}`;
+}
+
+function getLoadedRoadOverlayPartSignature(tier) {
+    const keys = [];
+    loadedRoadOverlayParts.forEach((record, key) => {
+        if (record?.tier === tier) keys.push(String(key || ''));
+    });
+    keys.sort((left, right) => left.localeCompare(
+        right,
+        'fr',
+        { numeric: true, sensitivity: 'base' }
+    ));
+    return `${Number(tier) || 0}|${keys.join('|')}`;
+}
+
+function shouldRefreshRoadOverlayLabelsForView({ force = false } = {}) {
+    if (!map) return false;
+    if (force) return true;
+
+    const center = map.getCenter?.();
+    const zoom = Number(map.getZoom?.());
+    const now = Date.now();
+
+    if (
+        !center
+        || !roadOverlayLastLabelCenter
+        || !Number.isFinite(roadOverlayLastLabelZoom)
+        || zoom !== roadOverlayLastLabelZoom
+    ) {
+        return true;
+    }
+
+    if (
+        now - roadOverlayLastLabelRefreshAt
+        >= ROAD_OVERLAY_LABEL_REFRESH_MAX_INTERVAL_MS
+    ) {
+        return true;
+    }
+
+    try {
+        const bounds = map.getBounds();
+        const westPoint = L.latLng(center.lat, bounds.getWest());
+        const eastPoint = L.latLng(center.lat, bounds.getEast());
+        const viewportWidthMeters = westPoint.distanceTo(eastPoint);
+        const minimumShiftMeters = Math.max(
+            1200,
+            viewportWidthMeters * ROAD_OVERLAY_LABEL_REFRESH_VIEWPORT_RATIO
+        );
+        return center.distanceTo(roadOverlayLastLabelCenter) >= minimumShiftMeters;
+    } catch (_) {
+        return false;
+    }
+}
+
+function rememberRoadOverlayLabelView() {
+    if (!map) return;
+    try {
+        const center = map.getCenter();
+        roadOverlayLastLabelCenter = L.latLng(center.lat, center.lng);
+    } catch (_) {
+        roadOverlayLastLabelCenter = null;
+    }
+    roadOverlayLastLabelZoom = Number(map.getZoom?.());
+    roadOverlayLastLabelRefreshAt = Date.now();
+}
+
+function resetRoadOverlayRefreshState() {
+    roadOverlayLastVisiblePartSignature = '';
+    roadOverlayLastStyleBand = -1;
+    roadOverlayLastLabelCenter = null;
+    roadOverlayLastLabelZoom = -1;
+    roadOverlayLastLabelRefreshAt = 0;
+}
+
 function clearRoadOverlayRenderedParts(options = {}) {
     loadedRoadOverlayParts.clear();
 
@@ -8536,6 +8867,8 @@ function clearRoadOverlayRenderedParts(options = {}) {
      */
     try { roadOverlayCasingRenderer?._redraw?.(); } catch (_) {}
     try { roadOverlayLineRenderer?._redraw?.(); } catch (_) {}
+
+    resetRoadOverlayRefreshState();
 
     if (options.resetTier !== false) {
         roadOverlayLoadedZoomTier = -1;
@@ -8605,7 +8938,7 @@ function rebuildRoadOverlayLabels() {
     roadOverlayLabelsLayer.clearLayers();
 
     /*
-     * v14.83 — préparer d'abord tous les candidats des parties visibles.
+     * v14.84 — préparer d'abord tous les candidats des parties visibles.
      * Le meilleur tronçon de chaque référence est retenu, puis les cartouches
      * sont triés et filtrés globalement pour éviter les amas illisibles.
      */
@@ -8640,6 +8973,8 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
 
     const token = ++roadOverlayRefreshToken;
     const currentTier = getRoadOverlayZoomTier();
+    const currentStyleBand = getRoadOverlayStyleBand();
+    const forceRefresh = source !== 'map-change';
 
     isRoadOverlayLoading = true;
     refreshRoadOverlayButtonState();
@@ -8650,17 +8985,19 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
          * GeoJSON, ne conserver aucune géométrie et ne solliciter aucun Canvas.
          */
         if (currentTier === 0) {
-            clearRoadOverlayRenderedParts({ resetTier: false });
+            if (
+                roadOverlayLoadedZoomTier !== 0
+                || loadedRoadOverlayParts.size
+            ) {
+                clearRoadOverlayRenderedParts({ resetTier: false });
+            }
             roadOverlayLoadedZoomTier = 0;
+            roadOverlayLastStyleBand = currentStyleBand;
             return;
         }
 
-        /*
-         * Lors du passage 2 NM ↔ 1 NM, détruire réellement les anciennes
-         * couches. On évite ainsi de conserver N/D invisibles à 2 NM ou de
-         * réutiliser une partie chargée avec une autre sélection de classes.
-         */
-        if (roadOverlayLoadedZoomTier !== currentTier) {
+        const tierChanged = roadOverlayLoadedZoomTier !== currentTier;
+        if (tierChanged) {
             clearRoadOverlayRenderedParts({ resetTier: false });
             roadOverlayLoadedZoomTier = currentTier;
         }
@@ -8670,51 +9007,86 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
             roadOverlayBboxIntersectsBounds(part.bbox, bounds)
         ));
         const visibleKeys = new Set(visibleParts.map(part => part.key));
+        const visibleSignature = getRoadOverlayPartSignature(
+            visibleParts,
+            currentTier
+        );
+        const loadedSignature = getLoadedRoadOverlayPartSignature(currentTier);
 
-        loadedRoadOverlayParts.forEach((record, key) => {
-            if (
-                visibleKeys.has(key)
-                && record?.tier === currentTier
-            ) {
-                return;
-            }
-
-            try {
-                if (record?.casing) {
-                    roadOverlayCasingLayer.removeLayer(record.casing);
-                }
-            } catch (_) {}
-
-            try {
-                if (record?.lines) {
-                    roadOverlayLineLayer.removeLayer(record.lines);
-                }
-            } catch (_) {}
-
-            loadedRoadOverlayParts.delete(key);
+        const partSelectionChanged = (
+            tierChanged
+            || visibleSignature !== roadOverlayLastVisiblePartSignature
+            || visibleSignature !== loadedSignature
+        );
+        const styleChanged = (
+            currentStyleBand !== roadOverlayLastStyleBand
+        );
+        const labelsNeedRefresh = shouldRefreshRoadOverlayLabelsForView({
+            force: forceRefresh || partSelectionChanged || styleChanged
         });
 
-        for (const part of visibleParts) {
-            if (
-                token !== roadOverlayRefreshToken
-                || !showRoadOverlayLayer
-                || currentTier !== roadOverlayLoadedZoomTier
-            ) {
-                return;
+        /*
+         * Cas normal en suivi GPS : la même sélection de fichiers est déjà
+         * chargée et le seuil de déplacement des cartouches n'est pas atteint.
+         * Leaflet translate les Canvas et les marqueurs sans aucune reconstruction.
+         */
+        if (
+            !partSelectionChanged
+            && !styleChanged
+            && !labelsNeedRefresh
+        ) {
+            return;
+        }
+
+        if (partSelectionChanged) {
+            loadedRoadOverlayParts.forEach((record, key) => {
+                if (
+                    visibleKeys.has(key)
+                    && record?.tier === currentTier
+                ) {
+                    return;
+                }
+
+                try {
+                    if (record?.casing) {
+                        roadOverlayCasingLayer.removeLayer(record.casing);
+                    }
+                } catch (_) {}
+
+                try {
+                    if (record?.lines) {
+                        roadOverlayLineLayer.removeLayer(record.lines);
+                    }
+                } catch (_) {}
+
+                loadedRoadOverlayParts.delete(key);
+            });
+
+            for (const part of visibleParts) {
+                if (
+                    token !== roadOverlayRefreshToken
+                    || !showRoadOverlayLayer
+                    || currentTier !== roadOverlayLoadedZoomTier
+                ) {
+                    return;
+                }
+
+                const existing = loadedRoadOverlayParts.get(part.key);
+                if (existing?.tier === currentTier) continue;
+
+                try {
+                    await loadRoadOverlayPart(part, token, currentTier);
+                } catch (error) {
+                    console.warn(
+                        'Partie du calque routier ignorée:',
+                        part.name,
+                        error
+                    );
+                }
             }
 
-            const existing = loadedRoadOverlayParts.get(part.key);
-            if (existing?.tier === currentTier) continue;
-
-            try {
-                await loadRoadOverlayPart(part, token, currentTier);
-            } catch (error) {
-                console.warn(
-                    'Partie du calque routier ignorée:',
-                    part.name,
-                    error
-                );
-            }
+            roadOverlayLastVisiblePartSignature =
+                getLoadedRoadOverlayPartSignature(currentTier);
         }
 
         if (
@@ -8725,23 +9097,34 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
             return;
         }
 
-        loadedRoadOverlayParts.forEach(record => {
-            if (record?.tier !== currentTier) return;
+        /*
+         * Les poids changent seulement aux seuils utiles (11, 12 et 13).
+         * Ne pas réappliquer les styles à chaque recentrage GPS.
+         */
+        if (styleChanged || tierChanged) {
+            loadedRoadOverlayParts.forEach(record => {
+                if (record?.tier !== currentTier) return;
 
-            try {
-                record.casing?.setStyle(
-                    feature => getRoadOverlayLineStyle(feature, true)
-                );
-                record.lines?.setStyle(
-                    feature => getRoadOverlayLineStyle(feature, false)
-                );
-            } catch (_) {}
-        });
+                try {
+                    record.casing?.setStyle(
+                        feature => getRoadOverlayLineStyle(feature, true)
+                    );
+                    record.lines?.setStyle(
+                        feature => getRoadOverlayLineStyle(feature, false)
+                    );
+                } catch (_) {}
+            });
 
-        try { roadOverlayCasingRenderer?._redraw?.(); } catch (_) {}
-        try { roadOverlayLineRenderer?._redraw?.(); } catch (_) {}
+            try { roadOverlayCasingRenderer?._redraw?.(); } catch (_) {}
+            try { roadOverlayLineRenderer?._redraw?.(); } catch (_) {}
+        }
 
-        rebuildRoadOverlayLabels();
+        roadOverlayLastStyleBand = currentStyleBand;
+
+        if (labelsNeedRefresh || partSelectionChanged) {
+            rebuildRoadOverlayLabels();
+            rememberRoadOverlayLabelView();
+        }
     } finally {
         if (token === roadOverlayRefreshToken) {
             isRoadOverlayLoading = false;
@@ -8756,7 +9139,7 @@ function scheduleRoadOverlayRefresh(source = 'scheduled') {
         refreshRoadOverlayVisibleParts(source).catch(error => {
             console.warn('Actualisation du calque routier impossible:', source, error);
         });
-    }, 220);
+    }, source === 'map-change' ? 650 : 220);
 }
 
 async function toggleRoadOverlayLayer(forceState = null, options = {}) {
