@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-84_flight_offline_recovery';
-const APP_VERSION = 'v14.84';
+const SW_VERSION = 'sw-v14-85_offline_window_reorganization';
+const APP_VERSION = 'v14.85';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
