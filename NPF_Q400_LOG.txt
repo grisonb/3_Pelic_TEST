@@ -1,5 +1,101 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.84 — STABILITÉ DES CARTES OFFLINE EN VOL
+Date : 05/08/2026
+Base : TEST v14.83
+
+PROBLÈME SIGNALÉ
+- Pendant un vol avec la v14.83, l’accès aux cartes hors ligne a été temporairement perdu.
+- La fermeture puis la relance de la PWA ont rétabli immédiatement les cartes.
+- L’incident est survenu longtemps après l’import du pack routier.
+
+CAUSES TECHNIQUES CORRIGÉES
+1. Actualisation excessive du calque routier
+- Le suivi GPS recentre régulièrement la carte.
+- Chaque recentrage provoquait un événement `moveend`.
+- La v14.83 relançait alors le contrôle des parties routières, réappliquait les styles, redessinait les Canvas et reconstruisait tous les cartouches.
+- Cette opération pouvait se répéter durant tout le vol alors que les mêmes fichiers routiers étaient déjà chargés.
+
+2. Absence de récupération après erreur IndexedDB
+- Une erreur ou un délai d’ouverture/lecture de la base locale était traité comme une tuile absente.
+- La connexion IndexedDB défaillante pouvait rester mémorisée.
+- La PWA ne rouvrait pas automatiquement la base tant qu’elle n’était pas relancée.
+
+CORRECTIONS INTÉGRÉES
+1. Stabilisation du calque routier
+- Signature mémorisée des parties GeoJSON effectivement visibles.
+- Comparaison entre la sélection attendue et les parties réellement chargées.
+- Aucun rechargement de partie si la sélection n’a pas changé.
+- Aucun `setStyle` global si le seuil graphique de zoom n’a pas changé.
+- Aucun redessin forcé des deux Canvas à chaque recentrage GPS.
+- Déplacement naturel des Canvas et marqueurs par Leaflet conservé.
+- Débounce des `moveend` GPS porté à 650 ms.
+- Les cartouches sont recalculés seulement :
+  - lors d’un changement de parties visibles ;
+  - lors d’un changement de seuil graphique de zoom ;
+  - après un déplacement d’au moins 24 % de la largeur de l’écran, avec un minimum de 1 200 m ;
+  - ou après 60 secondes au maximum.
+- Les commandes manuelles et l’activation du calque forcent toujours un rafraîchissement complet.
+
+2. Récupération automatique des cartes hors ligne
+- Distinction entre une tuile réellement absente et une erreur technique IndexedDB.
+- Comptage des erreurs consécutives uniquement sur la base active.
+- Les bases candidates anciennes ou absentes ne déclenchent pas de fausse alerte.
+- Après quatre erreurs techniques consécutives :
+  - annulation des lectures en attente ;
+  - fermeture des connexions IndexedDB mémorisées ;
+  - vidage du petit cache mémoire de blobs ;
+  - réconciliation des packs actifs et de leurs noms de bases ;
+  - attente de la disponibilité réelle de la base ;
+  - reconstruction automatique de la couche de tuiles locale.
+- Délai de sécurité de 12 secondes entre deux récupérations.
+- Chemin de secours utilisant les procédures de réveil déjà intégrées si la base n’est pas immédiatement disponible.
+- Aucun redémarrage de la PWA ne doit être nécessaire lorsque la récupération réussit.
+
+3. Diagnostic discret
+- La console JavaScript peut afficher l’état avec :
+  `getNpfOfflineRecoveryStatus()`
+- Valeurs disponibles :
+  - erreurs de lecture consécutives ;
+  - récupération en cours ;
+  - nombre de récupérations ;
+  - date et raison de la dernière récupération.
+- Aucun nouveau bouton ou encombrement de l’interface.
+
+4. Compatibilité et fonctionnement offline
+- Pack routier v6 conservé.
+- Cartes NPF, OACI et autres packs existants conservés.
+- Aucune nouvelle API ni ressource distante.
+- Service worker, Cache API et IndexedDB conservés.
+- Toutes les autres fonctions de la v14.83 sont conservées.
+
+CONTRÔLES TECHNIQUES
+- Versions index, manifeste, script et service worker alignées sur v14.84.
+- Syntaxe de `script.js` contrôlée avec Node.js.
+- Syntaxe de `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé.
+- Présence des seuils de stabilisation routière contrôlée.
+- Présence du comparateur de signatures de parties contrôlée.
+- Présence de la distinction erreur technique / tuile absente contrôlée.
+- Présence de la récupération automatique IndexedDB contrôlée.
+- Vérification de l’absence de nouvelle dépendance réseau.
+- Intégrité des deux archives de livraison contrôlée.
+
+VALIDATION À EFFECTUER DANS NPF TEST
+- Installer la v14.84 sans réimporter les cartes ni le pack routier.
+- Vérifier que les cartes offline déjà installées s’ouvrent normalement.
+- Activer le suivi GPS et le calque routier.
+- Contrôler que le calque se déplace sans clignotement ni reconstruction permanente.
+- Effectuer un essai prolongé avec plusieurs déplacements et changements de zoom.
+- Fermer complètement la PWA puis répéter le contrôle en mode avion.
+- Le contrôle réel en vol et le test iPad en mode avion restent nécessaires après publication.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.83 — CARTOUCHES ROUTIERS LISIBLES
 Date : 04/08/2026
 Base : TEST v14.82
