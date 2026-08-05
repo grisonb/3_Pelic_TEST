@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.84" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.84">
-    <link rel="manifest" href="manifest.json?appv=v14.84">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.85" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.85">
+    <link rel="manifest" href="manifest.json?appv=v14.85">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.84';
+        const APP_VERSION = 'v14.85';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -563,7 +563,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.84"></script>
+    <script src="script.js?appv=v14.85"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -798,25 +798,6 @@
             <div class="modal-content">
                 <div class="import-section">
                     <button id="simulation-mode-button" type="button" class="simulation-mode-button">Mode simulation avion</button>
-                    <label for="zip-importer-input" class="import-button">Importer un pack de tuiles (.zip)</label>
-                    <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
-
-                    <div class="road-overlay-import-block">
-                        <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
-                            Importer le calque routier A / N / D / M / T
-                        </label>
-                        <input type="file" id="road-overlay-importer-input"
-                               accept=".zip,.geojson,.json,application/geo+json,application/json"
-                               style="display: none;">
-                        <div id="road-overlay-installed-status" class="road-overlay-installed-status">
-                            Aucun pack routier installé.
-                        </div>
-                        <button id="delete-road-overlay-button" type="button"
-                                class="danger-inline-btn road-overlay-delete-button"
-                                style="display: none;">
-                            Supprimer le calque routier
-                        </button>
-                    </div>
                 </div>
 
                 <div id="import-progress-section" style="display: none;">
@@ -826,8 +807,11 @@
                     </div>
                 </div>
 
-                <div class="installed-maps-section">
-                    <h3>Packs installés</h3>
+                <div class="installed-maps-section offline-maps-management-section">
+                    <h3>Cartes Offline</h3>
+                    <label for="zip-importer-input" class="import-button">Importer Cartes Offline</label>
+                    <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
+
                     <div class="offline-toggle-row">
                         <span>Type de carte :</span>
                         <div class="map-source-buttons">
@@ -845,10 +829,36 @@
                         <li class="no-maps-placeholder">Aucun pack de cartes installé.</li>
                     </ul>
                 </div>
+
+                <div class="road-overlay-import-block">
+                    <h3>Calque Routier</h3>
+                    <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
+                        Importer Calque Routier
+                    </label>
+                    <input type="file" id="road-overlay-importer-input"
+                           accept=".zip,.geojson,.json,application/geo+json,application/json"
+                           style="display: none;">
+                    <div id="road-overlay-installed-status" class="road-overlay-installed-status">
+                        Aucun pack routier installé.
+                    </div>
+                    <button id="delete-road-overlay-button" type="button"
+                            class="danger-inline-btn road-overlay-delete-button"
+                            style="display: none;">
+                        Supprimer le calque routier
+                    </button>
+                </div>
+
                 <div class="airport-pdf-section">
                     <h3>PDFs FDF réduite / aérodromes offline</h3>
                     <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>, ou les documents communs <b>Doc Fdf Réduité.pdf</b> et <b>Carte Fréquences OPS.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne.</p>
-                    <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDFs Doc Fdf Réduité</label>
+                    <div class="airport-pdf-toolbar">
+                        <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDFs Doc Fdf Réduité</label>
+                        <button id="delete-all-airport-pdfs-button" type="button"
+                                class="danger-inline-btn airport-pdf-delete-all-button"
+                                style="display: none;">
+                            Tout supprimer
+                        </button>
+                    </div>
                     <input type="file" id="airport-pdf-importer-input" accept="application/pdf,.pdf" multiple style="display: none;">
                     <ul id="installed-airport-pdfs-list">
                         <li class="no-pdfs-placeholder">Aucun PDF aérodrome stocké.</li>
