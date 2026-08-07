@@ -1,5 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.90';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.91';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v14.91 TEST — présentation des aides d’import phrase par phrase
+// - retour à la ligne après chaque phrase dans les trois aides ;
+// - suppression de la virgule entre « Calque Routier » et « et clique » ;
+// - contenu des trois aides harmonisé sans modifier le fonctionnement d’import.
+// =========================================================================
 
 //  =========================================================================
 // INITIALISATION DE L'APPLICATION
@@ -569,7 +576,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.90';
+    './data/localites/localites-france-v14.56.zip?appv=v14.91';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -6793,15 +6800,31 @@ function setupEventListeners() {
     const importHelpContent = {
         'offline-maps': {
             title: 'Aide — Importer Cartes Offline',
-            text: 'Clique sur Drive. Il faut être connecté au Drive Dash 8. Ouvre le dossier Cartes NPF-Q400, puis Cartes OACI, et clique sur le fichier ZIP. Une fois le téléchargement terminé, recommence la procédure et ouvre le dossier Cartes NPF v... . Il faut télécharger les fichiers ZIP un par un, les uns après les autres et dans l\'ordre en répétant l’opération décrite pour chaque fichier.'
+            text: [
+                'Clique sur Drive.',
+                'Il faut être connecté au Drive Dash 8.',
+                'Ouvre le dossier Cartes NPF-Q400, puis Cartes OACI, et clique sur le fichier ZIP.',
+                'Une fois le téléchargement terminé, recommence la procédure et ouvre le dossier Cartes NPF v....',
+                'Il faut télécharger les fichiers ZIP un par un, les uns après les autres et dans l\'ordre en répétant l’opération décrite pour chaque fichier.'
+            ].join('\n')
         },
         'road-overlay': {
             title: 'Aide — Importer Calque Routier',
-            text: 'Clique sur Drive. Il faut être connecté au Drive Dash 8. Ouvre le dossier Cartes NPF-Q400, puis Calque Routier, et clique sur le fichier ZIP.'
+            text: [
+                'Clique sur Drive.',
+                'Il faut être connecté au Drive Dash 8.',
+                'Ouvre le dossier Cartes NPF-Q400, puis Calque Routier et clique sur le fichier ZIP.'
+            ].join('\n')
         },
         'fdf-pdfs': {
             title: 'Aide — Télécharger PDFs Doc Fdf',
-            text: 'Clique sur Drive. Il faut être connecté au Drive Dash 8. Ouvre le dossier Cartes NPF-Q400, puis Doc Fdf. Fais Tout sélectionner, puis Ouvrir. Cela va télécharger la documentation FDF réduite, accessible en cliquant sur les pélicandromes, ainsi que la carte des fréquences OPS.'
+            text: [
+                'Clique sur Drive.',
+                'Il faut être connecté au Drive Dash 8.',
+                'Ouvre le dossier Cartes NPF-Q400, puis Doc Fdf.',
+                'Fais Tout sélectionner, puis Ouvrir.',
+                'Cela va télécharger la documentation FDF réduite, accessible en cliquant sur les pélicandromes, ainsi que la carte des fréquences OPS.'
+            ].join('\n')
         }
     };
 
