@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.85';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.86';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.85';
+    './data/localites/localites-france-v14.56.zip?appv=v14.86';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -629,7 +629,7 @@ let roadOverlayLoadedZoomTier = -1;
 const loadedRoadOverlayParts = new Map();
 
 /*
- * v14.85 — état de rafraîchissement du calque routier.
+ * v14.86 — état de rafraîchissement du calque routier.
  * En suivi GPS, Leaflet déclenche un moveend à chaque recentrage. Les routes
  * déjà chargées se déplacent naturellement avec la carte : il est donc inutile
  * de reparcourir les GeoJSON, de réappliquer tous les styles et de reconstruire
@@ -5562,7 +5562,7 @@ let directOfflineTileHitCount = 0;
 let directOfflineTileMissCount = 0;
 
 /*
- * v14.85 — récupération automatique après panne temporaire d'IndexedDB.
+ * v14.86 — récupération automatique après panne temporaire d'IndexedDB.
  * Safari peut invalider une connexion pendant un usage long ou sous pression
  * mémoire. Les erreurs techniques ne doivent plus être assimilées à des tuiles
  * réellement absentes.
@@ -6368,6 +6368,9 @@ function setupEventListeners() {
     const highVoltageLinesButton = document.getElementById('high-voltage-lines-button');
     const roadOverlayButton = document.getElementById('road-overlay-button');
     const opsFrequenciesButton = document.getElementById('ops-frequencies-pdf-button');
+    const quickOfflineMapButton = document.getElementById('quick-offline-map-button');
+    const quickOfflineMapModal = document.getElementById('quick-offline-map-modal');
+    const closeQuickOfflineMapModalButton = document.getElementById('close-quick-offline-map-modal');
     const trafficLayerButton = document.getElementById('traffic-layer-button');
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
@@ -6472,6 +6475,31 @@ function setupEventListeners() {
             openOpsFrequenciesPdf();
         });
     }
+
+    if (quickOfflineMapButton) {
+        refreshQuickOfflineMapButtonState();
+        quickOfflineMapButton.addEventListener('click', () => {
+            openQuickOfflineMapSelector();
+        });
+    }
+
+    if (closeQuickOfflineMapModalButton) {
+        closeQuickOfflineMapModalButton.addEventListener('click', () => {
+            closeQuickOfflineMapSelector();
+        });
+    }
+
+    if (quickOfflineMapModal) {
+        quickOfflineMapModal.addEventListener('click', (event) => {
+            if (event.target === quickOfflineMapModal) closeQuickOfflineMapSelector();
+        });
+    }
+
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && quickOfflineMapModal && quickOfflineMapModal.style.display === 'flex') {
+            closeQuickOfflineMapSelector();
+        }
+    });
 
     if (trafficLayerButton) {
         refreshTrafficButtonState();
@@ -7747,6 +7775,15 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
+// v14.86 TEST — sélecteur rapide des cartes offline en vol
+// - nouveau bouton France immédiatement au-dessus de SafeSky ;
+// - fenêtre dédiée avec un gros bouton par carte offline installée ;
+// - sélection directe des groupes OACI, NPF ou de tout autre groupe installé ;
+// - mise en évidence de la carte active ;
+// - nouvel appui sur la carte déjà active = réouverture propre du lecteur IndexedDB.
+// =========================================================================
+
+// =========================================================================
 // v14.85 TEST — réorganisation de Gestion des Cartes et suppression groupée des PDF
 // - section Cartes Offline regroupée avec son bouton d'import ;
 // - section Calque Routier placée immédiatement sous les cartes offline ;
@@ -8954,7 +8991,7 @@ function rebuildRoadOverlayLabels() {
     roadOverlayLabelsLayer.clearLayers();
 
     /*
-     * v14.85 — préparer d'abord tous les candidats des parties visibles.
+     * v14.86 — préparer d'abord tous les candidats des parties visibles.
      * Le meilleur tronçon de chaque référence est retenu, puis les cartouches
      * sont triés et filtrés globalement pour éviter les amas illisibles.
      */
@@ -21722,7 +21759,237 @@ function getInstalledPackNamesForGroup(groupName) {
         .map(pack => pack.name);
 }
 
+function getQuickOfflineMapGroups() {
+    let installedPacks = [];
+    try {
+        const parsed = JSON.parse(localStorage.getItem('installedMapPacks') || '[]');
+        installedPacks = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        installedPacks = [];
+    }
+
+    return groupInstalledMapPacks(installedPacks)
+        .filter(group => group && group.name && Array.isArray(group.packs) && group.packs.length)
+        .sort((left, right) => String(left.name).localeCompare(
+            String(right.name),
+            'fr',
+            { numeric: true, sensitivity: 'base' }
+        ));
+}
+
+function getQuickOfflineActiveGroupName(groups = null) {
+    if (mapSourceMode !== 'offline') return '';
+    const installedGroups = Array.isArray(groups) ? groups : getQuickOfflineMapGroups();
+    for (const group of installedGroups) {
+        const names = group.packs.map(pack => pack?.name).filter(Boolean);
+        if (
+            names.length
+            && names.every(name => activeOfflinePacks.includes(name))
+            && activeOfflinePacks.length === names.length
+        ) return String(group.name || '');
+    }
+    return '';
+}
+
+function refreshQuickOfflineMapButtonState() {
+    const button = document.getElementById('quick-offline-map-button');
+    const status = document.getElementById('quick-offline-map-button-status');
+    if (!button) return;
+
+    const groups = getQuickOfflineMapGroups();
+    const activeGroupName = getQuickOfflineActiveGroupName(groups);
+    const hasInstalledMaps = groups.length > 0;
+
+    button.classList.toggle('active', !!activeGroupName && mapSourceMode === 'offline');
+    button.classList.toggle('missing-data', !hasInstalledMaps);
+    button.disabled = isMapSourceSwitching;
+    if (status) status.textContent = activeGroupName || (hasInstalledMaps ? 'OFF' : '!');
+    button.title = hasInstalledMaps
+        ? (activeGroupName ? `Carte offline active : ${activeGroupName} — appuyer pour changer` : 'Choisir rapidement une carte offline')
+        : 'Aucune carte offline téléchargée';
+}
+
+function closeQuickOfflineMapSelector() {
+    const modal = document.getElementById('quick-offline-map-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function setQuickOfflineMapStatus(message = '', state = '') {
+    const status = document.getElementById('quick-offline-map-status');
+    if (!status) return;
+    status.textContent = String(message || '');
+    status.dataset.state = String(state || '');
+}
+
+function displayQuickOfflineMapSelector() {
+    const list = document.getElementById('quick-offline-map-list');
+    if (!list) return;
+
+    const groups = getQuickOfflineMapGroups();
+    const activeGroupName = getQuickOfflineActiveGroupName(groups);
+    list.innerHTML = '';
+
+    if (!groups.length) {
+        const empty = document.createElement('div');
+        empty.className = 'quick-offline-map-empty';
+        empty.textContent = 'Aucune carte offline téléchargée.';
+        list.appendChild(empty);
+        setQuickOfflineMapStatus('Importe d’abord une carte depuis Gestion des Cartes.', 'empty');
+        refreshQuickOfflineMapButtonState();
+        return;
+    }
+
+    groups.forEach(group => {
+        const packNames = group.packs.map(pack => pack?.name).filter(Boolean);
+        const isActive = mapSourceMode === 'offline' && String(group.name) === activeGroupName;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'quick-offline-map-choice';
+        button.classList.toggle('active', isActive);
+        button.dataset.groupName = String(group.name);
+
+        const name = document.createElement('span');
+        name.className = 'quick-offline-map-choice-name';
+        name.textContent = String(group.name);
+
+        const detail = document.createElement('span');
+        detail.className = 'quick-offline-map-choice-detail';
+        detail.textContent = isActive
+            ? 'CARTE ACTUELLE — appuyer pour recharger'
+            : (packNames.length > 1 ? `${packNames.length} fichiers — appuyer pour afficher` : 'Appuyer pour afficher');
+
+        button.appendChild(name);
+        button.appendChild(detail);
+        button.addEventListener('click', () => {
+            selectQuickOfflineMapGroup(String(group.name)).catch(error => {
+                console.error('Sélection rapide carte offline impossible:', error);
+                alert(`Impossible de sélectionner ${group.name} : ${error?.message || error}`);
+            });
+        });
+        list.appendChild(button);
+    });
+
+    setQuickOfflineMapStatus(
+        activeGroupName ? `Carte actuellement affichée : ${activeGroupName}.` : 'Aucune carte offline n’est actuellement active.',
+        activeGroupName ? 'active' : 'idle'
+    );
+    refreshQuickOfflineMapButtonState();
+}
+
+function openQuickOfflineMapSelector() {
+    const modal = document.getElementById('quick-offline-map-modal');
+    if (!modal) return;
+    displayQuickOfflineMapSelector();
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+}
+
+async function forceQuickOfflineMapGroupReload(groupName, packNames) {
+    const token = ++offlineMapSwitchToken;
+    const cleanPacks = Array.isArray(packNames) ? packNames.filter(Boolean) : [];
+    if (!cleanPacks.length) throw new Error(`Aucun fichier installé pour ${groupName}.`);
+
+    isMapSourceSwitching = true;
+    updateMapSourceButtons();
+    refreshQuickOfflineMapButtonState();
+    setOfflineMapSwitchBusy(`Réouverture de la carte ${groupName}…`);
+
+    try {
+        await persistSimpleActiveOfflinePacks(cleanPacks);
+        if (token !== offlineMapSwitchToken) return false;
+
+        mapSourceMode = 'offline';
+        offlineTilesMode = true;
+        localStorage.setItem(MAP_SOURCE_MODE_KEY, 'offline');
+        localStorage.setItem(OFFLINE_TILES_ENABLED_KEY, 'true');
+        setOfflineTilesEnabled(true);
+        setOfflineOnlineFallbackMode(false);
+        notifyServiceWorkerOfflineTilesPreference(true);
+        notifyServiceWorkerActivePacks(activeOfflinePacks);
+
+        resetPendingDirectOfflineNpfReads();
+        closeDirectOfflineDatabaseConnectionsForStartupRetry();
+        directOfflineTileBlobCache.clear();
+        directOfflineTileHitCount = 0;
+        directOfflineTileMissCount = 0;
+        directOfflineConsecutiveReadErrors = 0;
+
+        await new Promise(resolve => setTimeout(resolve, 180));
+        if (token !== offlineMapSwitchToken) return false;
+        refreshRememberedOfflinePackRuntimeMetadata();
+
+        const readyDatabase = await waitForRememberedOfflineTileDatabaseReady();
+        if (token !== offlineMapSwitchToken) return false;
+
+        if (readyDatabase) {
+            const rebuilt = rebuildRememberedOfflineMapAfterDatabaseReady(
+                `quick-selector-force:${groupName}`,
+                readyDatabase
+            );
+            if (rebuilt) setOfflineMapSwitchBusy(`Carte ${groupName} réouverte.`);
+        } else {
+            applyImmediateBaseTileZoomForMapSource('offline');
+            rebuildBaseTileLayerAfterOfflineSwitch(`quick-selector-force-fallback:${groupName}`);
+            scheduleRememberedOfflineMapStartupRecovery(`quick-selector-force-fallback:${groupName}`);
+            setOfflineMapSwitchBusy(`Carte ${groupName} sélectionnée — stockage local en cours de réveil.`);
+        }
+
+        synchronizeOfflineConfigurationWithServiceWorker({
+            scheduleReload: false,
+            timeoutMs: 2200
+        }).then(controlled => {
+            if (!controlled || token !== offlineMapSwitchToken || mapSourceMode !== 'offline') return;
+            notifyServiceWorkerOfflineTilesPreference(true);
+            notifyServiceWorkerActivePacks(activeOfflinePacks);
+            rebuildBaseTileLayerAfterOfflineSwitch(`quick-selector-sw-ready:${groupName}`);
+        }).catch(() => {});
+        return true;
+    } finally {
+        if (token === offlineMapSwitchToken) {
+            isMapSourceSwitching = false;
+            updateMapSourceButtons();
+            updateOfflineStatus();
+            displayInstalledMaps();
+            refreshQuickOfflineMapButtonState();
+        }
+    }
+}
+
+async function selectQuickOfflineMapGroup(groupName) {
+    const packNames = getInstalledPackNamesForGroup(groupName);
+    if (!packNames.length) {
+        alert(`Aucun pack trouvé pour ${groupName}.`);
+        displayQuickOfflineMapSelector();
+        return false;
+    }
+
+    const isAlreadyActive = (
+        mapSourceMode === 'offline'
+        && packNames.length === activeOfflinePacks.length
+        && packNames.every(name => activeOfflinePacks.includes(name))
+    );
+
+    closeQuickOfflineMapSelector();
+    resetPendingDirectOfflineNpfReads();
+    closeDirectOfflineDatabaseConnectionsForStartupRetry();
+    directOfflineTileBlobCache.clear();
+
+    if (isAlreadyActive) return forceQuickOfflineMapGroupReload(groupName, packNames);
+
+    const changed = await applyOfflineMapGroupSelectionInPlace(groupName, true, packNames);
+    refreshQuickOfflineMapButtonState();
+    return changed;
+}
+
+window.openQuickOfflineMapSelector = openQuickOfflineMapSelector;
+window.closeQuickOfflineMapSelector = closeQuickOfflineMapSelector;
+window.selectQuickOfflineMapGroup = selectQuickOfflineMapGroup;
+
 function displayInstalledMaps() {
+    refreshQuickOfflineMapButtonState();
+
     /*
      * v12.12 — affichage par groupes.
      * Les packs OpenStreet_01...OpenStreet_05 apparaissent comme une seule ligne OpenStreet.
@@ -21821,6 +22088,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
             updateMapSourceButtons();
             updateOfflineStatus();
             displayInstalledMaps();
+            refreshQuickOfflineMapButtonState();
         }
     }
 
