@@ -1,5 +1,38 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.88 — CONTOUR FRANCE FIDÈLE À LA RÉFÉRENCE VALIDÉE
+Date : 07/08/2026
+Base : TEST v14.87
+
+DEMANDE INTÉGRÉE
+- Remplacer la forme approximative de la France par un contour réellement reconnaissable.
+- Conserver le bouton sans texte, sur fond blanc, avec uniquement un contour bleu.
+
+MODIFICATIONS
+- Le SVG polygonal simplifié de la v14.87 est supprimé.
+- Le nouveau tracé est vectorisé à partir de la référence visuelle de France validée.
+- Le dessin conserve les éléments caractéristiques nécessaires à la reconnaissance immédiate : Bretagne, façade Atlantique, Nord, Est et côte méditerranéenne.
+- Le `viewBox` passe de 64 × 64 à 100 × 100 pour conserver davantage de détails du contour.
+- Aucun texte ni badge n’est réintroduit dans le bouton.
+- Le fond blanc et le contour bleu existants sont conservés.
+- Le fonctionnement de sélection rapide OACI / NPF et la récupération IndexedDB restent strictement inchangés.
+
+CONTRÔLES
+- Version index, manifeste, script et service worker alignée sur v14.88.
+- Présence d’un seul bouton France avant SafeSky contrôlée.
+- Absence du badge texte contrôlée.
+- Nouveau `viewBox 0 0 100 100` et tracé détaillé contrôlés.
+- Syntaxe de `script.js` et `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé.
+- Aucune nouvelle dépendance réseau.
+- Archive ZIP contrôlée.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.87 — CORRECTION VISUELLE DU BOUTON FRANCE
 Date : 07/08/2026
 Base : TEST v14.86
