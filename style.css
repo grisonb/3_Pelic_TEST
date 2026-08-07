@@ -12319,3 +12319,64 @@ body.gaar-point-search-open .gaar-editing-banner {
         width: auto !important;
     }
 }
+
+
+/* ==========================================================================
+   v14.86 TEST — sélecteur rapide des cartes offline
+   ========================================================================== */
+.quick-offline-map-button { overflow: visible !important; }
+.quick-offline-france-icon { width: 62px; height: 62px; display: flex; align-items: center; justify-content: center; }
+.quick-offline-france-icon svg { width: 58px; height: 58px; overflow: visible; }
+.quick-offline-france-shape { fill: currentColor; stroke: #ffffff; stroke-width: 2.2; stroke-linejoin: round; }
+.quick-offline-map-button.active .quick-offline-france-shape { fill: #ffffff; stroke: rgba(255,255,255,.96); }
+.quick-offline-map-button.missing-data { border-color: #b42318 !important; color: #b42318 !important; }
+.quick-offline-map-button-status {
+    position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); min-width: 34px; max-width: 78px;
+    padding: 2px 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.97);
+    color: var(--primary-color); border: 1px solid rgba(0,80,130,.24); box-shadow: 0 1px 4px rgba(0,0,0,.18);
+    font-size: 11px; line-height: 1.05; font-weight: 950; white-space: nowrap; text-overflow: ellipsis;
+}
+.quick-offline-map-modal {
+    position: fixed; inset: 0; z-index: 2147483550; align-items: center; justify-content: center;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom)); box-sizing: border-box;
+    background: rgba(6,24,43,.58); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+.quick-offline-map-modal-content {
+    position: relative; width: min(92vw, 560px); max-height: 88vh; overflow-y: auto; box-sizing: border-box;
+    padding: 22px 20px 20px; border: 3px solid var(--primary-color); border-radius: 20px; background: #fff;
+    box-shadow: 0 18px 48px rgba(0,0,0,.36);
+}
+.quick-offline-map-modal-content h2 { margin: 0 58px 8px 0; color: var(--primary-color); font-size: 27px; line-height: 1.12; font-weight: 950; }
+.quick-offline-map-modal-close {
+    position: absolute; top: 0; right: 0; width: 54px; height: 54px; padding: 0; border: 0;
+    border-radius: 0 17px 0 15px; background: #e9f2f9; color: var(--primary-color); font-size: 38px;
+    line-height: 1; font-weight: 900; cursor: pointer; touch-action: manipulation;
+}
+.quick-offline-map-help { margin: 0 0 16px; color: #4d5d7a; font-size: 15px; line-height: 1.35; }
+.quick-offline-map-list { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.quick-offline-map-choice {
+    width: 100%; min-height: 96px; padding: 16px 18px; border: 3px solid #b8cee0; border-radius: 18px;
+    background: linear-gradient(180deg,#fff 0%,#edf5fb 100%); color: var(--primary-color);
+    box-shadow: 0 4px 14px rgba(0,65,110,.13); cursor: pointer; touch-action: manipulation;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; text-align: center;
+}
+.quick-offline-map-choice:active { transform: scale(.985); }
+.quick-offline-map-choice.active {
+    border-color: #117a37; background: linear-gradient(180deg,#1b8d49 0%,#117a37 100%); color: #fff;
+    box-shadow: 0 0 0 4px rgba(17,122,55,.16), 0 5px 16px rgba(0,0,0,.18);
+}
+.quick-offline-map-choice-name { display: block; font-size: clamp(28px,6vw,40px); line-height: 1; font-weight: 1000; letter-spacing: .025em; }
+.quick-offline-map-choice-detail { display: block; font-size: 13px; line-height: 1.2; font-weight: 850; opacity: .84; }
+.quick-offline-map-choice.active .quick-offline-map-choice-detail { opacity: 1; }
+.quick-offline-map-status { min-height: 20px; margin-top: 14px; padding: 9px 10px; border-radius: 10px; background: #f4f7fa; color: #46576a; font-size: 13px; line-height: 1.3; text-align: center; }
+.quick-offline-map-status[data-state="active"] { background: #eaf7ef; color: #176b39; }
+.quick-offline-map-empty { padding: 28px 18px; border: 2px dashed #c7d5e1; border-radius: 16px; color: #55697c; font-size: 17px; font-weight: 850; text-align: center; }
+@media (max-width: 760px) {
+    .quick-offline-france-icon, .quick-offline-france-icon svg { width: 36px !important; height: 36px !important; }
+    .quick-offline-map-button-status { bottom: 2px !important; min-width: 25px !important; max-width: 46px !important; padding: 1px 3px !important; font-size: 8px !important; }
+    .quick-offline-map-modal-content { width: min(94vw,520px); padding: 20px 16px 18px; }
+    .quick-offline-map-choice { min-height: 92px; }
+}
+@media (max-width: 430px) {
+    .quick-offline-france-icon, .quick-offline-france-icon svg { width: 38px !important; height: 38px !important; }
+}
