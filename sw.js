@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-86_quick_offline_map_selector';
-const APP_VERSION = 'v14.86';
+const SW_VERSION = 'sw-v14-87_france_outline_icon';
+const APP_VERSION = 'v14.87';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
