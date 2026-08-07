@@ -12380,3 +12380,85 @@ body.gaar-point-search-open .gaar-editing-banner {
 @media (max-width: 430px) {
     .quick-offline-france-icon, .quick-offline-france-icon svg { width: 38px !important; height: 38px !important; }
 }
+
+
+/* ==========================================================================
+   v14.87 TEST — bouton France simplifié : contour bleu, fond blanc, sans texte
+   ========================================================================== */
+
+.quick-offline-map-button {
+    background: #ffffff !important;
+    color: var(--primary-color) !important;
+    border-color: rgba(0, 80, 130, .20) !important;
+    overflow: visible !important;
+}
+
+.quick-offline-map-button.active,
+.quick-offline-map-button:active,
+.quick-offline-map-button:focus-visible {
+    background: #ffffff !important;
+    color: var(--primary-color) !important;
+    border-color: rgba(0, 80, 130, .38) !important;
+}
+
+.quick-offline-map-button.loading {
+    opacity: 1 !important;
+}
+
+.quick-offline-france-icon {
+    width: 62px;
+    height: 62px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quick-offline-france-icon svg {
+    width: 56px;
+    height: 56px;
+    overflow: visible;
+}
+
+.quick-offline-france-shape {
+    fill: none !important;
+    stroke: var(--primary-color) !important;
+    stroke-width: 3 !important;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+}
+
+.quick-offline-map-button.active .quick-offline-france-shape,
+.quick-offline-map-button.missing-data .quick-offline-france-shape {
+    fill: none !important;
+}
+
+.quick-offline-map-button.missing-data {
+    background: #ffffff !important;
+    color: #b42318 !important;
+    border-color: rgba(180, 35, 24, .30) !important;
+}
+
+.quick-offline-map-button.missing-data .quick-offline-france-shape {
+    stroke: #b42318 !important;
+}
+
+.quick-offline-map-button-status {
+    display: none !important;
+}
+
+@media (max-width: 760px) {
+    .quick-offline-france-icon,
+    .quick-offline-france-icon svg {
+        width: 38px !important;
+        height: 38px !important;
+    }
+}
+
+@media (max-width: 430px) {
+    .quick-offline-france-icon,
+    .quick-offline-france-icon svg {
+        width: 40px !important;
+        height: 40px !important;
+    }
+}
