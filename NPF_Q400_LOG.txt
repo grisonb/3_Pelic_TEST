@@ -1,5 +1,51 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.86 — SÉLECTEUR RAPIDE DES CARTES OFFLINE EN VOL
+Date : 07/08/2026
+Base : TEST v14.85
+
+CONTEXTE
+- De nouveaux problèmes de chargement de la carte NPF ont été rencontrés pendant un vol.
+- Un accès direct aux cartes offline téléchargées est ajouté sur la carte principale.
+
+MODIFICATIONS
+- Ajout d’un bouton à silhouette de la France immédiatement au-dessus de SafeSky.
+- Un appui ouvre une fenêtre dédiée avec un gros bouton par groupe de cartes réellement installé.
+- Les groupes sont lus depuis `installedMapPacks` et regroupés avec le moteur existant ; OACI et NPF apparaissent donc automatiquement lorsqu’ils sont installés.
+- Aucun nom de carte n’est codé en dur dans le sélecteur.
+- La carte active est mise en évidence en vert et son nom apparaît dans le petit badge du bouton France.
+- Un appui sur une carte différente ferme la fenêtre puis réutilise `applyOfflineMapGroupSelectionInPlace`.
+- Un nouvel appui sur la carte déjà active force une récupération manuelle : annulation des lectures en attente, fermeture des connexions directes IndexedDB, vidage du cache mémoire, attente de la base puis reconstruction de la couche.
+- Si la base ne répond pas immédiatement, la reconstruction est lancée et le mécanisme de réveil automatique de la v14.84 poursuit les tentatives.
+- Aucune réimportation des cartes n’est nécessaire.
+- Aucun changement aux PDF, au calque routier ou à SafeSky.
+- Aucune nouvelle dépendance réseau.
+
+CONTRÔLES TECHNIQUES
+- Versions alignées sur v14.86.
+- Syntaxe de `script.js` et `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé.
+- Position du bouton France avant SafeSky contrôlée.
+- Présence du SVG France, de la fenêtre et du rendu dynamique des cartes contrôlée.
+- Réutilisation du moteur de groupes existant contrôlée.
+- Fermeture des connexions IndexedDB et reconstruction de la couche lors du rechargement de la carte active contrôlées.
+- Absence de nouvelle dépendance réseau contrôlée.
+- Intégrité des archives ZIP contrôlée.
+
+VALIDATION À EFFECTUER DANS NPF TEST
+- Vérifier la position du bouton France juste au-dessus de SafeSky.
+- Vérifier les gros boutons correspondant aux cartes réellement téléchargées, notamment OACI et NPF.
+- Basculer OACI ↔ NPF et vérifier la fermeture automatique de la fenêtre.
+- Appuyer une seconde fois sur NPF lorsqu’elle est déjà active et vérifier la reconstruction sans relancer la PWA.
+- Effectuer un essai prolongé en mode avion puis en conditions de vol.
+- Le test réel iPad/en vol n’a pas été effectué par les contrôles statiques.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.85 — RÉORGANISATION DE GESTION DES CARTES
 Date : 05/08/2026
 Base : TEST v14.84
