@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.88" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.88">
-    <link rel="manifest" href="manifest.json?appv=v14.88">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.89" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.89">
+    <link rel="manifest" href="manifest.json?appv=v14.89">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.88';
+        const APP_VERSION = 'v14.89';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -594,7 +594,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.88"></script>
+    <script src="script.js?appv=v14.89"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -840,7 +840,10 @@
 
                 <div class="installed-maps-section offline-maps-management-section">
                     <h3>Cartes Offline</h3>
-                    <label for="zip-importer-input" class="import-button">Importer Cartes Offline</label>
+                    <div class="import-help-row">
+                        <label for="zip-importer-input" class="import-button">Importer Cartes Offline</label>
+                        <button type="button" class="import-help-button" data-import-help="offline-maps" aria-label="Aide Importer Cartes Offline" title="Aide">?</button>
+                    </div>
                     <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
 
                     <div class="offline-toggle-row">
@@ -863,9 +866,12 @@
 
                 <div class="road-overlay-import-block">
                     <h3>Calque Routier</h3>
-                    <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
-                        Importer Calque Routier
-                    </label>
+                    <div class="import-help-row">
+                        <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
+                            Importer Calque Routier
+                        </label>
+                        <button type="button" class="import-help-button" data-import-help="road-overlay" aria-label="Aide Importer Calque Routier" title="Aide">?</button>
+                    </div>
                     <input type="file" id="road-overlay-importer-input"
                            accept=".zip,.geojson,.json,application/geo+json,application/json"
                            style="display: none;">
@@ -883,7 +889,10 @@
                     <h3>PDFs FDF réduite / aérodromes offline</h3>
                     <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>, ou les documents communs <b>Doc Fdf Réduité.pdf</b> et <b>Carte Fréquences OPS.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne.</p>
                     <div class="airport-pdf-toolbar">
-                        <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDFs Doc Fdf Réduité</label>
+                        <div class="import-help-row airport-pdf-import-help-row">
+                            <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDFs Doc Fdf Réduité</label>
+                            <button type="button" class="import-help-button" data-import-help="fdf-pdfs" aria-label="Aide Télécharger PDFs Doc Fdf Réduité" title="Aide">?</button>
+                        </div>
                         <button id="delete-all-airport-pdfs-button" type="button"
                                 class="danger-inline-btn airport-pdf-delete-all-button"
                                 style="display: none;">
@@ -898,7 +907,17 @@
             </div>
         </div>
     </div>
- </body>
+ 
+    <div id="import-help-modal" class="import-help-modal" style="display: none;" aria-hidden="true">
+        <div class="import-help-modal-content" role="dialog" aria-modal="true" aria-labelledby="import-help-modal-title">
+            <button id="close-import-help-modal" class="import-help-modal-close" type="button" aria-label="Fermer">&times;</button>
+            <h2 id="import-help-modal-title">Aide</h2>
+            <div id="import-help-modal-text" class="import-help-modal-text"></div>
+            <button id="import-help-modal-ok" class="import-help-modal-ok" type="button">OK</button>
+        </div>
+    </div>
+
+</body>
 </html>
 
     
