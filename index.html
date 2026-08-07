@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.85" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.85">
-    <link rel="manifest" href="manifest.json?appv=v14.85">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.86" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.86">
+    <link rel="manifest" href="manifest.json?appv=v14.86">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.85';
+        const APP_VERSION = 'v14.86';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -411,6 +411,19 @@
                 </svg>
             </span>
         </button>
+        <button id="quick-offline-map-button"
+                class="left-map-action-button quick-offline-map-button"
+                type="button"
+                title="Choisir rapidement une carte offline"
+                aria-label="Choisir rapidement une carte offline">
+            <span class="quick-offline-france-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 64" focusable="false" role="img">
+                    <path class="quick-offline-france-shape"
+                          d="M22 5 L34 8 L41 5 L48 11 L56 14 L53 23 L58 30 L52 36 L49 45 L41 49 L37 58 L29 55 L24 61 L18 54 L10 52 L11 43 L5 37 L9 29 L7 21 L14 17 L15 10 Z"/>
+                </svg>
+            </span>
+            <span id="quick-offline-map-button-status" class="quick-offline-map-button-status">—</span>
+        </button>
         <button id="traffic-layer-button" class="left-map-action-button traffic-map-button" title="SafeSky — afficher/masquer le trafic aérien indicatif — appui long : filtres" aria-label="SafeSky — afficher ou masquer le trafic aérien indicatif">
             <span class="traffic-icon traffic-safesky-icon" aria-hidden="true"></span>
             <span id="traffic-button-count" class="traffic-button-count">0</span>
@@ -423,6 +436,25 @@
         </button>
     </div>
     <div id="traffic-status-display" class="traffic-status-display" style="display: none;"></div>
+
+    <div id="quick-offline-map-modal"
+         class="quick-offline-map-modal"
+         style="display: none;"
+         aria-hidden="true">
+        <div class="quick-offline-map-modal-content"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="quick-offline-map-modal-title">
+            <button id="close-quick-offline-map-modal"
+                    class="quick-offline-map-modal-close"
+                    type="button"
+                    aria-label="Fermer">&times;</button>
+            <h2 id="quick-offline-map-modal-title">Cartes Offline</h2>
+            <p class="quick-offline-map-help">Sélectionne directement la carte à afficher. Un nouvel appui sur la carte déjà active force sa réouverture.</p>
+            <div id="quick-offline-map-list" class="quick-offline-map-list" aria-live="polite"></div>
+            <div id="quick-offline-map-status" class="quick-offline-map-status" aria-live="polite"></div>
+        </div>
+    </div>
 
     <div id="simulation-motion-modal" class="simulation-motion-modal" style="display: none;" aria-hidden="true">
         <div class="simulation-motion-modal-content" role="dialog" aria-modal="true" aria-labelledby="simulation-motion-modal-title">
@@ -563,7 +595,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.85"></script>
+    <script src="script.js?appv=v14.86"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
