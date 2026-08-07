@@ -12464,3 +12464,86 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* v14.88 TEST — dessin France remplacé dans index.html ; style blanc/bleu v14.87 conservé. */
+
+
+/* ==========================================================================
+   v14.89 TEST — aides contextuelles des boutons d'import
+   ========================================================================== */
+#offline-map-modal .import-help-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 9px !important;
+    width: 100% !important;
+}
+#offline-map-modal .import-help-row .import-button {
+    flex: 1 1 auto !important;
+    width: auto !important;
+    max-width: 420px !important;
+    margin: 0 !important;
+}
+#offline-map-modal .airport-pdf-import-help-row {
+    flex: 1 1 auto !important;
+    width: auto !important;
+}
+.import-help-button {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--primary-color);
+    font-size: 23px;
+    line-height: 1;
+    font-weight: 950;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 2px 7px rgba(0,70,120,.14);
+}
+.import-help-button:active { transform: scale(.96); background: #edf6fc; }
+.import-help-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483600;
+    align-items: center;
+    justify-content: center;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    background: rgba(6,24,43,.62);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+.import-help-modal-content {
+    position: relative;
+    width: min(92vw, 570px);
+    max-height: min(82vh, 680px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 24px 20px 18px;
+    border: 3px solid var(--primary-color);
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 18px 48px rgba(0,0,0,.36);
+}
+.import-help-modal-content h2 { margin: 0 54px 16px 0; color: var(--primary-color); font-size: 23px; line-height: 1.2; }
+.import-help-modal-text { color: #24384b; font-size: 18px; line-height: 1.48; }
+.import-help-modal-close {
+    position: absolute; top: 0; right: 0; width: 52px; height: 52px; padding: 0; border: 0;
+    border-radius: 0 15px 0 14px; background: #e9f2f9; color: var(--primary-color);
+    font-size: 37px; line-height: 1; font-weight: 900; cursor: pointer; touch-action: manipulation;
+}
+.import-help-modal-ok {
+    display: block; width: min(100%,220px); margin: 20px auto 0; padding: 12px 18px; border: none;
+    border-radius: 10px; background: var(--primary-color); color: #fff; font-size: 18px; font-weight: 900;
+    cursor: pointer; touch-action: manipulation;
+}
+@media (max-width: 640px) {
+    #offline-map-modal .import-help-row { gap: 7px !important; }
+    .import-help-button { flex-basis: 38px; width: 38px; height: 38px; min-width: 38px; min-height: 38px; font-size: 21px; }
+    .import-help-modal-content { width: min(95vw,540px); padding: 22px 16px 16px; }
+    .import-help-modal-text { font-size: 17px; }
+}
