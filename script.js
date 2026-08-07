@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.88';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.89';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.88';
+    './data/localites/localites-france-v14.56.zip?appv=v14.89';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -6790,6 +6790,61 @@ function setupEventListeners() {
     closeCalculatorButton.addEventListener('click', () => { calculatorModal.style.display = 'none'; });
     calculatorModal.addEventListener('click', (e) => { if (e.target === calculatorModal) { calculatorModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && calculatorModal.style.display === 'flex') { calculatorModal.style.display = 'none'; } });
+    const importHelpContent = {
+        'offline-maps': {
+            title: 'Aide — Importer Cartes Offline',
+            text: 'Cliquez sur Drive, il faut être connecté au Drive Dash 8. Ouvrir le dossier Cartes NPF-Q400, Cartes OACI et cliquer sur le fichier ZIP. Une fois le téléchargement fini, recommencer la procédure et ouvrir le dossier Cartes NPF v... . Il faut télécharger les ZIP un par un, les uns après les autres, en répétant l’opération décrite.'
+        },
+        'road-overlay': {
+            title: 'Aide — Importer Calque Routier',
+            text: 'Cliquez sur Drive, il faut être connecté au Drive Dash 8. Ouvrir le dossier Cartes NPF-Q400, Calque Routier et cliquer sur le fichier ZIP.'
+        },
+        'fdf-pdfs': {
+            title: 'Aide — Télécharger PDFs Doc Fdf',
+            text: 'Cliquez sur Drive, il faut être connecté au Drive Dash 8. Ouvrir le dossier Cartes NPF-Q400, Doc Fdf, Tout sélectionner et ouvrir. Ça va télécharger la doc réduite FDF accessible en cliquant sur les pélicandromes ainsi que la carte des fréquences OPS.'
+        }
+    };
+
+    const importHelpModal = document.getElementById('import-help-modal');
+    const importHelpModalTitle = document.getElementById('import-help-modal-title');
+    const importHelpModalText = document.getElementById('import-help-modal-text');
+    const closeImportHelpModalButton = document.getElementById('close-import-help-modal');
+    const importHelpModalOkButton = document.getElementById('import-help-modal-ok');
+
+    function closeImportHelpModal() {
+        if (!importHelpModal) return;
+        importHelpModal.style.display = 'none';
+        importHelpModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openImportHelpModal(helpKey) {
+        const content = importHelpContent[helpKey];
+        if (!content || !importHelpModal) return;
+        if (importHelpModalTitle) importHelpModalTitle.textContent = content.title;
+        if (importHelpModalText) importHelpModalText.textContent = content.text;
+        importHelpModal.style.display = 'flex';
+        importHelpModal.setAttribute('aria-hidden', 'false');
+    }
+
+    document.querySelectorAll('.import-help-button').forEach(button => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            openImportHelpModal(button.dataset.importHelp || '');
+        });
+    });
+
+    if (closeImportHelpModalButton) closeImportHelpModalButton.addEventListener('click', closeImportHelpModal);
+    if (importHelpModalOkButton) importHelpModalOkButton.addEventListener('click', closeImportHelpModal);
+    if (importHelpModal) {
+        importHelpModal.addEventListener('click', (event) => {
+            if (event.target === importHelpModal) closeImportHelpModal();
+        });
+    }
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && importHelpModal?.style.display === 'flex') closeImportHelpModal();
+    });
+
     offlineMapsButton.addEventListener('click', () => {
         offlineMapModal.style.display = 'flex';
         displayInstalledMaps();
@@ -7773,6 +7828,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 }
 
 
+
+// =========================================================================
+// v14.89 TEST — aides contextuelles des imports offline
+// - ajout d’un bouton ? à côté de Importer Cartes Offline ;
+// - ajout d’un bouton ? à côté de Importer Calque Routier ;
+// - ajout d’un bouton ? à côté de Télécharger PDFs Doc Fdf Réduité ;
+// - fenêtre d’aide commune adaptée à l’iPad, sans modifier les imports.
+// =========================================================================
 
 // =========================================================================
 // v14.88 TEST — contour France fidèle à la référence visuelle validée
