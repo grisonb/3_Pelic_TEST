@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-90_import_help_texts';
-const APP_VERSION = 'v14.90';
+const SW_VERSION = 'sw-v14-91_import_help_linebreaks';
+const APP_VERSION = 'v14.91';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
