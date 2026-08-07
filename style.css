@@ -12547,3 +12547,11 @@ body.gaar-point-search-open .gaar-editing-banner {
     .import-help-modal-content { width: min(95vw,540px); padding: 22px 16px 16px; }
     .import-help-modal-text { font-size: 17px; }
 }
+
+
+/* ==========================================================================
+   v14.91 TEST — aides d’import, une phrase par ligne
+   ========================================================================== */
+.import-help-modal-text {
+    white-space: pre-line !important;
+}
