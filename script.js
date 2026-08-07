@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.86';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.87';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.86';
+    './data/localites/localites-france-v14.56.zip?appv=v14.87';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -629,7 +629,7 @@ let roadOverlayLoadedZoomTier = -1;
 const loadedRoadOverlayParts = new Map();
 
 /*
- * v14.86 — état de rafraîchissement du calque routier.
+ * v14.87 — état de rafraîchissement du calque routier.
  * En suivi GPS, Leaflet déclenche un moveend à chaque recentrage. Les routes
  * déjà chargées se déplacent naturellement avec la carte : il est donc inutile
  * de reparcourir les GeoJSON, de réappliquer tous les styles et de reconstruire
@@ -5562,7 +5562,7 @@ let directOfflineTileHitCount = 0;
 let directOfflineTileMissCount = 0;
 
 /*
- * v14.86 — récupération automatique après panne temporaire d'IndexedDB.
+ * v14.87 — récupération automatique après panne temporaire d'IndexedDB.
  * Safari peut invalider une connexion pendant un usage long ou sous pression
  * mémoire. Les erreurs techniques ne doivent plus être assimilées à des tuiles
  * réellement absentes.
@@ -7775,12 +7775,11 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
-// v14.86 TEST — sélecteur rapide des cartes offline en vol
-// - nouveau bouton France immédiatement au-dessus de SafeSky ;
-// - fenêtre dédiée avec un gros bouton par carte offline installée ;
-// - sélection directe des groupes OACI, NPF ou de tout autre groupe installé ;
-// - mise en évidence de la carte active ;
-// - nouvel appui sur la carte déjà active = réouverture propre du lecteur IndexedDB.
+// v14.87 TEST — icône France corrigée pour le sélecteur rapide offline
+// - suppression du texte dans le bouton France ;
+// - fond blanc conservé en permanence ;
+// - silhouette remplacée par un contour bleu de la France ;
+// - aspect du bouton rendu cohérent avec la demande utilisateur.
 // =========================================================================
 
 // =========================================================================
@@ -8991,7 +8990,7 @@ function rebuildRoadOverlayLabels() {
     roadOverlayLabelsLayer.clearLayers();
 
     /*
-     * v14.86 — préparer d'abord tous les candidats des parties visibles.
+     * v14.87 — préparer d'abord tous les candidats des parties visibles.
      * Le meilleur tronçon de chaque référence est retenu, puis les cartouches
      * sont triés et filtrés globalement pour éviter les amas illisibles.
      */
@@ -21793,19 +21792,30 @@ function getQuickOfflineActiveGroupName(groups = null) {
 
 function refreshQuickOfflineMapButtonState() {
     const button = document.getElementById('quick-offline-map-button');
-    const status = document.getElementById('quick-offline-map-button-status');
     if (!button) return;
 
     const groups = getQuickOfflineMapGroups();
     const activeGroupName = getQuickOfflineActiveGroupName(groups);
     const hasInstalledMaps = groups.length > 0;
 
-    button.classList.toggle('active', !!activeGroupName && mapSourceMode === 'offline');
-    button.classList.toggle('missing-data', !hasInstalledMaps);
+    button.classList.toggle(
+        'active',
+        !!activeGroupName && mapSourceMode === 'offline'
+    );
+    button.classList.toggle(
+        'missing-data',
+        !hasInstalledMaps
+    );
     button.disabled = isMapSourceSwitching;
-    if (status) status.textContent = activeGroupName || (hasInstalledMaps ? 'OFF' : '!');
+    button.dataset.activeGroup = activeGroupName || '';
+    button.dataset.hasInstalledMaps = hasInstalledMaps ? 'true' : 'false';
+
     button.title = hasInstalledMaps
-        ? (activeGroupName ? `Carte offline active : ${activeGroupName} — appuyer pour changer` : 'Choisir rapidement une carte offline')
+        ? (
+            activeGroupName
+                ? `Carte offline active : ${activeGroupName} — appuyer pour changer`
+                : 'Choisir rapidement une carte offline'
+        )
         : 'Aucune carte offline téléchargée';
 }
 
