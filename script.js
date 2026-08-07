@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.87';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.88';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 //  =========================================================================
@@ -569,7 +569,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.87';
+    './data/localites/localites-france-v14.56.zip?appv=v14.88';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -7773,6 +7773,13 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 }
 
 
+
+// =========================================================================
+// v14.88 TEST — contour France fidèle à la référence visuelle validée
+// - remplacement du tracé polygonal approximatif de la v14.87 ;
+// - contour vectorisé depuis la référence France validée ;
+// - fond blanc, contour bleu, aucun texte conservés.
+// =========================================================================
 
 // =========================================================================
 // v14.87 TEST — icône France corrigée pour le sélecteur rapide offline
