@@ -1,5 +1,57 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.91 — RETOURS À LA LIGNE DANS LES AIDES D’IMPORT
+Date : 07/08/2026
+Base : TEST v14.90
+
+MODIFICATIONS
+1. Aide « Importer Cartes Offline »
+- Chaque phrase est désormais affichée sur une ligne distincte.
+- Texte affiché :
+  Clique sur Drive.
+  Il faut être connecté au Drive Dash 8.
+  Ouvre le dossier Cartes NPF-Q400, puis Cartes OACI, et clique sur le fichier ZIP.
+  Une fois le téléchargement terminé, recommence la procédure et ouvre le dossier Cartes NPF v....
+  Il faut télécharger les fichiers ZIP un par un, les uns après les autres et dans l'ordre en répétant l’opération décrite pour chaque fichier.
+
+2. Aide « Importer Calque Routier »
+- Chaque phrase est désormais affichée sur une ligne distincte.
+- Suppression de la virgule entre « Calque Routier » et « et clique ».
+- Texte affiché :
+  Clique sur Drive.
+  Il faut être connecté au Drive Dash 8.
+  Ouvre le dossier Cartes NPF-Q400, puis Calque Routier et clique sur le fichier ZIP.
+
+3. Aide « Télécharger PDFs Doc Fdf Réduité »
+- Chaque phrase est désormais affichée sur une ligne distincte.
+- Texte affiché :
+  Clique sur Drive.
+  Il faut être connecté au Drive Dash 8.
+  Ouvre le dossier Cartes NPF-Q400, puis Doc Fdf.
+  Fais Tout sélectionner, puis Ouvrir.
+  Cela va télécharger la documentation FDF réduite, accessible en cliquant sur les pélicandromes, ainsi que la carte des fréquences OPS.
+
+TECHNIQUE
+- Les retours à la ligne sont intégrés dans les chaînes JavaScript avec `\n`.
+- La zone de texte de la fenêtre d’aide utilise `white-space: pre-line`.
+- Aucun changement du fonctionnement des trois imports.
+- Aucune nouvelle ressource réseau.
+- Toutes les fonctions de la v14.90 sont conservées.
+
+CONTRÔLES
+- Versions index, manifeste, script et service worker alignées sur v14.91.
+- Syntaxe `script.js` et `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé.
+- Présence des retours à la ligne dans les trois aides contrôlée.
+- Absence de la formulation `Calque Routier, et clique` contrôlée.
+- Archives ZIP contrôlées.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.90 — CORRECTION DES TEXTES D’AIDE
 Date : 07/08/2026
 Base : TEST v14.89
