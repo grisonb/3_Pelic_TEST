@@ -1,11 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.91';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.92';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v14.91 TEST — présentation des aides d’import phrase par phrase
-// - retour à la ligne après chaque phrase dans les trois aides ;
-// - suppression de la virgule entre « Calque Routier » et « et clique » ;
-// - contenu des trois aides harmonisé sans modifier le fonctionnement d’import.
+// v14.92 TEST — diagnostic CORS SIA depuis NPF
+// - ajout d’un bouton temporaire « Test SIA » dans Gestion des Cartes ;
+// - téléchargement de test d’une VAC officielle SIA (LFCR) en mode CORS ;
+// - diagnostic distinguant succès, HTTP, hors connexion, délai et CORS probable ;
+// - le service worker laisse passer directement les requêtes SIA de diagnostic.
 // =========================================================================
 
 //  =========================================================================
@@ -576,7 +577,7 @@ let communesByCodeInsee = new Map();
  * reste disponible en mode avion sans charger 20 Mo de JSON en mémoire.
  */
 const NAMED_PLACES_OFFLINE_ARCHIVE_URL =
-    './data/localites/localites-france-v14.56.zip?appv=v14.91';
+    './data/localites/localites-france-v14.56.zip?appv=v14.92';
 const NAMED_PLACES_OFFLINE_RESULT_LIMIT = 5;
 const NAMED_PLACES_OFFLINE_SHARD_PREFIX_LENGTH = 3;
 // v14.81 — la recherche phonétique charge tous les fragments partageant
@@ -6352,6 +6353,108 @@ function keepKeyboardAfterSearchClear() {
     }, 80);
 }
 
+const SIA_CORS_TEST_URL = 'https://www.sia.aviation-civile.gouv.fr/documents/download/f/d/15016323/';
+
+async function fetchSiaDiagnosticWithTimeout(mode = 'cors', timeoutMs = 20000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(SIA_CORS_TEST_URL, {
+            method: 'GET',
+            mode,
+            cache: 'no-store',
+            redirect: 'follow',
+            signal: controller.signal
+        });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function runSiaCorsDiagnostic() {
+    const button = document.getElementById('sia-cors-test-button');
+    const status = document.getElementById('sia-cors-test-status');
+    if (!button || !status || button.dataset.running === 'true') return;
+
+    button.dataset.running = 'true';
+    button.disabled = true;
+    status.className = 'sia-cors-test-status testing';
+    status.textContent = 'Test en cours…';
+
+    const finish = (kind, message) => {
+        status.className = `sia-cors-test-status ${kind}`;
+        status.textContent = message;
+    };
+
+    try {
+        if (!navigator.onLine) {
+            finish('error', '❌ Pas de connexion Internet. Aucun test SIA effectué.');
+            return;
+        }
+
+        const response = await fetchSiaDiagnosticWithTimeout('cors', 20000);
+        console.log('[NPF TEST SIA] URL finale :', response.url);
+        console.log('[NPF TEST SIA] Status :', response.status);
+        console.log('[NPF TEST SIA] Type :', response.type);
+        console.log('[NPF TEST SIA] Content-Type :', response.headers.get('content-type'));
+
+        if (!response.ok) {
+            finish('error', `❌ Erreur HTTP ${response.status} renvoyée par le SIA.`);
+            return;
+        }
+
+        const data = await response.arrayBuffer();
+        const signature = data.byteLength >= 5
+            ? new TextDecoder('ascii').decode(data.slice(0, 5))
+            : '';
+        const isPdf = signature === '%PDF-';
+        const sizeMo = (data.byteLength / (1024 * 1024)).toFixed(2).replace('.', ',');
+
+        console.log('[NPF TEST SIA] Taille :', data.byteLength, 'octets');
+        console.log('[NPF TEST SIA] Signature PDF :', signature);
+
+        if (!data.byteLength) {
+            finish('error', '❌ Le SIA a répondu mais le fichier reçu est vide.');
+            return;
+        }
+        if (!isPdf) {
+            finish('error', `❌ Réponse SIA reçue (${sizeMo} Mo), mais le contenu n’est pas un PDF VAC valide.`);
+            return;
+        }
+
+        finish('success', `✅ Téléchargement direct SIA possible — VAC LFCR reçue (${sizeMo} Mo).`);
+    } catch (error) {
+        console.error('[NPF TEST SIA] Échec du fetch CORS :', error);
+
+        if (error?.name === 'AbortError') {
+            finish('error', '❌ Délai dépassé : aucune réponse exploitable du SIA en 20 secondes.');
+            return;
+        }
+        if (!navigator.onLine) {
+            finish('error', '❌ Connexion Internet indisponible pendant le test.');
+            return;
+        }
+
+        // Un second essai opaque ne lit aucun octet : il sert uniquement à
+        // distinguer un serveur joignable d’un blocage de lecture CORS.
+        try {
+            const opaqueResponse = await fetchSiaDiagnosticWithTimeout('no-cors', 15000);
+            console.log('[NPF TEST SIA] Contrôle no-cors :', opaqueResponse.type);
+            if (opaqueResponse && (opaqueResponse.type === 'opaque' || opaqueResponse.type === 'opaqueredirect')) {
+                finish('error', '❌ CORS bloqué par le SIA : le serveur est joignable, mais NPF n’est pas autorisé à lire le PDF.');
+                return;
+            }
+        } catch (opaqueError) {
+            console.error('[NPF TEST SIA] Contrôle no-cors impossible :', opaqueError);
+        }
+
+        finish('error', '❌ Échec du téléchargement SIA. Consulte la console pour distinguer CORS, réseau ou serveur inaccessible.');
+    } finally {
+        button.dataset.running = 'false';
+        button.disabled = false;
+    }
+}
+
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -6382,6 +6485,7 @@ function setupEventListeners() {
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
     const closeOfflineMapButton = document.getElementById('close-offline-map-btn');
+    const siaCorsTestButton = document.getElementById('sia-cors-test-button');
     const zipImporterInput = document.getElementById('zip-importer-input');
     const folderImporterInput = document.getElementById('folder-importer-input');
     const tilesImporterInput = document.getElementById('tiles-importer-input');
@@ -6876,6 +6980,7 @@ function setupEventListeners() {
         refreshRoadOverlayInstalledStatus();
     });
     closeOfflineMapButton.addEventListener('click', () => { offlineMapModal.style.display = 'none'; });
+    if (siaCorsTestButton) siaCorsTestButton.addEventListener('click', runSiaCorsDiagnostic);
     offlineMapModal.addEventListener('click', (e) => { if (e.target === offlineMapModal) { offlineMapModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && offlineMapModal.style.display === 'flex') { offlineMapModal.style.display = 'none'; } });
     zipImporterInput.addEventListener('change', (event) => {
