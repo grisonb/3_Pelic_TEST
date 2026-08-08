@@ -1,12 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.92';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.93';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v14.92 TEST — diagnostic CORS SIA depuis NPF
-// - ajout d’un bouton temporaire « Test SIA » dans Gestion des Cartes ;
-// - téléchargement de test d’une VAC officielle SIA (LFCR) en mode CORS ;
-// - diagnostic distinguant succès, HTTP, hors connexion, délai et CORS probable ;
-// - le service worker laisse passer directement les requêtes SIA de diagnostic.
+// v14.93 TEST — Cartes VAC SIA hors ligne via GitHub Pages
+// - téléchargement des VAC publiées par le dépôt NPF-Q400-VAC ;
+// - stockage IndexedDB dédié et ouverture 100 % hors ligne ;
+// - bouton VAC dans les popups des terrains disposant d’une VAC locale ;
+// - contrôle léger des mises à jour au démarrage, uniquement si le réseau répond ;
+// - téléchargement différentiel par SHA-256 et conservation de l’ancienne VAC
+//   tant que le nouveau PDF n’a pas été téléchargé et validé.
 // =========================================================================
 
 //  =========================================================================
@@ -700,6 +702,37 @@ const COMMUNES_ALIASES_CACHE_KEY = 'communesAliasesCacheV2';
 const AIRPORT_PDF_STORE_NAME = 'airportPdfs';
 const AIRPORT_PDF_DB_NAME = 'AirportPdfsDB';
 const AIRPORT_PDF_DB_VERSION = 1;
+
+/*
+ * v14.93 TEST — cartes VAC SIA hors ligne.
+ * Les PDF sont publiés par le dépôt GitHub Pages NPF-Q400-VAC puis stockés
+ * localement dans une base IndexedDB distincte des PDF FDF.
+ */
+const VAC_DB_NAME = 'NpfVacDB';
+const VAC_DB_VERSION = 1;
+const VAC_STORE_NAME = 'vacPdfs';
+const VAC_REPOSITORY_BASE_URL = 'https://grisonb.github.io/NPF-Q400-VAC/';
+const VAC_MANIFEST_URL = `${VAC_REPOSITORY_BASE_URL}manifest.json`;
+const VAC_INSTALLED_CODES_KEY = 'npfVacInstalledCodesV1';
+const VAC_EXPECTED_COUNT_KEY = 'npfVacExpectedCountV1';
+const VAC_REMOTE_CYCLE_KEY = 'npfVacRemoteCycleV1';
+const VAC_REMOTE_TOTAL_SIZE_KEY = 'npfVacRemoteTotalSizeV1';
+const VAC_LAST_SUCCESSFUL_SYNC_KEY = 'npfVacLastSuccessfulSyncV1';
+
+let vacDb = null;
+let vacSyncInProgress = false;
+let pendingVacUpdateManifest = null;
+let vacInstalledOaciSet = new Set(
+    (() => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(VAC_INSTALLED_CODES_KEY) || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+            return [];
+        }
+    })()
+);
+
 const FDF_REDUCED_PDF_KEY = 'DOC_FDF_REDUITE';
 const FDF_REDUCED_PDF_FILENAME = 'Doc Fdf Réduite.pdf';
 const FDF_REDUCED_PDF_LABEL = 'Doc FDF réduite';
@@ -3259,6 +3292,23 @@ async function initializeApp() {
     }
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
     setTimeout(showUpdateReminderIfDue, 1700);
+
+    /*
+     * v14.93 — le contrôle VAC est volontairement différé et non bloquant.
+     * Hors connexion, fetchVacManifest() échoue silencieusement et les VAC
+     * déjà présentes dans IndexedDB restent immédiatement disponibles.
+     */
+    setTimeout(() => {
+        reconcileVacInstalledIndexFromDb()
+            .then(() => {
+                refreshUI();
+                return checkVacUpdatesAtStartup();
+            })
+            .catch(error => {
+                console.warn('[VAC] Initialisation différée indisponible:', error);
+            });
+    }, 2500);
+
     setTimeout(() => {
         scheduleOfflineTileWake('startup-post-init');
     }, 250);
@@ -6353,108 +6403,6 @@ function keepKeyboardAfterSearchClear() {
     }, 80);
 }
 
-const SIA_CORS_TEST_URL = 'https://www.sia.aviation-civile.gouv.fr/documents/download/f/d/15016323/';
-
-async function fetchSiaDiagnosticWithTimeout(mode = 'cors', timeoutMs = 20000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-        return await fetch(SIA_CORS_TEST_URL, {
-            method: 'GET',
-            mode,
-            cache: 'no-store',
-            redirect: 'follow',
-            signal: controller.signal
-        });
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-async function runSiaCorsDiagnostic() {
-    const button = document.getElementById('sia-cors-test-button');
-    const status = document.getElementById('sia-cors-test-status');
-    if (!button || !status || button.dataset.running === 'true') return;
-
-    button.dataset.running = 'true';
-    button.disabled = true;
-    status.className = 'sia-cors-test-status testing';
-    status.textContent = 'Test en cours…';
-
-    const finish = (kind, message) => {
-        status.className = `sia-cors-test-status ${kind}`;
-        status.textContent = message;
-    };
-
-    try {
-        if (!navigator.onLine) {
-            finish('error', '❌ Pas de connexion Internet. Aucun test SIA effectué.');
-            return;
-        }
-
-        const response = await fetchSiaDiagnosticWithTimeout('cors', 20000);
-        console.log('[NPF TEST SIA] URL finale :', response.url);
-        console.log('[NPF TEST SIA] Status :', response.status);
-        console.log('[NPF TEST SIA] Type :', response.type);
-        console.log('[NPF TEST SIA] Content-Type :', response.headers.get('content-type'));
-
-        if (!response.ok) {
-            finish('error', `❌ Erreur HTTP ${response.status} renvoyée par le SIA.`);
-            return;
-        }
-
-        const data = await response.arrayBuffer();
-        const signature = data.byteLength >= 5
-            ? new TextDecoder('ascii').decode(data.slice(0, 5))
-            : '';
-        const isPdf = signature === '%PDF-';
-        const sizeMo = (data.byteLength / (1024 * 1024)).toFixed(2).replace('.', ',');
-
-        console.log('[NPF TEST SIA] Taille :', data.byteLength, 'octets');
-        console.log('[NPF TEST SIA] Signature PDF :', signature);
-
-        if (!data.byteLength) {
-            finish('error', '❌ Le SIA a répondu mais le fichier reçu est vide.');
-            return;
-        }
-        if (!isPdf) {
-            finish('error', `❌ Réponse SIA reçue (${sizeMo} Mo), mais le contenu n’est pas un PDF VAC valide.`);
-            return;
-        }
-
-        finish('success', `✅ Téléchargement direct SIA possible — VAC LFCR reçue (${sizeMo} Mo).`);
-    } catch (error) {
-        console.error('[NPF TEST SIA] Échec du fetch CORS :', error);
-
-        if (error?.name === 'AbortError') {
-            finish('error', '❌ Délai dépassé : aucune réponse exploitable du SIA en 20 secondes.');
-            return;
-        }
-        if (!navigator.onLine) {
-            finish('error', '❌ Connexion Internet indisponible pendant le test.');
-            return;
-        }
-
-        // Un second essai opaque ne lit aucun octet : il sert uniquement à
-        // distinguer un serveur joignable d’un blocage de lecture CORS.
-        try {
-            const opaqueResponse = await fetchSiaDiagnosticWithTimeout('no-cors', 15000);
-            console.log('[NPF TEST SIA] Contrôle no-cors :', opaqueResponse.type);
-            if (opaqueResponse && (opaqueResponse.type === 'opaque' || opaqueResponse.type === 'opaqueredirect')) {
-                finish('error', '❌ CORS bloqué par le SIA : le serveur est joignable, mais NPF n’est pas autorisé à lire le PDF.');
-                return;
-            }
-        } catch (opaqueError) {
-            console.error('[NPF TEST SIA] Contrôle no-cors impossible :', opaqueError);
-        }
-
-        finish('error', '❌ Échec du téléchargement SIA. Consulte la console pour distinguer CORS, réseau ou serveur inaccessible.');
-    } finally {
-        button.dataset.running = 'false';
-        button.disabled = false;
-    }
-}
-
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -6485,7 +6433,11 @@ function setupEventListeners() {
     const offlineMapsButton = document.getElementById('offline-maps-button');
     const offlineMapModal = document.getElementById('offline-map-modal');
     const closeOfflineMapButton = document.getElementById('close-offline-map-btn');
-    const siaCorsTestButton = document.getElementById('sia-cors-test-button');
+    const vacDownloadUpdateButton = document.getElementById('vac-download-update-button');
+    const vacDeleteAllButton = document.getElementById('vac-delete-all-button');
+    const vacUpdateModal = document.getElementById('vac-update-modal');
+    const vacUpdateNowButton = document.getElementById('vac-update-now-button');
+    const vacUpdateLaterButton = document.getElementById('vac-update-later-button');
     const zipImporterInput = document.getElementById('zip-importer-input');
     const folderImporterInput = document.getElementById('folder-importer-input');
     const tilesImporterInput = document.getElementById('tiles-importer-input');
@@ -6976,11 +6928,50 @@ function setupEventListeners() {
         offlineMapModal.style.display = 'flex';
         displayInstalledMaps();
         displayInstalledAirportPdfs();
+        displayVacManagementStatus();
         refreshSimulationModeButtonState();
         refreshRoadOverlayInstalledStatus();
     });
     closeOfflineMapButton.addEventListener('click', () => { offlineMapModal.style.display = 'none'; });
-    if (siaCorsTestButton) siaCorsTestButton.addEventListener('click', runSiaCorsDiagnostic);
+
+    if (vacDownloadUpdateButton) {
+        vacDownloadUpdateButton.addEventListener('click', () => {
+            handleVacDownloadUpdateClick().catch(error => {
+                console.error('[VAC] Téléchargement / mise à jour impossible:', error);
+            });
+        });
+    }
+    if (vacDeleteAllButton) {
+        vacDeleteAllButton.addEventListener('click', () => {
+            deleteAllVacPdfs().catch(error => {
+                console.error('[VAC] Suppression impossible:', error);
+            });
+        });
+    }
+    if (vacUpdateNowButton) {
+        vacUpdateNowButton.addEventListener('click', async () => {
+            const manifestToApply = pendingVacUpdateManifest;
+            closeVacUpdatePrompt();
+            if (!manifestToApply) return;
+            if (offlineMapModal) offlineMapModal.style.display = 'flex';
+            await displayVacManagementStatus();
+            try {
+                await syncVacFromManifest(manifestToApply, { source: 'startup-prompt' });
+            } catch (error) {
+                console.error('[VAC] Mise à jour depuis l’alerte impossible:', error);
+                alert(`Mise à jour des cartes VAC impossible : ${error.message || error}`);
+            }
+        });
+    }
+    if (vacUpdateLaterButton) {
+        vacUpdateLaterButton.addEventListener('click', closeVacUpdatePrompt);
+    }
+    if (vacUpdateModal) {
+        vacUpdateModal.addEventListener('click', event => {
+            if (event.target === vacUpdateModal) closeVacUpdatePrompt();
+        });
+    }
+
     offlineMapModal.addEventListener('click', (e) => { if (e.target === offlineMapModal) { offlineMapModal.style.display = 'none'; } });
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && offlineMapModal.style.display === 'flex') { offlineMapModal.style.display = 'none'; } });
     zipImporterInput.addEventListener('change', (event) => {
@@ -15908,6 +15899,618 @@ function refreshUI() {
     if (currentCommune) displayCommuneDetails(currentCommune, false);
 }
 
+
+/* =========================================================================
+   v14.93 TEST — Cartes VAC SIA hors ligne via GitHub Pages / IndexedDB
+   ========================================================================= */
+
+function initVacDB() {
+    return new Promise((resolve, reject) => {
+        if (vacDb) {
+            resolve(vacDb);
+            return;
+        }
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('IndexedDB indisponible'));
+            return;
+        }
+
+        const request = indexedDB.open(VAC_DB_NAME, VAC_DB_VERSION);
+        request.onupgradeneeded = event => {
+            const dbInstance = event.target.result;
+            if (!dbInstance.objectStoreNames.contains(VAC_STORE_NAME)) {
+                dbInstance.createObjectStore(VAC_STORE_NAME, { keyPath: 'oaci' });
+            }
+        };
+        request.onsuccess = event => {
+            vacDb = event.target.result;
+            vacDb.onversionchange = () => {
+                try { vacDb.close(); } catch (_) {}
+                vacDb = null;
+            };
+            resolve(vacDb);
+        };
+        request.onerror = event => {
+            reject(event.target.error || new Error('Ouverture base VAC impossible'));
+        };
+        request.onblocked = () => {
+            reject(new Error("Base VAC bloquée par une autre instance de l'application"));
+        };
+    });
+}
+
+function normalizeVacOaci(oaci) {
+    return String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function formatVacBytes(bytes) {
+    const value = Number(bytes) || 0;
+    if (value <= 0) return '0 Mo';
+    if (value < 1024 * 1024) {
+        return `${Math.max(1, Math.round(value / 1024))} ko`;
+    }
+    return `${(value / (1024 * 1024)).toFixed(1).replace('.', ',')} Mo`;
+}
+
+function persistVacManifestSummary(manifest) {
+    try {
+        const availableEntries = Object.values(manifest?.airports || {})
+            .filter(entry => entry && entry.available && entry.file);
+        const expected = Number(manifest?.stats?.availableVac) || availableEntries.length;
+        const totalSize = Number(manifest?.stats?.totalSizeBytes)
+            || availableEntries.reduce((sum, entry) => sum + (Number(entry.size) || 0), 0);
+
+        localStorage.setItem(VAC_EXPECTED_COUNT_KEY, String(expected));
+        localStorage.setItem(VAC_REMOTE_CYCLE_KEY, String(manifest?.sourceCycle || ''));
+        localStorage.setItem(VAC_REMOTE_TOTAL_SIZE_KEY, String(totalSize));
+    } catch (_) {}
+}
+
+async function getAllVacRecords() {
+    try {
+        const database = await initVacDB();
+        return await new Promise((resolve, reject) => {
+            const tx = database.transaction(VAC_STORE_NAME, 'readonly');
+            const request = tx.objectStore(VAC_STORE_NAME).getAll();
+            request.onsuccess = () => {
+                resolve(
+                    (request.result || [])
+                        .filter(record => record && record.oaci)
+                        .sort((a, b) => String(a.oaci).localeCompare(String(b.oaci)))
+                );
+            };
+            request.onerror = () => reject(request.error || new Error('Lecture VAC impossible'));
+        });
+    } catch (error) {
+        console.warn('[VAC] Liste locale indisponible:', error);
+        return [];
+    }
+}
+
+async function getVacRecord(oaci) {
+    const safeOaci = normalizeVacOaci(oaci);
+    if (!safeOaci) return null;
+
+    try {
+        const database = await initVacDB();
+        return await new Promise((resolve, reject) => {
+            const tx = database.transaction(VAC_STORE_NAME, 'readonly');
+            const request = tx.objectStore(VAC_STORE_NAME).get(safeOaci);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error || new Error('Lecture VAC impossible'));
+        });
+    } catch (error) {
+        console.warn(`[VAC] Lecture ${safeOaci} impossible:`, error);
+        return null;
+    }
+}
+
+async function putVacRecord(record) {
+    const safeOaci = normalizeVacOaci(record?.oaci);
+    if (!safeOaci || !(record?.blob instanceof Blob)) {
+        throw new Error('Enregistrement VAC invalide');
+    }
+
+    const database = await initVacDB();
+    await new Promise((resolve, reject) => {
+        const tx = database.transaction(VAC_STORE_NAME, 'readwrite');
+        tx.objectStore(VAC_STORE_NAME).put({
+            ...record,
+            oaci: safeOaci
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error(`Enregistrement ${safeOaci} impossible`));
+        tx.onabort = () => reject(tx.error || new Error(`Enregistrement ${safeOaci} interrompu`));
+    });
+}
+
+async function reconcileVacInstalledIndexFromDb() {
+    const records = await getAllVacRecords();
+    vacInstalledOaciSet = new Set(records.map(record => normalizeVacOaci(record.oaci)).filter(Boolean));
+    try {
+        localStorage.setItem(VAC_INSTALLED_CODES_KEY, JSON.stringify([...vacInstalledOaciSet].sort()));
+    } catch (_) {}
+    return records;
+}
+
+async function fetchVacManifest(timeoutMs = 12000) {
+    if (!navigator.onLine) {
+        throw new Error('Connexion Internet indisponible');
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const separator = VAC_MANIFEST_URL.includes('?') ? '&' : '?';
+        const response = await fetch(`${VAC_MANIFEST_URL}${separator}t=${Date.now()}`, {
+            method: 'GET',
+            cache: 'no-store',
+            credentials: 'omit',
+            signal: controller.signal
+        });
+        if (!response.ok) {
+            throw new Error(`Manifest VAC HTTP ${response.status}`);
+        }
+        const manifest = await response.json();
+        if (
+            !manifest
+            || Number(manifest.schemaVersion) !== 1
+            || !manifest.airports
+            || typeof manifest.airports !== 'object'
+        ) {
+            throw new Error('Manifest VAC invalide');
+        }
+        persistVacManifestSummary(manifest);
+        return manifest;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function getVacAvailableEntries(manifest) {
+    return Object.entries(manifest?.airports || {})
+        .map(([oaci, entry]) => ({
+            oaci: normalizeVacOaci(oaci),
+            ...(entry || {})
+        }))
+        .filter(entry => (
+            entry.oaci
+            && entry.available === true
+            && typeof entry.file === 'string'
+            && entry.file
+            && typeof entry.sha256 === 'string'
+            && entry.sha256
+        ))
+        .sort((a, b) => a.oaci.localeCompare(b.oaci));
+}
+
+function getVacEntriesNeedingDownload(manifest, localRecords = []) {
+    const localByOaci = new Map(
+        (localRecords || []).map(record => [normalizeVacOaci(record.oaci), record])
+    );
+
+    return getVacAvailableEntries(manifest).filter(entry => {
+        const local = localByOaci.get(entry.oaci);
+        if (!local || !(local.blob instanceof Blob)) return true;
+        return String(local.sha256 || '').toLowerCase() !== String(entry.sha256 || '').toLowerCase();
+    });
+}
+
+async function sha256HexFromArrayBuffer(buffer) {
+    if (!globalThis.crypto?.subtle?.digest) {
+        throw new Error('Vérification SHA-256 indisponible sur cet appareil');
+    }
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
+    return Array.from(new Uint8Array(digest))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+async function downloadAndValidateVacEntry(entry, timeoutMs = 30000) {
+    const pdfUrl = new URL(entry.file, VAC_REPOSITORY_BASE_URL).toString();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(`${pdfUrl}?sha=${encodeURIComponent(entry.sha256)}`, {
+            method: 'GET',
+            cache: 'no-store',
+            credentials: 'omit',
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const buffer = await response.arrayBuffer();
+        if (!buffer.byteLength) {
+            throw new Error('PDF vide');
+        }
+
+        const signatureBytes = new Uint8Array(buffer, 0, Math.min(5, buffer.byteLength));
+        const signature = String.fromCharCode(...signatureBytes);
+        if (signature !== '%PDF-') {
+            throw new Error('signature PDF invalide');
+        }
+
+        const expectedSize = Number(entry.size) || 0;
+        if (expectedSize && buffer.byteLength !== expectedSize) {
+            throw new Error(
+                `taille invalide (${buffer.byteLength} octets au lieu de ${expectedSize})`
+            );
+        }
+
+        const computedSha256 = await sha256HexFromArrayBuffer(buffer);
+        if (computedSha256.toLowerCase() !== String(entry.sha256).toLowerCase()) {
+            throw new Error('SHA-256 invalide');
+        }
+
+        return {
+            blob: new Blob([buffer], { type: 'application/pdf' }),
+            size: buffer.byteLength,
+            sha256: computedSha256,
+            sourceUrl: pdfUrl
+        };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function setVacDownloadProgress(current, total, label = '') {
+    const container = document.getElementById('vac-download-progress');
+    const bar = document.getElementById('vac-download-progress-bar');
+    const text = document.getElementById('vac-download-progress-text');
+    if (!container || !bar || !text) return;
+
+    const safeTotal = Math.max(1, Number(total) || 1);
+    const safeCurrent = Math.min(safeTotal, Math.max(0, Number(current) || 0));
+    const percent = Math.round((safeCurrent / safeTotal) * 100);
+
+    container.style.display = 'block';
+    bar.style.width = `${percent}%`;
+    text.textContent = label || `${safeCurrent} / ${safeTotal}`;
+}
+
+function hideVacDownloadProgress(delayMs = 0) {
+    const apply = () => {
+        const container = document.getElementById('vac-download-progress');
+        const bar = document.getElementById('vac-download-progress-bar');
+        const text = document.getElementById('vac-download-progress-text');
+        if (container) container.style.display = 'none';
+        if (bar) bar.style.width = '0%';
+        if (text) text.textContent = '';
+    };
+    if (delayMs > 0) setTimeout(apply, delayMs);
+    else apply();
+}
+
+async function displayVacManagementStatus() {
+    const status = document.getElementById('vac-installed-status');
+    const downloadButton = document.getElementById('vac-download-update-button');
+    const deleteButton = document.getElementById('vac-delete-all-button');
+    if (!status) return;
+
+    const records = await reconcileVacInstalledIndexFromDb();
+    const count = records.length;
+    const totalSize = records.reduce((sum, record) => sum + (Number(record.size) || Number(record.blob?.size) || 0), 0);
+    const expected = Math.max(0, Number(localStorage.getItem(VAC_EXPECTED_COUNT_KEY)) || 0);
+    const cycle = localStorage.getItem(VAC_REMOTE_CYCLE_KEY)
+        || records.find(record => record.cycle)?.cycle
+        || '';
+    const lastSyncRaw = Number(localStorage.getItem(VAC_LAST_SUCCESSFUL_SYNC_KEY)) || 0;
+    const lastSync = lastSyncRaw
+        ? new Date(lastSyncRaw).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+        : '';
+
+    if (!count) {
+        const remoteHint = expected
+            ? ` ${expected} VAC étaient disponibles lors du dernier contrôle.`
+            : '';
+        status.textContent = `Aucune carte VAC téléchargée.${remoteHint}`;
+    } else {
+        const missing = expected ? Math.max(0, expected - count) : null;
+        const pieces = [
+            `Téléchargées : ${count}${expected ? ` / ${expected}` : ''}`,
+            missing !== null ? `Non téléchargées : ${missing}` : '',
+            cycle ? `Cycle SIA : ${cycle}` : '',
+            `Stockage : ${formatVacBytes(totalSize)}`,
+            lastSync ? `Dernière mise à jour : ${lastSync}` : ''
+        ].filter(Boolean);
+        status.textContent = pieces.join(' · ');
+    }
+
+    if (downloadButton) {
+        downloadButton.textContent = count
+            ? 'Mettre à jour les Cartes VAC'
+            : 'Télécharger les Cartes VAC';
+        downloadButton.disabled = vacSyncInProgress;
+    }
+    if (deleteButton) {
+        deleteButton.style.display = count ? 'inline-flex' : 'none';
+        deleteButton.disabled = vacSyncInProgress;
+    }
+}
+
+async function syncVacFromManifest(manifest, options = {}) {
+    if (vacSyncInProgress) return false;
+    vacSyncInProgress = true;
+
+    const downloadButton = document.getElementById('vac-download-update-button');
+    const deleteButton = document.getElementById('vac-delete-all-button');
+    if (downloadButton) downloadButton.disabled = true;
+    if (deleteButton) deleteButton.disabled = true;
+
+    try {
+        persistVacManifestSummary(manifest);
+
+        const localRecords = await getAllVacRecords();
+        const targets = getVacEntriesNeedingDownload(manifest, localRecords);
+
+        if (!targets.length) {
+            await displayVacManagementStatus();
+            hideVacDownloadProgress();
+            if (options.showNoChangesAlert) {
+                alert('Les cartes VAC téléchargées sont déjà à jour.');
+            }
+            return true;
+        }
+
+        let completed = 0;
+        let stored = 0;
+        const failures = [];
+
+        setVacDownloadProgress(0, targets.length, `Préparation de ${targets.length} VAC…`);
+
+        for (const entry of targets) {
+            setVacDownloadProgress(
+                completed,
+                targets.length,
+                `Téléchargement ${completed + 1} / ${targets.length} — ${entry.oaci}`
+            );
+
+            try {
+                /*
+                 * Le record IndexedDB existant n'est écrasé qu'après :
+                 * 1) réponse HTTP complète ;
+                 * 2) signature %PDF- ;
+                 * 3) taille attendue ;
+                 * 4) SHA-256 identique au manifeste.
+                 */
+                const validated = await downloadAndValidateVacEntry(entry);
+                await putVacRecord({
+                    oaci: entry.oaci,
+                    filename: `${entry.oaci}.pdf`,
+                    blob: validated.blob,
+                    size: validated.size,
+                    sha256: validated.sha256,
+                    cycle: String(entry.cycle || manifest.sourceCycle || ''),
+                    updatedAt: Date.now(),
+                    source: String(entry.source || 'SIA'),
+                    sourceUrl: validated.sourceUrl
+                });
+                stored += 1;
+            } catch (error) {
+                console.error(`[VAC] ${entry.oaci} non mise à jour:`, error);
+                failures.push(`${entry.oaci} (${error.message || error})`);
+                if (error?.name === 'QuotaExceededError') {
+                    break;
+                }
+            }
+
+            completed += 1;
+            setVacDownloadProgress(
+                completed,
+                targets.length,
+                `${completed} / ${targets.length} VAC traitées`
+            );
+        }
+
+        await reconcileVacInstalledIndexFromDb();
+
+        if (!failures.length && completed === targets.length) {
+            try {
+                localStorage.setItem(VAC_LAST_SUCCESSFUL_SYNC_KEY, String(Date.now()));
+            } catch (_) {}
+        }
+
+        await displayVacManagementStatus();
+        refreshUI();
+
+        if (failures.length) {
+            alert(
+                `${stored} carte(s) VAC mise(s) à jour.\n`
+                + `${failures.length} échec(s) : ${failures.slice(0, 8).join(', ')}`
+                + (failures.length > 8 ? '…' : '')
+                + '\n\nLes anciennes VAC locales ont été conservées lorsqu’elles existaient.'
+            );
+            hideVacDownloadProgress(1800);
+            return false;
+        }
+
+        alert(`${stored} carte(s) VAC téléchargée(s) et vérifiée(s) pour utilisation hors ligne.`);
+        hideVacDownloadProgress(1200);
+        return true;
+    } finally {
+        vacSyncInProgress = false;
+        if (downloadButton) downloadButton.disabled = false;
+        if (deleteButton) deleteButton.disabled = false;
+        displayVacManagementStatus().catch(() => {});
+    }
+}
+
+async function handleVacDownloadUpdateClick() {
+    if (vacSyncInProgress) return;
+
+    let manifest;
+    try {
+        manifest = await fetchVacManifest();
+    } catch (error) {
+        if (!navigator.onLine) {
+            alert('Connexion Internet nécessaire pour télécharger ou mettre à jour les cartes VAC.');
+        } else {
+            alert(`Impossible de récupérer la liste des cartes VAC : ${error.message || error}`);
+        }
+        return;
+    }
+
+    const localRecords = await getAllVacRecords();
+    const availableEntries = getVacAvailableEntries(manifest);
+    const targets = getVacEntriesNeedingDownload(manifest, localRecords);
+
+    if (!localRecords.length) {
+        const totalSize = Number(manifest?.stats?.totalSizeBytes)
+            || availableEntries.reduce((sum, entry) => sum + (Number(entry.size) || 0), 0);
+        const confirmed = confirm(
+            `Télécharger les ${availableEntries.length} cartes VAC disponibles `
+            + `(${formatVacBytes(totalSize)}) pour utilisation hors ligne ?`
+        );
+        if (!confirmed) return;
+    } else if (!targets.length) {
+        await displayVacManagementStatus();
+        alert('Les cartes VAC téléchargées sont déjà à jour.');
+        return;
+    } else {
+        const confirmed = confirm(
+            `${targets.length} carte(s) VAC nouvelle(s) ou modifiée(s) sont disponibles.\n\n`
+            + 'Les télécharger maintenant ?'
+        );
+        if (!confirmed) return;
+    }
+
+    await syncVacFromManifest(manifest, {
+        source: localRecords.length ? 'manual-update' : 'initial-download'
+    });
+}
+
+async function deleteAllVacPdfs() {
+    if (vacSyncInProgress) return false;
+
+    const records = await getAllVacRecords();
+    if (!records.length) {
+        alert('Aucune carte VAC hors ligne à supprimer.');
+        await displayVacManagementStatus();
+        return false;
+    }
+
+    if (!confirm(`Supprimer les ${records.length} cartes VAC stockées hors ligne sur cet appareil ?`)) {
+        return false;
+    }
+
+    const database = await initVacDB();
+    await new Promise((resolve, reject) => {
+        const tx = database.transaction(VAC_STORE_NAME, 'readwrite');
+        tx.objectStore(VAC_STORE_NAME).clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('Suppression des VAC impossible'));
+        tx.onabort = () => reject(tx.error || new Error('Suppression des VAC interrompue'));
+    });
+
+    vacInstalledOaciSet = new Set();
+    try {
+        localStorage.setItem(VAC_INSTALLED_CODES_KEY, '[]');
+        localStorage.removeItem(VAC_LAST_SUCCESSFUL_SYNC_KEY);
+    } catch (_) {}
+
+    await displayVacManagementStatus();
+    refreshUI();
+    alert(`${records.length} carte(s) VAC supprimée(s).`);
+    return true;
+}
+
+async function openVacPdf(oaci) {
+    const safeOaci = normalizeVacOaci(oaci);
+    if (!safeOaci) return false;
+
+    const openedWindow = window.open('', '_blank');
+
+    try {
+        const record = await getVacRecord(safeOaci);
+        if (!record || !(record.blob instanceof Blob)) {
+            try {
+                if (openedWindow && !openedWindow.closed) openedWindow.close();
+            } catch (_) {}
+            alert(`Aucune carte VAC hors ligne disponible pour ${safeOaci}.`);
+            return false;
+        }
+
+        const pdfUrl = URL.createObjectURL(record.blob);
+        if (openedWindow) {
+            openedWindow.location.href = pdfUrl;
+        } else {
+            window.location.href = pdfUrl;
+        }
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 120000);
+        return true;
+    } catch (error) {
+        try {
+            if (openedWindow && !openedWindow.closed) openedWindow.close();
+        } catch (_) {}
+        alert(`Ouverture de la VAC ${safeOaci} impossible : ${error.message || error}`);
+        return false;
+    }
+}
+
+function buildVacButtonHtml(oaci) {
+    const safeOaci = normalizeVacOaci(oaci);
+    if (!safeOaci || !vacInstalledOaciSet.has(safeOaci)) return '';
+    return `<div class="popup-buttons popup-vac-buttons"><button type="button" class="vac-btn" onclick="window.openVacPdf('${safeOaci}')">VAC</button></div>`;
+}
+
+function closeVacUpdatePrompt() {
+    const modal = document.getElementById('vac-update-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    pendingVacUpdateManifest = null;
+}
+
+function showVacUpdatePrompt(manifest, updateCount) {
+    const modal = document.getElementById('vac-update-modal');
+    const detail = document.getElementById('vac-update-detail');
+    if (!modal) return false;
+
+    pendingVacUpdateManifest = manifest;
+    if (detail) {
+        const cycle = String(manifest?.sourceCycle || '').trim();
+        detail.textContent = cycle
+            ? `${updateCount} carte(s) concernée(s) — cycle ${cycle}.`
+            : `${updateCount} carte(s) concernée(s).`;
+    }
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    return true;
+}
+
+async function checkVacUpdatesAtStartup() {
+    /*
+     * Aucun popup de téléchargement initial : l'utilisateur choisit lui-même
+     * de télécharger les VAC depuis Gestion des Cartes.
+     */
+    const localRecords = await getAllVacRecords();
+    if (!localRecords.length) return false;
+    if (!navigator.onLine) return false;
+
+    let manifest;
+    try {
+        manifest = await fetchVacManifest(9000);
+    } catch (error) {
+        console.info('[VAC] Contrôle de mise à jour ignoré:', error.message || error);
+        return false;
+    }
+
+    const targets = getVacEntriesNeedingDownload(manifest, localRecords);
+    if (!targets.length) return false;
+
+    return showVacUpdatePrompt(manifest, targets.length);
+}
+
+window.openVacPdf = openVacPdf;
+window.deleteAllVacPdfs = deleteAllVacPdfs;
+window.displayVacManagementStatus = displayVacManagementStatus;
+
+
 function initAirportPdfDB() {
     return new Promise((resolve, reject) => {
         if (airportPdfDb) {
@@ -16414,7 +17017,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
+            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
@@ -16461,7 +17064,7 @@ function drawPermanentAirportMarkers() {
             color: 'transparent',
             weight: 1,
             opacity: 0
-        }).bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildAirportGoToButtonHtml(airport.oaci)}</div>`);
+        }).bindPopup(`<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`);
         marker.addTo(permanentAirportLayer);
     });
 
@@ -16479,7 +17082,7 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
         marker.bindPopup(popupHtml);
         marker.addTo(permanentAirportLayer);
         addAirportTouchHitbox(airport, popupHtml);
