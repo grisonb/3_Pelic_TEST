@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-93_vac_offline_github_pages';
-const APP_VERSION = 'v14.93';
+const SW_VERSION = 'sw-v14-94_map_stability_safesky_serialized';
+const APP_VERSION = 'v14.94';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
