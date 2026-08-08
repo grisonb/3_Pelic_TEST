@@ -1,5 +1,15 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.93';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.94';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v14.94 TEST — stabilisation carte / SafeSky / dézoom
+// - un seul rafraîchissement SafeSky à la fois ;
+// - une demande forcée reçue pendant un chargement est regroupée et rejouée ;
+// - les réponses SafeSky devenues obsolètes sont ignorées ;
+// - les lectures NPF de l'ancien niveau de zoom sont invalidées au zoomstart ;
+// - après zoom ou changement SafeSky, la couche de fond est vérifiée/redessinée
+//   sans reconstruction de la base de tuiles ni changement de carte active.
+// =========================================================================
 
 // =========================================================================
 // v14.93 TEST — Cartes VAC SIA hors ligne via GitHub Pages
@@ -806,6 +816,9 @@ let trafficLayer = null;
 let trafficAdvisoryLayer = null;
 let showTrafficLayer = localStorage.getItem(TRAFFIC_LAYER_KEY) === 'true';
 let isTrafficLoading = false;
+// v14.94 — sérialise les rafraîchissements SafeSky et invalide les réponses obsolètes.
+let trafficRefreshQueued = false;
+let trafficRefreshGeneration = 0;
 let trafficRefreshTimer = null;
 let lastTrafficRefreshAt = 0;
 let lastTrafficError = '';
@@ -953,6 +966,8 @@ const OFFLINE_TILE_WAKE_DELAYS_MS = [250, 900, 1800, 3500, 6500, 10000];
 const OFFLINE_AUX_LAYER_START_DELAY_MS = 6500;
 const OFFLINE_DISABLE_STARTUP_FORCE_SCAN = true;
 let offlineTileWakeToken = 0;
+// v14.94 — rafraîchissement léger et dédupliqué du fond de carte après un geste/UI lourd.
+let baseMapStabilityRefreshToken = 0;
 let offlineStartupLayerRecoveryToken = 0;
 let offlineMapSwitchToken = 0;
 let highVoltageLinesRetryToken = 0;
@@ -4877,11 +4892,15 @@ function initMap() {
         markerZoomAnimation: false
     }).setView([46.6, 2.2], 5.5);
 
+    map.on('zoomstart', () => {
+        beginBaseMapZoomStabilityGuard('zoomstart');
+    });
     map.on('zoomend', enforceOfflineZoomLimit);
     map.on('zoomend', () => {
         if (showTrafficLayer) {
             redrawTrafficLayerFromSnapshot();
         }
+        scheduleBaseMapStabilityRefresh('zoomend');
     });
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
@@ -5019,6 +5038,59 @@ function initMap() {
         currentCommune = manualCommune;
         localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
         displayCommuneDetails(manualCommune, false);
+    });
+}
+
+function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
+    if (!map) return;
+
+    // Annule les rafraîchissements post-geste qui ne correspondent plus à la vue courante.
+    baseMapStabilityRefreshToken += 1;
+
+    /*
+     * v14.94 — la carte NPF utilise une file IndexedDB limitée. Pendant un
+     * changement de zoom, les lectures encore en attente pour l'ancien niveau
+     * ne doivent pas retarder les nouvelles tuiles. Les lectures déjà actives
+     * sont rendues inoffensives par la génération existante.
+     */
+    if (
+        offlineTilesMode
+        && typeof isNpfOfflinePackSelection === 'function'
+        && isNpfOfflinePackSelection()
+        && typeof resetPendingDirectOfflineNpfReads === 'function'
+    ) {
+        resetPendingDirectOfflineNpfReads();
+    }
+}
+
+function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
+    if (!map || !baseTileLayer) return;
+    const token = ++baseMapStabilityRefreshToken;
+
+    /*
+     * Un seul cycle de réparation est conservé. Deux passages courts sont
+     * volontairement utilisés pour Safari/iPadOS : le premier après la fin du
+     * geste, le second après que les autres calques de zoom aient terminé leur
+     * propre rendu. Aucune reconstruction de la couche ni de la base IndexedDB.
+     */
+    [180, 700].forEach((delay, index) => {
+        setTimeout(() => {
+            if (token !== baseMapStabilityRefreshToken) return;
+            if (!map || !baseTileLayer) return;
+
+            try {
+                if (!map.hasLayer(baseTileLayer)) {
+                    baseTileLayer.addTo(map);
+                }
+                map.invalidateSize?.({ animate: false, pan: false });
+                baseTileLayer.redraw?.();
+                if (index === 1 && offlineTilesMode) {
+                    enforceOfflineZoomLimit();
+                }
+            } catch (error) {
+                console.warn('Stabilisation fond de carte impossible:', reason, error);
+            }
+        }, delay);
     });
 }
 
@@ -10816,6 +10888,7 @@ function ensureTrafficSettingsModal() {
         if (showTrafficLayer) {
             refreshTrafficLayer({ force: true, reason: 'settings' });
         }
+        scheduleBaseMapStabilityRefresh('traffic-settings');
 
         closeModal();
     });
@@ -14987,7 +15060,19 @@ function refreshTrafficButtonState(count = null) {
 async function refreshTrafficLayer(options = {}) {
     const { force = false } = options;
     if (!showTrafficLayer || !trafficLayer) return;
-    if (isTrafficLoading && !force) return;
+
+    /*
+     * v14.94 — ne jamais lancer deux lectures SafeSky en parallèle.
+     * Une demande forcée (filtre/toggle) reçue pendant une lecture invalide
+     * immédiatement la réponse en cours et demande un unique nouveau passage.
+     */
+    if (isTrafficLoading) {
+        if (force) {
+            trafficRefreshQueued = true;
+            trafficRefreshGeneration += 1;
+        }
+        return;
+    }
 
     const now = Date.now();
     if (!force && lastTrafficRefreshAt && now - lastTrafficRefreshAt < 4500) return;
@@ -15004,6 +15089,7 @@ async function refreshTrafficLayer(options = {}) {
         return;
     }
 
+    const refreshGeneration = ++trafficRefreshGeneration;
     isTrafficLoading = true;
     refreshTrafficButtonState();
     updateTrafficStatus({ state: 'loading', visible: true });
@@ -15086,6 +15172,18 @@ async function refreshTrafficLayer(options = {}) {
             ...getTemporaryGlobalTrafficRaw()
         );
 
+        /*
+         * Un filtre plus récent ou une désactivation SafeSky rend ce résultat
+         * caduc : il ne doit ni redessiner ni effacer l'état courant.
+         */
+        if (
+            refreshGeneration !== trafficRefreshGeneration
+            || !showTrafficLayer
+            || !trafficLayer
+        ) {
+            return;
+        }
+
         if (
             !combinedAircraft.length
             && errors.length
@@ -15102,6 +15200,13 @@ async function refreshTrafficLayer(options = {}) {
             now: lastTrafficRefreshAt
         });
     } catch (error) {
+        if (
+            refreshGeneration !== trafficRefreshGeneration
+            || !showTrafficLayer
+            || !trafficLayer
+        ) {
+            return;
+        }
         lastTrafficError = error && error.message ? error.message : String(error);
         lastTrafficDisplayedCount = 0;
         console.warn('Trafic temporairement indisponible:', error);
@@ -15109,8 +15214,17 @@ async function refreshTrafficLayer(options = {}) {
         refreshTrafficButtonState(0);
         updateTrafficStatus({ state: 'error', visible: true, message: 'Trafic temporairement indisponible — nouvelle tentative automatique' });
     } finally {
+        const runQueuedRefresh = trafficRefreshQueued && showTrafficLayer;
+        trafficRefreshQueued = false;
         isTrafficLoading = false;
         refreshTrafficButtonState();
+
+        if (runQueuedRefresh) {
+            setTimeout(() => {
+                if (!showTrafficLayer) return;
+                refreshTrafficLayer({ force: true, reason: 'queued-latest' });
+            }, 0);
+        }
     }
 }
 
@@ -15139,12 +15253,15 @@ function stopTrafficAutoRefresh() {
 function toggleTrafficLayer(forceState = null) {
     if (TRAFFIC_DISABLED_FOR_NOW) {
         showTrafficLayer = false;
+        trafficRefreshGeneration += 1;
+        trafficRefreshQueued = false;
         try { localStorage.setItem(TRAFFIC_LAYER_KEY, 'false'); } catch (_) {}
         stopTrafficAutoRefresh();
         clearTrafficDisplay();
         if (trafficLayer && map && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
         updateTrafficStatus({ visible: false });
         refreshTrafficButtonState(0);
+        scheduleBaseMapStabilityRefresh('traffic-disabled');
         return;
     }
     const shouldShow = forceState === null ? !showTrafficLayer : Boolean(forceState);
@@ -15157,6 +15274,9 @@ function toggleTrafficLayer(forceState = null) {
         refreshTrafficButtonState();
         refreshTrafficLayer({ force: true, reason: 'toggle' });
     } else {
+        // Invalide toute réponse réseau encore en vol avant de retirer la couche.
+        trafficRefreshGeneration += 1;
+        trafficRefreshQueued = false;
         stopTrafficAutoRefresh();
         clearTrafficDisplay();
         lastTrafficDisplayedCount = 0;
@@ -15165,6 +15285,7 @@ function toggleTrafficLayer(forceState = null) {
         updateTrafficStatus({ visible: false });
     }
 
+    scheduleBaseMapStabilityRefresh(showTrafficLayer ? 'traffic-on' : 'traffic-off');
     refreshTrackedTrafficListUi();
 }
 
