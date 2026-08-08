@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-TEST SIA VAC v4 — résolution réelle de l'URL d'une VAC depuis le catalogue SIA.
+TEST SIA VAC v5 — résolution stricte d'une vraie VAC Atlas VAC.
 
-Objectif :
-- ne plus construire ni deviner l'URL du PDF ;
-- interroger le catalogue SIA pour LFBD ;
-- repérer le résultat "AD-2.LFBD.pdf" ;
-- extraire toutes les URL/chemins associés au résultat ;
-- tester les candidats et identifier automatiquement un vrai PDF ;
-- produire un diagnostic exploitable si le lien est généré dynamiquement.
+But :
+- rechercher LFBD dans le catalogue officiel SIA ;
+- sélectionner UNIQUEMENT la ligne :
+      AIP - AD-2.LFBD.pdf
+      AIP Atlas VAC
+- ignorer tous les SUP AIP, AIP France, VACH, amendements, etc. ;
+- télécharger le PDF via le lien exact fourni par cette ligne ;
+- vérifier HTTP 200, Content-Type, en-tête %PDF-, taille et SHA-256.
 
 Aucun inventaire complet.
 Aucune modification de NPF.
@@ -18,9 +19,8 @@ Aucune publication des VAC.
 from __future__ import annotations
 
 import argparse
-import html
+import hashlib
 import json
-import re
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -29,145 +29,160 @@ from bs4 import BeautifulSoup
 
 SIA = "https://www.sia.aviation-civile.gouv.fr"
 ICAO = "LFBD"
-TARGET = f"AD-2.{ICAO}.pdf"
+TARGET_LABEL = f"AIP - AD-2.{ICAO}.pdf"
+TARGET_CATEGORY = "AIP Atlas VAC"
 
-SEARCH_URLS = [
-    f"{SIA}/catalogsearch/result/?q={ICAO}",
-    f"{SIA}/catalogsearch/result/?c=8&format=pdf&q={ICAO}",
-    f"{SIA}/catalogsearch/result/index/?c=8&format=pdf&q={ICAO}",
-]
+SEARCH_URL = (
+    f"{SIA}/catalogsearch/result/"
+    f"?c=8&format=pdf&q={ICAO}"
+)
 
-UA = (
+USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151 Safari/537.36 "
-    "NPF-Q400-VAC-technical-test/4.0"
+    "NPF-Q400-VAC-technical-test/5.0"
 )
 
 HEADERS = {
-    "User-Agent": UA,
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
-              "application/pdf;q=0.8,*/*;q=0.7",
+    "User-Agent": USER_AGENT,
     "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.7",
     "Cache-Control": "no-cache",
 }
 
 
-def normalize_candidate(value: str, base_url: str) -> list[str]:
-    """Transforme un attribut/fragment en éventuelles URL HTTP."""
-    if not value:
-        return []
+def human_bytes(n: int) -> str:
+    value = float(n)
+    for unit in ("o", "Ko", "Mo", "Go"):
+        if value < 1024 or unit == "Go":
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{n} o"
 
-    value = html.unescape(value).strip()
-    values = [value]
 
-    # Extrait aussi les URL/chemins noyés dans onclick, JSON, JS, etc.
-    patterns = [
-        r'https?://[^\s"\'<>\\]+',
-        r'/(?:documents|media|pub|catalog|download|files?)/[^\s"\'<>\\]+',
-    ]
-    for pat in patterns:
-        values.extend(re.findall(pat, value, flags=re.I))
+def clean_text(value: str) -> str:
+    return " ".join((value or "").split())
 
-    out = []
-    for v in values:
-        v = v.strip(" '\"\t\r\n,;()[]{}")
-        if not v:
+
+def resolve_exact_vac_url(session: requests.Session, diagnostic_dir: Path) -> dict:
+    """
+    Le catalogue SIA présente chaque document sous forme d'une ligne <tr>.
+    On sélectionne uniquement la ligne dont :
+    - le texte du lien est exactement "AIP - AD-2.LFBD.pdf"
+    - la catégorie est exactement "AIP Atlas VAC"
+    """
+    r = session.get(
+        SEARCH_URL,
+        headers={**HEADERS, "Accept": "text/html,*/*;q=0.8"},
+        timeout=(15, 40),
+        allow_redirects=True,
+    )
+    r.raise_for_status()
+
+    diagnostic_dir.mkdir(parents=True, exist_ok=True)
+    (diagnostic_dir / "catalogue_lfbd.html").write_text(
+        r.text, encoding="utf-8", errors="replace"
+    )
+
+    soup = BeautifulSoup(r.text, "html.parser")
+    inspected = []
+
+    for row in soup.select("tr.tr_ligne_document"):
+        link = row.select_one("a.lien_document[href]")
+        if not link:
             continue
 
-        if v.startswith("http://") or v.startswith("https://"):
-            u = v
-        elif v.startswith("/"):
-            u = urljoin(base_url, v)
-        else:
-            continue
+        label = clean_text(link.get_text(" ", strip=True))
 
-        if u.startswith(SIA):
-            out.append(u)
+        description_cell = row.select_one("td.td_description_ligne_document")
+        category = ""
+        if description_cell:
+            divs = description_cell.find_all("div", recursive=False)
+            if divs:
+                category = clean_text(divs[-1].get_text(" ", strip=True))
 
-    return out
+        href = urljoin(r.url, link.get("href", ""))
 
+        inspected.append(
+            {
+                "label": label,
+                "category": category,
+                "href": href,
+            }
+        )
 
-def collect_candidates_from_tag(tag, base_url: str) -> list[str]:
-    candidates = []
+        if label == TARGET_LABEL and category == TARGET_CATEGORY:
+            return {
+                "found": True,
+                "search_url": r.url,
+                "label": label,
+                "category": category,
+                "download_url": href,
+                "inspected": inspected,
+            }
 
-    nodes = [tag]
-    nodes.extend(tag.find_all(True))
-
-    for node in nodes:
-        for key, val in node.attrs.items():
-            if isinstance(val, list):
-                vals = [str(x) for x in val]
-            else:
-                vals = [str(val)]
-            for v in vals:
-                candidates.extend(normalize_candidate(v, base_url))
-
-    # HTML brut du bloc : utile pour les URLs dans scripts/JSON.
-    candidates.extend(normalize_candidate(str(tag), base_url))
-
-    # Déduplication en conservant l'ordre.
-    seen = set()
-    unique = []
-    for u in candidates:
-        if u not in seen:
-            seen.add(u)
-            unique.append(u)
-    return unique
+    return {
+        "found": False,
+        "search_url": r.url,
+        "label": "",
+        "category": "",
+        "download_url": "",
+        "inspected": inspected,
+    }
 
 
-def score_candidate(url: str) -> int:
-    u = url.lower()
-    score = 0
-    if "lfbd" in u:
-        score += 20
-    if ".pdf" in u:
-        score += 15
-    if "atlas" in u or "vac" in u:
-        score += 10
-    if "/media/" in u:
-        score += 8
-    if "/documents/" in u or "download" in u:
-        score += 6
-    if "catalogsearch" in u:
-        score -= 8
-    return score
-
-
-def test_candidate(session: requests.Session, url: str) -> dict:
+def download_pdf(session: requests.Session, url: str, target: Path) -> dict:
     result = {
-        "url": url,
+        "request_url": url,
         "status": None,
         "final_url": "",
         "content_type": "",
-        "size_header": "",
+        "size_bytes": 0,
         "pdf_header_ok": False,
-        "first_bytes_hex": "",
+        "sha256": "",
         "error": "",
     }
 
     try:
+        sha = hashlib.sha256()
+        total = 0
+        first = True
+
         with session.get(
             url,
-            headers={**HEADERS, "Range": "bytes=0-4095"},
+            headers={**HEADERS, "Accept": "application/pdf,*/*;q=0.8"},
             stream=True,
             allow_redirects=True,
-            timeout=(15, 40),
+            timeout=(15, 60),
         ) as r:
             result["status"] = r.status_code
             result["final_url"] = r.url
             result["content_type"] = r.headers.get("Content-Type", "")
-            result["size_header"] = (
-                r.headers.get("Content-Range")
-                or r.headers.get("Content-Length")
-                or ""
-            )
+            r.raise_for_status()
 
-            chunk = next(r.iter_content(chunk_size=4096), b"")
-            result["pdf_header_ok"] = chunk.startswith(b"%PDF-")
-            result["first_bytes_hex"] = chunk[:16].hex()
+            with target.open("wb") as f:
+                for chunk in r.iter_content(chunk_size=256 * 1024):
+                    if not chunk:
+                        continue
+
+                    if first:
+                        result["pdf_header_ok"] = chunk.startswith(b"%PDF-")
+                        first = False
+
+                    f.write(chunk)
+                    sha.update(chunk)
+                    total += len(chunk)
+
+        result["size_bytes"] = total
+        result["sha256"] = sha.hexdigest() if total else ""
+
+        if total == 0:
+            result["error"] = "Fichier vide"
+        elif not result["pdf_header_ok"]:
+            result["error"] = "Le fichier ne commence pas par %PDF-"
 
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
+        target.unlink(missing_ok=True)
 
     return result
 
@@ -183,192 +198,108 @@ def main() -> int:
     s = requests.Session()
     s.headers.update(HEADERS)
 
-    all_candidates = []
-    diagnostics = []
-    found_target = False
+    print("=== TEST SIA VAC v5 — LFBD STRICT ===")
+    print(f"Cible exacte : {TARGET_LABEL}")
+    print(f"Catégorie exacte : {TARGET_CATEGORY}")
 
-    for idx, search_url in enumerate(SEARCH_URLS, 1):
-        print(f"[recherche {idx}] {search_url}")
-
-        try:
-            r = s.get(search_url, timeout=(15, 40), allow_redirects=True)
-            r.raise_for_status()
-        except Exception as exc:
-            diagnostics.append({
-                "search_url": search_url,
-                "error": f"{type(exc).__name__}: {exc}",
-            })
-            continue
-
-        html_text = r.text
-        (out / f"catalogue_lfbd_{idx}.html").write_text(
-            html_text, encoding="utf-8", errors="replace"
+    try:
+        resolved = resolve_exact_vac_url(s, out)
+    except Exception as exc:
+        summary = (
+            "# Test GitHub Actions → SIA / VAC — v5 strict\n\n"
+            f"❌ Erreur lors de la lecture du catalogue SIA : "
+            f"`{type(exc).__name__}: {exc}`\n"
         )
+        (out / "summary.md").write_text(summary, encoding="utf-8")
+        return 2
 
-        soup = BeautifulSoup(html_text, "html.parser")
-        target_nodes = soup.find_all(
-            string=lambda x: x and TARGET.lower() in str(x).lower()
+    (out / "resolution_lfbd.json").write_text(
+        json.dumps(resolved, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    if not resolved["found"]:
+        lines = [
+            "# Test GitHub Actions → SIA / VAC — v5 strict",
+            "",
+            f"❌ La ligne exacte `{TARGET_LABEL}` / `{TARGET_CATEGORY}` "
+            "n'a pas été trouvée.",
+            "",
+            f"Lignes du catalogue inspectées : **{len(resolved['inspected'])}**",
+        ]
+        (out / "summary.md").write_text(
+            "\n".join(lines) + "\n", encoding="utf-8"
         )
+        return 3
 
-        diag = {
-            "search_url": search_url,
-            "final_url": r.url,
-            "status": r.status_code,
-            "target_occurrences": len(target_nodes),
-            "fragments": [],
-        }
+    print("Ligne Atlas VAC exacte trouvée.")
+    print(f"URL SIA : {resolved['download_url']}")
 
-        print(f"  occurrences de {TARGET}: {len(target_nodes)}")
+    pdf_target = out / f"{ICAO}.pdf"
+    pdf = download_pdf(s, resolved["download_url"], pdf_target)
 
-        for n, node in enumerate(target_nodes[:10], 1):
-            found_target = True
-            cur = node.parent
-
-            # Monte plusieurs niveaux pour capturer le bloc complet du résultat.
-            ancestors = []
-            for level in range(8):
-                if cur is None:
-                    break
-                ancestors.append(cur)
-                cur = cur.parent
-
-            # Choisit le premier ancêtre ayant une quantité raisonnable de HTML.
-            chosen = ancestors[0] if ancestors else None
-            for anc in ancestors:
-                txt = " ".join(anc.stripped_strings)
-                if TARGET.lower() in txt.lower() and len(str(anc)) < 25000:
-                    chosen = anc
-                if len(txt) > 500 and TARGET.lower() in txt.lower():
-                    break
-
-            if chosen is None:
-                continue
-
-            fragment_html = str(chosen)
-            fragment_file = out / f"fragment_lfbd_{idx}_{n}.html"
-            fragment_file.write_text(
-                fragment_html, encoding="utf-8", errors="replace"
-            )
-
-            candidates = collect_candidates_from_tag(chosen, r.url)
-            all_candidates.extend(candidates)
-
-            diag["fragments"].append({
-                "file": fragment_file.name,
-                "candidate_count": len(candidates),
-                "candidates": candidates,
-            })
-
-        # Recherche globale de chemins suspects dans le HTML autour de LFBD.
-        lower = html_text.lower()
-        pos = lower.find(TARGET.lower())
-        if pos >= 0:
-            context = html_text[max(0, pos - 12000): pos + 12000]
-            context_file = out / f"context_lfbd_{idx}.txt"
-            context_file.write_text(
-                context, encoding="utf-8", errors="replace"
-            )
-            globals_here = normalize_candidate(context, r.url)
-            all_candidates.extend(globals_here)
-            diag["context_file"] = context_file.name
-            diag["context_candidates"] = globals_here
-
-        diagnostics.append(diag)
-
-    # Déduplique et trie les candidats les plus probables d'abord.
-    seen = set()
-    unique = []
-    for u in all_candidates:
-        if u not in seen:
-            seen.add(u)
-            unique.append(u)
-
-    unique.sort(key=score_candidate, reverse=True)
-
-    print(f"\nCandidats URL uniques : {len(unique)}")
-
-    tested = []
-    valid_pdf = None
-
-    # Évite de marteler le SIA : 30 candidats maximum.
-    for i, url in enumerate(unique[:30], 1):
-        print(f"[test {i:02d}] {url}")
-        result = test_candidate(s, url)
-        tested.append(result)
-        print(
-            f"  HTTP={result['status']} "
-            f"type={result['content_type']} "
-            f"PDF={result['pdf_header_ok']}"
-        )
-
-        if result["pdf_header_ok"]:
-            valid_pdf = result
-            print("  >>> PDF VAC RÉEL IDENTIFIÉ")
-            break
+    valid = (
+        pdf["status"] == 200
+        and pdf["pdf_header_ok"]
+        and pdf["size_bytes"] > 0
+        and not pdf["error"]
+    )
 
     payload = {
-        "target": TARGET,
-        "search_diagnostics": diagnostics,
-        "candidate_count": len(unique),
-        "candidates": unique,
-        "tested": tested,
-        "valid_pdf": valid_pdf,
+        "resolution": resolved,
+        "pdf": pdf,
+        "valid": valid,
     }
-    (out / "diagnostic_lfbd.json").write_text(
+    (out / "resultat_lfbd.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
     lines = [
-        "# Test GitHub Actions → SIA / VAC — v4 URL réelle",
+        "# Test GitHub Actions → SIA / VAC — v5 strict",
         "",
-        f"- Cible : **{TARGET}**",
-        f"- Le nom de la VAC apparaît dans le catalogue : "
-        f"**{'OUI' if found_target else 'NON'}**",
-        f"- URL candidates extraites : **{len(unique)}**",
-        f"- URL candidates testées : **{len(tested)}**",
+        f"- OACI : **{ICAO}**",
+        f"- Document demandé : **{TARGET_LABEL}**",
+        f"- Catégorie exigée : **{TARGET_CATEGORY}**",
+        f"- Ligne exacte trouvée : **OUI**",
+        f"- URL de téléchargement SIA : `{resolved['download_url']}`",
+        "",
+        "## PDF téléchargé",
+        "",
+        f"- HTTP : **{pdf['status']}**",
+        f"- URL finale : `{pdf['final_url']}`",
+        f"- Content-Type : `{pdf['content_type']}`",
+        f"- Taille : **{human_bytes(pdf['size_bytes'])}**",
+        f"- En-tête `%PDF-` : **{'OUI' if pdf['pdf_header_ok'] else 'NON'}**",
+        f"- SHA-256 : `{pdf['sha256']}`",
+        "",
+        "## Conclusion",
         "",
     ]
 
-    if valid_pdf:
-        lines += [
-            "## ✅ Résultat",
-            "",
-            "**Un vrai PDF VAC SIA a été trouvé et lu depuis GitHub Actions.**",
-            "",
-            f"- URL : `{valid_pdf['final_url'] or valid_pdf['url']}`",
-            f"- HTTP : `{valid_pdf['status']}`",
-            f"- Content-Type : `{valid_pdf['content_type']}`",
-            f"- Taille annoncée : `{valid_pdf['size_header']}`",
-            "",
-            "Cette URL ne sera pas codée en dur dans NPF : le système définitif "
-            "devra la résoudre dynamiquement depuis les données SIA.",
-        ]
+    if valid:
+        lines.append(
+            "✅ **La vraie VAC LFBD de l'Atlas VAC a été téléchargée "
+            "et validée depuis GitHub Actions.**"
+        )
     else:
-        lines += [
-            "## ⚠️ Résultat",
-            "",
-            "Le catalogue SIA a été lu mais aucun candidat testé n'a encore produit "
-            "un PDF `%PDF-`.",
-            "",
-            "Les fichiers de diagnostic joints à l'artifact contiennent le HTML "
-            "et le fragment exact du résultat LFBD. Ils permettront de déterminer "
-            "comment le SIA encode réellement le lien de téléchargement.",
-        ]
+        lines.append(
+            "❌ La ligne Atlas VAC a été trouvée mais son téléchargement "
+            "n'a pas produit un PDF valide."
+        )
+        if pdf["error"]:
+            lines.append(f"\nErreur : `{pdf['error']}`")
 
     (out / "summary.md").write_text(
         "\n".join(lines) + "\n",
         encoding="utf-8",
     )
 
-    print("\n=== TERMINÉ ===")
-    print(f"Cible visible dans catalogue : {found_target}")
-    print(f"Candidats : {len(unique)}")
-    print(f"PDF réel trouvé : {bool(valid_pdf)}")
+    print("=== TERMINÉ ===")
+    print(f"PDF valide : {valid}")
+    print(f"Taille : {pdf['size_bytes']} octets")
 
-    # Le job reste vert dès lors que le catalogue a bien été analysé :
-    # même sans PDF résolu, l'artifact contient le diagnostic nécessaire.
-    return 0 if found_target else 3
+    return 0 if valid else 4
 
 
 if __name__ == "__main__":
