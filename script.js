@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.94';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.95';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v14.95 TEST — performance carte Offline aux grands dézooms
+// - lecture directe prioritaire par index IndexedDB `tileUrl` ;
+// - les bases isolées modernes n'essaient plus toutes les anciennes clés pack-scopées ;
+// - la base historique commune est ignorée lorsque tous les packs actifs sont confirmés isolés ;
+// - cache négatif borné pour éviter de rechercher plusieurs fois les mêmes tuiles absentes ;
+// - aucune modification du nombre de lectures simultanées, du keepBuffer ou des données cartographiques.
+// =========================================================================
 
 // =========================================================================
 // v14.94 TEST — stabilisation carte / SafeSky / dézoom
@@ -5483,6 +5492,7 @@ function rebuildRememberedOfflineMapAfterDatabaseReady(reason, readyDatabase) {
     if (mapSourceMode !== 'offline' || !map) return false;
 
     directOfflineTileBlobCache.clear();
+    directOfflineTileMissCache.clear();
     directOfflineTileHitCount = 0;
     directOfflineTileMissCount = 0;
     offlineTilesMode = true;
@@ -5686,7 +5696,10 @@ function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
  * applicatif et comme chemin de compatibilité secondaire.
  */
 const DIRECT_OFFLINE_TILE_CACHE_MAX = 240;
+const DIRECT_OFFLINE_TILE_MISS_CACHE_MAX = 512;
+const DIRECT_OFFLINE_TILE_MISS_CACHE_TTL_MS = 30000;
 const directOfflineTileBlobCache = new Map();
+const directOfflineTileMissCache = new Map();
 const directOfflineDbPromises = new Map();
 let directOfflineTileHitCount = 0;
 let directOfflineTileMissCount = 0;
@@ -5828,18 +5841,50 @@ function getDirectOfflineTileUrlCandidates(coords) {
     return urls;
 }
 
+function activeOfflineSelectionUsesCompleteIsolatedStorage() {
+    const packs = Array.isArray(activeOfflinePacks)
+        ? activeOfflinePacks.filter(Boolean)
+        : [];
+    if (!packs.length || typeof getInstalledMapPacksSafe !== 'function') return false;
+
+    const installed = getInstalledMapPacksSafe();
+    if (!Array.isArray(installed) || !installed.length) return false;
+
+    return packs.every(packName => {
+        const canonical = typeof normalizeOfflinePackName === 'function'
+            ? normalizeOfflinePackName(packName)
+            : String(packName || '').trim();
+        const record = installed.find(pack => {
+            if (!pack) return false;
+            const installedCanonical = typeof normalizeOfflinePackName === 'function'
+                ? normalizeOfflinePackName(pack.name)
+                : String(pack.name || '').trim();
+            return installedCanonical === canonical;
+        });
+        if (!record) return false;
+        const dbName = String(record.dbName || '').trim();
+        const storageMode = String(record.storageMode || '').trim().toLowerCase();
+        return !!dbName
+            && dbName !== String(OFFLINE_DB_NAME || '')
+            && storageMode.startsWith('isolated-');
+    });
+}
+
 function getDirectOfflineDatabaseCandidates() {
     const names = [];
+    const skipLegacyCommonDb = activeOfflineSelectionUsesCompleteIsolatedStorage();
     const addName = value => {
         const clean = String(value || '').trim();
-        if (clean && !names.includes(clean)) names.push(clean);
+        if (!clean) return;
+        if (skipLegacyCommonDb && clean === String(OFFLINE_DB_NAME || '')) return;
+        if (!names.includes(clean)) names.push(clean);
     };
     (Array.isArray(activeOfflinePackDatabases) ? activeOfflinePackDatabases : [])
         .forEach(addName);
     if (typeof getOfflineActivePackDatabasesForPacks === 'function') {
         getOfflineActivePackDatabasesForPacks(activeOfflinePacks).forEach(addName);
     }
-    addName(OFFLINE_DB_NAME);
+    if (!skipLegacyCommonDb || !names.length) addName(OFFLINE_DB_NAME);
     return names;
 }
 
@@ -5938,7 +5983,9 @@ function getDirectOfflineStoredKeyCandidates(tileUrl) {
     return keys;
 }
 
-function readDirectOfflineTileRecord(db, tileUrl) {
+function readDirectOfflineTileRecord(db, tileUrl, options = {}) {
+    const allowLegacyFallback = options.allowLegacyFallback !== false;
+
     return new Promise((resolve, reject) => {
         let tx;
         let store;
@@ -5962,18 +6009,55 @@ function readDirectOfflineTileRecord(db, tileUrl) {
             reject(error);
         };
 
-        const exactKeys = getDirectOfflineStoredKeyCandidates(tileUrl);
+        const readByTileUrlIndex = () => {
+            if (settled) return;
+            if (!store.indexNames.contains('tileUrl')) {
+                if (allowLegacyFallback) {
+                    readByLegacyKeys();
+                } else {
+                    finish(null);
+                }
+                return;
+            }
+
+            let request;
+            try {
+                request = store.index('tileUrl').openCursor(IDBKeyRange.only(tileUrl));
+            } catch (error) {
+                fail(error);
+                return;
+            }
+
+            request.onsuccess = () => {
+                const cursor = request.result;
+                if (!cursor) {
+                    if (allowLegacyFallback) {
+                        readByLegacyKeys();
+                    } else {
+                        finish(null);
+                    }
+                    return;
+                }
+                const record = cursor.value || {};
+                if (isDirectOfflineTileRecordAllowed(record)) {
+                    finish(record);
+                    return;
+                }
+                cursor.continue();
+            };
+            request.onerror = () => fail(request.error || new Error('Erreur lecture index tileUrl'));
+        };
+
+        const exactKeys = allowLegacyFallback
+            ? getDirectOfflineStoredKeyCandidates(tileUrl)
+            : [];
         let keyIndex = 0;
 
-        const fallbackToTileUrlIndex = () => {
+        const readByLegacyCursor = () => {
             if (settled) return;
             let request;
             try {
-                if (store.indexNames.contains('tileUrl')) {
-                    request = store.index('tileUrl').openCursor(IDBKeyRange.only(tileUrl));
-                } else {
-                    request = store.openCursor();
-                }
+                request = store.openCursor();
             } catch (error) {
                 fail(error);
                 return;
@@ -5992,13 +6076,17 @@ function readDirectOfflineTileRecord(db, tileUrl) {
                 }
                 cursor.continue();
             };
-            request.onerror = () => fail(request.error || new Error('Erreur lecture index tuile'));
+            request.onerror = () => fail(request.error || new Error('Erreur lecture legacy tuile'));
         };
 
-        const tryNextExactKey = () => {
+        const readByLegacyKeys = () => {
             if (settled) return;
+            if (!allowLegacyFallback) {
+                finish(null);
+                return;
+            }
             if (keyIndex >= exactKeys.length) {
-                fallbackToTileUrlIndex();
+                readByLegacyCursor();
                 return;
             }
             const key = exactKeys[keyIndex++];
@@ -6015,14 +6103,21 @@ function readDirectOfflineTileRecord(db, tileUrl) {
                     finish(record);
                     return;
                 }
-                tryNextExactKey();
+                readByLegacyKeys();
             };
-            request.onerror = tryNextExactKey;
+            request.onerror = readByLegacyKeys;
         };
 
         tx.onerror = () => fail(tx.error || new Error('Erreur transaction tuile'));
         tx.onabort = () => fail(tx.error || new Error('Transaction tuile annulée'));
-        tryNextExactKey();
+
+        /*
+         * v14.95 — les imports modernes possèdent un index `tileUrl` : une seule
+         * recherche indexée remplace les dizaines de `store.get()` essayées avant.
+         * Le chemin historique n'est conservé que lorsque la base peut réellement
+         * contenir d'anciens enregistrements sans champ `tileUrl`.
+         */
+        readByTileUrlIndex();
     });
 }
 
@@ -6033,6 +6128,16 @@ function rememberDirectOfflineTileBlob(cacheKey, blob) {
     while (directOfflineTileBlobCache.size > DIRECT_OFFLINE_TILE_CACHE_MAX) {
         const oldestKey = directOfflineTileBlobCache.keys().next().value;
         directOfflineTileBlobCache.delete(oldestKey);
+    }
+}
+
+function rememberDirectOfflineTileMiss(cacheKey) {
+    if (!cacheKey) return;
+    directOfflineTileMissCache.delete(cacheKey);
+    directOfflineTileMissCache.set(cacheKey, Date.now());
+    while (directOfflineTileMissCache.size > DIRECT_OFFLINE_TILE_MISS_CACHE_MAX) {
+        const oldestKey = directOfflineTileMissCache.keys().next().value;
+        directOfflineTileMissCache.delete(oldestKey);
     }
 }
 
@@ -6104,6 +6209,7 @@ async function recoverDirectOfflineTileReader(reason = 'read-error') {
         resetPendingDirectOfflineNpfReads();
         closeDirectOfflineDatabaseConnectionsForStartupRetry();
         directOfflineTileBlobCache.clear();
+        directOfflineTileMissCache.clear();
         directOfflineTileMissCount = 0;
 
         await new Promise(resolve => setTimeout(resolve, 180));
@@ -6211,6 +6317,16 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
         return cachedBlob;
     }
 
+    if (directOfflineTileMissCache.has(cacheKey)) {
+        const cachedMissAt = Number(directOfflineTileMissCache.get(cacheKey)) || 0;
+        if (Date.now() - cachedMissAt <= DIRECT_OFFLINE_TILE_MISS_CACHE_TTL_MS) {
+            directOfflineTileMissCache.delete(cacheKey);
+            directOfflineTileMissCache.set(cacheKey, cachedMissAt);
+            return null;
+        }
+        directOfflineTileMissCache.delete(cacheKey);
+    }
+
     const dbNames = getDirectOfflineDatabaseCandidates();
     const tileUrls = getDirectOfflineTileUrlCandidates(coords);
     let hadRecoverableTechnicalError = false;
@@ -6240,8 +6356,9 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
         for (const tileUrl of tileUrls) {
             try {
                 const readTimeoutMs = isNpfOfflinePackSelection() ? 5200 : 1800;
+                const allowLegacyFallback = String(dbName || '') === String(OFFLINE_DB_NAME || '');
                 const record = await withTimeout(
-                    readDirectOfflineTileRecord(tileDb, tileUrl),
+                    readDirectOfflineTileRecord(tileDb, tileUrl, { allowLegacyFallback }),
                     readTimeoutMs,
                     'Timeout lecture tuile'
                 );
@@ -6287,6 +6404,7 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
         return null;
     }
 
+    rememberDirectOfflineTileMiss(cacheKey);
     directOfflineTileMissCount += 1;
     if (
         directOfflineTileHitCount === 0
@@ -22844,6 +22962,7 @@ async function forceQuickOfflineMapGroupReload(groupName, packNames) {
         resetPendingDirectOfflineNpfReads();
         closeDirectOfflineDatabaseConnectionsForStartupRetry();
         directOfflineTileBlobCache.clear();
+        directOfflineTileMissCache.clear();
         directOfflineTileHitCount = 0;
         directOfflineTileMissCount = 0;
         directOfflineConsecutiveReadErrors = 0;
@@ -22907,6 +23026,7 @@ async function selectQuickOfflineMapGroup(groupName) {
     resetPendingDirectOfflineNpfReads();
     closeDirectOfflineDatabaseConnectionsForStartupRetry();
     directOfflineTileBlobCache.clear();
+    directOfflineTileMissCache.clear();
 
     if (isAlreadyActive) return forceQuickOfflineMapGroupReload(groupName, packNames);
 
