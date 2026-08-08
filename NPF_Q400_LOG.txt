@@ -1,5 +1,67 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.92 — DIAGNOSTIC CORS SIA DEPUIS NPF
+Date : 08/08/2026
+Base : TEST v14.91
+
+OBJECTIF
+- Vérifier directement depuis NPF TEST si une PWA hébergée sur GitHub Pages peut télécharger et lire une VAC officielle du SIA.
+- Ne pas commencer le système VAC offline tant que ce test n’a pas validé le téléchargement direct.
+- Aucun proxy NAS/VPS n’est ajouté.
+
+MODIFICATIONS
+1. Gestion des Cartes
+- Ajout d’un bloc temporaire « Diagnostic SIA ».
+- Ajout d’un bouton « Test SIA ».
+- Le test n’est lancé que sur action utilisateur : aucune requête SIA automatique au démarrage.
+
+2. Test de téléchargement
+- URL testée : VAC officielle LFCR via le point de téléchargement SIA `/documents/download/f/d/15016323/`.
+- Requête principale en `fetch(..., mode: 'cors')`.
+- Contrôle du statut HTTP, de la taille reçue et de la signature `%PDF-`.
+- Affichage d’un résultat lisible directement dans Gestion des Cartes.
+
+3. Diagnostic d’échec
+- Hors connexion : message spécifique et aucun comportement gênant.
+- Délai dépassé : message spécifique.
+- Erreur HTTP : code HTTP affiché.
+- Si le fetch CORS échoue alors qu’un fetch `no-cors` opaque atteint le serveur, le résultat indique que le CORS SIA bloque la lecture du PDF par NPF.
+- Les détails techniques sont également écrits dans la console navigateur.
+
+4. Service Worker
+- Les requêtes vers `sia.aviation-civile.gouv.fr` et `www.sia.aviation-civile.gouv.fr` sont laissées directement au réseau.
+- Le service worker NPF ne peut donc plus transformer le test SIA en `504 Offline asset unavailable`.
+- Cette exception ne concerne pas les autres ressources NPF.
+
+5. Hors ligne
+- Aucun fichier SIA n’est ajouté au cache applicatif.
+- Aucun téléchargement SIA n’est lancé automatiquement.
+- Les cartes offline, le calque routier, les PDF FDF et les autres fonctions existantes ne sont pas modifiés.
+- Lorsque l’iPad est hors connexion, le bouton de test signale simplement l’absence d’Internet.
+
+CONTRÔLES TECHNIQUES
+- Versions index, manifeste, script et service worker alignées sur v14.92.
+- Syntaxe JavaScript `script.js` contrôlée avec Node.js.
+- Syntaxe JavaScript `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé comme JSON valide.
+- Présence du bouton, du statut et du gestionnaire de clic contrôlée.
+- Passage direct SIA dans le service worker contrôlé avant le fallback offline.
+- Aucune requête SIA automatique au démarrage ajoutée.
+- Intégrité des archives ZIP contrôlée.
+
+VALIDATION À EFFECTUER DANS NPF TEST
+- Mettre l’iPad/PC en ligne.
+- Ouvrir Gestion des Cartes.
+- Appuyer une fois sur « Test SIA ».
+- Transmettre le message affiché par NPF.
+- En cas d’échec, transmettre aussi la ligne CORS éventuelle visible dans la console.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.91 — RETOURS À LA LIGNE DANS LES AIDES D’IMPORT
 Date : 07/08/2026
 Base : TEST v14.90
