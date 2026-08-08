@@ -12556,28 +12556,164 @@ body.gaar-point-search-open .gaar-editing-banner {
     white-space: pre-line !important;
 }
 
-
 /* ==========================================================================
-   v14.92 TEST — diagnostic CORS SIA
+   v14.93 TEST — Cartes VAC hors ligne
    ========================================================================== */
-.sia-cors-test-section {
-    margin-top: 18px;
-    padding: 15px;
-    border: 1px solid rgba(0, 80, 130, .20);
-    border-radius: 12px;
-    background: rgba(255,255,255,.72);
+#offline-map-modal .vac-management-section {
+    margin-top: 0 !important;
+    padding: 14px !important;
+    border: 1px solid #d6e0ea !important;
+    border-radius: 12px !important;
+    background: #f8fbff !important;
+    box-sizing: border-box !important;
 }
-.sia-cors-test-section h3 { margin-top: 0; }
-.sia-cors-test-section p { margin: 0 0 12px; }
-.sia-cors-test-status {
-    margin-top: 10px;
-    padding: 10px 12px;
-    border-radius: 9px;
-    background: #eef3f7;
-    color: #31475b;
-    font-weight: 700;
+#offline-map-modal .vac-management-section h3 {
+    margin: 0 0 8px !important;
+    color: var(--primary-color) !important;
+    font-size: 18px !important;
+}
+#offline-map-modal .vac-management-section p {
+    margin: 0 0 12px;
+    color: var(--light-text-color);
+    font-size: 14px;
     line-height: 1.35;
 }
-.sia-cors-test-status.testing { background: #fff8df; color: #6d5200; }
-.sia-cors-test-status.success { background: #e8f7ec; color: #17652c; }
-.sia-cors-test-status.error { background: #fdecec; color: #9f1d1d; }
+.vac-installed-status {
+    padding: 10px 12px;
+    border: 1px solid #dbe5ee;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #31475b;
+    font-weight: 750;
+    line-height: 1.4;
+}
+.vac-management-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+.vac-management-actions .import-button,
+.vac-management-actions .danger-inline-btn {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+}
+.vac-download-progress {
+    margin-top: 12px;
+}
+.vac-download-progress-track {
+    width: 100%;
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #dbe5ee;
+}
+.vac-download-progress-bar {
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--primary-color);
+    transition: width .12s linear;
+}
+.vac-download-progress-text {
+    margin-top: 7px;
+    color: #31475b;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.airport-popup .popup-vac-buttons {
+    margin-top: 6px;
+}
+.airport-popup .vac-btn {
+    background: #005596;
+    color: #ffffff;
+    font-weight: 900;
+}
+
+.vac-update-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483610;
+    align-items: center;
+    justify-content: center;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    box-sizing: border-box;
+    background: rgba(6,24,43,.62);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+.vac-update-modal-content {
+    width: min(92vw, 560px);
+    box-sizing: border-box;
+    padding: 22px 20px 18px;
+    border: 3px solid var(--primary-color);
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 18px 48px rgba(0,0,0,.36);
+    text-align: center;
+}
+.vac-update-modal-content h2 {
+    margin: 0 0 14px;
+    color: var(--primary-color);
+    font-size: 23px;
+}
+.vac-update-modal-content p {
+    margin: 0;
+    color: #24384b;
+    font-size: 18px;
+    line-height: 1.45;
+}
+.vac-update-detail {
+    min-height: 18px;
+    margin-top: 10px;
+    color: #55697c;
+    font-size: 14px;
+    font-weight: 750;
+}
+.vac-update-modal-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 18px;
+}
+.vac-update-modal-actions button {
+    min-width: 150px;
+    padding: 12px 15px;
+    border-radius: 10px;
+    font-size: 17px;
+    font-weight: 900;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.vac-update-now-button {
+    border: 2px solid var(--primary-color);
+    background: var(--primary-color);
+    color: #ffffff;
+}
+.vac-update-later-button {
+    border: 2px solid #9fb2c2;
+    background: #ffffff;
+    color: #31475b;
+}
+@media (max-width: 640px) {
+    .vac-management-actions {
+        align-items: stretch;
+    }
+    .vac-management-actions .import-button,
+    .vac-management-actions .danger-inline-btn {
+        width: 100% !important;
+    }
+    .vac-update-modal-actions {
+        flex-direction: column;
+    }
+    .vac-update-modal-actions button {
+        width: 100%;
+    }
+}
+
