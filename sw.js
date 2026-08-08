@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-91_import_help_linebreaks';
-const APP_VERSION = 'v14.91';
+const SW_VERSION = 'sw-v14-92_sia_cors_diagnostic';
+const APP_VERSION = 'v14.92';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -384,6 +384,13 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
+    // v14.92 TEST — les requêtes SIA de diagnostic doivent atteindre le réseau
+    // directement. Le SW ne doit pas les transformer en réponse 504 offline.
+    if (isSiaDirectRequest(request.url)) {
+        event.respondWith(fetch(request));
+        return;
+    }
+
     if (isTrafficApiRequest(request.url)) {
         event.respondWith(fetch(request));
         return;
@@ -408,6 +415,16 @@ self.addEventListener('fetch', event => {
 });
 
 
+
+function isSiaDirectRequest(url) {
+    try {
+        const hostname = new URL(url).hostname.toLowerCase();
+        return hostname === 'sia.aviation-civile.gouv.fr' ||
+            hostname === 'www.sia.aviation-civile.gouv.fr';
+    } catch (_) {
+        return false;
+    }
+}
 
 function isTrafficApiRequest(url) {
     try {
