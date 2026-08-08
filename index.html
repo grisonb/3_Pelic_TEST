@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.92" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v14.92">
-    <link rel="manifest" href="manifest.json?appv=v14.92">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v14.93" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v14.93">
+    <link rel="manifest" href="manifest.json?appv=v14.93">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v14.92';
+        const APP_VERSION = 'v14.93';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -594,7 +594,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v14.92"></script>
+    <script src="script.js?appv=v14.93"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -885,11 +885,31 @@
                     </button>
                 </div>
 
-                <div class="sia-cors-test-section">
-                    <h3>Diagnostic SIA</h3>
-                    <p>Test temporaire du téléchargement direct d’une VAC officielle depuis le SIA.</p>
-                    <button id="sia-cors-test-button" type="button" class="neutral-inline-btn">Test SIA</button>
-                    <div id="sia-cors-test-status" class="sia-cors-test-status" aria-live="polite">Test non effectué.</div>
+                <div class="vac-management-section">
+                    <h3>Cartes VAC</h3>
+                    <p>
+                        Cartes VAC officielles SIA publiées par NPF-Q400-VAC et stockées sur cet appareil
+                        pour une utilisation 100 % hors ligne. Source : SIA / AIP Atlas VAC.
+                    </p>
+                    <div id="vac-installed-status" class="vac-installed-status" aria-live="polite">
+                        Vérification du stockage local…
+                    </div>
+                    <div class="vac-management-actions">
+                        <button id="vac-download-update-button" type="button" class="import-button">
+                            Télécharger les Cartes VAC
+                        </button>
+                        <button id="vac-delete-all-button" type="button"
+                                class="danger-inline-btn"
+                                style="display: none;">
+                            Tout supprimer
+                        </button>
+                    </div>
+                    <div id="vac-download-progress" class="vac-download-progress" style="display: none;">
+                        <div class="vac-download-progress-track">
+                            <div id="vac-download-progress-bar" class="vac-download-progress-bar"></div>
+                        </div>
+                        <div id="vac-download-progress-text" class="vac-download-progress-text"></div>
+                    </div>
                 </div>
 
                 <div class="airport-pdf-section">
@@ -915,6 +935,19 @@
         </div>
     </div>
  
+
+    <div id="vac-update-modal" class="vac-update-modal" style="display: none;" aria-hidden="true">
+        <div class="vac-update-modal-content" role="dialog" aria-modal="true" aria-labelledby="vac-update-modal-title">
+            <h2 id="vac-update-modal-title">Mise à jour des cartes VAC</h2>
+            <p>Des cartes VAC ont été mises à jour. Voulez-vous les mettre à jour maintenant ?</p>
+            <div id="vac-update-detail" class="vac-update-detail"></div>
+            <div class="vac-update-modal-actions">
+                <button id="vac-update-now-button" type="button" class="vac-update-now-button">Mettre à jour</button>
+                <button id="vac-update-later-button" type="button" class="vac-update-later-button">Plus tard</button>
+            </div>
+        </div>
+    </div>
+
     <div id="import-help-modal" class="import-help-modal" style="display: none;" aria-hidden="true">
         <div class="import-help-modal-content" role="dialog" aria-modal="true" aria-labelledby="import-help-modal-title">
             <button id="close-import-help-modal" class="import-help-modal-close" type="button" aria-label="Fermer">&times;</button>
