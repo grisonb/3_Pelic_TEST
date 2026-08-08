@@ -1,5 +1,67 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v14.95 — PERFORMANCE CARTE OFFLINE / DÉZOOM 50–100 NM
+Date : 08/08/2026
+Base : TEST v14.94
+
+OBJECTIF
+- Accélérer le chargement de la carte Offline lors des dézooms importants, notamment vers 50 NM et 100 NM.
+- Corriger le goulot d'étranglement ancien du lecteur direct IndexedDB sans modifier les cartes installées.
+- Conserver intégralement les corrections de stabilité carte / SafeSky de la v14.94.
+- Ne modifier ni les VAC, ni le calque routier, ni les réglages métier.
+
+MODIFICATIONS
+1. Lecture IndexedDB — chemin rapide par index `tileUrl`
+- Les bases modernes utilisent désormais en priorité l'index IndexedDB `tileUrl`.
+- Une tuile présente peut être retrouvée directement par une seule recherche indexée, au lieu d'essayer successivement de nombreuses clés pack-scopées avant l'index.
+- Le contrôle du pack actif reste appliqué avant d'accepter l'enregistrement trouvé.
+
+2. Compatibilité anciennes bases conservée
+- Le parcours par anciennes clés et le curseur historique sont conservés uniquement pour la base commune héritée susceptible de contenir d'anciens enregistrements sans champ `tileUrl`.
+- Les bases isolées modernes n'exécutent plus ce chemin lent lorsqu'une URL de tuile n'existe pas.
+
+3. Bases candidates
+- Lorsque tous les packs actifs sont confirmés comme installés dans une base isolée moderne (`storageMode` isolé + `dbName` dédié), la base historique commune n'est plus interrogée inutilement pour chaque tuile.
+- Si cette confirmation n'est pas complète, le comportement de compatibilité précédent est conservé.
+
+4. Tuiles réellement absentes
+- Ajout d'un cache négatif borné à 512 entrées avec expiration automatique après 30 secondes.
+- Une tuile confirmée absente n'est plus recherchée à nouveau dans IndexedDB lors d'un `redraw()` ou d'un rafraîchissement Leaflet rapproché.
+- Les erreurs techniques IndexedDB ne sont jamais mémorisées comme des absences.
+- Le cache d'absence est vidé lors des réouvertures/récupérations de la carte Offline.
+
+5. Paramètres volontairement inchangés
+- Concurrence NPF maintenue à 3 lectures simultanées pour ne pas augmenter la pression sur Safari/iPadOS.
+- `keepBuffer` maintenu à 6.
+- Aucun changement de niveau de zoom, aucune suppression de tuile et aucun changement du format des packs.
+- Aucun changement du mécanisme VAC.
+- Aucun nouveau service réseau ni aucune nouvelle dépendance.
+
+CONTRÔLES TECHNIQUES
+- Versions index, manifeste, script et service worker alignées sur v14.95.
+- Syntaxe JavaScript de `script.js` contrôlée avec Node.js.
+- Syntaxe JavaScript de `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé comme JSON valide.
+- Contrôle statique : les bases isolées utilisent l'index `tileUrl` avant tout chemin historique.
+- Contrôle statique : la base historique n'est écartée que lorsque tous les packs actifs disposent d'un stockage isolé confirmé.
+- Contrôle statique : une absence confirmée est mise en cache ; une erreur technique ne l'est pas.
+- Contrôle statique : les valeurs de concurrence IndexedDB et `keepBuffer` restent identiques à v14.94.
+- Aucun nouveau domaine réseau ajouté.
+
+VALIDATION À EFFECTUER DANS NPF TEST
+- Charger TEST v14.95 sur l'iPad avec la même carte Offline que celle utilisée actuellement.
+- Partir d'un affichage rapproché puis dézoomer vers 50 NM et 100 NM.
+- Refaire plusieurs fois 20/50/100 NM et comparer le délai d'apparition des tuiles avec la v14.94.
+- Vérifier ensuite un changement de filtre SafeSky afin de confirmer que la correction v14.94 reste fonctionnelle.
+- Refaire le test sans connexion Internet.
+- La validation réelle des performances sur Safari/iPadOS reste à effectuer sur l'appareil.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v14.94 — STABILISATION CARTE / SAFE SKY / DÉZOOM
 Date : 08/08/2026
 Base : TEST v14.93
