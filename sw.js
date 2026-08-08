@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-92_sia_cors_diagnostic';
-const APP_VERSION = 'v14.92';
+const SW_VERSION = 'sw-v14-93_vac_offline_github_pages';
+const APP_VERSION = 'v14.93';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -384,9 +384,9 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
-    // v14.92 TEST — les requêtes SIA de diagnostic doivent atteindre le réseau
-    // directement. Le SW ne doit pas les transformer en réponse 504 offline.
-    if (isSiaDirectRequest(request.url)) {
+    // v14.93 TEST — le dépôt VAC GitHub Pages reste une source réseau pure.
+    // Les PDF sont ensuite conservés par script.js dans IndexedDB, pas dans Cache Storage.
+    if (isVacRepositoryRequest(request.url)) {
         event.respondWith(fetch(request));
         return;
     }
@@ -416,11 +416,12 @@ self.addEventListener('fetch', event => {
 
 
 
-function isSiaDirectRequest(url) {
+
+function isVacRepositoryRequest(url) {
     try {
-        const hostname = new URL(url).hostname.toLowerCase();
-        return hostname === 'sia.aviation-civile.gouv.fr' ||
-            hostname === 'www.sia.aviation-civile.gouv.fr';
+        const parsed = new URL(url);
+        return parsed.hostname === 'grisonb.github.io'
+            && parsed.pathname.startsWith('/NPF-Q400-VAC/');
     } catch (_) {
         return false;
     }
