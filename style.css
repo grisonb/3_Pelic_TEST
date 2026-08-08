@@ -12555,3 +12555,29 @@ body.gaar-point-search-open .gaar-editing-banner {
 .import-help-modal-text {
     white-space: pre-line !important;
 }
+
+
+/* ==========================================================================
+   v14.92 TEST — diagnostic CORS SIA
+   ========================================================================== */
+.sia-cors-test-section {
+    margin-top: 18px;
+    padding: 15px;
+    border: 1px solid rgba(0, 80, 130, .20);
+    border-radius: 12px;
+    background: rgba(255,255,255,.72);
+}
+.sia-cors-test-section h3 { margin-top: 0; }
+.sia-cors-test-section p { margin: 0 0 12px; }
+.sia-cors-test-status {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 9px;
+    background: #eef3f7;
+    color: #31475b;
+    font-weight: 700;
+    line-height: 1.35;
+}
+.sia-cors-test-status.testing { background: #fff8df; color: #6d5200; }
+.sia-cors-test-status.success { background: #e8f7ec; color: #17652c; }
+.sia-cors-test-status.error { background: #fdecec; color: #9f1d1d; }
