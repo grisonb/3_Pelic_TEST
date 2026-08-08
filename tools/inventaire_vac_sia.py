@@ -1,182 +1,175 @@
 #!/usr/bin/env python3
 """
-TEST SIA VAC v3 — test rapide GitHub Actions -> SIA.
+TEST SIA VAC v4 — résolution réelle de l'URL d'une VAC depuis le catalogue SIA.
 
-Objectif unique :
-- vérifier qu'un runner GitHub Actions peut télécharger réellement plusieurs PDF VAC SIA ;
-- contrôler HTTP 200, en-tête %PDF-, taille et SHA-256 ;
-- terminer rapidement.
+Objectif :
+- ne plus construire ni deviner l'URL du PDF ;
+- interroger le catalogue SIA pour LFBD ;
+- repérer le résultat "AD-2.LFBD.pdf" ;
+- extraire toutes les URL/chemins associés au résultat ;
+- tester les candidats et identifier automatiquement un vrai PDF ;
+- produire un diagnostic exploitable si le lien est généré dynamiquement.
 
 Aucun inventaire complet.
 Aucune modification de NPF.
 Aucune publication des VAC.
-
-Le workflow existant test-sia-vac.yml peut rester inchangé.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
+import html
 import json
+import re
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
+from bs4 import BeautifulSoup
 
-SIA_BASE = (
-    "https://www.sia.aviation-civile.gouv.fr/"
-    "media/dvd/eAIP_14_MAY_2026/"
-    "Atlas-VAC/PDF_AIPparSSection/VAC/AD/"
-)
+SIA = "https://www.sia.aviation-civile.gouv.fr"
+ICAO = "LFBD"
+TARGET = f"AD-2.{ICAO}.pdf"
 
-TEST_ICAO = ("LFBD", "LFBO", "LFCR", "LFMT", "LFMA")
+SEARCH_URLS = [
+    f"{SIA}/catalogsearch/result/?q={ICAO}",
+    f"{SIA}/catalogsearch/result/?c=8&format=pdf&q={ICAO}",
+    f"{SIA}/catalogsearch/result/index/?c=8&format=pdf&q={ICAO}",
+]
 
-USER_AGENT = (
+UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151 Safari/537.36 "
-    "NPF-Q400-VAC-technical-test/3.0"
+    "NPF-Q400-VAC-technical-test/4.0"
 )
 
+HEADERS = {
+    "User-Agent": UA,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
+              "application/pdf;q=0.8,*/*;q=0.7",
+    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.7",
+    "Cache-Control": "no-cache",
+}
 
-def human_bytes(n: int) -> str:
-    value = float(n)
-    for unit in ("o", "Ko", "Mo", "Go"):
-        if value < 1024 or unit == "Go":
-            return f"{value:.1f} {unit}"
-        value /= 1024
-    return f"{n} o"
+
+def normalize_candidate(value: str, base_url: str) -> list[str]:
+    """Transforme un attribut/fragment en éventuelles URL HTTP."""
+    if not value:
+        return []
+
+    value = html.unescape(value).strip()
+    values = [value]
+
+    # Extrait aussi les URL/chemins noyés dans onclick, JSON, JS, etc.
+    patterns = [
+        r'https?://[^\s"\'<>\\]+',
+        r'/(?:documents|media|pub|catalog|download|files?)/[^\s"\'<>\\]+',
+    ]
+    for pat in patterns:
+        values.extend(re.findall(pat, value, flags=re.I))
+
+    out = []
+    for v in values:
+        v = v.strip(" '\"\t\r\n,;()[]{}")
+        if not v:
+            continue
+
+        if v.startswith("http://") or v.startswith("https://"):
+            u = v
+        elif v.startswith("/"):
+            u = urljoin(base_url, v)
+        else:
+            continue
+
+        if u.startswith(SIA):
+            out.append(u)
+
+    return out
 
 
-def download_one(icao: str, out_dir: Path) -> dict:
-    url = SIA_BASE + f"AD-2.{icao}.pdf"
-    target = out_dir / f"{icao}.pdf"
+def collect_candidates_from_tag(tag, base_url: str) -> list[str]:
+    candidates = []
 
+    nodes = [tag]
+    nodes.extend(tag.find_all(True))
+
+    for node in nodes:
+        for key, val in node.attrs.items():
+            if isinstance(val, list):
+                vals = [str(x) for x in val]
+            else:
+                vals = [str(val)]
+            for v in vals:
+                candidates.extend(normalize_candidate(v, base_url))
+
+    # HTML brut du bloc : utile pour les URLs dans scripts/JSON.
+    candidates.extend(normalize_candidate(str(tag), base_url))
+
+    # Déduplication en conservant l'ordre.
+    seen = set()
+    unique = []
+    for u in candidates:
+        if u not in seen:
+            seen.add(u)
+            unique.append(u)
+    return unique
+
+
+def score_candidate(url: str) -> int:
+    u = url.lower()
+    score = 0
+    if "lfbd" in u:
+        score += 20
+    if ".pdf" in u:
+        score += 15
+    if "atlas" in u or "vac" in u:
+        score += 10
+    if "/media/" in u:
+        score += 8
+    if "/documents/" in u or "download" in u:
+        score += 6
+    if "catalogsearch" in u:
+        score -= 8
+    return score
+
+
+def test_candidate(session: requests.Session, url: str) -> dict:
     result = {
-        "icao": icao,
         "url": url,
         "status": None,
         "final_url": "",
         "content_type": "",
-        "size_bytes": 0,
+        "size_header": "",
         "pdf_header_ok": False,
-        "sha256": "",
+        "first_bytes_hex": "",
         "error": "",
     }
 
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "application/pdf,*/*;q=0.8",
-        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.7",
-        "Cache-Control": "no-cache",
-    }
-
     try:
-        sha = hashlib.sha256()
-        total = 0
-        first_chunk = True
-
-        with requests.get(
+        with session.get(
             url,
-            headers=headers,
+            headers={**HEADERS, "Range": "bytes=0-4095"},
             stream=True,
             allow_redirects=True,
-            timeout=(15, 45),
+            timeout=(15, 40),
         ) as r:
             result["status"] = r.status_code
             result["final_url"] = r.url
             result["content_type"] = r.headers.get("Content-Type", "")
+            result["size_header"] = (
+                r.headers.get("Content-Range")
+                or r.headers.get("Content-Length")
+                or ""
+            )
 
-            r.raise_for_status()
-
-            with target.open("wb") as f:
-                for chunk in r.iter_content(chunk_size=256 * 1024):
-                    if not chunk:
-                        continue
-
-                    if first_chunk:
-                        result["pdf_header_ok"] = chunk.startswith(b"%PDF-")
-                        first_chunk = False
-
-                    f.write(chunk)
-                    sha.update(chunk)
-                    total += len(chunk)
-
-        result["size_bytes"] = total
-        result["sha256"] = sha.hexdigest()
-
-        if total == 0:
-            result["error"] = "Fichier vide"
-        elif not result["pdf_header_ok"]:
-            result["error"] = "Le fichier ne commence pas par %PDF-"
+            chunk = next(r.iter_content(chunk_size=4096), b"")
+            result["pdf_header_ok"] = chunk.startswith(b"%PDF-")
+            result["first_bytes_hex"] = chunk[:16].hex()
 
     except Exception as exc:
         result["error"] = f"{type(exc).__name__}: {exc}"
-        try:
-            target.unlink(missing_ok=True)
-        except Exception:
-            pass
 
     return result
-
-
-def write_summary(out_dir: Path, results: list[dict]) -> None:
-    good = [
-        r for r in results
-        if r["status"] == 200
-        and r["pdf_header_ok"]
-        and r["size_bytes"] > 0
-        and not r["error"]
-    ]
-
-    total = sum(r["size_bytes"] for r in good)
-
-    lines = [
-        "# Test GitHub Actions → SIA / VAC — v3 rapide",
-        "",
-        f"- VAC testées : **{len(results)}**",
-        f"- Téléchargements PDF valides : **{len(good)}**",
-        f"- Échecs : **{len(results) - len(good)}**",
-        f"- Taille totale des PDF valides : **{human_bytes(total)}**",
-        "",
-        "## Résultats",
-        "",
-        "| OACI | HTTP | Taille | PDF valide | SHA-256 |",
-        "|---|---:|---:|:---:|---|",
-    ]
-
-    for r in results:
-        lines.append(
-            f"| {r['icao']} | {r['status']} | {human_bytes(r['size_bytes'])} "
-            f"| {'✅' if r['pdf_header_ok'] else '❌'} "
-            f"| `{r['sha256']}` |"
-        )
-
-    errors = [r for r in results if r["error"]]
-    if errors:
-        lines += ["", "## Erreurs", ""]
-        for r in errors:
-            lines.append(f"- **{r['icao']}** : {r['error']}")
-
-    lines += ["", "## Conclusion", ""]
-
-    if good:
-        lines.append(
-            "✅ **GitHub Actions peut télécharger et lire directement des PDF VAC du SIA.**"
-        )
-        if len(good) == len(results):
-            lines.append("Les 5 VAC témoins ont été téléchargées et validées.")
-        else:
-            lines.append(
-                "Au moins une VAC témoin fonctionne ; les éventuels échecs isolés "
-                "sont à analyser séparément."
-            )
-    else:
-        lines.append("❌ Aucun PDF VAC témoin n'a pu être téléchargé et validé.")
-
-    (out_dir / "summary.md").write_text(
-        "\n".join(lines) + "\n",
-        encoding="utf-8",
-    )
 
 
 def main() -> int:
@@ -184,47 +177,198 @@ def main() -> int:
     parser.add_argument("--output-dir", default="vac-sia-resultats")
     args = parser.parse_args()
 
-    out_dir = Path(args.output_dir)
-    sample_dir = out_dir / "echantillons"
-    sample_dir.mkdir(parents=True, exist_ok=True)
+    out = Path(args.output_dir)
+    out.mkdir(parents=True, exist_ok=True)
 
-    results = []
+    s = requests.Session()
+    s.headers.update(HEADERS)
 
-    print("=== TEST SIA VAC v3 RAPIDE ===")
-    print("5 téléchargements maximum, aucun inventaire complet.")
+    all_candidates = []
+    diagnostics = []
+    found_target = False
 
-    for icao in TEST_ICAO:
-        print(f"\n[{icao}] téléchargement...")
-        result = download_one(icao, sample_dir)
-        results.append(result)
+    for idx, search_url in enumerate(SEARCH_URLS, 1):
+        print(f"[recherche {idx}] {search_url}")
 
-        print(
-            f"[{icao}] HTTP={result['status']} "
-            f"taille={result['size_bytes']} "
-            f"PDF={result['pdf_header_ok']} "
-            f"erreur={result['error'] or '-'}"
+        try:
+            r = s.get(search_url, timeout=(15, 40), allow_redirects=True)
+            r.raise_for_status()
+        except Exception as exc:
+            diagnostics.append({
+                "search_url": search_url,
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            continue
+
+        html_text = r.text
+        (out / f"catalogue_lfbd_{idx}.html").write_text(
+            html_text, encoding="utf-8", errors="replace"
         )
 
-    (out_dir / "resultats.json").write_text(
-        json.dumps(results, ensure_ascii=False, indent=2),
+        soup = BeautifulSoup(html_text, "html.parser")
+        target_nodes = soup.find_all(
+            string=lambda x: x and TARGET.lower() in str(x).lower()
+        )
+
+        diag = {
+            "search_url": search_url,
+            "final_url": r.url,
+            "status": r.status_code,
+            "target_occurrences": len(target_nodes),
+            "fragments": [],
+        }
+
+        print(f"  occurrences de {TARGET}: {len(target_nodes)}")
+
+        for n, node in enumerate(target_nodes[:10], 1):
+            found_target = True
+            cur = node.parent
+
+            # Monte plusieurs niveaux pour capturer le bloc complet du résultat.
+            ancestors = []
+            for level in range(8):
+                if cur is None:
+                    break
+                ancestors.append(cur)
+                cur = cur.parent
+
+            # Choisit le premier ancêtre ayant une quantité raisonnable de HTML.
+            chosen = ancestors[0] if ancestors else None
+            for anc in ancestors:
+                txt = " ".join(anc.stripped_strings)
+                if TARGET.lower() in txt.lower() and len(str(anc)) < 25000:
+                    chosen = anc
+                if len(txt) > 500 and TARGET.lower() in txt.lower():
+                    break
+
+            if chosen is None:
+                continue
+
+            fragment_html = str(chosen)
+            fragment_file = out / f"fragment_lfbd_{idx}_{n}.html"
+            fragment_file.write_text(
+                fragment_html, encoding="utf-8", errors="replace"
+            )
+
+            candidates = collect_candidates_from_tag(chosen, r.url)
+            all_candidates.extend(candidates)
+
+            diag["fragments"].append({
+                "file": fragment_file.name,
+                "candidate_count": len(candidates),
+                "candidates": candidates,
+            })
+
+        # Recherche globale de chemins suspects dans le HTML autour de LFBD.
+        lower = html_text.lower()
+        pos = lower.find(TARGET.lower())
+        if pos >= 0:
+            context = html_text[max(0, pos - 12000): pos + 12000]
+            context_file = out / f"context_lfbd_{idx}.txt"
+            context_file.write_text(
+                context, encoding="utf-8", errors="replace"
+            )
+            globals_here = normalize_candidate(context, r.url)
+            all_candidates.extend(globals_here)
+            diag["context_file"] = context_file.name
+            diag["context_candidates"] = globals_here
+
+        diagnostics.append(diag)
+
+    # Déduplique et trie les candidats les plus probables d'abord.
+    seen = set()
+    unique = []
+    for u in all_candidates:
+        if u not in seen:
+            seen.add(u)
+            unique.append(u)
+
+    unique.sort(key=score_candidate, reverse=True)
+
+    print(f"\nCandidats URL uniques : {len(unique)}")
+
+    tested = []
+    valid_pdf = None
+
+    # Évite de marteler le SIA : 30 candidats maximum.
+    for i, url in enumerate(unique[:30], 1):
+        print(f"[test {i:02d}] {url}")
+        result = test_candidate(s, url)
+        tested.append(result)
+        print(
+            f"  HTTP={result['status']} "
+            f"type={result['content_type']} "
+            f"PDF={result['pdf_header_ok']}"
+        )
+
+        if result["pdf_header_ok"]:
+            valid_pdf = result
+            print("  >>> PDF VAC RÉEL IDENTIFIÉ")
+            break
+
+    payload = {
+        "target": TARGET,
+        "search_diagnostics": diagnostics,
+        "candidate_count": len(unique),
+        "candidates": unique,
+        "tested": tested,
+        "valid_pdf": valid_pdf,
+    }
+    (out / "diagnostic_lfbd.json").write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
-    write_summary(out_dir, results)
-
-    good = [
-        r for r in results
-        if r["status"] == 200
-        and r["pdf_header_ok"]
-        and r["size_bytes"] > 0
-        and not r["error"]
+    lines = [
+        "# Test GitHub Actions → SIA / VAC — v4 URL réelle",
+        "",
+        f"- Cible : **{TARGET}**",
+        f"- Le nom de la VAC apparaît dans le catalogue : "
+        f"**{'OUI' if found_target else 'NON'}**",
+        f"- URL candidates extraites : **{len(unique)}**",
+        f"- URL candidates testées : **{len(tested)}**",
+        "",
     ]
 
-    print("\n=== TERMINÉ ===")
-    print(f"PDF valides : {len(good)}/{len(results)}")
-    print(f"Résultats : {out_dir}")
+    if valid_pdf:
+        lines += [
+            "## ✅ Résultat",
+            "",
+            "**Un vrai PDF VAC SIA a été trouvé et lu depuis GitHub Actions.**",
+            "",
+            f"- URL : `{valid_pdf['final_url'] or valid_pdf['url']}`",
+            f"- HTTP : `{valid_pdf['status']}`",
+            f"- Content-Type : `{valid_pdf['content_type']}`",
+            f"- Taille annoncée : `{valid_pdf['size_header']}`",
+            "",
+            "Cette URL ne sera pas codée en dur dans NPF : le système définitif "
+            "devra la résoudre dynamiquement depuis les données SIA.",
+        ]
+    else:
+        lines += [
+            "## ⚠️ Résultat",
+            "",
+            "Le catalogue SIA a été lu mais aucun candidat testé n'a encore produit "
+            "un PDF `%PDF-`.",
+            "",
+            "Les fichiers de diagnostic joints à l'artifact contiennent le HTML "
+            "et le fragment exact du résultat LFBD. Ils permettront de déterminer "
+            "comment le SIA encode réellement le lien de téléchargement.",
+        ]
 
-    return 0 if good else 4
+    (out / "summary.md").write_text(
+        "\n".join(lines) + "\n",
+        encoding="utf-8",
+    )
+
+    print("\n=== TERMINÉ ===")
+    print(f"Cible visible dans catalogue : {found_target}")
+    print(f"Candidats : {len(unique)}")
+    print(f"PDF réel trouvé : {bool(valid_pdf)}")
+
+    # Le job reste vert dès lors que le catalogue a bien été analysé :
+    # même sans PDF résolu, l'artifact contient le diagnostic nécessaire.
+    return 0 if found_target else 3
 
 
 if __name__ == "__main__":
