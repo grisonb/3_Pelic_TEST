@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-99_local_communes_appdata';
-const APP_VERSION = 'v14.99';
+const SW_VERSION = 'sw-v15-00_map_render_stability';
+const APP_VERSION = 'v15.00';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
