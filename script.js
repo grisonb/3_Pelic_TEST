@@ -1,8 +1,17 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.00';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.01';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v15.00 TEST — stabilisation carte / calque routier / SafeSky
+// v15.01 TEST — reprise carte unifiée après VAC / retour au premier plan
+// - déduplication focus / visibilitychange / pageshow ;
+// - retour court : un seul invalidateSize léger, sans redraw systématique ;
+// - redraw lourd uniquement si les tuiles sont absentes ou après reprise longue ;
+// - anciens gestionnaires concurrents de reprise Leaflet neutralisés ;
+// - VAC, SafeSky, GPS, cartes Offline et données inchangés.
+// =========================================================================
+
+// =========================================================================
+// v2026.62 PÉRENNE — stabilisation carte / calque routier / SafeSky
 // - priorité au fond de carte après zoom/déplacement ;
 // - rendu SafeSky temporairement suspendu pendant les gestes et le rendu routier ;
 // - calque routier différé et rendu par étapes pour limiter les pics CPU/mémoire ;
@@ -247,7 +256,13 @@ document.addEventListener('DOMContentLoaded', () => {
 // redemande à Leaflet de recalculer sa taille.
 // =========================================================================
 (function setupNpfMapViewportHeightFix() {
-    const applyViewportHeight = () => {
+    /*
+     * v15.01 — la hauteur du viewport reste recalculée comme auparavant, mais
+     * un recalcul de taille ne force plus un redraw complet des tuiles.
+     * Les retours au premier plan sont traités sans action Leaflet ici :
+     * setupNpfUnifiedForegroundResume() effectue une seule invalidation dédupliquée.
+     */
+    const applyViewportHeight = ({ refreshMap = true } = {}) => {
         try {
             const docEl = document.documentElement;
             const vv = window.visualViewport;
@@ -272,165 +287,76 @@ document.addEventListener('DOMContentLoaded', () => {
                 mapEl.style.backgroundColor = '#dff3fb';
             }
 
+            if (!refreshMap) return;
+
             setTimeout(() => {
                 try {
                     if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
-                        map.invalidateSize(true);
-                    }
-                    if (typeof baseTileLayer !== 'undefined' && baseTileLayer && typeof baseTileLayer.redraw === 'function') {
-                        baseTileLayer.redraw();
+                        map.invalidateSize({ animate: false, pan: false });
                     }
                 } catch (_) {}
             }, 80);
         } catch (_) {}
     };
 
-    const scheduleApply = () => {
-        applyViewportHeight();
-        setTimeout(applyViewportHeight, 250);
-        setTimeout(applyViewportHeight, 900);
+    const scheduleApply = (options = {}) => {
+        applyViewportHeight(options);
+        setTimeout(() => applyViewportHeight(options), 250);
+        setTimeout(() => applyViewportHeight(options), 900);
+    };
+
+    const scheduleForegroundViewportOnly = () => {
+        scheduleApply({ refreshMap: false });
     };
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', scheduleApply, { once: true });
+        document.addEventListener('DOMContentLoaded', () => scheduleApply(), { once: true });
     } else {
         scheduleApply();
     }
 
-    window.addEventListener('load', scheduleApply, { passive: true });
-    window.addEventListener('resize', scheduleApply, { passive: true });
-    window.addEventListener('orientationchange', () => setTimeout(scheduleApply, 350), { passive: true });
-    window.addEventListener('pageshow', scheduleApply, { passive: true });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleApply(); }, { passive: true });
+    window.addEventListener('load', () => scheduleApply(), { passive: true });
+    window.addEventListener('resize', () => scheduleApply(), { passive: true });
+    window.addEventListener(
+        'orientationchange',
+        () => setTimeout(() => scheduleApply(), 350),
+        { passive: true }
+    );
+
+    // v15.01 : retour premier plan = hauteur uniquement, aucun redraw ici.
+    window.addEventListener('pageshow', scheduleForegroundViewportOnly, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) scheduleForegroundViewportOnly();
+    }, { passive: true });
 
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', scheduleApply, { passive: true });
-        window.visualViewport.addEventListener('scroll', scheduleApply, { passive: true });
+        window.visualViewport.addEventListener('resize', () => scheduleApply(), { passive: true });
+        window.visualViewport.addEventListener('scroll', () => scheduleApply(), { passive: true });
     }
 })();
 
 // =========================================================================
-// REPRISE iPAD / PWA APRÈS LONGUE PÉRIODE EN ARRIÈRE-PLAN
+// v15.01 TEST — REPRISE CARTE UNIQUE APRÈS RETOUR AU PREMIER PLAN
 // =========================================================================
-(function setupBackgroundResumeRecovery() {
-    const LONG_BACKGROUND_MS = 5 * 60 * 1000;
-    const RECOVERY_GUARD_KEY = `npfResumeRecoveryReload:${window.APP_VERSION || 'unknown'}`;
-    let hiddenAt = 0;
+(function setupNpfUnifiedForegroundResume() {
+    if (window.__npfUnifiedForegroundResumeInstalled) return;
+    window.__npfUnifiedForegroundResumeInstalled = true;
 
-    const markReady = () => {
-        if (document.body) {
-            document.body.classList.add('app-ready');
-            document.documentElement.classList.add('app-ready');
-        }
-    };
-
-    const invalidateMapSoon = () => {
-        setTimeout(() => {
-            try {
-                if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
-                    map.invalidateSize(true);
-                }
-            } catch (_) {}
-            markReady();
-        }, 250);
-    };
-
-    const recoverIfMapStillBlank = () => {
-        setTimeout(() => {
-            try {
-                const mapEl = document.getElementById('map');
-                const mapLooksReady = !!(
-                    mapEl
-                    && mapEl.classList.contains('leaflet-container')
-                    && mapEl.offsetWidth > 0
-                    && mapEl.offsetHeight > 0
-                );
-
-                if (mapLooksReady) return;
-
-                const alreadyReloaded = sessionStorage.getItem(RECOVERY_GUARD_KEY) === '1';
-                if (!alreadyReloaded && typeof window.forceRecoveryReload === 'function') {
-                    sessionStorage.setItem(RECOVERY_GUARD_KEY, '1');
-                    window.forceRecoveryReload();
-                }
-            } catch (_) {}
-        }, 3500);
-    };
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            hiddenAt = Date.now();
-            return;
-        }
-
-        const wasLongBackground = hiddenAt && (Date.now() - hiddenAt) >= LONG_BACKGROUND_MS;
-        invalidateMapSoon();
-
-        if (wasLongBackground) {
-            recoverIfMapStillBlank();
-        }
-    });
-
-    window.addEventListener('pageshow', (event) => {
-        markReady();
-        invalidateMapSoon();
-
-        if (event.persisted) {
-            recoverIfMapStillBlank();
-        }
-    });
-
-    window.addEventListener('load', () => {
-        markReady();
-        setTimeout(() => {
-            try {
-                if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
-                    map.invalidateSize(true);
-                }
-            } catch (_) {}
-        }, 500);
-    });
-
-    // Si Safari/iPad repart sur un état incomplet, on évite un blanc permanent.
-    setTimeout(() => {
-        markReady();
-        recoverIfMapStillBlank();
-    }, 9000);
-})();
-
-
-// v12.22 — reprise iPad plus progressive après veille.
-(function setupNpfFastResumeAfterWake() {
-    const invalidateDelays = [80, 250, 600, 1200, 2200];
-
-    const refreshMapAfterWake = () => {
-        invalidateDelays.forEach(delay => {
-            setTimeout(() => {
-                try {
-                    if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
-                        map.invalidateSize(true);
-                    }
-                    if (typeof baseTileLayer !== 'undefined' && map && baseTileLayer) {
-                        baseTileLayer.redraw();
-                    }
-                } catch (_) {}
-            }, delay);
-        });
-    };
-
-    window.addEventListener('focus', refreshMapAfterWake);
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) refreshMapAfterWake();
-    });
-    window.addEventListener('pageshow', refreshMapAfterWake);
-})();
-
-// v12.71 — Prévi rotation : +1 TMD/CS/HDV et aides détaillées.
-(function setupNpfIpadResumeHardening() {
     const LONG_BACKGROUND_MS = 2 * 60 * 1000;
-    const RESUME_DELAYS_MS = [0, 80, 180, 350, 700, 1200, 2200, 3600];
+    const EVENT_DEBOUNCE_MS = 220;
+    const AFTER_RUN_DEDUPE_MS = 900;
+    const SHORT_TILE_CHECK_MS = 650;
+    const LONG_REDRAW_DELAY_MS = 220;
+    const LONG_TILE_CHECK_MS = 1400;
+    const RECOVERY_GUARD_KEY =
+        `npfResumeRecoveryReload:${window.APP_VERSION || 'unknown'}`;
+
     let hiddenAt = 0;
+    let resumeTimer = null;
     let resumeToken = 0;
+    let lastResumeRunAt = 0;
+    let pendingReason = 'resume';
+    let pendingPersisted = false;
 
     const markReady = () => {
         try {
@@ -439,48 +365,68 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (_) {}
     };
 
-    const ensureResumeOverlay = () => {
-        let overlay = document.getElementById('npf-resume-overlay');
-        if (overlay) return overlay;
-
-        overlay = document.createElement('div');
-        overlay.id = 'npf-resume-overlay';
-        overlay.setAttribute('aria-live', 'polite');
-        overlay.innerHTML = '<div class="npf-resume-card">Patience, je réfléchis ...</div>';
-        document.body.appendChild(overlay);
-        return overlay;
-    };
-
-    const showResumeOverlay = () => {
-        try {
-            if (!document.body) return;
-            document.body.classList.add('npf-resuming');
-            ensureResumeOverlay();
-        } catch (_) {}
-    };
-
-    const hideResumeOverlay = (token, delay = 1800) => {
-        setTimeout(() => {
-            if (token !== resumeToken) return;
-            try {
-                if (document.body) document.body.classList.remove('npf-resuming');
-            } catch (_) {}
-        }, delay);
-    };
-
     const forceMapContainerVisible = () => {
         try {
             const mapEl = document.getElementById('map');
             if (mapEl) {
                 mapEl.style.visibility = 'visible';
                 mapEl.style.opacity = '1';
-                mapEl.style.backgroundColor = '#eef2f5';
             }
 
-            document.querySelectorAll('.leaflet-container, .leaflet-pane, .leaflet-map-pane, .leaflet-tile-pane').forEach((el) => {
-                el.style.visibility = 'visible';
-                el.style.opacity = '1';
-            });
+            document
+                .querySelectorAll('.leaflet-container, .leaflet-pane, .leaflet-map-pane, .leaflet-tile-pane')
+                .forEach((el) => {
+                    el.style.visibility = 'visible';
+                    el.style.opacity = '1';
+                });
+        } catch (_) {}
+    };
+
+    const notifyOfflineSelection = () => {
+        try {
+            if (typeof notifyServiceWorkerActivePacks === 'function') {
+                notifyServiceWorkerActivePacks(activeOfflinePacks);
+            }
+        } catch (_) {}
+    };
+
+    const invalidateMapLightly = () => {
+        try {
+            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                map.invalidateSize({ animate: false, pan: false });
+            }
+        } catch (_) {}
+    };
+
+    const countUsableTiles = () => {
+        try {
+            const tiles = Array.from(document.querySelectorAll('.leaflet-tile'));
+            if (!tiles.length) return 0;
+
+            return tiles.filter((tile) => {
+                const rect = tile.getBoundingClientRect ? tile.getBoundingClientRect() : null;
+                const hasSize = rect && rect.width > 10 && rect.height > 10;
+                return (
+                    hasSize
+                    && tile.complete !== false
+                    && tile.style.display !== 'none'
+                    && tile.style.visibility !== 'hidden'
+                );
+            }).length;
+        } catch (_) {
+            return 0;
+        }
+    };
+
+    const redrawBaseTilesOnce = () => {
+        try {
+            if (
+                typeof baseTileLayer !== 'undefined'
+                && baseTileLayer
+                && typeof baseTileLayer.redraw === 'function'
+            ) {
+                baseTileLayer.redraw();
+            }
         } catch (_) {}
     };
 
@@ -516,101 +462,176 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (_) {}
     };
 
-    const refreshLeafletOnce = (options = {}) => {
-        markReady();
-        forceMapContainerVisible();
+    const recoverIfMapStillBlank = () => {
+        setTimeout(() => {
+            try {
+                const mapEl = document.getElementById('map');
+                const mapLooksReady = Boolean(
+                    mapEl
+                    && mapEl.classList.contains('leaflet-container')
+                    && mapEl.offsetWidth > 0
+                    && mapEl.offsetHeight > 0
+                );
 
-        try {
-            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
-                map.invalidateSize(options.pan === true);
-            }
-        } catch (_) {}
+                if (mapLooksReady) return;
 
-        try {
-            if (typeof notifyServiceWorkerActivePacks === 'function') {
-                notifyServiceWorkerActivePacks(activeOfflinePacks);
-            }
-        } catch (_) {}
+                const alreadyReloaded =
+                    sessionStorage.getItem(RECOVERY_GUARD_KEY) === '1';
 
-        try {
-            if (typeof baseTileLayer !== 'undefined' && baseTileLayer && typeof baseTileLayer.redraw === 'function') {
-                baseTileLayer.redraw();
-            }
-        } catch (_) {}
-
-        redrawVisibleApplicationLayers();
-    };
-
-    const countUsableTiles = () => {
-        try {
-            const tiles = Array.from(document.querySelectorAll('.leaflet-tile'));
-            if (!tiles.length) return 0;
-            return tiles.filter((tile) => {
-                const img = tile;
-                const rect = img.getBoundingClientRect ? img.getBoundingClientRect() : null;
-                const hasSize = rect && rect.width > 10 && rect.height > 10;
-                return hasSize && img.complete !== false && img.style.display !== 'none' && img.style.visibility !== 'hidden';
-            }).length;
-        } catch (_) {
-            return 0;
-        }
+                if (
+                    !alreadyReloaded
+                    && typeof window.forceRecoveryReload === 'function'
+                ) {
+                    sessionStorage.setItem(RECOVERY_GUARD_KEY, '1');
+                    window.forceRecoveryReload();
+                }
+            } catch (_) {}
+        }, 3500);
     };
 
     const softRebuildTileLayerIfNeeded = () => {
         try {
             if (typeof isZipImportRunning !== 'undefined' && isZipImportRunning) return;
             if (countUsableTiles() > 0) return;
-            if (typeof setupBaseTileLayer === 'function' && typeof map !== 'undefined' && map) {
+
+            if (
+                typeof setupBaseTileLayer === 'function'
+                && typeof map !== 'undefined'
+                && map
+            ) {
                 setupBaseTileLayer();
-                if (typeof map.invalidateSize === 'function') map.invalidateSize(true);
+                invalidateMapLightly();
             }
         } catch (_) {}
     };
 
-    const runResumeSequence = (reason = 'resume') => {
-        const token = ++resumeToken;
-        const wasLongBackground = hiddenAt && (Date.now() - hiddenAt) >= LONG_BACKGROUND_MS;
-        const shouldShowOverlay = wasLongBackground || reason === 'pageshow-persisted';
+    const ensureResumeOverlay = () => {
+        let overlay = document.getElementById('npf-resume-overlay');
+        if (overlay) return overlay;
 
+        overlay = document.createElement('div');
+        overlay.id = 'npf-resume-overlay';
+        overlay.setAttribute('aria-live', 'polite');
+        overlay.innerHTML = '<div class="npf-resume-card">Patience, je réfléchis ...</div>';
+        document.body.appendChild(overlay);
+        return overlay;
+    };
+
+    const showResumeOverlay = () => {
+        try {
+            if (!document.body) return;
+            document.body.classList.add('npf-resuming');
+            ensureResumeOverlay();
+        } catch (_) {}
+    };
+
+    const hideResumeOverlay = (token, delay = 1800) => {
+        setTimeout(() => {
+            if (token !== resumeToken) return;
+            try {
+                if (document.body) document.body.classList.remove('npf-resuming');
+            } catch (_) {}
+        }, delay);
+    };
+
+    const runResume = (reason, persisted) => {
+        const now = Date.now();
+        const token = ++resumeToken;
+        const hiddenDuration = hiddenAt ? Math.max(0, now - hiddenAt) : 0;
+        const longResume = Boolean(persisted || hiddenDuration >= LONG_BACKGROUND_MS);
+
+        hiddenAt = 0;
+        lastResumeRunAt = now;
         markReady();
         forceMapContainerVisible();
-        if (shouldShowOverlay) showResumeOverlay();
+        notifyOfflineSelection();
 
-        RESUME_DELAYS_MS.forEach((delay, index) => {
+        // Retour normal (ex. fermeture d'une VAC) : une seule invalidation légère.
+        invalidateMapLightly();
+
+        if (!longResume) {
             setTimeout(() => {
                 if (token !== resumeToken) return;
-                refreshLeafletOnce({ pan: index >= 2 });
-            }, delay);
-        });
 
-        if (shouldShowOverlay) {
-            setTimeout(() => {
-                if (token !== resumeToken) return;
-                softRebuildTileLayerIfNeeded();
-            }, 2400);
-            hideResumeOverlay(token, 3200);
-        } else {
-            hideResumeOverlay(token, 900);
+                // Le redraw complet n'est utilisé qu'en secours si les tuiles ont disparu.
+                if (countUsableTiles() === 0) {
+                    redrawBaseTilesOnce();
+                    setTimeout(() => {
+                        if (token !== resumeToken) return;
+                        softRebuildTileLayerIfNeeded();
+                    }, 900);
+                }
+            }, SHORT_TILE_CHECK_MS);
+            return;
         }
+
+        // Reprise longue / page restaurée par Safari : récupération renforcée unique.
+        showResumeOverlay();
+
+        setTimeout(() => {
+            if (token !== resumeToken) return;
+            redrawBaseTilesOnce();
+            redrawVisibleApplicationLayers();
+        }, LONG_REDRAW_DELAY_MS);
+
+        setTimeout(() => {
+            if (token !== resumeToken) return;
+            softRebuildTileLayerIfNeeded();
+        }, LONG_TILE_CHECK_MS);
+
+        recoverIfMapStillBlank();
+        hideResumeOverlay(token, 2100);
+    };
+
+    const scheduleResume = (reason = 'resume', persisted = false) => {
+        const now = Date.now();
+
+        // focus + visibilitychange + pageshow arrivent souvent en rafale.
+        // Après une reprise déjà exécutée, les doublons immédiats sont ignorés.
+        if (!persisted && lastResumeRunAt && (now - lastResumeRunAt) < AFTER_RUN_DEDUPE_MS) {
+            return;
+        }
+
+        pendingReason = reason || pendingReason;
+        pendingPersisted = pendingPersisted || Boolean(persisted);
+
+        if (resumeTimer) clearTimeout(resumeTimer);
+        resumeTimer = setTimeout(() => {
+            resumeTimer = null;
+            const reasonToRun = pendingReason;
+            const persistedToRun = pendingPersisted;
+            pendingReason = 'resume';
+            pendingPersisted = false;
+            runResume(reasonToRun, persistedToRun);
+        }, EVENT_DEBOUNCE_MS);
     };
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
-            hiddenAt = Date.now();
+            if (!hiddenAt) hiddenAt = Date.now();
+            if (resumeTimer) {
+                clearTimeout(resumeTimer);
+                resumeTimer = null;
+            }
+            pendingPersisted = false;
+            pendingReason = 'resume';
             return;
         }
-        runResumeSequence('visible');
+
+        scheduleResume('visible', false);
     }, { passive: true });
 
     window.addEventListener('pageshow', (event) => {
-        runResumeSequence(event && event.persisted ? 'pageshow-persisted' : 'pageshow');
-    });
+        scheduleResume(
+            event && event.persisted ? 'pageshow-persisted' : 'pageshow',
+            Boolean(event && event.persisted)
+        );
+    }, { passive: true });
 
     window.addEventListener('focus', () => {
-        runResumeSequence('focus');
-    });
+        scheduleResume('focus', false);
+    }, { passive: true });
 })();
-
 
 // =========================================================================
 // VARIABLES GLOBALES
@@ -29724,29 +29745,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 /*
- * v11.43 — reprise arrière-plan plus rapide.
- * Si iPadOS garde la page mais fige Leaflet, on évite une reconstruction lourde :
- * on invalide la taille de la carte et on redessine la couche active.
+ * v15.01 — l'ancien redraw Leaflet au `visibilitychange` (hérité de v11.43)
+ * est supprimé. La reprise de la carte est centralisée dans
+ * setupNpfUnifiedForegroundResume(), afin d'éviter plusieurs redraw concurrents.
  */
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState !== 'visible') return;
-
-    setTimeout(() => {
-        try {
-            if (map) map.invalidateSize(false);
-        } catch (_) {}
-
-        try {
-            notifyServiceWorkerActivePacks(activeOfflinePacks);
-        } catch (_) {}
-
-        try {
-            if (baseTileLayer && typeof baseTileLayer.redraw === 'function') {
-                baseTileLayer.redraw();
-            }
-        } catch (_) {}
-    }, 200);
-});
 
 
 
