@@ -1,8 +1,8 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.98';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.99';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v14.98 TEST — commune survolée : GeoJSON local sur iPad/tablette
+// v14.99 TEST — commune survolée : GeoJSON local + SW finalisé
 // - iPad/tablette : ./data/communes-1000m.geojson (même origine que NPF) ;
 // - aucune dépendance Etalab au runtime pour la commune survolée sur iPad ;
 // - PC : source 50 m existante conservée ;
