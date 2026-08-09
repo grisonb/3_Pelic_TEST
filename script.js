@@ -1,8 +1,17 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.99';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.00';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v14.99 TEST — commune survolée : GeoJSON local + SW finalisé
+// v15.00 TEST — stabilisation carte / calque routier / SafeSky
+// - priorité au fond de carte après zoom/déplacement ;
+// - rendu SafeSky temporairement suspendu pendant les gestes et le rendu routier ;
+// - calque routier différé et rendu par étapes pour limiter les pics CPU/mémoire ;
+// - animation SafeSky allégée sur iPad lorsque le calque routier est affiché ;
+// - aucune modification des données, filtres SafeSky, VAC, GPS ou cartes Offline.
+// =========================================================================
+
+// =========================================================================
+// v2026.61 PÉRENNE — commune survolée : GeoJSON local + SW finalisé
 // - iPad/tablette : ./data/communes-1000m.geojson (même origine que NPF) ;
 // - aucune dépendance Etalab au runtime pour la commune survolée sur iPad ;
 // - PC : source 50 m existante conservée ;
@@ -695,6 +704,13 @@ let roadOverlayLastLabelZoom = -1;
 let roadOverlayLastLabelRefreshAt = 0;
 const ROAD_OVERLAY_LABEL_REFRESH_MAX_INTERVAL_MS = 60000;
 const ROAD_OVERLAY_LABEL_REFRESH_VIEWPORT_RATIO = 0.24;
+/*
+ * v15.00 TEST — laisser le fond de carte et SafeSky se stabiliser avant le
+ * rendu routier, et éviter de charger des secteurs trop éloignés de l'écran.
+ */
+const ROAD_OVERLAY_MAP_CHANGE_DELAY_MS = 1050;
+const ROAD_OVERLAY_VIEWPORT_PAD_TIER_1 = 0.12;
+const ROAD_OVERLAY_VIEWPORT_PAD_TIER_2 = 0.16;
 
 let areDepartmentsVisible = false;
 let hasLoadedDepartments = false;
@@ -924,6 +940,8 @@ const TRAFFIC_TRACKED_FETCH_CONCURRENCY = 6;
 const TRAFFIC_VIEWPORT_IDENTIFIER_QUERY_LIMIT = 40;
 const TRAFFIC_TEMPORARY_SEARCH_RESULT_TTL_MS = 10 * 60 * 1000;
 const TRAFFIC_SMOOTH_FRAME_INTERVAL_MS = 50;
+const TRAFFIC_SMOOTH_FRAME_INTERVAL_ROAD_TABLET_MS = 100;
+const TRAFFIC_VISUAL_RESUME_AFTER_MAP_MS = 420;
 /*
  * v14.72 TEST — l'âge déjà accumulé par un point SafeSky ne doit plus
  * consommer la totalité de la période de mouvement local. Deux horizons sont
@@ -944,6 +962,14 @@ const SAFESKY_OWN_PUBLISH_INTERVAL_MS = 5000;
 let trafficMarkerRegistry = new Map();
 let trafficSmoothAnimationFrame = null;
 let trafficSmoothAnimationLastAt = 0;
+/*
+ * v15.00 TEST — plusieurs opérations lourdes peuvent demander une suspension
+ * visuelle simultanée. Un Set évite qu'une reprise prématurée relance SafeSky
+ * alors qu'un zoom ou le calque routier est encore en cours de rendu.
+ */
+const trafficVisualSuspensionReasons = new Set();
+let trafficVisualResumeTimer = null;
+let trafficVisualMapSequenceToken = 0;
 let temporaryGlobalTrafficResults = new Map();
 let safeSkyOwnPublishTimer = null;
 let safeSkyOwnPublishInProgress = false;
@@ -4925,15 +4951,20 @@ function initMap() {
         markerZoomAnimation: false
     }).setView([46.6, 2.2], 5.5);
 
+    map.on('movestart', () => {
+        beginMapVisualRenderGuard('movestart');
+    });
     map.on('zoomstart', () => {
         beginBaseMapZoomStabilityGuard('zoomstart');
+        beginMapVisualRenderGuard('zoomstart');
     });
     map.on('zoomend', enforceOfflineZoomLimit);
     map.on('zoomend', () => {
-        if (showTrafficLayer) {
-            redrawTrafficLayerFromSnapshot();
-        }
         scheduleBaseMapStabilityRefresh('zoomend');
+        scheduleTrafficVisualResumeAfterMapInteraction('zoomend');
+    });
+    map.on('moveend', () => {
+        scheduleTrafficVisualResumeAfterMapInteraction('moveend');
     });
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
     ensureNauticalScaleControl();
@@ -5074,6 +5105,41 @@ function initMap() {
     });
 }
 
+function beginMapVisualRenderGuard(reason = 'map-start') {
+    if (!map) return;
+
+    trafficVisualMapSequenceToken += 1;
+    clearTimeout(trafficVisualResumeTimer);
+    trafficVisualResumeTimer = null;
+    suspendTrafficVisualUpdates('map-interaction');
+
+    /*
+     * Un rendu routier lancé pour l'ancienne vue n'a plus d'intérêt. L'annuler
+     * évite qu'il continue à parser/créer des couches pendant le nouveau geste.
+     */
+    clearTimeout(roadOverlayRefreshTimer);
+    roadOverlayRefreshTimer = null;
+    roadOverlayRefreshToken += 1;
+    if (isRoadOverlayLoading) {
+        isRoadOverlayLoading = false;
+        refreshRoadOverlayButtonState();
+    }
+}
+
+function scheduleTrafficVisualResumeAfterMapInteraction(reason = 'map-end') {
+    clearTimeout(trafficVisualResumeTimer);
+    const token = ++trafficVisualMapSequenceToken;
+
+    trafficVisualResumeTimer = setTimeout(() => {
+        if (token !== trafficVisualMapSequenceToken) return;
+        trafficVisualResumeTimer = null;
+        resumeTrafficVisualUpdates('map-interaction', {
+            redraw: true,
+            reason
+        });
+    }, TRAFFIC_VISUAL_RESUME_AFTER_MAP_MS);
+}
+
 function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
     if (!map) return;
 
@@ -5101,12 +5167,16 @@ function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
     const token = ++baseMapStabilityRefreshToken;
 
     /*
-     * Un seul cycle de réparation est conservé. Deux passages courts sont
-     * volontairement utilisés pour Safari/iPadOS : le premier après la fin du
-     * geste, le second après que les autres calques de zoom aient terminé leur
-     * propre rendu. Aucune reconstruction de la couche ni de la base IndexedDB.
+     * v15.00 — un seul redraw lourd du fond. Le second passage ne force plus
+     * toutes les tuiles une deuxième fois : il vérifie seulement que la couche
+     * est présente et réapplique la limite de zoom Offline.
      */
-    [180, 700].forEach((delay, index) => {
+    const passes = [
+        { delay: 180, redraw: true },
+        { delay: 620, redraw: false }
+    ];
+
+    passes.forEach(pass => {
         setTimeout(() => {
             if (token !== baseMapStabilityRefreshToken) return;
             if (!map || !baseTileLayer) return;
@@ -5115,15 +5185,21 @@ function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
                 if (!map.hasLayer(baseTileLayer)) {
                     baseTileLayer.addTo(map);
                 }
-                map.invalidateSize?.({ animate: false, pan: false });
-                baseTileLayer.redraw?.();
-                if (index === 1 && offlineTilesMode) {
+
+                if (pass.redraw) {
+                    map.invalidateSize?.({ animate: false, pan: false });
+                    baseTileLayer.redraw?.();
+                } else if (offlineTilesMode) {
                     enforceOfflineZoomLimit();
                 }
             } catch (error) {
-                console.warn('Stabilisation fond de carte impossible:', reason, error);
+                console.warn(
+                    'Stabilisation fond de carte impossible:',
+                    reason,
+                    error
+                );
             }
-        }, delay);
+        }, pass.delay);
     });
 }
 
@@ -9330,6 +9406,18 @@ function clearRoadOverlayRenderedParts(options = {}) {
     }
 }
 
+function yieldRoadOverlayRenderTurn() {
+    return new Promise(resolve => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => {
+                setTimeout(resolve, 0);
+            });
+            return;
+        }
+        setTimeout(resolve, 0);
+    });
+}
+
 async function loadRoadOverlayPart(part, token, tier) {
     const cache = await caches.open(ROAD_OVERLAY_CACHE_NAME);
     const response = await cache.match(buildRoadOverlayCacheRequest(part.key));
@@ -9430,6 +9518,13 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
     const currentTier = getRoadOverlayZoomTier();
     const currentStyleBand = getRoadOverlayStyleBand();
     const forceRefresh = source !== 'map-change';
+    let trafficSuspendedForRoad = false;
+
+    const suspendTrafficForRoadWork = () => {
+        if (trafficSuspendedForRoad) return;
+        trafficSuspendedForRoad = true;
+        suspendTrafficVisualUpdates('road-overlay-render');
+    };
 
     isRoadOverlayLoading = true;
     refreshRoadOverlayButtonState();
@@ -9444,6 +9539,7 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
                 roadOverlayLoadedZoomTier !== 0
                 || loadedRoadOverlayParts.size
             ) {
+                suspendTrafficForRoadWork();
                 clearRoadOverlayRenderedParts({ resetTier: false });
             }
             roadOverlayLoadedZoomTier = 0;
@@ -9453,11 +9549,16 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
 
         const tierChanged = roadOverlayLoadedZoomTier !== currentTier;
         if (tierChanged) {
+            suspendTrafficForRoadWork();
             clearRoadOverlayRenderedParts({ resetTier: false });
             roadOverlayLoadedZoomTier = currentTier;
         }
 
-        const bounds = map.getBounds().pad(currentTier === 1 ? 0.18 : 0.22);
+        const bounds = map.getBounds().pad(
+            currentTier === 1
+                ? ROAD_OVERLAY_VIEWPORT_PAD_TIER_1
+                : ROAD_OVERLAY_VIEWPORT_PAD_TIER_2
+        );
         const visibleParts = manifest.parts.filter(part => (
             roadOverlayBboxIntersectsBounds(part.bbox, bounds)
         ));
@@ -9492,6 +9593,8 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
         ) {
             return;
         }
+
+        suspendTrafficForRoadWork();
 
         if (partSelectionChanged) {
             loadedRoadOverlayParts.forEach((record, key) => {
@@ -9538,6 +9641,12 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
                         error
                     );
                 }
+
+                /*
+                 * Safari/iPadOS : laisser le navigateur peindre entre deux
+                 * fichiers évite une longue séquence parse + Leaflet sans pause.
+                 */
+                await yieldRoadOverlayRenderTurn();
             }
 
             roadOverlayLastVisiblePartSignature =
@@ -9585,16 +9694,28 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
             isRoadOverlayLoading = false;
             refreshRoadOverlayButtonState();
         }
+
+        if (trafficSuspendedForRoad) {
+            resumeTrafficVisualUpdates('road-overlay-render', {
+                redraw: true,
+                reason: source
+            });
+        }
     }
 }
 
 function scheduleRoadOverlayRefresh(source = 'scheduled') {
     clearTimeout(roadOverlayRefreshTimer);
     roadOverlayRefreshTimer = setTimeout(() => {
+        roadOverlayRefreshTimer = null;
         refreshRoadOverlayVisibleParts(source).catch(error => {
-            console.warn('Actualisation du calque routier impossible:', source, error);
+            console.warn(
+                'Actualisation du calque routier impossible:',
+                source,
+                error
+            );
         });
-    }, source === 'map-change' ? 650 : 220);
+    }, source === 'map-change' ? ROAD_OVERLAY_MAP_CHANGE_DELAY_MS : 220);
 }
 
 async function toggleRoadOverlayLayer(forceState = null, options = {}) {
@@ -14294,6 +14415,49 @@ function clearTrafficDisplay() {
     } catch (_) {}
 }
 
+function isTrafficVisualUpdatesSuspended() {
+    return trafficVisualSuspensionReasons.size > 0;
+}
+
+function suspendTrafficVisualUpdates(reason = 'temporary') {
+    trafficVisualSuspensionReasons.add(String(reason || 'temporary'));
+    stopTrafficSmoothAnimation();
+}
+
+function resumeTrafficVisualUpdates(
+    reason = 'temporary',
+    options = {}
+) {
+    trafficVisualSuspensionReasons.delete(String(reason || 'temporary'));
+
+    if (isTrafficVisualUpdatesSuspended()) return;
+    if (!showTrafficLayer || !trafficLayer) return;
+
+    if (options.redraw !== false) {
+        redrawTrafficLayerFromSnapshot();
+    }
+    startTrafficSmoothAnimation();
+}
+
+function getTrafficSmoothFrameIntervalMs() {
+    /*
+     * v15.00 — quand le calque routier est affiché sur iPad/tablette, 10 Hz
+     * restent suffisamment fluides pour l'extrapolation SafeSky tout en
+     * réduisant de moitié les mises à jour DOM permanentes.
+     */
+    try {
+        if (
+            showRoadOverlayLayer
+            && typeof isTouchTabletForCommunesLayer === 'function'
+            && isTouchTabletForCommunesLayer()
+        ) {
+            return TRAFFIC_SMOOTH_FRAME_INTERVAL_ROAD_TABLET_MS;
+        }
+    } catch (_) {}
+
+    return TRAFFIC_SMOOTH_FRAME_INTERVAL_MS;
+}
+
 function stopTrafficSmoothAnimation() {
     if (trafficSmoothAnimationFrame) {
         cancelAnimationFrame(
@@ -14308,6 +14472,7 @@ function updateTrafficSmoothPositions(timestamp) {
     if (
         !showTrafficLayer
         || !trafficLayer
+        || isTrafficVisualUpdatesSuspended()
         || (
             typeof document !== 'undefined'
             && document.visibilityState === 'hidden'
@@ -14319,7 +14484,7 @@ function updateTrafficSmoothPositions(timestamp) {
 
     if (
         timestamp - trafficSmoothAnimationLastAt
-        >= TRAFFIC_SMOOTH_FRAME_INTERVAL_MS
+        >= getTrafficSmoothFrameIntervalMs()
     ) {
         trafficSmoothAnimationLastAt = timestamp;
         const now = Date.now();
@@ -14372,6 +14537,7 @@ function startTrafficSmoothAnimation() {
         !showTrafficLayer
         || !trafficMarkerRegistry.size
         || trafficSmoothAnimationFrame
+        || isTrafficVisualUpdatesSuspended()
     ) {
         return;
     }
@@ -14850,6 +15016,16 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 ? meta.points.map(point => ({ ...point }))
                 : meta?.points
         };
+    }
+
+    /*
+     * Une réponse SafeSky peut arriver pendant un zoom ou pendant le rendu
+     * routier. On conserve le snapshot mais on ne touche pas au DOM/Leaflet
+     * tant que la carte n'est pas de nouveau disponible.
+     */
+    if (isTrafficVisualUpdatesSuspended()) {
+        stopTrafficSmoothAnimation();
+        return;
     }
 
     let openTrafficPopupKey = '';
