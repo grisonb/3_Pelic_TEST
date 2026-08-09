@@ -1,0 +1,76 @@
+name: Synchroniser communes NPF
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-communes-npf
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Télécharger et valider communes-1000m.geojson
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          tmp="$(mktemp)"
+
+          curl --fail --location --retry 3 --retry-delay 3 \
+            --connect-timeout 20 --max-time 180 \
+            "https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/communes-1000m.geojson" \
+            --output "$tmp"
+
+          python - "$tmp" <<'PY'
+          import json
+          import os
+          import sys
+
+          path = sys.argv[1]
+          size = os.path.getsize(path)
+          if size < 1_000_000:
+              raise SystemExit(f"Fichier anormalement petit: {size} octets")
+
+          with open(path, "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          if data.get("type") != "FeatureCollection":
+              raise SystemExit("GeoJSON invalide: type FeatureCollection absent")
+
+          features = data.get("features")
+          if not isinstance(features, list) or len(features) < 30_000:
+              raise SystemExit(
+                  f"GeoJSON incomplet: {len(features) if isinstance(features, list) else 'N/A'} features"
+              )
+
+          print(f"GeoJSON valide: {len(features)} communes/features, {size} octets")
+          PY
+
+          mv "$tmp" data/communes-1000m.geojson
+
+      - name: Commit si modification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- data/communes-1000m.geojson && \
+             git ls-files --error-unmatch data/communes-1000m.geojson >/dev/null 2>&1; then
+            echo "Aucune modification."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/communes-1000m.geojson
+          git commit -m "Mise à jour communes-1000m NPF"
+          git push
