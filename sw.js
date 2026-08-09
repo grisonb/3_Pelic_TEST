@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-00_map_render_stability';
-const APP_VERSION = 'v15.00';
+const SW_VERSION = 'sw-v15-01_foreground_resume_dedup';
+const APP_VERSION = 'v15.01';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
