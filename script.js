@@ -1,5 +1,29 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v14.95';
+const NPF_SCRIPT_BUILD_VERSION = 'v14.98';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v14.98 TEST — commune survolée : GeoJSON local sur iPad/tablette
+// - iPad/tablette : ./data/communes-1000m.geojson (même origine que NPF) ;
+// - aucune dépendance Etalab au runtime pour la commune survolée sur iPad ;
+// - PC : source 50 m existante conservée ;
+// - GPS et algorithme de recherche géométrique inchangés.
+// =========================================================================
+
+// =========================================================================
+// v14.97 TEST — commune survolée : GeoJSON allégé sur iPad
+// - iPad/tablette : communes-1000m.geojson ;
+// - PC : communes-50m.geojson conservé ;
+// - le Service Worker met aussi en cache le fichier 1000 m ;
+// - aucun changement du GPS ni de l'identification géométrique de la commune.
+// =========================================================================
+
+// =========================================================================
+// v14.96 TEST — commune survolée stable dans la PWA iPad
+// - le Service Worker met en cache les GeoJSON Etalab communes 100 m / 50 m ;
+// - cache-first après un premier chargement réussi ;
+// - timeout initial adapté aux gros GeoJSON dans la PWA installée ;
+// - aucun changement du GPS ni de l'identification géométrique de la commune.
+// =========================================================================
 
 // =========================================================================
 // v14.95 TEST — performance carte Offline aux grands dézooms
@@ -18171,18 +18195,21 @@ function isTouchTabletForCommunesLayer() {
 
 function getCommunesGeojsonUrl() {
     /*
-     * Sur PC, le 50 m fonctionne.
-     * Sur iPad, le 50 m peut être trop lourd à charger/parser et l'app retombe
-     * alors sur l'ancien calcul par centre-ville.
-     *
-     * On utilise donc 1000 m sur iPad/tablette : beaucoup plus léger, suffisant
-     * pour identifier la commune/arrondissement sous le point GPS dans l'immense
-     * majorité des cas.
+     * v14.98 TEST — une nouvelle PWA iPad ne doit plus dépendre du gros fichier
+     * Etalab au premier lancement. Le GeoJSON 1000 m est désormais hébergé avec
+     * NPF et chargé depuis la même origine. Le PC conserve pour l'instant le
+     * fichier officiel 50 m afin de préserver la précision existante.
      */
-    const precision = isTouchTabletForCommunesLayer() ? '100m' : '50m';
+    if (isTouchTabletForCommunesLayer()) {
+        return {
+            precision: '1000m-local',
+            url: './data/communes-1000m.geojson'
+        };
+    }
+
     return {
-        precision,
-        url: `https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/communes-${precision}.geojson`
+        precision: '50m',
+        url: 'https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/latest/geojson/communes-50m.geojson'
     };
 }
 
