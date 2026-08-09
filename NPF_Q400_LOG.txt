@@ -1,5 +1,106 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.01 — REPRISE CARTE APRÈS VAC / RETOUR AU PREMIER PLAN
+Date : 09/08/2026
+Base : version pérenne v2026.62
+
+CONSTAT
+- Après fermeture d'une carte VAC, la carte NPF peut scintiller brièvement.
+- Le même comportement peut apparaître lors d'autres retours au premier plan de la PWA.
+- Plusieurs anciens mécanismes de reprise Leaflet réagissaient simultanément à `focus`, `visibilitychange` et `pageshow`.
+- Ces mécanismes pouvaient enchaîner plusieurs `invalidateSize()` et plusieurs `baseTileLayer.redraw()` sur quelques secondes.
+
+OBJECTIF
+- Regrouper la reprise visuelle de la carte dans un seul gestionnaire.
+- Éviter les redessins complets inutiles lors d'un retour court, notamment après fermeture d'une VAC.
+- Conserver une récupération renforcée uniquement lorsque l'application revient d'une longue période en arrière-plan ou lorsque les tuiles sont réellement absentes.
+- Ne modifier ni les VAC, ni SafeSky, ni le GPS, ni les données cartographiques, ni les cartes Offline.
+
+CORRECTIONS
+- Les événements `focus`, `visibilitychange` et `pageshow` sont maintenant regroupés et dédupliqués avant toute action sur Leaflet.
+- Un retour court au premier plan effectue un seul `invalidateSize()` léger, sans `redraw()` systématique du fond de carte.
+- Le fond de carte n'est redessiné après un retour court que si aucune tuile utilisable n'est détectée.
+- Une reprise longue ou un `pageshow` restauré depuis le cache Safari conserve une récupération renforcée, mais avec un seul redessin lourd du fond de carte.
+- Les anciens gestionnaires de reprise qui provoquaient des séquences concurrentes de redessin sont neutralisés.
+- Le correctif de hauteur de viewport iPad continue de recalculer la taille de l'application, mais ne force plus un redessin complet des tuiles à chaque recalcul.
+- Le vieux redessin supplémentaire déclenché uniquement par `visibilitychange` (hérité de v11.43) est supprimé au profit du gestionnaire unique.
+
+INCHANGÉ
+- Ouverture, téléchargement, stockage et fermeture des cartes VAC.
+- SafeSky : requêtes, filtres, animation et logique de suivi.
+- GPS, commune survolée et simulation.
+- Cartes Offline, IndexedDB et mécanisme de récupération Offline lorsqu'aucune tuile n'est réellement disponible.
+- Calque routier, lignes HT, pistes, aérodromes et autres couches.
+- Données locales et dépendances réseau.
+- Interface et textes d'aide.
+
+VALIDATION EFFECTUÉE
+- Contrôle syntaxique JavaScript de `script.js` et `sw.js`.
+- Contrôle JSON du manifest.
+- Contrôle de cohérence des versions v15.01.
+- Contrôle statique de la déduplication `focus` / `visibilitychange` / `pageshow`.
+- Vérification que le retour court ne contient plus de `baseTileLayer.redraw()` systématique.
+- Vérification que le mécanisme de récupération Offline conditionnel reste présent.
+- Aucun nouveau domaine ni dépendance réseau ajouté.
+
+VALIDATION RÉELLE À EFFECTUER
+- Sur iPad : ouvrir une VAC puis la fermer plusieurs fois et vérifier l'absence de scintillement de la carte.
+- Tester également un aller-retour vers une autre application puis retour dans NPF.
+- Vérifier ensuite une reprise après mise en arrière-plan plus longue.
+- Le comportement réel iPad/PWA n'est pas considéré comme validé tant que ces essais ne sont pas effectués.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
+VERSION PÉRENNE v2026.62
+Date : 09/08/2026
+Base : TEST v15.00
+
+REPRISE DE LA TEST v15.00
+- Reprise intégrale de la TEST v15.00 consacrée à la stabilisation de la carte avec calque routier et SafeSky.
+- Aucun changement fonctionnel supplémentaire par rapport à la TEST v15.00.
+- Passage uniquement en version pérenne v2026.62.
+
+CORRECTIONS REPRISES
+- Priorité au fond de carte après zoom/déplacement.
+- Un seul redraw lourd du fond après le geste.
+- Suspension temporaire des mises à jour visuelles SafeSky pendant les mouvements de carte.
+- Reprise différée du rendu SafeSky une fois la carte stabilisée.
+- Suspension de l’animation SafeSky pendant les rendus lourds du calque routier.
+- Limitation à 10 images/s de l’animation SafeSky sur iPad/tablette lorsque le calque routier est affiché.
+- Rafraîchissement différé du calque routier afin de laisser le fond de carte et SafeSky se stabiliser.
+- Marge de sélection routière légèrement réduite.
+- Relâchement du thread principal entre deux parties routières.
+- Annulation d’un ancien rafraîchissement routier lorsqu’un nouveau changement de vue le rend obsolète.
+
+INCHANGÉ
+- Pack/calque routier v6 et données routières.
+- Source, filtres et fréquence réseau SafeSky.
+- Cartes Offline / IndexedDB.
+- VAC.
+- Commune survolée et fichier local `data/communes-1000m.geojson`.
+- GPS et suivi GPS.
+- Pistes, aérodromes et autres couches.
+- Interface et textes d’aide.
+
+VALIDATION TECHNIQUE
+- Syntaxe JavaScript contrôlée pour script.js et sw.js.
+- Manifest JSON contrôlé.
+- Cohérence des versions contrôlée.
+- Aucune nouvelle dépendance réseau introduite.
+
+REMARQUE
+- La v2026.62 reprend exactement la logique de la TEST v15.00. La validation réelle sur iPad du comportement calque routier + SafeSky reste distincte du contrôle statique effectué ici.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.00 — STABILISATION CARTE / CALQUE ROUTIER / SAFESKY
 Date : 09/08/2026
 Base : version pérenne v2026.61
