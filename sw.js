@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v14-98_communes_cold_start_gzip';
-const APP_VERSION = 'v14.98';
+const SW_VERSION = 'sw-v14-99_local_communes_appdata';
+const APP_VERSION = 'v14.99';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -26,6 +26,7 @@ const COMMUNES_GEOJSON_URLS = Object.freeze([
     COMMUNES_GEOJSON_100M_URL,
     COMMUNES_GEOJSON_50M_URL
 ]);
+const LOCAL_COMMUNES_GEOJSON_URL = './data/communes-1000m.geojson';
 const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
 
 /*
@@ -49,6 +50,7 @@ const APP_DATA_URLS = [
     './communes.json',
     './communes_aliases.json',
     './data/localites/localites-france-v14.56.zip',
+    LOCAL_COMMUNES_GEOJSON_URL,
     HIGH_VOLTAGE_LINES_GEOJSON_URL,
     DEPARTMENTS_GEOJSON_URL,
     ...COMMUNES_GEOJSON_URLS,
@@ -463,7 +465,20 @@ function getRequestFilename(request) {
 
 function isCommunesGeojsonRequest(url) {
     try {
-        const parsed = new URL(url);
+        const parsed = new URL(url, self.location.href);
+
+        const localPath = new URL(
+            LOCAL_COMMUNES_GEOJSON_URL,
+            self.location.href
+        ).pathname;
+
+        if (
+            parsed.origin === self.location.origin
+            && parsed.pathname === localPath
+        ) {
+            return true;
+        }
+
         return parsed.hostname === 'etalab-datasets.geo.data.gouv.fr'
             && /^\/contours-administratifs\/latest\/geojson\/communes-(?:50|100|1000)m\.geojson(?:\.gz)?$/i.test(parsed.pathname);
     } catch (_) {
@@ -485,6 +500,7 @@ function isAppDataRequest(request) {
         return [
             'communes.json',
             'communes_aliases.json',
+            'communes-1000m.geojson',
             'localites-france-v14.56.zip',
             'lignes_ht_rte_simplifiees.geojson'
         ].includes(filename)
