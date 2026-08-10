@@ -1,8 +1,17 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.01';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.02';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v15.01 TEST — reprise carte unifiée après VAC / retour au premier plan
+// v15.02 TEST — filtres SafeSky plus compacts / altitude non grisée
+// - lignes altitude non sélectionnées visuellement identiques aux lignes actives ;
+// - seul le bouton radio bleu/blanc indique le mode d'altitude sélectionné ;
+// - sous-titre « Réglages du calque trafic indicatif » supprimé ;
+// - texte explicatif sous « Mon avion » supprimé pour gagner de la hauteur ;
+// - logique SafeSky, filtres, GPS, VAC et cartes Offline inchangés.
+// =========================================================================
+
+// =========================================================================
+// v2026.63 PÉRENNE — reprise carte unifiée après VAC / retour au premier plan
 // - déduplication focus / visibilitychange / pageshow ;
 // - retour court : un seul invalidateSize léger, sans redraw systématique ;
 // - redraw lourd uniquement si les tuiles sont absentes ou après reprise longue ;
@@ -28,7 +37,7 @@ window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 // =========================================================================
 
 // =========================================================================
-// v14.97 TEST — commune survolée : GeoJSON allégé sur iPad
+// v14.97 — commune survolée : GeoJSON allégé sur iPad
 // - iPad/tablette : communes-1000m.geojson ;
 // - PC : communes-50m.geojson conservé ;
 // - le Service Worker met aussi en cache le fichier 1000 m ;
@@ -36,7 +45,7 @@ window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 // =========================================================================
 
 // =========================================================================
-// v14.96 TEST — commune survolée stable dans la PWA iPad
+// v14.96 — commune survolée stable dans la PWA iPad
 // - le Service Worker met en cache les GeoJSON Etalab communes 100 m / 50 m ;
 // - cache-first après un premier chargement réussi ;
 // - timeout initial adapté aux gros GeoJSON dans la PWA installée ;
@@ -44,7 +53,7 @@ window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 // =========================================================================
 
 // =========================================================================
-// v14.95 TEST — performance carte Offline aux grands dézooms
+// v14.95 — performance carte Offline aux grands dézooms
 // - lecture directe prioritaire par index IndexedDB `tileUrl` ;
 // - les bases isolées modernes n'essaient plus toutes les anciennes clés pack-scopées ;
 // - la base historique commune est ignorée lorsque tous les packs actifs sont confirmés isolés ;
@@ -53,26 +62,26 @@ window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 // =========================================================================
 
 // =========================================================================
-// v14.94 TEST — stabilisation carte / SafeSky / dézoom
+// v14.94 — stabilisation carte / SafeSky / dézoom
 // - un seul rafraîchissement SafeSky à la fois ;
 // - une demande forcée reçue pendant un chargement est regroupée et rejouée ;
 // - les réponses SafeSky devenues obsolètes sont ignorées ;
 // - les lectures NPF de l'ancien niveau de zoom sont invalidées au zoomstart ;
 // - après zoom ou changement SafeSky, la couche de fond est vérifiée/redessinée
-//   sans reconstruction de la base de tuiles ni changement de carte active.
+// sans reconstruction de la base de tuiles ni changement de carte active.
 // =========================================================================
 
 // =========================================================================
-// v14.93 TEST — Cartes VAC SIA hors ligne via GitHub Pages
+// v14.93 — Cartes VAC SIA hors ligne via GitHub Pages
 // - téléchargement des VAC publiées par le dépôt NPF-Q400-VAC ;
 // - stockage IndexedDB dédié et ouverture 100 % hors ligne ;
 // - bouton VAC dans les popups des terrains disposant d’une VAC locale ;
 // - contrôle léger des mises à jour au démarrage, uniquement si le réseau répond ;
 // - téléchargement différentiel par SHA-256 et conservation de l’ancienne VAC
-//   tant que le nouveau PDF n’a pas été téléchargé et validé.
+// tant que le nouveau PDF n’a pas été téléchargé et validé.
 // =========================================================================
 
-//  =========================================================================
+// =========================================================================
 // INITIALISATION DE L'APPLICATION
 // =========================================================================
 
@@ -236,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         initializeApp();
 
-        // Laisse Leaflet créer la carte, puis retire l'écran de reprise.
+ // Laisse Leaflet créer la carte, puis retire l'écran de reprise.
         setTimeout(markAppReady, 250);
     } catch (error) {
         console.error('Erreur initialisation application:', error);
@@ -250,14 +259,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // =========================================================================
-// v2026.52 — version pérenne issue de v12.95 TEST
-// Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
+// v2026.52 — version pérenne issue de v12.95 // Corrige le grand bandeau bas : Safari peut donner une hauteur CSS trop courte
 // avec -webkit-fill-available. On force une variable de hauteur réelle et on
 // redemande à Leaflet de recalculer sa taille.
 // =========================================================================
 (function setupNpfMapViewportHeightFix() {
     /*
-     * v15.01 — la hauteur du viewport reste recalculée comme auparavant, mais
+     * v2026.63 — la hauteur du viewport reste recalculée comme auparavant, mais
      * un recalcul de taille ne force plus un redraw complet des tuiles.
      * Les retours au premier plan sont traités sans action Leaflet ici :
      * setupNpfUnifiedForegroundResume() effectue une seule invalidation dédupliquée.
@@ -323,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { passive: true }
     );
 
-    // v15.01 : retour premier plan = hauteur uniquement, aucun redraw ici.
+ // v2026.63 : retour premier plan = hauteur uniquement, aucun redraw ici.
     window.addEventListener('pageshow', scheduleForegroundViewportOnly, { passive: true });
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) scheduleForegroundViewportOnly();
@@ -336,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // =========================================================================
-// v15.01 TEST — REPRISE CARTE UNIQUE APRÈS RETOUR AU PREMIER PLAN
+// v2026.63 PÉRENNE — REPRISE CARTE UNIQUE APRÈS RETOUR AU PREMIER PLAN
 // =========================================================================
 (function setupNpfUnifiedForegroundResume() {
     if (window.__npfUnifiedForegroundResumeInstalled) return;
@@ -546,14 +554,14 @@ document.addEventListener('DOMContentLoaded', () => {
         forceMapContainerVisible();
         notifyOfflineSelection();
 
-        // Retour normal (ex. fermeture d'une VAC) : une seule invalidation légère.
+ // Retour normal (ex. fermeture d'une VAC) : une seule invalidation légère.
         invalidateMapLightly();
 
         if (!longResume) {
             setTimeout(() => {
                 if (token !== resumeToken) return;
 
-                // Le redraw complet n'est utilisé qu'en secours si les tuiles ont disparu.
+ // Le redraw complet n'est utilisé qu'en secours si les tuiles ont disparu.
                 if (countUsableTiles() === 0) {
                     redrawBaseTilesOnce();
                     setTimeout(() => {
@@ -565,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Reprise longue / page restaurée par Safari : récupération renforcée unique.
+ // Reprise longue / page restaurée par Safari : récupération renforcée unique.
         showResumeOverlay();
 
         setTimeout(() => {
@@ -586,8 +594,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const scheduleResume = (reason = 'resume', persisted = false) => {
         const now = Date.now();
 
-        // focus + visibilitychange + pageshow arrivent souvent en rafale.
-        // Après une reprise déjà exécutée, les doublons immédiats sont ignorés.
+ // focus + visibilitychange + pageshow arrivent souvent en rafale.
+ // Après une reprise déjà exécutée, les doublons immédiats sont ignorés.
         if (!persisted && lastResumeRunAt && (now - lastResumeRunAt) < AFTER_RUN_DEDUPE_MS) {
             return;
         }
@@ -636,7 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // VARIABLES GLOBALES
 // =========================================================================
-// v14.44 TEST — filtre trafics au sol et zone centrée sur la carte.
+// v14.44 — filtre trafics au sol et zone centrée sur la carte.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null, selectedAirportDestination = null;
 let npfRunwayMapLayer = null;
 let npfRunwayRenderer = null;
@@ -644,7 +652,7 @@ let communeAliases = [];
 let communesByCodeInsee = new Map();
 
 /*
- * v14.40 TEST — base nationale de localités intégralement offline.
+ * v14.40 — base nationale de localités intégralement offline.
  *
  * Une archive ZIP unique est pré-cachée par le service worker. Elle contient
  * 179 402 villages, hameaux et lieux-dits répartis en petits fragments de
@@ -726,7 +734,7 @@ let roadOverlayLastLabelRefreshAt = 0;
 const ROAD_OVERLAY_LABEL_REFRESH_MAX_INTERVAL_MS = 60000;
 const ROAD_OVERLAY_LABEL_REFRESH_VIEWPORT_RATIO = 0.24;
 /*
- * v15.00 TEST — laisser le fond de carte et SafeSky se stabiliser avant le
+ * v15.00 — laisser le fond de carte et SafeSky se stabiliser avant le
  * rendu routier, et éviter de charger des secteurs trop éloignés de l'écran.
  */
 const ROAD_OVERLAY_MAP_CHANGE_DELAY_MS = 1050;
@@ -746,7 +754,7 @@ let communesLayerLoadController = null;
 let communesLayerLoadPromise = null;
 
 /*
- * v13.93 TEST — priorité des libellés de communes selon la population.
+ * v13.93 — priorité des libellés de communes selon la population.
  * La géométrie Etalab reste la source des contours. La population est chargée
  * séparément depuis l'API officielle geo.api.gouv.fr et mise en cache localement.
  */
@@ -784,7 +792,7 @@ const AIRPORT_PDF_DB_NAME = 'AirportPdfsDB';
 const AIRPORT_PDF_DB_VERSION = 1;
 
 /*
- * v14.93 TEST — cartes VAC SIA hors ligne.
+ * v14.93 — cartes VAC SIA hors ligne.
  * Les PDF sont publiés par le dépôt GitHub Pages NPF-Q400-VAC puis stockés
  * localement dans une base IndexedDB distincte des PDF FDF.
  */
@@ -850,7 +858,7 @@ let isRoadOverlayLoading = false;
 const TRAFFIC_LAYER_KEY = 'showTrafficLayer';
 
 /*
- * v14.24 TEST — appel direct de SafeSky Production depuis NPF.
+ * v14.24 — appel direct de SafeSky Production depuis NPF.
  *
  * La clé temporaire est volontairement intégrée dans le code à la demande de
  * l'utilisateur. Elle sera visible dans GitHub, le navigateur et les requêtes.
@@ -897,7 +905,7 @@ let lastTrafficAircraftSnapshot = [];
 let lastTrafficRenderMeta = null;
 
 /*
- * v14.44 TEST — déplacement fluide continu sur base v14.43.
+ * v14.44 — déplacement fluide continu sur base v14.43.
  * Les marqueurs sont conservés entre deux réponses SafeSky et raccordés
  * progressivement aux nouvelles positions sans réintroduire les anciennes
  * zones GPS / feu ni modifier le filtre explicite des trafics au sol.
@@ -906,7 +914,7 @@ const TRAFFIC_TRACKED_IDENTIFIERS_STORAGE_KEY =
     'safeSkyTrackedIdentifiersV1';
 
 /*
- * v14.74 TEST — indicatifs suivis permanents.
+ * v14.74 — indicatifs suivis permanents.
  *
  * Cette liste est intégrée au code de NPF : elle est donc automatiquement
  * recréée après une réinstallation ou un effacement du stockage local. Elle
@@ -943,7 +951,7 @@ const TRAFFIC_PERMANENT_TRACKED_CALLSIGN_SET = new Set(
     TRAFFIC_PERMANENT_TRACKED_CALLSIGNS
 );
 /*
- * v14.48 TEST — l'identifiant du propre avion est volontairement temporaire.
+ * v14.48 — l'identifiant du propre avion est volontairement temporaire.
  * sessionStorage le conserve pendant la session PWA courante, puis le navigateur
  * le supprime lorsqu'une nouvelle session réelle est créée.
  */
@@ -953,7 +961,7 @@ let ownTrafficAircraftSessionFallback = null;
 const TRAFFIC_PUBLISHED_BEACON_ID_STORAGE_KEY =
     'safeSkyPublishedBeaconIdV1';
 /*
- * v14.57 TEST — la liste suivie n'est plus plafonnée à 20 entrées.
+ * v14.57 — la liste suivie n'est plus plafonnée à 20 entrées.
  * La concurrence ne limite pas le nombre enregistré : elle évite seulement
  * d'envoyer toutes les interrogations SafeSky individuelles simultanément.
  */
@@ -964,7 +972,7 @@ const TRAFFIC_SMOOTH_FRAME_INTERVAL_MS = 50;
 const TRAFFIC_SMOOTH_FRAME_INTERVAL_ROAD_TABLET_MS = 100;
 const TRAFFIC_VISUAL_RESUME_AFTER_MAP_MS = 420;
 /*
- * v14.72 TEST — l'âge déjà accumulé par un point SafeSky ne doit plus
+ * v14.72 — l'âge déjà accumulé par un point SafeSky ne doit plus
  * consommer la totalité de la période de mouvement local. Deux horizons sont
  * désormais séparés :
  * - rattrapage limité de l'horodatage source jusqu'à la réception par NPF ;
@@ -984,7 +992,7 @@ let trafficMarkerRegistry = new Map();
 let trafficSmoothAnimationFrame = null;
 let trafficSmoothAnimationLastAt = 0;
 /*
- * v15.00 TEST — plusieurs opérations lourdes peuvent demander une suspension
+ * v15.00 — plusieurs opérations lourdes peuvent demander une suspension
  * visuelle simultanée. Un Set évite qu'une reprise prématurée relance SafeSky
  * alors qu'un zoom ou le calque routier est encore en cours de rendu.
  */
@@ -1009,7 +1017,7 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     relativeAltitudeBandFt: 1500,
     groundToAboveBandFt: 1500,
     /*
-     * v14.44 TEST — la zone trafic est toujours centrée sur la carte.
+     * v14.44 — la zone trafic est toujours centrée sur la carte.
      * Les deux anciennes options GPS / feu restent neutralisées pour assurer
      * la migration des réglages déjà stockés.
      */
@@ -1120,7 +1128,7 @@ const CHAT_PUSH_VAPID_PUBLIC_KEY = 'BAB6UkrM0OzfJPCKYux_BdLfQJbMo7qKoXPhIoTB99J9
 let mqttLoaderPromise = null;
 
 /*
- * v14.79 TEST — repositionnement des repères des pélicandromes permanents.
+ * v14.79 — repositionnement des repères des pélicandromes permanents.
  *
  * Les coordonnées ci-dessous ont été relevées et transmises par l’utilisateur
  * pour placer le rond / symbole cliquable au point opérationnel souhaité.
@@ -1137,7 +1145,7 @@ const waterPoints = [{"id":"AIGUEBLETTE","name":"Aigueblette","countryCode":"FR"
 const otherAirports = [
     { oaci: "LFBC", name: "Cazaux", lat: 44.534, lon: -1.155 }, { oaci: "LFBH", name: "La Rochelle-Île de Ré", lat: 46.179, lon: -1.195 }, { oaci: "LFBF", name: "Toulouse-Francazal", lat: 43.546, lon: 1.365 }, { oaci: "LFBG", name: "Cognac-Châteaubernard", lat: 45.660, lon: -0.354 }, { oaci: "LFBI", name: "Poitiers-Biard", lat: 46.587, lon: 0.309 }, { oaci: "LFBK", name: "Saint-Brieuc-Armor", lat: 48.538, lon: -2.852 }, { oaci: "LFBO", name: "Toulouse-Blagnac", lat: 43.635, lon: 1.363 }, { oaci: "LFBS", name: "Chambéry-Savoie", lat: 45.640, lon: 5.881 }, { oaci: "LFBT", name: "Tarbes-Lourdes-Pyrénées", lat: 43.185, lon: -0.003 }, { oaci: "LFBU", name: "Angoulême-Cognac", lat: 45.729, lon: 0.220 }, { oaci: "LFCU", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFLA", name: "Auxerre-Branches", lat: 47.848, lon: 3.497 }, { oaci: "LFLC", name: "Clermont-Ferrand-Auvergne", lat: 45.786, lon: 3.169 }, { oaci: "LFLD", name: "Bourges", lat: 47.059, lon: 2.370 }, { oaci: "LFLL", name: "Lyon-Saint Exupéry", lat: 45.725, lon: 5.081 }, { oaci: "LFLN", name: "Saint-Yan", lat: 46.409, lon: 4.013 }, { oaci: "LFLS", name: "Grenoble-Isère", lat: 45.363, lon: 5.331 }, { oaci: "LFLV", name: "Vichy-Charmeil", lat: 46.167, lon: 3.403 }, { oaci: "LFLW", name: "Aurillac", lat: 44.887, lon: 2.418 }, { oaci: "LFLY", name: "Lyon-Bron", lat: 45.729, lon: 4.945 }, { oaci: "LFLZ", name: "Le Puy-Loudes", lat: 45.079, lon: 3.762 }, { oaci: "LFMC", name: "Le Luc-Le Cannet", lat: 43.385, lon: 6.368 }, { oaci: "LFMI", name: "Istres-Le Tubé", lat: 43.524, lon: 4.944 }, { oaci: "LFMN", name: "Nice-Côte d'Azur", lat: 43.665, lon: 7.215 }, { oaci: "LFMQ", name: "Le Castellet", lat: 43.253, lon: 5.786 }, { oaci: "LFMV", name: "Avignon-Provence", lat: 43.906, lon: 4.902 }, { oaci: "LFMY", name: "Salon-de-Provence", lat: 43.606, lon: 5.110 }, { oaci: "LFOA", name: "Avord", lat: 47.056, lon: 2.637 }, { oaci: "LFOC", name: "Châteaudun", lat: 48.058, lon: 1.378 }, { oaci: "LFOE", name: "Évreux-Fauville", lat: 49.028, lon: 1.218 }, { oaci: "LFOK", name: "Châlons-Vatry", lat: 48.776, lon: 4.185 }, { oaci: "LFOJ", name: "Orléans-Bricy", lat: 47.989, lon: 1.758 }, { oaci: "LFOP", name: "Rouen-Vallée de Seine", lat: 49.385, lon: 1.182 }, { oaci: "LFOQ", name: "Blois-Le Breuil", lat: 47.678, lon: 1.217 }, { oaci: "LFOR", name: "Chartres-Métropole", lat: 48.455, lon: 1.530 }, { oaci: "LFOT", name: "Tours-Val de Loire", lat: 47.432, lon: 0.722 }, { oaci: "LFOU", name: "Cholet-Le Pontreau", lat: 47.081, lon: -0.871 }, { oaci: "LFOV", name: "Laval-Entrammes", lat: 48.033, lon: -0.749 }, { oaci: "LFPB", name: "Paris-Le Bourget", lat: 48.969, lon: 2.441 }, { oaci: "LFPC", name: "Creil", lat: 49.253, lon: 2.520 }, { oaci: "LFPG", name: "Paris-Charles-de-Gaulle", lat: 49.009, lon: 2.547 }, { oaci: "LFPO", name: "Paris-Orly", lat: 48.723, lon: 2.379 }, { oaci: "LFPV", name: "Villacoublay-Vélizy", lat: 48.773, lon: 2.203 }, { oaci: "LFRB", name: "Brest-Bretagne", lat: 48.447, lon: -4.418 }, { oaci: "LFRC", name: "Cherbourg-Manche", lat: 49.650, lon: -1.478 }, { oaci: "LFRD", name: "Dinard-Pleurtuit-Saint-Malo", lat: 48.587, lon: -2.080 }, { oaci: "LFRE", name: "La Baule-Escoublac", lat: 47.289, lon: -2.348 }, { oaci: "LFRF", name: "Granville-Mont-Saint-Michel", lat: 48.887, lon: -1.564 }, { oaci: "LFRG", name: "Deauville-Normandie", lat: 49.365, lon: 0.154 }, { oaci: "LFRH", name: "Lorient-Bretagne-Sud", lat: 47.760, lon: -3.440 }, { oaci: "LFRI", name: "La Roche-sur-Yon-Les Ajoncs", lat: 46.702, lon: -1.381 }, { oaci: "LFRJ", name: "Landivisiau", lat: 48.527, lon: -4.156 }, { oaci: "LFRK", name: "Caen-Carpiquet", lat: 49.173, lon: -0.450 }, { oaci: "LFRL", name: "Lanvéoc-Poulmic", lat: 48.278, lon: -4.437 }, { oaci: "LFRM", name: "Le Mans-Arnage", lat: 47.949, lon: 0.203 }, { oaci: "LFRN", name: "Rennes-Saint-Jacques", lat: 48.070, lon: -1.732 }, { oaci: "LFRO", name: "Lannion-Côte de Granit Rose", lat: 48.755, lon: -3.472 }, { oaci: "LFRQ", name: "Quimper-Pluguffan", lat: 47.975, lon: -4.167 }, { oaci: "LFRS", name: "Nantes-Atlantique", lat: 47.153, lon: -1.607 }, { oaci: "LFRT", name: "Saint-Nazaire-Montoir", lat: 47.312, lon: -2.152 }, { oaci: "LFRU", name: "Morlaix-Ploujean", lat: 48.604, lon: -3.818 }, { oaci: "LFSD", name: "Dijon-Longvic", lat: 47.268, lon: 5.088 }, { oaci: "LFSF", name: "Metz-Nancy-Lorraine", lat: 48.981, lon: 6.251 }, { oaci: "LFSH", name: "Haguenau", lat: 48.790, lon: 7.820 }, { oaci: "LFSK", name: "Colmar-Houssen", lat: 48.110, lon: 7.359 }, { oaci: "LFSO", name: "Nancy-Ochey", lat: 48.577, lon: 5.955 }, { oaci: "LFSQ", name: "Luxeuil-Saint-Sauveur", lat: 47.779, lon: 6.353 }, { oaci: "LFQA", name: "Reims-Prunay", lat: 49.207, lon: 4.148 }, { oaci: "LFST", name: "Strasbourg-Entzheim", lat: 48.542, lon: 7.628 }, { oaci: "LFSX", name: "Montbéliard-Courcelles", lat: 47.487, lon: 6.852 }, { oaci: "LFYR", name: "Romorantin-Pruniers", lat: 47.352, lon: 1.670 }, { oaci: "LFYD", name: "Dinard", lat: 48.587, lon: -2.080 }, { oaci: "LFSR", name: "Reims-Champagne", lat: 49.308, lon: 4.045 }, { oaci: "LFPM", name: "Melun-Villaroche", lat: 48.604, lon: 2.676 }, { oaci: "LFOB", name: "Beauvais-Tillé", lat: 49.454, lon: 2.112 }, { oaci: "LFQN", name: "Saint-Omer-Wizernes", lat: 50.727, lon: 2.233 }, { oaci: "LFKS", name: "Solenzara", lat: 41.924, lon: 9.405 },
 
-    // Terrains ajoutés depuis le PDF "piste revêtue > 1500 m"
+ // Terrains ajoutés depuis le PDF "piste revêtue > 1500 m"
     { oaci: "LFBA", name: "Agen-La Garenne", lat: 44.1747, lon: 0.5906 },
     { oaci: "LFBE", name: "Bergerac-Roumanière", lat: 44.8253, lon: 0.5186 },
     { oaci: "LFDN", name: "Rochefort-Saint-Agnant", lat: 45.8878, lon: -0.9831 },
@@ -1160,7 +1168,7 @@ const otherAirports = [
 ];
 
 /*
- * v14.71 TEST — aérodromes complémentaires PIAF.
+ * v14.71 — aérodromes complémentaires PIAF.
  *
  * La liste embarquée ci-dessous reprend les aérodromes métropolitains et corses
  * disposant d'un code OACI à quatre lettres LFxx dans la table PIAF de la DGAC.
@@ -1647,7 +1655,7 @@ const additionalAerodromes = piafMetropolitanAerodromesData
 
 
 /*
- * v14.76 TEST — pistes intégrées à la carte NPF, indépendamment des symboles.
+ * v14.76 — pistes intégrées à la carte NPF, indépendamment des symboles.
  *
  * Les données de la v14.75 restent entièrement embarquées dans script.js.
  * Les extrémités géographiques permettent à Leaflet d'afficher chaque piste
@@ -2059,7 +2067,7 @@ function getAdditionalAerodromeRunways(oaci) {
 
 
 /*
- * v14.77 TEST — pistes des aérodromes déclarés comme pélicandromes.
+ * v14.77 — pistes des aérodromes déclarés comme pélicandromes.
  *
  * Les 27 pélicandromes permanents de la liste `pelicanAirports` disposent
  * désormais de leurs pistes dans la même représentation cartographique que
@@ -2164,7 +2172,7 @@ const declaredPelicanRunwaysByOaci = (() => {
 
 
 /*
- * v14.78 TEST — couverture des pistes de tous les aéroports pouvant être
+ * v14.78 — couverture des pistes de tous les aéroports pouvant être
  * déclarés comme pélicandromes depuis l'interface.
  *
  * La v14.77 ne contenait que les 27 pélicandromes permanents. Les 97 terrains
@@ -2421,7 +2429,7 @@ const withTimeout = (promise, timeoutMs, timeoutMessage) => new Promise((resolve
     );
 });
 
-const TILE_CACHE_PREFIX = 'test-communes-tile-cache-';
+const TILE_CACHE_PREFIX = 'npf-communes-tile-cache-';
 
 
 function buildStoredTileKey(tileUrl, packName) {
@@ -2963,7 +2971,7 @@ function setFireHistoryCollapsed(collapsed) {
 }
 
 function displayFireHistory() {
-    // v13.31 — flèche de repli conservée à droite de « Tout effacer » quand l’historique est ouvert.
+ // v13.31 — flèche de repli conservée à droite de « Tout effacer » quand l’historique est ouvert.
     const resultsList = document.getElementById('results-list');
     if (!resultsList) return;
 
@@ -3256,8 +3264,8 @@ async function initializeApp() {
         localStorage.removeItem('water_airports');
         localStorage.removeItem('selected_base_oaci');
     }
-    // v12.67 — le bouton Route BASE a été retiré de l'interface, mais la route base reste active.
-    // On ignore donc l'ancien état local éventuel (ex. utilisateur avait désactivé la route avant suppression du bouton).
+ // v12.67 — le bouton Route BASE a été retiré de l'interface, mais la route base reste active.
+ // On ignore donc l'ancien état local éventuel (ex. utilisateur avait désactivé la route avant suppression du bouton).
     showLftwRoute = true;
     localStorage.setItem('showLftwRoute', 'true');
     localStorage.setItem(SHOW_DEPARTMENTS_LAYER_KEY, 'false');
@@ -3305,13 +3313,13 @@ async function initializeApp() {
         }
 
         /*
-         * v14.63 TEST — l'interface ne doit jamais attendre IndexedDB ou le
+         * v14.63 — l'interface ne doit jamais attendre IndexedDB ou le
          * service worker avant de créer la carte et de lier les boutons.
          */
         initializeOfflineTilePreference().catch(error => {
             console.warn('[Offline] Initialisation différée:', error);
         });
-        // Le scan de zoom est utile mais non bloquant pour l'ouverture de l'interface.
+ // Le scan de zoom est utile mais non bloquant pour l'ouverture de l'interface.
         withTimeout(
             updateBaseTileNativeZoomFromAvailability({ forceScan: false }),
             2200,
@@ -3747,7 +3755,7 @@ function scoreCommuneSearchCandidate(candidate, searchWords, departmentFilter = 
         }
 
         /*
-         * v14.45 TEST — tolérance phonétique ciblée avec département.
+         * v14.45 — tolérance phonétique ciblée avec département.
          * « essen 12 », « esen 12 » et « aissen 12 » doivent retrouver
          * Ayssènes. La comparaison porte sur le nom compact complet afin que
          * les mots très fréquents de noms composés (Saint, Sainte...) ne
@@ -4966,7 +4974,7 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-        // v13.58 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
+ // v13.58 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
         zoomAnimation: false,
         fadeAnimation: false,
         markerZoomAnimation: false
@@ -5164,7 +5172,7 @@ function scheduleTrafficVisualResumeAfterMapInteraction(reason = 'map-end') {
 function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
     if (!map) return;
 
-    // Annule les rafraîchissements post-geste qui ne correspondent plus à la vue courante.
+ // Annule les rafraîchissements post-geste qui ne correspondent plus à la vue courante.
     baseMapStabilityRefreshToken += 1;
 
     /*
@@ -5371,7 +5379,7 @@ function scheduleOfflineTileWake(reason = 'startup') {
 
 
 /*
- * v14.69 TEST — restauration fiable de la carte Offline mémorisée.
+ * v14.69 — restauration fiable de la carte Offline mémorisée.
  *
  * Les v14.66/v14.67 reconstruisaient plusieurs fois la couche Leaflet, mais avec
  * les mêmes informations de pack déjà présentes en mémoire. Sur Safari/iPadOS,
@@ -5807,7 +5815,7 @@ function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
 
 
 /*
- * v14.63 TEST — lecture directe des tuiles Offline depuis IndexedDB.
+ * v14.63 — lecture directe des tuiles Offline depuis IndexedDB.
  *
  * La carte ne dépend plus du service worker pour afficher les packs téléchargés.
  * Safari peut conserver une page sans contrôleur SW après une mise à jour : dans
@@ -5840,7 +5848,7 @@ let directOfflineRecoveryCount = 0;
 let directOfflineLastRecoveryReason = '';
 
 /*
- * v14.69 TEST — lecture NPF à froid stabilisée.
+ * v14.69 — lecture NPF à froid stabilisée.
  *
  * La carte NPF est nettement plus volumineuse que la carte OACI. Safari peut
  * mettre plusieurs secondes à ouvrir son index IndexedDB et supporte mal une
@@ -6818,7 +6826,7 @@ function setupEventListeners() {
 
         if (map && map._communesZoomStyleBound !== true) {
             map._communesZoomStyleBound = true;
-            // v12.62 — performance iPad : recalcul du calque Communes uniquement en fin de déplacement/zoom.
+ // v12.62 — performance iPad : recalcul du calque Communes uniquement en fin de déplacement/zoom.
             map.on('zoomend moveend', updateCommunesLayerAppearance);
         }
     }
@@ -6977,7 +6985,7 @@ function setupEventListeners() {
 
     const showFireHistoryFromSearch = () => {
         /*
-         * v14.45 TEST — placement tactile natif du curseur dans la recherche.
+         * v14.45 — placement tactile natif du curseur dans la recherche.
          * L'ancien setSelectionRange différé remettait systématiquement le
          * curseur à droite après un toucher au milieu du nom. On conserve le
          * focus et l'historique, mais Safari/iPadOS choisit désormais lui-même
@@ -7867,7 +7875,7 @@ function updateCommuneDisplay(commune) {
     communeDisplay.innerHTML = communeNameHTML + sunsetHTML + closeButtonHTML;
     updateCommuneGpsRouteDisplay();
 
-    // On attache l'événement de clic au nouveau bouton
+ // On attache l'événement de clic au nouveau bouton
     const clearCommuneBtn = document.getElementById('clear-commune-btn');
     if (clearCommuneBtn) {
         const preserveSearchFocusBeforeClear = (event) => {
@@ -8260,7 +8268,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
-// v14.89 TEST — aides contextuelles des imports offline
+// v14.89 — aides contextuelles des imports offline
 // - ajout d’un bouton ? à côté de Importer Cartes Offline ;
 // - ajout d’un bouton ? à côté de Importer Calque Routier ;
 // - ajout d’un bouton ? à côté de Télécharger PDFs Doc Fdf Réduité ;
@@ -8268,14 +8276,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.88 TEST — contour France fidèle à la référence visuelle validée
+// v14.88 — contour France fidèle à la référence visuelle validée
 // - remplacement du tracé polygonal approximatif de la v14.87 ;
 // - contour vectorisé depuis la référence France validée ;
 // - fond blanc, contour bleu, aucun texte conservés.
 // =========================================================================
 
 // =========================================================================
-// v14.87 TEST — icône France corrigée pour le sélecteur rapide offline
+// v14.87 — icône France corrigée pour le sélecteur rapide offline
 // - suppression du texte dans le bouton France ;
 // - fond blanc conservé en permanence ;
 // - silhouette remplacée par un contour bleu de la France ;
@@ -8283,7 +8291,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.85 TEST — réorganisation de Gestion des Cartes et suppression groupée des PDF
+// v14.85 — réorganisation de Gestion des Cartes et suppression groupée des PDF
 // - section Cartes Offline regroupée avec son bouton d'import ;
 // - section Calque Routier placée immédiatement sous les cartes offline ;
 // - libellés d'import simplifiés ;
@@ -8292,7 +8300,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.84 TEST — stabilité cartes offline pendant un vol prolongé
+// v14.84 — stabilité cartes offline pendant un vol prolongé
 // - le calque routier ne reconstruit plus toutes ses couches à chaque recentrage GPS ;
 // - les cartouches ne sont recalculés qu'après un déplacement significatif ;
 // - les connexions IndexedDB sont rouvertes automatiquement après plusieurs erreurs ;
@@ -8300,7 +8308,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.83 TEST — cartouches routiers lisibles
+// v14.83 — cartouches routiers lisibles
 // - suppression à l'affichage des suffixes techniques girondins U / Uxxxx ;
 // - un seul cartouche par référence dans l'emprise visible ;
 // - priorité aux axes principaux et rejet des cartouches qui se chevauchent ;
@@ -8308,7 +8316,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.82 TEST — routes territoriales T / RT et cartouches sur la portion visible
+// v14.82 — routes territoriales T / RT et cartouches sur la portion visible
 // - import et affichage des références T10, RT10 et « Route territoriale 10 » ;
 // - classe T affichée comme une route nationale à partir du niveau 1 NM ;
 // - cartouches calculés sur les segments réellement visibles dans la fenêtre ;
@@ -8316,14 +8324,14 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 // =========================================================================
 
 // =========================================================================
-// v14.49 TEST — routes métropolitaines M
+// v14.49 — routes métropolitaines M
 // - import des références M613, M185, M5E14, RM613 et « Route métropolitaine » ;
 // - classe M affichée comme une route départementale, dès le niveau 1 NM ;
 // - conservation intégrale des classes A, N et D existantes.
 // =========================================================================
 
 // =========================================================================
-// v14.49 TEST — calque routier vectoriel offline A / N / D / M / T
+// v14.49 — calque routier vectoriel offline A / N / D / M / T
 // =========================================================================
 
 function getRoadOverlayManifest() {
@@ -9784,7 +9792,7 @@ async function toggleRoadOverlayLayer(forceState = null, options = {}) {
 
 
 // =========================================================================
-// v13.01 TEST — réglages calque trafic ADS-B
+// v13.01 — réglages calque trafic ADS-B
 // =========================================================================
 function sanitizeTrafficSettings(candidate = {}) {
     const fallback = DEFAULT_TRAFFIC_SETTINGS;
@@ -9844,7 +9852,7 @@ function sanitizeTrafficSettings(candidate = {}) {
     );
 
     /*
-     * v14.44 TEST — suppression des modes « autour de ma position » et
+     * v14.44 — suppression des modes « autour de ma position » et
      * « autour du feu ». Le trafic est toujours demandé autour du centre
      * courant de la carte, quelle que soit une ancienne valeur mémorisée.
      */
@@ -9864,7 +9872,7 @@ function sanitizeTrafficSettings(candidate = {}) {
         fallback.onlyTrackedIdentifiers
     );
     /*
-     * v14.41 TEST — publication NPF vers SafeSky supprimée.
+     * v14.41 — publication NPF vers SafeSky supprimée.
      * Les anciennes valeurs mémorisées sont ignorées et neutralisées.
      */
     const publishOwnPosition = false;
@@ -10485,7 +10493,7 @@ function refreshTrackedTrafficListUi() {
             );
 
             /*
-             * v14.56 TEST — distinction appui / défilement dans la liste suivie.
+             * v14.56 — distinction appui / défilement dans la liste suivie.
              *
              * Aucun preventDefault n'est utilisé : Safari peut donc faire défiler
              * naturellement la carte des filtres lorsque le doigt part verticalement.
@@ -10888,7 +10896,6 @@ function ensureTrafficSettingsModal() {
             <div class="traffic-settings-header">
                 <div>
                     <div id="traffic-settings-title" class="traffic-settings-title">Filtres trafic</div>
-                    <div class="traffic-settings-subtitle">Réglages du calque trafic indicatif</div>
                 </div>
                 <button type="button" id="traffic-settings-close" class="traffic-settings-close" aria-label="Fermer">×</button>
             </div>
@@ -10975,10 +10982,6 @@ function ensureTrafficSettingsModal() {
                             disabled>
                         Réinitialiser
                     </button>
-                </div>
-                <div class="traffic-tools-note">
-                    Sélectionne ton transpondeur depuis la fenêtre d’un trafic ou depuis la recherche.
-                    Son étiquette sera masquée uniquement pendant la session PWA en cours.
                 </div>
             </div>
 
@@ -12279,7 +12282,7 @@ async function fetchTrackedTrafficBeacons() {
 }
 
 /*
- * v14.41 TEST — SafeSky est strictement utilisé en lecture.
+ * v14.41 — SafeSky est strictement utilisé en lecture.
  * Ces fonctions restent comme stubs de compatibilité interne, sans requête POST.
  */
 async function publishOwnSafeSkyPosition() {
@@ -12345,7 +12348,7 @@ function getFireTrafficPoint() {
 
 function getTrafficQueryPoints() {
     /*
-     * v14.44 TEST — les anciennes zones GPS et feu sont supprimées.
+     * v14.44 — les anciennes zones GPS et feu sont supprimées.
      * Le rayon SafeSky est toujours appliqué autour du centre actuel de la
      * carte, ce qui rend le comportement unique et prévisible.
      */
@@ -12440,7 +12443,7 @@ async function fetchTrafficAircraftForPoint(point, providers) {
 }
 
 // =========================================================================
-// v12.96 TEST — calque trafic ADS-B indicatif
+// v12.96 — calque trafic ADS-B indicatif
 // =========================================================================
 function getTrafficQueryPoint() {
     const points = getTrafficQueryPoints();
@@ -14816,7 +14819,7 @@ function installTrafficMarkerPopupInteraction(marker) {
 }
 
 /*
- * v14.57 TEST — fermeture de la fiche trafic par clic réel sur le fond de carte.
+ * v14.57 — fermeture de la fiche trafic par clic réel sur le fond de carte.
  * Le déplacement, le zoom, le pincement et la molette ne ferment pas la fiche.
  */
 function closeOpenTrafficAircraftPopup() {
@@ -15613,7 +15616,7 @@ function toggleTrafficLayer(forceState = null) {
         refreshTrafficButtonState();
         refreshTrafficLayer({ force: true, reason: 'toggle' });
     } else {
-        // Invalide toute réponse réseau encore en vol avant de retirer la couche.
+ // Invalide toute réponse réseau encore en vol avant de retirer la couche.
         trafficRefreshGeneration += 1;
         trafficRefreshQueued = false;
         stopTrafficAutoRefresh();
@@ -15626,79 +15629,6 @@ function toggleTrafficLayer(forceState = null) {
 
     scheduleBaseMapStabilityRefresh(showTrafficLayer ? 'traffic-on' : 'traffic-off');
     refreshTrackedTrafficListUi();
-}
-
-async function testSafeSkyApi() {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-        () => controller.abort(),
-        TRAFFIC_FETCH_TIMEOUT_MS
-    );
-
-    const testUrl = new URL(
-        SAFESKY_API_BASE_URL,
-        window.location.href
-    );
-    testUrl.searchParams.set(
-        'viewport',
-        '43.20,5.20,43.40,5.55'
-    );
-    testUrl.searchParams.set('show_grounded', 'true');
-
-    try {
-        const response = await fetch(testUrl.toString(), {
-            cache: 'no-store',
-            mode: 'cors',
-            credentials: 'omit',
-            referrerPolicy: 'no-referrer',
-            signal: controller.signal,
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'x-api-key': SAFESKY_API_KEY
-            }
-        });
-
-        let data = null;
-        try {
-            data = await response.json();
-        } catch (_) {
-            data = null;
-        }
-
-        if (!response.ok) {
-            throw new Error(
-                data?.error
-                || data?.message
-                || `HTTP ${response.status}`
-            );
-        }
-
-        if (!Array.isArray(data)) {
-            throw new Error(
-                'Réponse SafeSky inattendue'
-            );
-        }
-
-        return {
-            ok: true,
-            provider: 'SafeSky',
-            mode: 'direct',
-            count: data.length
-        };
-    } catch (error) {
-        if (
-            error instanceof TypeError
-            && /fetch/i.test(String(error.message || ''))
-        ) {
-            throw new Error(
-                'Appel direct SafeSky bloqué par le réseau ou le CORS'
-            );
-        }
-        throw error;
-    } finally {
-        clearTimeout(timeoutId);
-    }
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -15723,97 +15653,9 @@ document.addEventListener('visibilitychange', () => {
 
 window.toggleTrafficLayer = toggleTrafficLayer;
 window.refreshTrafficLayer = refreshTrafficLayer;
-window.testSafeSkyApi = testSafeSkyApi;
 window.searchSafeSkyBeaconExact = searchSafeSkyBeaconExact;
 window.fetchSafeSkyBeaconById = fetchSafeSkyBeaconById;
 window.getTrackedTrafficIdentifiers = getTrackedTrafficIdentifiers;
-window.testNamedPlacesSearch = async (
-    query = 'Blagon 33'
-) => {
-    const {
-        departmentFilter,
-        searchTerm
-    } = parseSearchDepartmentFilter(query);
-    const searchWords =
-        simplifyString(searchTerm)
-            .split(' ')
-            .filter(Boolean);
-
-    return {
-        results:
-            await searchNamedPlacesOffline(
-                searchTerm,
-                departmentFilter,
-                searchWords
-            ),
-        offline: true
-    };
-};
-window.getNamedPlacesSearchStatus = () => ({
-    databaseUrl:
-        NAMED_PLACES_OFFLINE_ARCHIVE_URL,
-    databaseReady:
-        Boolean(namedPlacesOfflineArchive),
-    departments:
-        Array.isArray(
-            namedPlacesOfflineIndex?.departments
-        )
-            ? namedPlacesOfflineIndex.departments
-            : [],
-    departmentCount:
-        Number(
-            namedPlacesOfflineIndex?.department_count
-            || 0
-        ),
-    totalCount:
-        Number(
-            namedPlacesOfflineIndex?.total_count
-            || 0
-        ),
-    loadedShardCount:
-        namedPlacesOfflineShardCache.size,
-    phoneticShardPrefixLength:
-        NAMED_PLACES_OFFLINE_PHONETIC_PREFIX_LENGTH,
-    phoneticShardGroupCount:
-        namedPlacesOfflineShardIdsByPrefix.size,
-    loadedRecordCount:
-        namedPlacesOfflineLoadedCount,
-    loadError:
-        namedPlacesOfflineLoadError,
-    localPhoneticScoringRetained: true,
-    onlineFallbackEnabled: false,
-    firstSearchWorksOffline: true,
-    nationwideOfflineEnabled: true
-});
-
-window.getSafeSkyIntegrationStatus = () => ({
-    codeReady: true,
-    mode: 'direct',
-    apiUrl: SAFESKY_API_BASE_URL,
-    apiKeyEmbedded: Boolean(SAFESKY_API_KEY),
-    trafficEnabled: !TRAFFIC_DISABLED_FOR_NOW,
-    safeSkyProviderActive: TRAFFIC_API_PROVIDERS.some(
-        provider => provider?.dataFormat === 'safesky'
-    ),
-    activeProviders: TRAFFIC_API_PROVIDERS
-        .map(provider => provider?.label)
-        .filter(Boolean),
-    refreshIntervalMs: TRAFFIC_REFRESH_INTERVAL_MS,
-    smoothInterpolationEnabled: true,
-    curvedTurnRateVectorEnabled: true,
-    trackedIdentifiers:
-        getTrackedTrafficIdentifiers().length,
-    droneAdvisoriesEnabled:
-        sanitizeTrafficSettings(
-            trafficSettings
-        ).showDroneAdvisories,
-    ownPositionPublicationAvailable: false,
-    ownPositionPublicationEnabled: false,
-    partialCallsignSearchEnabled: true,
-    partialCallsignSearchScope: 'zones NPF actives',
-    backgroundPollingDisabled: true
-});
-
 setTimeout(() => {
     syncSafeSkyOwnPublication();
 }, 3500);
@@ -15854,8 +15696,8 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     updateCommuneDisplay(commune);
 
     const { latitude_mairie: lat, longitude_mairie: lon, nom_standard: name } = commune;
-    // v13.54 — après validation d'un feu, la barre de recherche est vidée.
-    // Le feu reste sélectionné via currentCommune + bandeau carte ; seul le texte de recherche est nettoyé.
+ // v13.54 — après validation d'un feu, la barre de recherche est vidée.
+ // Le feu reste sélectionné via currentCommune + bandeau carte ; seul le texte de recherche est nettoyé.
     const fireSearchInput = document.getElementById('search-input');
     const fireResultsList = document.getElementById('results-list');
     const fireClearSearchButton = document.getElementById('clear-search');
@@ -15925,7 +15767,7 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     updateBaseLabels();
     updateCalculatorData();
     updateMapBingoDisplay();
-    // Nous appelons directement la fonction de dessin. Si le GPS est actif, elle utilisera la dernière position.
+ // Nous appelons directement la fonction de dessin. Si le GPS est actif, elle utilisera la dernière position.
     drawUserToTargetRoute();
 
     if (shouldFitBounds) {
@@ -16028,7 +15870,7 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
             lineCap: 'round',
             lineJoin: 'round'
         }).addTo(layer);
-        // Pas d'étiquette sur la route rouge GPS -> Feu : l'information est affichée dans le bandeau commune.
+ // Pas d'étiquette sur la route rouge GPS -> Feu : l'information est affichée dans le bandeau commune.
         return;
     }
 
@@ -16097,7 +15939,7 @@ function normalizeOaciCodeInput(value) {
 }
 
 /*
- * v14.55 TEST — destination aéroport temporaire et fermeture tactile fiable.
+ * v14.55 — destination aéroport temporaire et fermeture tactile fiable.
  * Cette destination ne modifie ni le feu, ni la base, ni le pélicandrome, ni les
  * calculs mission. Elle remplace uniquement la route GPS et le bandeau de carte.
  */
@@ -16361,7 +16203,7 @@ function refreshUI() {
 
 
 /* =========================================================================
-   v14.93 TEST — Cartes VAC SIA hors ligne via GitHub Pages / IndexedDB
+   v14.93 — Cartes VAC SIA hors ligne via GitHub Pages / IndexedDB
    ========================================================================= */
 
 function initVacDB() {
@@ -17495,7 +17337,7 @@ function drawPermanentAirportMarkers() {
          * - un point noir central ;
          * - un cercle transparent séparé pour conserver une grande zone tactile.
          *
-         * v14.73 TEST — symbole légèrement agrandi pour mieux distinguer les
+         * v14.73 — symbole légèrement agrandi pour mieux distinguer les
          * aérodromes pouvant être sélectionnés comme pélicandrome. La zone
          * tactile transparente reste volontairement inchangée.
          */
@@ -18392,7 +18234,7 @@ function isTouchTabletForCommunesLayer() {
 
 function getCommunesGeojsonUrl() {
     /*
-     * v14.98 TEST — une nouvelle PWA iPad ne doit plus dépendre du gros fichier
+     * v14.98 — une nouvelle PWA iPad ne doit plus dépendre du gros fichier
      * Etalab au premier lancement. Le GeoJSON 1000 m est désormais hébergé avec
      * NPF et chargé depuis la même origine. Le PC conserve pour l'instant le
      * fichier officiel 50 m afin de préserver la précision existante.
@@ -18413,7 +18255,7 @@ function getCommunesGeojsonUrl() {
 async function loadCommunesLayerData() {
     if (hasLoadedCommunes) return;
 
-    // Chargement en parallèle : la population ne bloque pas la carte.
+ // Chargement en parallèle : la population ne bloque pas la carte.
     loadCommunesPopulationIndex().catch(() => null);
 
     const communesSource = getCommunesGeojsonUrl();
@@ -20103,12 +19945,12 @@ function updateUserPosition(pos) {
         }
     }
 
-    // Synchronise les calculs (dont GPS->Feu) dès qu'une position GPS est reçue.
+ // Synchronise les calculs (dont GPS->Feu) dès qu'une position GPS est reçue.
     if (currentCommune) {
         updateCalculatorData();
     }
 
-    // On appelle toujours la fonction qui redessine la route
+ // On appelle toujours la fonction qui redessine la route
     drawUserToTargetRoute();
 
     /*
@@ -21544,7 +21386,7 @@ function getOfflinePackDatabaseName(packName) {
     const sameGroupWithDb = installed.find(pack => pack && pack.dbName && typeof getOfflinePackGroupName === 'function' && getOfflinePackGroupName(pack.name) === groupName);
     if (sameGroupWithDb && sameGroupWithDb.dbName) return sameGroupWithDb.dbName;
 
-    // Compatibilité cartes déjà installées avant v13.73 : ancienne base commune.
+ // Compatibilité cartes déjà installées avant v13.73 : ancienne base commune.
     return OFFLINE_DB_NAME;
 }
 
@@ -21641,7 +21483,7 @@ async function setOfflineTilesEnabled(enabled) {
     notifyServiceWorkerOfflineTilesPreference(offlineTilesMode);
 
     /*
-     * v14.63 TEST — persistance IndexedDB strictement en arrière-plan.
+     * v14.63 — persistance IndexedDB strictement en arrière-plan.
      * Safari peut conserver une transaction ouverte sans déclencher oncomplete ;
      * cela ne doit plus bloquer le bouton ni la création de la couche Leaflet.
      */
@@ -21972,7 +21814,7 @@ async function setMapSourceMode(mode) {
 
     try {
         /*
-         * v14.63 TEST — le changement visible et la couche sont appliqués
+         * v14.63 — le changement visible et la couche sont appliqués
          * synchroniquement, avant tout accès IndexedDB ou attente du SW.
          */
         setOfflineTilesEnabled(offlineTilesMode);
@@ -22817,7 +22659,7 @@ function parseTilePathFromName(name) {
     if (isPlausibleTileZoom(a)) {
         candidates.push({ tilePath: `${flatMatch[1]}/${flatMatch[2]}/${flatMatch[3]}.png`, zoom: a });
     }
-    // Compatibilité imports plats potentiellement en x_y_z : on ajoute aussi z/x/y.
+ // Compatibilité imports plats potentiellement en x_y_z : on ajoute aussi z/x/y.
     if (isPlausibleTileZoom(c)) {
         const altTilePath = `${flatMatch[3]}/${flatMatch[1]}/${flatMatch[2]}.png`;
         if (!candidates.some((entry) => entry.tilePath === altTilePath)) {
@@ -23993,7 +23835,7 @@ const calculateConsoRotation = (dist) => { const effectiveDist = Math.max(dist, 
 const calculateTransitTime = (dist) => (dist <= 70) ? (dist * (60 / 210)) : (dist * (60 / 240));
 
 /*
- * v14.47 TEST — forfait premier transit piloté par le champ RLT Départ.
+ * v14.47 — forfait premier transit piloté par le champ RLT Départ.
  * Ce forfait est distinct des 10 minutes conservées avant validation du largage.
  */
 const RETARDANT_LOADING_FORFAIT_MIN = 10;
@@ -24095,7 +23937,7 @@ function updateAndSortRotations(container, current, params) {
         `Retour feu → base = ${minOrNA(returnBaseTime)}`
     ].filter(Boolean).join('\n');
 
-    // --- Première passe : calculer toutes les valeurs et trouver les limites ---
+ // --- Première passe : calculer toutes les valeurs et trouver les limites ---
     lines.forEach(line => {
         const type = line.dataset.rotationType;
         let value = null;
@@ -24249,11 +24091,11 @@ function updateAndSortRotations(container, current, params) {
         }
     });
 
-    // Si une limite temporelle est la première limite atteinte,
-    // toute valeur suivante (plus élevée) est impossible et passe en rouge.
+ // Si une limite temporelle est la première limite atteinte,
+ // toute valeur suivante (plus élevée) est impossible et passe en rouge.
     const shouldForceTimeConstraint = minTimeLimit !== Infinity;
 
-    // --- Deuxième passe : appliquer les styles et mettre à jour le DOM ---
+ // --- Deuxième passe : appliquer les styles et mettre à jour le DOM ---
     resultsData.forEach(result => {
         const { type, value, element, formulaString } = result;
         const valueCell = element.querySelector('.value');
@@ -24286,7 +24128,7 @@ function updateAndSortRotations(container, current, params) {
         if (helpIcon) { helpIcon.onclick = () => alert(formulaString); }
     });
 
-    // --- Trier et ré-insérer les éléments dans le DOM ---
+ // --- Trier et ré-insérer les éléments dans le DOM ---
     resultsData.sort((a, b) => {
         const valA = a.value !== null ? Math.max(0, a.value) : Infinity;
         const valB = b.value !== null ? Math.max(0, b.value) : Infinity;
@@ -24383,7 +24225,7 @@ function recalculateBlocFuel() {
     });
 }
 
-// v13.88 TEST — Fuel sur feu Prévi en lecture seule, RLT départ et espacements ajustés.
+// v13.88 — Fuel sur feu Prévi en lecture seule, RLT départ et espacements ajustés.
 function updatePreviTab() {
     const defaultFormula = "Données insuffisantes pour le calcul.";
     const setHelp = (id, formula) => {
@@ -25961,8 +25803,8 @@ function initializeTeamChat() {
         });
         chatClient.publish(`${chatHistoryTopic}/${payload.id}`, JSON.stringify(payload), { qos: 1, retain: true });
 
-        // Push Web pour les appareils où la PWA est en arrière-plan/suspendue.
-        // Cette ligne ne fait rien tant que CHAT_PUSH_API_URL et CHAT_PUSH_VAPID_PUBLIC_KEY ne sont pas configurés.
+ // Push Web pour les appareils où la PWA est en arrière-plan/suspendue.
+ // Cette ligne ne fait rien tant que CHAT_PUSH_API_URL et CHAT_PUSH_VAPID_PUBLIC_KEY ne sont pas configurés.
         sendChatPushNotification(payload);
     };
 
@@ -26116,8 +25958,8 @@ function initializeTeamChat() {
                     return;
                 }
 
-                // On annonce la connexion dès que le canal de chat principal est prêt,
-                // pour conserver un ordre visuel cohérent avec les messages reçus juste après reconnexion.
+ // On annonce la connexion dès que le canal de chat principal est prêt,
+ // pour conserver un ordre visuel cohérent avec les messages reçus juste après reconnexion.
                 announceConnection();
                 if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
                     Notification.requestPermission().catch(() => {});
@@ -26184,8 +26026,8 @@ function initializeTeamChat() {
                     if (locationAgeMs > CHAT_LOCATION_DISPLAY_MAX_AGE_MS) {
                         removeRemoteLocation(parsed.senderClientId);
 
-                        // Nettoie aussi la position conservée sur le broker MQTT pour éviter
-                        // qu'elle revienne brièvement à chaque ouverture de l'application.
+ // Nettoie aussi la position conservée sur le broker MQTT pour éviter
+ // qu'elle revienne brièvement à chaque ouverture de l'application.
                         if (chatClient && isCurrentLocationTopic && receivedTopic) {
                             chatClient.publish(receivedTopic, '', { qos: 1, retain: true });
                         }
@@ -26217,7 +26059,7 @@ function initializeTeamChat() {
                 if (receivedTopic.startsWith(chatHistoryTopic)) {
                     const ageHours = Math.abs(Date.now() - new Date(parsed.time).getTime()) / 3600000;
                     if (Number.isFinite(ageHours) && ageHours > 12) {
-                        // Nettoyage automatique des messages retenus trop anciens (>12h) sur le canal.
+ // Nettoyage automatique des messages retenus trop anciens (>12h) sur le canal.
                         if (parsed.id && chatClient && chatHistoryTopic) {
                             chatClient.publish(`${chatHistoryTopic}/${parsed.id}`, '', { qos: 1, retain: true });
                         }
@@ -26695,7 +26537,7 @@ function initializeCalculator() {
                 if (previCsDisplay) previCsDisplay.value = sunsetString;
                 return;
             } catch (e) {
-                // ignore
+ // ignore
             }
         }
         if (csLftwDisplay) csLftwDisplay.value = '--:--';
@@ -29745,17 +29587,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 /*
- * v15.01 — l'ancien redraw Leaflet au `visibilitychange` (hérité de v11.43)
+ * v2026.63 — l'ancien redraw Leaflet au `visibilitychange` (hérité de v11.43)
  * est supprimé. La reprise de la carte est centralisée dans
  * setupNpfUnifiedForegroundResume(), afin d'éviter plusieurs redraw concurrents.
  */
 
 
 
-// v13.89 TEST — corrections d'affichage RLT/Suivi et alerte post-MAJ gérées par index.html/style.css.
+// v13.89 — corrections d'affichage RLT/Suivi et alerte post-MAJ gérées par index.html/style.css.
 
 
-// v14.44 TEST — filtres trafic : centre carte unique et affichage au sol optionnel.
+// v14.44 — filtres trafic : centre carte unique et affichage au sol optionnel.
 
 
-// v14.44 TEST — restauration de getOwnTrafficAltitudeFeet : connexion SafeSky rétablie, carte inchangée.
+// v14.44 — restauration de getOwnTrafficAltitudeFeet : connexion SafeSky rétablie, carte inchangée.
