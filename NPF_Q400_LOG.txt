@@ -1,5 +1,57 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.08 — BOUTONS D’AIDE « ? » : CERCLE NOIR / « ? » NOIR
+Date : 10/08/2026
+Base : TEST v15.07
+
+DEMANDE INTÉGRÉE
+- Corriger la couleur des boutons d’aide « ? » dans la fenêtre « Gestion des Cartes ».
+- Le bleu doit disparaître complètement.
+- Le bouton ne doit pas être rempli en noir : le fond doit rester blanc.
+- Le cercle et le caractère « ? » doivent tous les deux être noirs.
+
+MODIFICATIONS
+1. Présentation des boutons « ? »
+- Taille réduite de v15.07 conservée : 30 px, et 28 px sur petit écran.
+- Fond blanc forcé.
+- Contour circulaire noir forcé.
+- Caractère « ? » noir forcé.
+- Ombre colorée supprimée.
+- Au survol / focus / appui : fond gris très clair, avec cercle et « ? » toujours noirs.
+
+2. Priorité CSS renforcée
+- Ajout d’un sélecteur plus spécifique dans « Gestion des Cartes ».
+- Les couleurs sont forcées avec `!important` afin qu’aucune ancienne règle bleue ou la règle noire remplie de v15.07 ne puisse reprendre la priorité.
+
+INCHANGÉ
+- Taille et position des boutons « ? ».
+- Textes et ouverture des fenêtres d’aide.
+- Alignement du bouton Télécharger / Mettre à jour les Cartes VAC.
+- Couleurs et fonctionnement des autres boutons de Gestion des Cartes.
+- Cartes Offline / IndexedDB, calque routier, VAC et PDF.
+- SafeSky, GPS et carte principale.
+- Service Worker hors changement du numéro de version/cache d’app-shell.
+
+CONTRÔLES TECHNIQUES
+- Versions index, manifeste, script et service worker alignées sur v15.08.
+- Syntaxe JavaScript de script.js et sw.js contrôlée.
+- manifest.json contrôlé comme JSON valide.
+- Contrôle statique du dernier bloc CSS : fond blanc, bordure noire et texte noir.
+- Vérification de l’absence de nouvelle dépendance réseau.
+- Historique v15.07 et antérieur conservé intégralement ci-dessous.
+
+VALIDATION RÉELLE À EFFECTUER
+- Ouvrir « Gestion des Cartes » sur iPad.
+- Vérifier que chaque bouton « ? » a un fond blanc, un cercle noir et un « ? » noir.
+- Vérifier qu’aucune teinte bleue ne subsiste sur ces boutons.
+- Vérifier que les aides s’ouvrent toujours normalement.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.07 — BOUTONS D’AIDE « ? » PLUS PETITS / NOIR ET BLANC
 Date : 10/08/2026
 Base : TEST v15.06
