@@ -1,5 +1,16 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.04';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.05';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.05 TEST — ajustements visuels Gestion des Cartes
+// - simulation réellement orange malgré la règle générale bleue ;
+// - ONLINE/OFFLINE : mode actif soutenu, mode inactif pastel ;
+// - action VAC déplacée au-dessus du statut et centrée ;
+// - suppression VAC conservée à droite ;
+// - hauteur des boutons d'import uniformisée ;
+// - logique Offline / VAC / PDF / cartes inchangée.
+// =========================================================================
+
 
 // =========================================================================
 // v15.04 TEST — correction couleurs Gestion des Cartes
