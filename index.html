@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.02" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.02">
-    <link rel="manifest" href="manifest.json?appv=v15.02">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.03" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.03">
+    <link rel="manifest" href="manifest.json?appv=v15.03">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.02';
+        const APP_VERSION = 'v15.03';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -594,7 +594,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.02"></script>
+    <script src="script.js?appv=v15.03"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -831,6 +831,14 @@
                     <button id="simulation-mode-button" type="button" class="simulation-mode-button">Mode simulation avion</button>
                 </div>
 
+                <div class="map-source-management-section">
+                    <h3 class="maps-management-title">Type de carte</h3>
+                    <div class="map-source-buttons">
+                        <button type="button" id="map-source-online-btn" class="map-source-btn map-source-btn-online active">ONLINE</button>
+                        <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">OFFLINE</button>
+                    </div>
+                </div>
+
                 <div id="import-progress-section" style="display: none;">
                     <p id="import-status-message">Importation en cours...</p>
                     <div class="progress-bar-container">
@@ -839,25 +847,13 @@
                 </div>
 
                 <div class="installed-maps-section offline-maps-management-section">
-                    <h3>Cartes Offline</h3>
+                    <h3 class="maps-management-title">Cartes Offline</h3>
                     <div class="import-help-row">
                         <label for="zip-importer-input" class="import-button">Importer Cartes Offline</label>
                         <button type="button" class="import-help-button" data-import-help="offline-maps" aria-label="Aide Importer Cartes Offline" title="Aide">?</button>
                     </div>
                     <input type="file" id="zip-importer-input" accept=".zip" style="display: none;">
 
-                    <div class="offline-toggle-row">
-                        <span>Type de carte :</span>
-                        <div class="map-source-buttons">
-                            <button type="button" id="map-source-online-btn" class="map-source-btn map-source-btn-online active">Online</button>
-                            <button type="button" id="map-source-offline-btn" class="map-source-btn map-source-btn-offline">Offline</button>
-                        </div>
-                    </div>
-                    <details class="offline-maintenance-section">
-                        <summary>Maintenance / dépannage</summary>
-                        <button type="button" id="refresh-offline-tiles-btn" class="neutral-inline-btn">Rafraîchir l'affichage des cartes</button>
-                        <button type="button" id="purge-inactive-packs-btn" class="danger-inline-btn">Vider le cache des packs désélectionnés</button>
-                    </details>
                     <ul id="installed-maps-list">
                         <!-- Les packs installés seront listés ici par le JavaScript -->
                         <li class="no-maps-placeholder">Aucun pack de cartes installé.</li>
@@ -865,7 +861,7 @@
                 </div>
 
                 <div class="road-overlay-import-block">
-                    <h3>Calque Routier</h3>
+                    <h3 class="maps-management-title">Calque Routier</h3>
                     <div class="import-help-row">
                         <label for="road-overlay-importer-input" class="import-button road-overlay-import-button">
                             Importer Calque Routier
@@ -886,7 +882,7 @@
                 </div>
 
                 <div class="vac-management-section">
-                    <h3>Cartes VAC</h3>
+                    <h3 class="maps-management-title">Cartes VAC</h3>
                     <p>
                         Cartes VAC officielles SIA publiées par NPF-Q400-VAC et stockées sur cet appareil
                         pour une utilisation 100 % hors ligne. Source : SIA / AIP Atlas VAC.
@@ -913,12 +909,12 @@
                 </div>
 
                 <div class="airport-pdf-section">
-                    <h3>PDFs FDF réduite / aérodromes offline</h3>
+                    <h3>Doc FdF Réduite / Carte Fréquences</h3>
                     <p>Importe un ou plusieurs PDF nommés avec leur code OACI, par exemple <b>LFTW.pdf</b>, <b>LFKJ.pdf</b> ou <b>LFAQ.pdf</b>, ou les documents communs <b>Doc Fdf Réduité.pdf</b> et <b>Carte Fréquences OPS.pdf</b>. Ils seront stockés sur l’iPad pour ouverture hors ligne.</p>
                     <div class="airport-pdf-toolbar">
                         <div class="import-help-row airport-pdf-import-help-row">
-                            <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Télécharger PDFs Doc Fdf Réduité</label>
-                            <button type="button" class="import-help-button" data-import-help="fdf-pdfs" aria-label="Aide Télécharger PDFs Doc Fdf Réduité" title="Aide">?</button>
+                            <label for="airport-pdf-importer-input" class="import-button pdf-import-button">Importer Doc FdF Réduite / Carte Fréquences</label>
+                            <button type="button" class="import-help-button" data-import-help="fdf-pdfs" aria-label="Aide Importer Doc FdF Réduite / Carte Fréquences" title="Aide">?</button>
                         </div>
                         <button id="delete-all-airport-pdfs-button" type="button"
                                 class="danger-inline-btn airport-pdf-delete-all-button"
