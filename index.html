@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.04" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.04">
-    <link rel="manifest" href="manifest.json?appv=v15.04">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.05" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.05">
+    <link rel="manifest" href="manifest.json?appv=v15.05">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.04';
+        const APP_VERSION = 'v15.05';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -594,7 +594,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.04"></script>
+    <script src="script.js?appv=v15.05"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -887,9 +887,6 @@
                         Cartes VAC officielles SIA publiées par NPF-Q400-VAC et stockées sur cet appareil
                         pour une utilisation 100 % hors ligne. Source : SIA / AIP Atlas VAC.
                     </p>
-                    <div id="vac-installed-status" class="vac-installed-status" aria-live="polite">
-                        Vérification du stockage local…
-                    </div>
                     <div class="vac-management-actions">
                         <button id="vac-download-update-button" type="button" class="import-button">
                             Télécharger les Cartes VAC
@@ -899,6 +896,9 @@
                                 style="display: none;">
                             Tout supprimer
                         </button>
+                    </div>
+                    <div id="vac-installed-status" class="vac-installed-status" aria-live="polite">
+                        Vérification du stockage local…
                     </div>
                     <div id="vac-download-progress" class="vac-download-progress" style="display: none;">
                         <div class="vac-download-progress-track">
