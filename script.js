@@ -1,5 +1,16 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.02';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.03';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.03 TEST — réorganisation de « Gestion des Cartes »
+// - « Type de carte » déplacé juste sous « Mode simulation avion » ;
+// - suppression de la section « Maintenance / dépannage » ;
+// - « Réparation stockage offline » placée après les cartes téléchargées ;
+// - titres Cartes Offline / Type de carte / Calque Routier / Cartes VAC renforcés ;
+// - section PDF renommée « Doc FdF Réduite / Carte Fréquences » ;
+// - boutons de Gestion des Cartes harmonisés en bleu ;
+// - logique Offline, VAC, calque routier et imports inchangée.
+// =========================================================================
 
 // =========================================================================
 // v15.02 TEST — filtres SafeSky plus compacts / altitude non grisée
@@ -6766,8 +6777,6 @@ function setupEventListeners() {
     const deleteRoadOverlayButton = document.getElementById('delete-road-overlay-button');
     const mapSourceOnlineBtn = document.getElementById('map-source-online-btn');
     const mapSourceOfflineBtn = document.getElementById('map-source-offline-btn');
-    const purgeInactivePacksBtn = document.getElementById('purge-inactive-packs-btn');
-    const refreshOfflineTilesBtn = document.getElementById('refresh-offline-tiles-btn');
     const simulationModeButton = document.getElementById('simulation-mode-button');
     const simulationMotionButton = document.getElementById('simulation-motion-button');
     const simulationMotionModal = document.getElementById('simulation-motion-modal');
@@ -7192,7 +7201,7 @@ function setupEventListeners() {
             ].join('\n')
         },
         'fdf-pdfs': {
-            title: 'Aide — Télécharger PDFs Doc Fdf',
+            title: 'Aide — Importer Doc FdF Réduite / Carte Fréquences',
             text: [
                 'Clique sur Drive.',
                 'Il faut être connecté au Drive Dash 8.',
@@ -7379,24 +7388,6 @@ function setupEventListeners() {
         });
     }
 
-    if (purgeInactivePacksBtn) {
-        purgeInactivePacksBtn.addEventListener('click', async () => {
-            await purgeInactivePacksCache();
-        });
-    }
-
-    if (refreshOfflineTilesBtn) {
-        refreshOfflineTilesBtn.addEventListener('click', async () => {
-            refreshOfflineTilesBtn.disabled = true;
-            refreshOfflineTilesBtn.textContent = '⏳ Rafraîchissement...';
-            try {
-                await refreshOfflineTilesRendering();
-            } finally {
-                refreshOfflineTilesBtn.disabled = false;
-                refreshOfflineTilesBtn.textContent = "Rafraîchir l'affichage des cartes offline";
-            }
-        });
-    }
 
 
     if (simulationModeButton) {
@@ -23119,21 +23110,6 @@ function displayInstalledMaps() {
     const groups = groupInstalledMapPacks(installedPacks);
     list.innerHTML = '';
 
-    if (groups.length > 0) {
-        const resetLi = document.createElement('li');
-        resetLi.className = 'offline-map-reset-line';
-        resetLi.innerHTML = `
-            <span class="offline-map-name-line">
-                <strong>Réparation stockage offline</strong><br>
-                <small>À utiliser si une suppression reste bloquée.</small>
-            </span>
-            <div class="offline-map-actions">
-                <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Réinitialiser profond</button>
-            </div>
-        `;
-        list.appendChild(resetLi);
-    }
-
     if (groups.length === 0) {
         list.innerHTML = '<li class="no-maps-placeholder">Aucun pack de cartes installé.</li>';
         return;
@@ -23161,6 +23137,20 @@ function displayInstalledMaps() {
         `;
         list.appendChild(li);
     });
+
+    // v15.03 — dépannage profond affiché sous les cartes téléchargées.
+    const resetLi = document.createElement('li');
+    resetLi.className = 'offline-map-reset-line';
+    resetLi.innerHTML = `
+        <span class="offline-map-name-line">
+            <strong>Réparation stockage offline</strong><br>
+            <small>À utiliser si une suppression reste bloquée.</small>
+        </span>
+        <div class="offline-map-actions">
+            <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Réinitialiser profond</button>
+        </div>
+    `;
+    list.appendChild(resetLi);
 
     updateOfflineStatus();
 }
