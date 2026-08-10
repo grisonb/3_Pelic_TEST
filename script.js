@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.03';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.04';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.04 TEST — correction couleurs Gestion des Cartes
+// - actions destructives rouges ; actions standards bleues ;
+// - Mode simulation orange ; ONLINE vert ; OFFLINE violet ;
+// - « Tout supprimer » Doc FdF aligné à droite ;
+// - logique Offline / VAC / PDF / cartes inchangée.
+// =========================================================================
+
 
 // =========================================================================
 // v15.03 TEST — réorganisation de « Gestion des Cartes »
