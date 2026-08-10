@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-03_maps_management_reorder';
-const APP_VERSION = 'v15.03';
+const SW_VERSION = 'sw-v15-04_maps_button_colors';
+const APP_VERSION = 'v15.04';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
