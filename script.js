@@ -1,5 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.05';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.06';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.06 TEST — alignement horizontal de l’action VAC
+// - bouton Télécharger / Mettre à jour les Cartes VAC aligné à gauche
+//   sur les autres boutons d’import ;
+// - aucune modification de la logique VAC, Offline, PDF ou cartographique.
+// =========================================================================
 
 // =========================================================================
 // v15.05 TEST — ajustements visuels Gestion des Cartes
