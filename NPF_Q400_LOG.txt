@@ -1,5 +1,59 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.03 — RÉORGANISATION « GESTION DES CARTES » / HARMONISATION BLEUE
+Date : 10/08/2026
+Base : TEST v15.02
+
+OBJECTIF
+- Réorganiser la fenêtre « Gestion des Cartes » pour placer les commandes principales dans un ordre plus logique.
+- Mettre « Type de carte » immédiatement sous « Mode simulation avion ».
+- Supprimer la section « Maintenance / dépannage » devenue inutile dans l’interface.
+- Rendre plus lisibles les grandes rubriques de gestion des cartes.
+- Uniformiser en bleu les boutons d’action de cette fenêtre.
+
+MODIFICATIONS
+- « Type de carte » est maintenant une section dédiée placée immédiatement sous le bouton « Mode simulation avion ».
+- Les boutons « ONLINE » et « OFFLINE » sont conservés avec la même logique de sélection ; leur état actif est distingué par un liseré, sans changer de couleur.
+- La section déroulante « Maintenance / dépannage » et ses deux commandes visibles sont supprimées de la fenêtre.
+- « Réparation stockage offline » n’est plus affichée avant les cartes : elle apparaît maintenant après la liste des cartes téléchargées.
+- Les titres « Cartes Offline », « Type de carte », « Calque Routier » et « Cartes VAC » sont renforcés visuellement par une taille/épaisseur supérieure et un cartouche bleu clair.
+- Le titre « PDFs FDF réduite / aérodromes offline » devient « Doc FdF Réduite / Carte Fréquences ».
+- Le bouton « Télécharger PDFs Doc Fdf Réduité » devient « Importer Doc FdF Réduite / Carte Fréquences ».
+- Le titre de l’aide associée à cet import est harmonisé avec le nouveau libellé.
+- Tous les boutons d’action de « Gestion des Cartes » utilisent désormais le même bleu principal, y compris import, suppression, réinitialisation, VAC, calque routier et aide « ? ».
+- Les états sélectionnés « ONLINE / OFFLINE » et « Mode simulation » conservent une indication visuelle par liseré blanc.
+
+INCHANGÉ
+- Import, sélection, suppression et stockage des cartes Offline.
+- Bases IndexedDB et lecture des tuiles Offline.
+- Fonction de réparation profonde du stockage Offline.
+- Import/suppression du calque routier.
+- Téléchargement, mise à jour, stockage et suppression des cartes VAC.
+- Import et stockage des PDF ; seuls les libellés de la section et du bouton changent.
+- Mode simulation et logique ONLINE/OFFLINE.
+- SafeSky et réglages de la TEST v15.02.
+- Fonctionnement hors ligne du Service Worker, hors changement de numéro de version pour installer le nouvel app-shell.
+
+VALIDATION TECHNIQUE
+- Contrôle syntaxique JavaScript de `script.js` et `sw.js`.
+- Contrôle JSON de `manifest.json`.
+- Contrôle de cohérence croisée de la version `v15.03`.
+- Vérification de la suppression de « Maintenance / dépannage » dans l’interface.
+- Vérification que « Réparation stockage offline » est générée après les cartes téléchargées.
+- Vérification de la présence unique des boutons ONLINE/OFFLINE et de leurs identifiants existants.
+- Vérification du maintien de l’app-shell et de la logique Offline de v15.02.
+
+VALIDATION RÉELLE À EFFECTUER
+- Sur iPad, ouvrir « Gestion des Cartes » et contrôler l’ordre visuel des sections.
+- Vérifier la sélection ONLINE/OFFLINE et le liseré de l’état actif.
+- Vérifier qu’une carte téléchargée apparaît avant « Réparation stockage offline ».
+- Tester un import/suppression de carte Offline, un calque routier, une VAC et un PDF.
+- Effectuer ensuite un démarrage en mode avion avec une carte Offline déjà installée.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ
+======================================================================
+
 VERSION TEST v15.02 — FILTRES SAFESKY PLUS COMPACTS / SÉLECTION ALTITUDE NON GRISÉE
 Date : 10/08/2026
 Base : version pérenne v2026.63
