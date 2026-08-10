@@ -1,7 +1,8 @@
-/* v14.83 TEST — nettoyage des références techniques et limitation des cartouches routiers. */
-/* v14.81 TEST — recherche phonétique nationale élargie aux fragments sur deux lettres. */
-/* v14.80 TEST — Brive conservé uniquement sous LFSL. */
-/* NPF-Q400 TEST v13.58 — fluidité carte iPad : CSS inchangé depuis v13.54. */
+/* v15.02 TEST — filtres SafeSky : lignes altitude non sélectionnées non grisées. */
+/* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
+/* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
+/* v14.80 — Brive conservé uniquement sous LFSL. */
+/* NPF-Q400 v13.58 — fluidité carte iPad : CSS inchangé depuis v13.54. */
  :root {
     --primary-color: #005a9c;
     --secondary-color: #e3001b;
@@ -3788,7 +3789,7 @@ body {
 
 /* v11.90 — export GPX : essais de partage iOS avec MIME alternatifs */
 
-/* v11.91 — export KML en remplacement du test GPX */
+/* v11.91 — export KML en remplacement de l’essai GPX */
 
 /* v11.92 — KML minimal, partage fichier seul */
 
@@ -5516,7 +5517,7 @@ body {
 
 
 
-/* v12.96 TEST — calque trafic ADS-B indicatif */
+/* v12.96 — calque trafic ADS-B indicatif */
 .traffic-map-button {
     font-size: 34px;
     overflow: hidden;
@@ -6816,7 +6817,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.01 TEST — bandeau commune à gauche + état trafic par couleur
+   v13.01 — bandeau commune à gauche + état trafic par couleur
    ========================================================================== */
 #nearest-commune-display {
     left: 14px !important;
@@ -6907,7 +6908,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.02 TEST — bandeau commune bas droit décalé + fenêtre filtres ADS-B
+   v13.02 — bandeau commune bas droit décalé + fenêtre filtres ADS-B
    ========================================================================== */
 #nearest-commune-display {
     left: auto !important;
@@ -7126,7 +7127,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.03 TEST — ADS-B sans bandeau, étiquette altitude et refresh 15 s
+   v13.03 — ADS-B sans bandeau, étiquette altitude et refresh 15 s
    ========================================================================== */
 .traffic-status-display {
     display: none !important;
@@ -7198,7 +7199,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.04 TEST — meilleure visibilité de la position propre
+   v13.04 — meilleure visibilité de la position propre
    ========================================================================== */
 .own-gps-vector-time-marker {
     pointer-events: none !important;
@@ -7217,7 +7218,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.05 TEST — étiquette pélicandrome cliquable
+   v13.05 — étiquette pélicandrome cliquable
    ========================================================================== */
 .leaflet-tooltip.route-tooltip-clickable {
     cursor: pointer !important;
@@ -7233,7 +7234,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.06 TEST — priorités affichage commune + filtres trafic enrichis
+   v13.06 — priorités affichage commune + filtres trafic enrichis
    ========================================================================== */
 #nearest-commune-display {
     z-index: 980 !important;
@@ -7295,7 +7296,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.07 TEST — MAJ PWA, modal trafic et vecteurs trafic corrigés
+   v13.07 — MAJ PWA, modal trafic et vecteurs trafic corrigés
    ========================================================================== */
 .traffic-settings-relative-line {
     grid-column: 1 / -1;
@@ -7393,11 +7394,11 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 
-/* v13.08 TEST — fenêtre post-MAJ rétablie côté index.html ; styles existants conservés. */
+/* v13.08 — fenêtre post-MAJ rétablie côté index.html ; styles existants conservés. */
 
 
 /* ==========================================================================
-   v13.09 TEST — export BLOC/FUEL PDF + centrage vecteur trafic
+   v13.09 — export BLOC/FUEL PDF + centrage vecteur trafic
    ========================================================================== */
 #export-bloc-fuel-pdf-btn {
     background: #005a9c !important;
@@ -7434,7 +7435,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.11 TEST — vecteur trafic centré + partage BLOC/FUEL
+   v13.11 — vecteur trafic centré + partage BLOC/FUEL
    ========================================================================== */
 #export-bloc-fuel-pdf-btn {
     background: #005a9c !important;
@@ -7501,7 +7502,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.11 TEST — aperçu export BLOC/FUEL intégré à l'application
+   v13.11 — aperçu export BLOC/FUEL intégré à l'application
    ========================================================================== */
 #bloc-fuel-export-overlay {
     position: fixed;
@@ -7591,7 +7592,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.12 TEST — export BLOC/FUEL : aperçu imprimable stylé, sans PDF texte
+   v13.12 — export BLOC/FUEL : aperçu imprimable stylé, sans PDF texte
    ========================================================================== */
 .bloc-fuel-export-toolbar .print-primary {
     background: #005a9c !important;
@@ -7615,7 +7616,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.14 TEST — ajustements UI, export, position et trafic masqué
+   v13.14 — ajustements UI, export, position et trafic masqué
    ========================================================================== */
 #traffic-layer-button {
     display: none !important;
@@ -7683,7 +7684,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ==========================================================================
-   v13.27 TEST — suivi automatique position GPS depuis le bouton centrage
+   v13.27 — suivi automatique position GPS depuis le bouton centrage
    ========================================================================== */
 #center-gps-button.center-follow-active {
     background: rgba(210, 245, 222, 0.96) !important;
@@ -7790,7 +7791,7 @@ body:not(.app-ready) #nearest-commune-display {
 }
 
 /* ========================================================================== 
-   v13.34 TEST — Suivi GPS, historique et commune survolée longue
+   v13.34 — Suivi GPS, historique et commune survolée longue
    ========================================================================== */
 
 /* Historique ouvert : la flèche est replacée dans la zone du titre,
@@ -7868,7 +7869,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.34 TEST — Bandeau feu : ETA GPS + durée rotation / exports dans historique
+   v13.34 — Bandeau feu : ETA GPS + durée rotation / exports dans historique
    ========================================================================== */
 
 #commune-info-display {
@@ -7985,7 +7986,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.41 TEST — Retour v13.34 : bandeau feu sur une ligne / suivi GPS sans refresh
+   v13.41 — Retour v13.34 : bandeau feu sur une ligne / suivi GPS sans refresh
    ========================================================================== */
 
 /* Bandeau du feu sélectionné : nom + CS + route/distance/temps + Rot. sur une seule ligne. */
@@ -8053,7 +8054,7 @@ body:not(.app-ready) #nearest-commune-display {
 
 
 /* ========================================================================== 
-   v13.41 TEST — Historique exports décalés / ligne Réfracto. retardant
+   v13.41 — Historique exports décalés / ligne Réfracto. retardant
    ========================================================================== */
 
 /* Historique des feux : éloigner ForeFlight / SDVFR du X sans changer la logique JS. */
@@ -8551,7 +8552,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.64 TEST — GAAR : X d'effacement dans recherche point + renommage sans déplacement
+   v13.64 — GAAR : X d'effacement dans recherche point + renommage sans déplacement
    ========================================================================== */
 .gaar-point-search-field-wrapper {
     position: relative;
@@ -8665,7 +8666,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v13.79 TEST — bandeaux carte remontés / hauteur optimisée / icônes épurées
+   v13.79 — bandeaux carte remontés / hauteur optimisée / icônes épurées
    ========================================================================== */
 
 /* Icônes latérales : suppression des libellés texte HT / OPS pour ne garder
@@ -8743,7 +8744,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
-   v13.80 TEST — pélicandromes légèrement plus compacts
+   v13.80 — pélicandromes légèrement plus compacts
    Taille visuelle 20 px ; la zone tactile invisible JS reste à 40 px.
    ========================================================================== */
 .leaflet-marker-icon.custom-marker-icon.airport-marker-base,
@@ -8764,7 +8765,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v13.81 TEST — pélicandromes réellement réduits
+   v13.81 — pélicandromes réellement réduits
    Taille visuelle 16 px ; halo affiné ; zone tactile invisible JS conservée à 40 px.
    ========================================================================== */
 .leaflet-marker-icon.custom-marker-icon.airport-marker-base,
@@ -8785,7 +8786,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
-   v13.82 TEST — bouton MAJ retiré / commune survolée décalée à droite
+   v13.82 — bouton MAJ retiré / commune survolée décalée à droite
    Seule la position horizontale du bandeau commune survolée est modifiée.
    ========================================================================== */
 #nearest-commune-display {
@@ -8802,7 +8803,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.83 TEST — BINGO compacts dans Suivi/Déroutement + données rotation en lecture seule
+   v13.83 — BINGO compacts dans Suivi/Déroutement + données rotation en lecture seule
    Les tailles de police sont conservées. Seuls les hauteurs, marges et espacements
    verticaux sont réduits afin d'éviter le défilement sur iPad.
    ========================================================================== */
@@ -8873,7 +8874,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.84 TEST — espacements ciblés et harmonisation des fenêtres rotations
+   v13.84 — espacements ciblés et harmonisation des fenêtres rotations
    - les fenêtres « nombre de rotations » de Suivi et Dérout/GAAR reprennent
      la mise en page et les espacements verticaux de Prévi. nbr rotations ;
    - les séparations demandées sont renforcées dans les colonnes de droite,
@@ -8928,7 +8929,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.85 TEST — application effective des espacements demandés
+   v13.85 — application effective des espacements demandés
    Les sélecteurs reposent maintenant sur des classes explicites et ne sont plus
    limités par la largeur du viewport. Les tailles de police restent inchangées.
    ========================================================================== */
@@ -8982,7 +8983,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.86 TEST — interlignes augmentés dans les fenêtres de droite
+   v13.86 — interlignes augmentés dans les fenêtres de droite
    - Suivi rotations et Dérout. / GAAR uniquement ;
    - taille de police, calculs, dimensions des contrôles et colonne gauche inchangés ;
    - les séparations spécifiques de la v13.85 restent conservées.
@@ -8994,7 +8995,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.88 TEST — RLT départ / Fuel sur feu non modifiable / espacements droits
+   v13.88 — RLT départ / Fuel sur feu non modifiable / espacements droits
    ========================================================================== */
 
 /* BLOC / FUEL : six champs sur la ligne d'en-tête, avec RLT entre Fuel départ et Base. */
@@ -9080,7 +9081,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v13.89 TEST — correction RLT / Suivi rotations / première alerte post-MAJ
+   v13.89 — correction RLT / Suivi rotations / première alerte post-MAJ
    ========================================================================== */
 
 /*
@@ -9150,7 +9151,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 /* v13.90 — cellule RLT : placeholder [kg] et effacement direct gérés dans index/script ; mise en page inchangée. */
 
 /* ========================================================================== 
-   v13.91 TEST — alerte post-MAJ visible / fenêtre FUEL MINI Dérout.-GAAR
+   v13.91 — alerte post-MAJ visible / fenêtre FUEL MINI Dérout.-GAAR
    ========================================================================== */
 
 /* La demande de relance reste au-dessus de l'écran de démarrage. */
@@ -9207,7 +9208,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.92 TEST — transfert FUEL MINI / fenêtre rotations ajustée au contenu
+   v13.92 — transfert FUEL MINI / fenêtre rotations ajustée au contenu
    ========================================================================== */
 
 /* Les lignes Fuel mini sont maintenant réellement dans cette fenêtre. */
@@ -9235,7 +9236,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.93 TEST — netteté des noms de communes, tailles inchangées
+   v13.93 — netteté des noms de communes, tailles inchangées
    ========================================================================== */
 
 .leaflet-marker-icon.commune-name-label {
@@ -9253,7 +9254,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.94 TEST — Dérout. / GAAR : interlignes identiques à Suivi rotations
+   v13.94 — Dérout. / GAAR : interlignes identiques à Suivi rotations
    Fenêtre de droite uniquement. Tailles de police et contrôles inchangés.
    ========================================================================== */
 
@@ -9289,7 +9290,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.95 TEST — Dérout. / GAAR : fenêtre droite ajustée au contenu
+   v13.95 — Dérout. / GAAR : fenêtre droite ajustée au contenu
    Les interlignes v13.94 restent strictement inchangés.
    ========================================================================== */
 
@@ -9317,7 +9318,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.96 TEST — SafeSky préparé, activation volontairement différée
+   v13.96 — SafeSky préparé, activation volontairement différée
    Le bouton reste masqué jusqu'à validation de la clé Sandbox et du proxy.
    ========================================================================== */
 
@@ -9328,7 +9329,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.97 TEST — bouton TRAFIC réactivé pour travailler sur les filtres
+   v13.97 — bouton TRAFIC réactivé pour travailler sur les filtres
    ========================================================================== */
 
 #traffic-layer-button {
@@ -9337,7 +9338,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.98 TEST — icône SafeSky et états de connexion
+   v13.98 — icône SafeSky et états de connexion
    Rouge : déconnecté, arrêté, chargement initial ou erreur.
    Vert : connexion active et dernière interrogation réussie.
    ========================================================================== */
@@ -9411,7 +9412,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.98 TEST — couleur des trafics selon l'altitude relative
+   v13.98 — couleur des trafics selon l'altitude relative
    Rouge : même altitude ±500 ft.
    Vert : plus bas de plus de 500 ft.
    Bleu : plus haut de plus de 500 ft.
@@ -9484,7 +9485,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v13.99 TEST — icône SafeSky monochrome et parfaitement stable
+   v13.99 — icône SafeSky monochrome et parfaitement stable
    ========================================================================== */
 
 #traffic-layer-button {
@@ -9568,7 +9569,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.00 TEST — symboles trafic réduits, zone tactile conservée
+   v14.00 — symboles trafic réduits, zone tactile conservée
    ========================================================================== */
 
 /*
@@ -9590,7 +9591,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.01 TEST — trafics encore réduits et vraie zone tactile 36 × 36 px
+   v14.01 — trafics encore réduits et vraie zone tactile 36 × 36 px
    ========================================================================== */
 
 .traffic-aircraft-icon {
@@ -9660,7 +9661,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.02 TEST — une seule fenêtre trafic, rapprochée, fermeture facilitée
+   v14.02 — une seule fenêtre trafic, rapprochée, fermeture facilitée
    ========================================================================== */
 
 /* Sécurité : aucun ancien tooltip trafic ne doit apparaître. */
@@ -9717,7 +9718,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.02 TEST — silhouettes selon la catégorie SafeSky
+   v14.02 — silhouettes selon la catégorie SafeSky
    ========================================================================== */
 
 .traffic-aircraft-arrow {
@@ -9754,7 +9755,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.03 TEST — popup réellement rapproché du trafic
+   v14.03 — popup réellement rapproché du trafic
    ========================================================================== */
 
 /*
@@ -9780,7 +9781,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.03 TEST — silhouettes uniformisées et exactement centrées dans le rond
+   v14.03 — silhouettes uniformisées et exactement centrées dans le rond
    ========================================================================== */
 
 .traffic-aircraft-symbol-wrap .traffic-aircraft-arrow {
@@ -9837,7 +9838,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.04 TEST — popup au contact du trafic
+   v14.04 — popup au contact du trafic
    ========================================================================== */
 
 .traffic-aircraft-popup {
@@ -9862,7 +9863,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.04 TEST — altitude toujours opposée au vecteur
+   v14.04 — altitude toujours opposée au vecteur
    ========================================================================== */
 
 .traffic-aircraft-altitude-label {
@@ -9877,7 +9878,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.04 TEST — silhouettes centrées et familles d'aéronefs élargies
+   v14.04 — silhouettes centrées et familles d'aéronefs élargies
    ========================================================================== */
 
 .traffic-type-airplane .traffic-aircraft-arrow svg,
@@ -9900,7 +9901,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.05 TEST — correction fondamentale de l'ancrage Leaflet
+   v14.05 — correction fondamentale de l'ancrage Leaflet
    ========================================================================== */
 
 /*
@@ -9916,7 +9917,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.05 TEST — étiquette altitude réellement opposée au vecteur
+   v14.05 — étiquette altitude réellement opposée au vecteur
    ========================================================================== */
 
 .traffic-aircraft-altitude-label {
@@ -9930,7 +9931,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.05 TEST — popup centré, pointe alignée et distance maîtrisée
+   v14.05 — popup centré, pointe alignée et distance maîtrisée
    ========================================================================== */
 
 .traffic-aircraft-popup {
@@ -9955,7 +9956,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.05 TEST — dimensions des nouvelles familles visuelles
+   v14.05 — dimensions des nouvelles familles visuelles
    ========================================================================== */
 
 .traffic-type-widebody-jet .traffic-aircraft-arrow svg {
@@ -9977,7 +9978,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.06 TEST — indicatif / immatriculation ajouté à l'étiquette altitude
+   v14.06 — indicatif / immatriculation ajouté à l'étiquette altitude
    ========================================================================== */
 
 .traffic-aircraft-altitude-label {
@@ -10007,7 +10008,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.08 TEST — bouton déplacement simulation sous SafeSky
+   v14.08 — bouton déplacement simulation sous SafeSky
    ========================================================================== */
 
 .simulation-motion-map-button {
@@ -10049,7 +10050,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.08 TEST — fenêtre vitesse / route de la simulation
+   v14.08 — fenêtre vitesse / route de la simulation
    ========================================================================== */
 
 .simulation-motion-modal {
@@ -10209,7 +10210,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.09 TEST — clavier immédiat et altitude simulation
+   v14.09 — clavier immédiat et altitude simulation
    ========================================================================== */
 
 .simulation-motion-fields {
@@ -10257,7 +10258,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.10 TEST — badge SIM sous l'avion simulé
+   v14.10 — badge SIM sous l'avion simulé
    ========================================================================== */
 
 /*
@@ -10275,7 +10276,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.11 TEST — saisie simulation au doigt uniquement
+   v14.11 — saisie simulation au doigt uniquement
    ========================================================================== */
 
 .simulation-finger-only-note {
@@ -10292,7 +10293,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.12 TEST — retour visuel très bref lors d'un appui au stylet
+   v14.12 — retour visuel très bref lors d'un appui au stylet
    ========================================================================== */
 
 .npf-global-stylus-blocked-field {
@@ -10302,7 +10303,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.13 TEST — choix exclusifs des filtres altitude trafic
+   v14.13 — choix exclusifs des filtres altitude trafic
    ========================================================================== */
 
 .traffic-settings-altitude-mode-line {
@@ -10369,7 +10370,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.14 TEST — menu filtres trafic compact et homogène
+   v14.14 — menu filtres trafic compact et homogène
    ========================================================================== */
 
 .traffic-settings-card {
@@ -10533,7 +10534,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.49 TEST — calque routier vectoriel offline A / N / D / M / T
+   v14.49 — calque routier vectoriel offline A / N / D / M / T
    ========================================================================== */
 
 #road-overlay-button.active {
@@ -10712,7 +10713,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.16 TEST — stabilité du calque routier
+   v14.16 — stabilité du calque routier
    ========================================================================== */
 
 .leaflet-roadOverlayCasingPane-pane canvas,
@@ -10723,7 +10724,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.17 TEST — clic court centrage / appui long suivi GPS
+   v14.17 — clic court centrage / appui long suivi GPS
    ========================================================================== */
 
 #center-gps-button {
@@ -10757,7 +10758,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.23 TEST — SafeSky Production via proxy NAS
+   v14.23 — SafeSky Production via proxy NAS
    ========================================================================== */
 
 /* La connexion SafeSky active conserve le contour vert déjà utilisé. */
@@ -10769,7 +10770,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.25 TEST — silhouettes trafic renforcées, inspirées de SafeSky
+   v14.25 — silhouettes trafic renforcées, inspirées de SafeSky
    ========================================================================== */
 
 /*
@@ -10960,7 +10961,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.26 TEST — pictogrammes proches de la référence visuelle SafeSky
+   v14.26 — pictogrammes proches de la référence visuelle SafeSky
    ========================================================================== */
 
 .traffic-aircraft-icon,
@@ -11089,7 +11090,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.27 TEST — longueur du vecteur proportionnelle à la vitesse sol
+   v14.27 — longueur du vecteur proportionnelle à la vitesse sol
    ========================================================================== */
 
 .traffic-aircraft-vector-wrap {
@@ -11110,7 +11111,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.29 TEST — base d'icônes SafeSky validée par l'utilisateur
+   v14.29 — base d'icônes SafeSky validée par l'utilisateur
    ========================================================================== */
 
 /* Toutes les catégories conservent le noir par défaut. */
@@ -11167,7 +11168,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.30 TEST — familles de couleurs des voilures légères
+   v14.30 — familles de couleurs des voilures légères
    ========================================================================== */
 
 /* Famille parapente : parapente et paramoteur en magenta vif. */
@@ -11212,7 +11213,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.31 TEST — couleur des icônes, sol noir et étiquette sur deux lignes
+   v14.31 — couleur des icônes, sol noir et étiquette sur deux lignes
    ========================================================================== */
 
 .traffic-aircraft-symbol-wrap {
@@ -11369,7 +11370,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.32 TEST — flèches montée/descente diagonales et renforcées
+   v14.32 — flèches montée/descente diagonales et renforcées
    ========================================================================== */
 
 /*
@@ -11416,7 +11417,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.33 TEST — flèches compactes et étiquette jamais superposée à l'icône
+   v14.33 — flèches compactes et étiquette jamais superposée à l'icône
    ========================================================================== */
 
 /*
@@ -11485,7 +11486,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.35 TEST — recherche, suivi, ADVISORY, vecteur courbe et publication
+   v14.35 — recherche, suivi, ADVISORY, vecteur courbe et publication
    ========================================================================== */
 
 .traffic-tools-section {
@@ -11745,7 +11746,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.38 TEST — résultats villages, hameaux et lieux nommés
+   v14.38 — résultats villages, hameaux et lieux nommés
    ========================================================================== */
 
 #results-list li.search-result-locality {
@@ -11778,7 +11779,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* v14.40 TEST — état discret de la base nationale de localités offline. */
+/* v14.40 — état discret de la base nationale de localités offline. */
 #named-places-offline-status {
     position: fixed;
     left: max(12px, env(safe-area-inset-left));
@@ -11807,14 +11808,14 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* v14.41 TEST — aucune modification du rendu ni du fonctionnement de la carte. */
+/* v14.41 — aucune modification du rendu ni du fonctionnement de la carte. */
 
 
-/* v14.44 TEST — filtres SafeSky uniquement ; rendu de la carte inchangé. */
+/* v14.44 — filtres SafeSky uniquement ; rendu de la carte inchangé. */
 
 
 /* ==========================================================================
-   v14.44 TEST — déplacement fluide continu des trafics
+   v14.44 — déplacement fluide continu des trafics
    ========================================================================== */
 
 /*
@@ -11830,7 +11831,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.45 TEST — curseur tactile et recherche phonétique
+   v14.45 — curseur tactile et recherche phonétique
    ========================================================================== */
 
 /* Aucun changement visuel : le positionnement du curseur reste géré nativement
@@ -11838,7 +11839,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.46 TEST — heure sur feu et forfait plein retardant
+   v14.46 — heure sur feu et forfait plein retardant
    ========================================================================== */
 
 /* Aucun changement visuel : la correction porte uniquement sur les calculs
@@ -11846,7 +11847,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.47 TEST — correction de la source RLT du premier transit
+   v14.47 — correction de la source RLT du premier transit
    ========================================================================== */
 
 /* Aucun changement visuel : la condition d’exemption des 10 minutes lit
@@ -11854,7 +11855,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.48 TEST — masquage temporaire du propre avion SafeSky
+   v14.48 — masquage temporaire du propre avion SafeSky
    ========================================================================== */
 
 .traffic-own-aircraft-row {
@@ -11932,11 +11933,11 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* v14.49 TEST — les cartouches M utilisent le style des routes départementales. */
+/* v14.49 — les cartouches M utilisent le style des routes départementales. */
 
 
 /* ========================================================================== 
-   v14.55 TEST — recherche OACI et destination aéroport temporaire
+   v14.55 — recherche OACI et destination aéroport temporaire
    ========================================================================== */
 
 #results-list li.search-result-airport {
@@ -11995,7 +11996,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
-   v14.55 TEST — croix aéroport tactile et bandeau haut sans feu
+   v14.55 — croix aéroport tactile et bandeau haut sans feu
    ========================================================================== */
 
 #clear-airport-destination-btn {
@@ -12057,7 +12058,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.55 TEST — Go To, suivi détecté vert et commandes SafeSky dupliquées
+   v14.55 — Go To, suivi détecté vert et commandes SafeSky dupliquées
    ========================================================================== */
 
 .airport-popup .popup-goto-buttons {
@@ -12116,7 +12117,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.55 TEST — clic sur trafic suivi et affichage forcé individuel
+   v14.55 — clic sur trafic suivi et affichage forcé individuel
    ========================================================================== */
 
 .traffic-tracked-row.traffic-tracked-detected {
@@ -12137,7 +12138,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.55 TEST — ajout manuel d'un indicatif à la liste suivie
+   v14.55 — ajout manuel d'un indicatif à la liste suivie
    ========================================================================== */
 
 .traffic-tool-button-add {
@@ -12164,7 +12165,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ========================================================================== 
-   v14.55 TEST — indicatifs en attente et tri alphabétique
+   v14.55 — indicatifs en attente et tri alphabétique
    ========================================================================== */
 
 .traffic-tracked-row:not(.traffic-tracked-detected)
@@ -12175,7 +12176,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ========================================================================== 
-   v14.56 TEST — défilement tactile de la liste suivie
+   v14.56 — défilement tactile de la liste suivie
    ========================================================================== */
 
 .traffic-settings-card,
@@ -12200,13 +12201,13 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* =========================================================================
-   v14.57 TEST — liste suivie sans plafond et fermeture de la fiche trafic
+   v14.57 — liste suivie sans plafond et fermeture de la fiche trafic
    Aucun changement visuel : les comportements sont gérés en JavaScript.
    ========================================================================= */
 
 
 /* ==========================================================================
-   v14.76 TEST — pistes cartographiques et étiquettes jaunes conservées
+   v14.76 — pistes cartographiques et étiquettes jaunes conservées
    ========================================================================== */
 
 /*
@@ -12226,13 +12227,13 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.79 TEST — vecteur vitesse segmenté par tranches de 50 kt
+   v14.79 — vecteur vitesse segmenté par tranches de 50 kt
    ========================================================================== */
 /* La géométrie et le nombre exact de traits sont calculés dans script.js. */
 
 
 /* ==========================================================================
-   v14.85 TEST — réorganisation Gestion des Cartes
+   v14.85 — réorganisation Gestion des Cartes
    ========================================================================== */
 
 #offline-map-modal .offline-maps-management-section,
@@ -12322,7 +12323,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.86 TEST — sélecteur rapide des cartes offline
+   v14.86 — sélecteur rapide des cartes offline
    ========================================================================== */
 .quick-offline-map-button { overflow: visible !important; }
 .quick-offline-france-icon { width: 62px; height: 62px; display: flex; align-items: center; justify-content: center; }
@@ -12383,7 +12384,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.87 TEST — bouton France simplifié : contour bleu, fond blanc, sans texte
+   v14.87 — bouton France simplifié : contour bleu, fond blanc, sans texte
    ========================================================================== */
 
 .quick-offline-map-button {
@@ -12463,11 +12464,11 @@ body.gaar-point-search-open .gaar-editing-banner {
     }
 }
 
-/* v14.88 TEST — dessin France remplacé dans index.html ; style blanc/bleu v14.87 conservé. */
+/* v14.88 — dessin France remplacé dans index.html ; style blanc/bleu v14.87 conservé. */
 
 
 /* ==========================================================================
-   v14.89 TEST — aides contextuelles des boutons d'import
+   v14.89 — aides contextuelles des boutons d'import
    ========================================================================== */
 #offline-map-modal .import-help-row {
     display: flex !important;
@@ -12550,14 +12551,14 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v14.91 TEST — aides d’import, une phrase par ligne
+   v14.91 — aides d’import, une phrase par ligne
    ========================================================================== */
 .import-help-modal-text {
     white-space: pre-line !important;
 }
 
 /* ==========================================================================
-   v14.93 TEST — Cartes VAC hors ligne
+   v14.93 — Cartes VAC hors ligne
    ========================================================================== */
 #offline-map-modal .vac-management-section {
     margin-top: 0 !important;
@@ -12717,3 +12718,37 @@ body.gaar-point-search-open .gaar-editing-banner {
     }
 }
 
+
+
+/* ==========================================================================
+   v15.02 TEST — le bouton radio est le seul indicateur visuel du mode altitude
+   ========================================================================== */
+#traffic-altitude-absolute-mode-field.traffic-settings-field-disabled,
+#traffic-around-altitude-field.traffic-settings-field-disabled,
+#traffic-ground-altitude-field.traffic-settings-field-disabled {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+#traffic-altitude-absolute-mode-field.traffic-settings-field-disabled input[type="number"],
+#traffic-around-altitude-field.traffic-settings-field-disabled input[type="number"],
+#traffic-ground-altitude-field.traffic-settings-field-disabled input[type="number"] {
+    opacity: 1 !important;
+    filter: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+}
+
+#traffic-altitude-absolute-mode-field.traffic-settings-field-disabled em,
+#traffic-around-altitude-field.traffic-settings-field-disabled em,
+#traffic-ground-altitude-field.traffic-settings-field-disabled em,
+#traffic-altitude-absolute-mode-field.traffic-settings-field-disabled strong,
+#traffic-around-altitude-field.traffic-settings-field-disabled strong,
+#traffic-ground-altitude-field.traffic-settings-field-disabled strong,
+#traffic-altitude-absolute-mode-field.traffic-settings-field-disabled .traffic-altitude-separator,
+#traffic-around-altitude-field.traffic-settings-field-disabled .traffic-relative-plusminus,
+#traffic-ground-altitude-field.traffic-settings-field-disabled .traffic-relative-plusminus {
+    opacity: 1 !important;
+    filter: none !important;
+}
