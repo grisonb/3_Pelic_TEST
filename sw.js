@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-02_traffic_filters_compact';
-const APP_VERSION = 'v15.02';
+const SW_VERSION = 'sw-v15-03_maps_management_reorder';
+const APP_VERSION = 'v15.03';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
