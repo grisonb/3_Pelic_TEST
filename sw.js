@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-01_foreground_resume_dedup';
-const APP_VERSION = 'v15.01';
+const SW_VERSION = 'sw-v15-02_traffic_filters_compact';
+const APP_VERSION = 'v15.02';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -30,7 +30,7 @@ const LOCAL_COMMUNES_GEOJSON_URL = './data/communes-1000m.geojson';
 const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
 
 /*
- * v14.64 TEST — app-shell minimal et atomique.
+ * v14.64 — app-shell minimal et atomique.
  * Seules les ressources indispensables à l'ouverture de l'interface bloquent
  * l'installation. Les bases volumineuses et ressources métier sont mises en
  * cache séparément, à la demande, et ne peuvent plus faire échouer le SW.
@@ -397,8 +397,8 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
-    // v14.93 TEST — le dépôt VAC GitHub Pages reste une source réseau pure.
-    // Les PDF sont ensuite conservés par script.js dans IndexedDB, pas dans Cache Storage.
+ // v14.93 — le dépôt VAC GitHub Pages reste une source réseau pure.
+ // Les PDF sont ensuite conservés par script.js dans IndexedDB, pas dans Cache Storage.
     if (isVacRepositoryRequest(request.url)) {
         event.respondWith(fetch(request));
         return;
@@ -618,7 +618,7 @@ async function handleAppDataRequest(request) {
     const isCommunePolygonGeojson = isCommunesGeojsonRequest(request.url);
 
     /*
-     * v14.96 TEST — PWA iPad / commune survolée :
+     * v14.96 — PWA iPad / commune survolée :
      * le gros GeoJSON Etalab des communes ne doit plus dépendre du chemin
      * générique limité à 8 s. Après un premier succès, la copie locale stable
      * est renvoyée immédiatement et le réseau ne sert qu'à la rafraîchir.
