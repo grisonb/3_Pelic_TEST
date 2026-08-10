@@ -12820,3 +12820,90 @@ body.gaar-point-search-open .gaar-editing-banner {
 #offline-map-modal .offline-map-reset-line small {
     color: var(--light-text-color) !important;
 }
+
+
+/* ==========================================================================
+   v15.04 TEST — couleurs sémantiques Gestion des Cartes / Doc FdF
+   ========================================================================== */
+/* Actions destructives : rouge. */
+#offline-map-modal .modal-content .danger-inline-btn,
+#offline-map-modal .modal-content .delete-map-btn,
+#offline-map-modal .modal-content .delete-pdf-btn,
+#offline-map-modal .modal-content .offline-full-reset-btn {
+    background: var(--secondary-color) !important;
+    background-color: var(--secondary-color) !important;
+    border-color: var(--secondary-color) !important;
+    color: #ffffff !important;
+}
+
+#offline-map-modal .modal-content .danger-inline-btn:hover,
+#offline-map-modal .modal-content .delete-map-btn:hover,
+#offline-map-modal .modal-content .delete-pdf-btn:hover,
+#offline-map-modal .modal-content .offline-full-reset-btn:hover {
+    background: #b00016 !important;
+    background-color: #b00016 !important;
+    border-color: #b00016 !important;
+    color: #ffffff !important;
+}
+
+/* Mode simulation : orange, distinct des actions standards et destructives. */
+#offline-map-modal .simulation-mode-button,
+#offline-map-modal .simulation-mode-button:hover,
+#offline-map-modal .simulation-mode-button.active {
+    background: #e67e00 !important;
+    background-color: #e67e00 !important;
+    border-color: #c96d00 !important;
+    color: #ffffff !important;
+}
+
+#offline-map-modal .simulation-mode-button.active {
+    box-shadow:
+        inset 0 0 0 3px rgba(255,255,255,.96),
+        0 0 0 2px rgba(230,126,0,.24) !important;
+}
+
+/* Type de carte : deux couleurs propres et distinctes. */
+#offline-map-modal #map-source-online-btn,
+#offline-map-modal #map-source-online-btn:hover,
+#offline-map-modal #map-source-online-btn.active {
+    background: #198754 !important;
+    background-color: #198754 !important;
+    border-color: #146c43 !important;
+    color: #ffffff !important;
+}
+
+#offline-map-modal #map-source-offline-btn,
+#offline-map-modal #map-source-offline-btn:hover,
+#offline-map-modal #map-source-offline-btn.active {
+    background: #6f42c1 !important;
+    background-color: #6f42c1 !important;
+    border-color: #59359a !important;
+    color: #ffffff !important;
+}
+
+#offline-map-modal #map-source-online-btn.active,
+#offline-map-modal #map-source-offline-btn.active {
+    box-shadow:
+        inset 0 0 0 3px rgba(255,255,255,.96),
+        0 0 0 2px rgba(0,0,0,.10) !important;
+}
+
+/* Doc FdF : import à gauche, suppression à droite. */
+#offline-map-modal .airport-pdf-toolbar {
+    justify-content: space-between !important;
+    width: 100% !important;
+}
+
+#offline-map-modal .airport-pdf-delete-all-button {
+    width: auto !important;
+    flex: 0 0 auto !important;
+    margin-left: auto !important;
+}
+
+@media (max-width: 640px) {
+    #offline-map-modal .airport-pdf-delete-all-button {
+        width: auto !important;
+        align-self: flex-end !important;
+        margin-left: auto !important;
+    }
+}
