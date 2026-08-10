@@ -1,6 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.07';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.08';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
+
+// =========================================================================
+// v15.08 TEST — boutons d’aide « ? » : fond blanc, cercle noir et ? noir
+// - taille réduite de v15.07 conservée ;
+// - suppression du remplissage noir ;
+// - contour noir et caractère ? noir sur fond blanc ;
+// - fonctionnement des aides et Gestion des Cartes inchangé.
+// =========================================================================
 
 // =========================================================================
 // v15.07 TEST — boutons d’aide « ? » plus petits, noir/blanc
