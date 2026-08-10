@@ -1,5 +1,70 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.05 — AJUSTEMENTS VISUELS GESTION DES CARTES
+Date : 10/08/2026
+Base : TEST v15.04
+
+OBJECTIF
+- Corriger les derniers écarts visuels de la fenêtre « Gestion des Cartes » constatés sur iPad.
+- Forcer réellement « Mode simulation avion » en orange malgré la règle générale bleue des boutons.
+- Rendre pastel le bouton ONLINE ou OFFLINE qui n’est pas sélectionné, tout en conservant une couleur soutenue pour le mode actif.
+- Placer l’action de téléchargement/mise à jour des cartes VAC au-dessus de la zone de statut « Téléchargées… ».
+- Centrer cette action VAC par rapport aux autres boutons d’import et conserver « Tout supprimer » à droite lorsqu’il est affiché.
+- Donner au bouton « Importer Doc FdF Réduite / Carte Fréquences » la même hauteur que les autres boutons d’import.
+
+MODIFICATIONS
+1. Mode simulation
+- La règle CSS est rendue plus spécifique que la règle générale des boutons de la modale.
+- « Mode simulation avion » est orange en état normal, survolé et actif.
+- L’état actif conserve un liseré interne blanc pour rester identifiable sans changer de famille de couleur.
+
+2. ONLINE / OFFLINE
+- ONLINE conserve le vert comme couleur propre ; OFFLINE conserve le violet.
+- Le mode sélectionné utilise la teinte soutenue avec texte blanc.
+- Le mode non sélectionné utilise désormais une version pastel de sa propre couleur avec texte foncé.
+- La sélection reste donc lisible immédiatement sans griser le bouton inactif.
+
+3. Cartes VAC
+- La rangée d’actions VAC est déplacée au-dessus de la zone de statut local.
+- Le bouton « Télécharger les Cartes VAC » / « Mettre à jour les Cartes VAC » est centré sur la fenêtre.
+- Lorsque « Tout supprimer » est visible, il reste rouge et est placé à droite sans décaler le bouton principal du centre.
+- Le texte de statut « Téléchargées : … / Non téléchargées : … / Cycle SIA… » reste inchangé.
+
+4. Doc FdF Réduite / Carte Fréquences
+- Les boutons d’import de la fenêtre utilisent une hauteur commune de 54 px.
+- « Importer Doc FdF Réduite / Carte Fréquences » a donc exactement la même hauteur que « Importer Cartes Offline » et « Importer Calque Routier », même si son texte s’affiche sur deux lignes.
+- « Tout supprimer » reste aligné à droite comme demandé en v15.04.
+
+INCHANGÉ
+- Logique Mode simulation.
+- Logique de sélection ONLINE/OFFLINE et stockage du mode actif.
+- Téléchargement, mise à jour, contrôle SHA-256, stockage IndexedDB et ouverture hors ligne des VAC.
+- Cartes Offline / IndexedDB, calque routier et PDF déjà stockés.
+- SafeSky, GPS, aérodromes, pélicandromes et autres fonctions métier.
+- Service Worker hors changement de version d’app-shell.
+
+VALIDATION TECHNIQUE
+- Contrôle syntaxique JavaScript de `script.js` et `sw.js`.
+- Contrôle JSON de `manifest.json`.
+- Contrôle de cohérence croisée de la version `v15.05`.
+- Contrôle de l’ordre DOM : actions VAC avant zone de statut VAC.
+- Contrôle des sélecteurs CSS spécifiques : simulation orange, ONLINE/OFFLINE pastel uniquement lorsqu’ils sont inactifs, couleurs soutenues lorsqu’ils sont actifs.
+- Contrôle de la hauteur commune des boutons d’import.
+- Aucun changement de la logique Offline / IndexedDB.
+
+VALIDATION RÉELLE À EFFECTUER
+- Sur iPad, vérifier que « Mode simulation avion » apparaît orange.
+- Basculer ONLINE puis OFFLINE et vérifier que le bouton non sélectionné passe en pastel tandis que le bouton sélectionné reste soutenu.
+- Vérifier que « Mettre à jour les Cartes VAC » se trouve au-dessus du statut et reste centré ; « Tout supprimer » doit rester à droite.
+- Vérifier la hauteur identique des trois boutons d’import.
+- Effectuer ensuite un essai en mode avion avec les cartes Offline et VAC déjà téléchargées.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.04 — CORRECTION COULEURS BOUTONS / ALIGNEMENT DOC FDF
 Date : 10/08/2026
 Base : TEST v15.03
