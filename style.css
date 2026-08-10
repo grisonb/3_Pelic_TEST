@@ -13156,3 +13156,39 @@ body.gaar-point-search-open .gaar-editing-banner {
         column-gap: 7px !important;
     }
 }
+
+/* ==========================================================================
+   v15.08 TEST — boutons d’aide « ? » : fond blanc / cercle noir / ? noir
+   ========================================================================== */
+/*
+ * Correction de l’interprétation v15.07 :
+ * - le bouton n’est pas rempli en noir ;
+ * - le fond reste blanc ;
+ * - le cercle (bordure) est noir ;
+ * - le caractère « ? » est noir ;
+ * - la taille réduite 30 px / 28 px est conservée.
+ *
+ * Sélecteur volontairement plus spécifique + !important afin de neutraliser
+ * les anciennes règles bleues de .import-help-button.
+ */
+#offline-map-modal button.import-help-button,
+#offline-map-modal .import-help-row > button.import-help-button {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+    border-color: #000000 !important;
+    box-shadow: none !important;
+}
+
+#offline-map-modal button.import-help-button:hover,
+#offline-map-modal button.import-help-button:focus,
+#offline-map-modal button.import-help-button:active,
+#offline-map-modal .import-help-row > button.import-help-button:hover,
+#offline-map-modal .import-help-row > button.import-help-button:focus,
+#offline-map-modal .import-help-row > button.import-help-button:active {
+    background: #f2f2f2 !important;
+    background-color: #f2f2f2 !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+}
