@@ -1,3 +1,4 @@
+/* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
 /* v15.02 TEST — filtres SafeSky : lignes altitude non sélectionnées non grisées. */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
@@ -12751,4 +12752,71 @@ body.gaar-point-search-open .gaar-editing-banner {
 #traffic-ground-altitude-field.traffic-settings-field-disabled .traffic-relative-plusminus {
     opacity: 1 !important;
     filter: none !important;
+}
+
+
+/* ==========================================================================
+   v15.03 TEST — Gestion des Cartes : hiérarchie visuelle et boutons bleus
+   ========================================================================== */
+#offline-map-modal .map-source-management-section {
+    flex: 0 0 auto !important;
+    margin-top: 0 !important;
+    padding: 14px !important;
+    border: 1px solid #d6e0ea !important;
+    border-radius: 12px !important;
+    background: #f8fbff !important;
+    box-sizing: border-box !important;
+}
+
+#offline-map-modal .maps-management-title {
+    margin: 0 0 11px !important;
+    padding: 8px 10px !important;
+    border-left: 5px solid var(--primary-color) !important;
+    border-radius: 8px !important;
+    background: #e8f3fc !important;
+    color: var(--primary-color) !important;
+    font-size: 20px !important;
+    line-height: 1.15 !important;
+    font-weight: 950 !important;
+    letter-spacing: .01em !important;
+}
+
+#offline-map-modal .map-source-management-section .map-source-buttons {
+    display: flex !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+}
+
+/* Tous les boutons d'action de Gestion des Cartes utilisent le même bleu. */
+#offline-map-modal .modal-content button,
+#offline-map-modal .modal-content .import-button {
+    background: var(--primary-color) !important;
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #ffffff !important;
+}
+
+#offline-map-modal .modal-content button:hover,
+#offline-map-modal .modal-content .import-button:hover {
+    background: #004a80 !important;
+    background-color: #004a80 !important;
+    border-color: #004a80 !important;
+    color: #ffffff !important;
+}
+
+/* Même couleur pour l'état actif ; un liseré blanc indique la sélection. */
+#offline-map-modal .map-source-btn.active,
+#offline-map-modal .simulation-mode-button.active {
+    background: var(--primary-color) !important;
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    box-shadow:
+        inset 0 0 0 3px rgba(255,255,255,.96),
+        0 0 0 2px rgba(0,90,156,.18) !important;
+}
+
+#offline-map-modal .offline-map-reset-line small {
+    color: var(--light-text-color) !important;
 }
