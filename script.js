@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.06';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.07';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+
+// =========================================================================
+// v15.07 TEST — boutons d’aide « ? » plus petits, noir/blanc
+// - diamètre réduit ;
+// - couleurs inversées : fond noir, « ? » blanc ;
+// - réserve d’alignement VAC adaptée à la nouvelle largeur ;
+// - aucune modification fonctionnelle.
+// =========================================================================
 
 // =========================================================================
 // v15.06 TEST — alignement horizontal de l’action VAC
