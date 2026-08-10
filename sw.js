@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-05_maps_ui_polish';
-const APP_VERSION = 'v15.05';
+const SW_VERSION = 'sw-v15-06_vac_button_alignment';
+const APP_VERSION = 'v15.06';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
