@@ -1,5 +1,54 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.09 — FICHE TRAFIC : ÉTIQUETTE CLIQUABLE / LISTE SUIVIE RÉACTIVE
+Date : 11/08/2026
+Base : TEST v15.08
+
+DEMANDES INTÉGRÉES
+- Ouvrir la fiche d’un avion SafeSky aussi lorsqu’on clique directement sur son étiquette permanente.
+- Corriger le bouton « Retirer de la liste suivie » qui pouvait ne plus répondre immédiatement après « Ajouter à la liste suivie » et nécessiter une nouvelle ouverture ou plusieurs secondes d’attente.
+
+CORRECTIONS
+1. Étiquette trafic cliquable
+- L’étiquette permanente d’un avion reçoit désormais les événements tactiles/souris.
+- Un clic ou un appui sur l’étiquette ouvre exactement la même fiche que l’appui sur le symbole de l’avion.
+- Le clic sur l’étiquette est arrêté avant d’atteindre le fond de carte afin d’éviter une fermeture immédiate de la fiche.
+- Le gestionnaire est réinstallé automatiquement lorsque Leaflet remplace l’icône d’un trafic pendant un rafraîchissement.
+
+2. Bouton Ajouter / Retirer de la liste suivie
+- Le câblage des boutons de la fiche trafic est regroupé dans une fonction dédiée.
+- Lorsqu’un rafraîchissement SafeSky met à jour le contenu d’une fiche déjà ouverte, les nouveaux boutons recréés dans le DOM sont immédiatement recâblés.
+- Le passage « Ajouter à la liste suivie » → « Retirer de la liste suivie » reste donc utilisable sans fermer/réouvrir la fiche et sans attendre le rafraîchissement suivant.
+- Les indicatifs permanents restent non supprimables et conservent le libellé « Suivi permanent ».
+
+INCHANGÉ
+- Source et fréquence de rafraîchissement SafeSky.
+- Filtres trafic et calculs d’altitude.
+- Liste suivie stockée en localStorage et indicatifs permanents.
+- Mon avion.
+- Cartes Online/Offline, VAC, calque routier, PDF et GPS.
+- Service Worker hors ligne, IndexedDB et caches métier.
+
+CONTRÔLES TECHNIQUES
+- Syntaxe JavaScript de script.js contrôlée.
+- Syntaxe JavaScript de sw.js contrôlée.
+- Manifest JSON contrôlé.
+- Cohérence des versions v15.09 contrôlée.
+- Contrôle statique : l’étiquette trafic accepte les événements et ouvre la popup du marqueur.
+- Contrôle statique : les boutons d’une popup ouverte sont recâblés après chaque remplacement de contenu.
+- Aucun nouveau domaine réseau ni aucune nouvelle dépendance.
+
+VALIDATION RÉELLE À EFFECTUER
+- Sur iPad : toucher le symbole d’un avion puis son étiquette et vérifier que les deux ouvrent la même fiche.
+- Dans une fiche, appuyer sur « Ajouter à la liste suivie », puis immédiatement sur « Retirer de la liste suivie » sans fermer la fiche.
+- Refaire l’essai pendant plusieurs rafraîchissements SafeSky successifs.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.08 — BOUTONS D’AIDE « ? » : CERCLE NOIR / « ? » NOIR
 Date : 10/08/2026
 Base : TEST v15.07
