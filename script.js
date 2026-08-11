@@ -1,5 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.08';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.09';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.09 TEST — fiche trafic : étiquette cliquable / liste suivie réactive
+// - clic/appui sur l’étiquette permanente = ouverture de la fiche avion ;
+// - recâblage immédiat des boutons Ajouter/Retirer après setContent() ;
+// - aucune modification des données SafeSky ni des filtres.
+// =========================================================================
 
 
 // =========================================================================
@@ -14786,72 +14793,120 @@ function buildTrafficAircraftPopupHtml(
         </div>`;
 }
 
+function wireTrafficMarkerPopupButtons(marker) {
+    if (!marker) return;
+
+    const ac = marker._npfTrafficAircraft;
+    const popupElement = marker.getPopup()?.getElement?.();
+    if (!popupElement) return;
+
+    const trackButton = popupElement.querySelector(
+        '.traffic-popup-track-button'
+    );
+    const ownAircraftButton = popupElement.querySelector(
+        '.traffic-popup-own-button'
+    );
+
+    if (trackButton && ac?.hex) {
+        const updateTrackButtonState = () => {
+            const currentAircraft = marker._npfTrafficAircraft;
+            const trackedEntry = findTrackedTrafficEntryForAircraft(
+                currentAircraft
+            );
+            const permanentEntry = isPermanentTrackedTrafficEntry(
+                trackedEntry
+            );
+
+            trackButton.disabled = permanentEntry;
+            trackButton.textContent = permanentEntry
+                ? 'Suivi permanent'
+                : (trackedEntry
+                    ? 'Retirer de la liste suivie'
+                    : 'Ajouter à la liste suivie');
+            trackButton.title = permanentEntry
+                ? 'Indicatif permanent intégré à NPF'
+                : '';
+        };
+
+        updateTrackButtonState();
+        trackButton.onclick = () => {
+            const currentAircraft = marker._npfTrafficAircraft;
+            if (!currentAircraft?.hex) return;
+
+            const trackedEntry = findTrackedTrafficEntryForAircraft(
+                currentAircraft
+            );
+            if (isPermanentTrackedTrafficEntry(trackedEntry)) {
+                updateTrackButtonState();
+                return;
+            }
+
+            if (trackedEntry) {
+                removeTrackedTrafficIdentifier(trackedEntry.id);
+            } else {
+                addTrackedTrafficIdentifier(currentAircraft);
+            }
+
+            /*
+             * Le bouton visible est mis à jour immédiatement. Si le rendu
+             * SafeSky remplace ensuite le contenu de la popup, updateTrafficMarkerPopup()
+             * recâble le nouveau bouton sans attendre une réouverture.
+             */
+            updateTrackButtonState();
+        };
+    }
+
+    if (ownAircraftButton && ac?.hex) {
+        ownAircraftButton.onclick = () => {
+            const currentAircraft = marker._npfTrafficAircraft;
+            if (!currentAircraft?.hex) return;
+            setOwnTrafficAircraftSession(currentAircraft);
+        };
+    }
+}
+
 function installTrafficMarkerPopupInteraction(marker) {
     if (!marker || marker._npfTrafficPopupInteractionInstalled) return;
     marker._npfTrafficPopupInteractionInstalled = true;
 
     marker.on('popupopen', () => {
-        const ac = marker._npfTrafficAircraft;
-        const popupElement = marker.getPopup()?.getElement?.();
-        const trackButton = popupElement?.querySelector(
-            '.traffic-popup-track-button'
-        );
-        const ownAircraftButton = popupElement?.querySelector(
-            '.traffic-popup-own-button'
-        );
-
-        if (trackButton && ac?.hex) {
-            const updateTrackButtonState = () => {
-                const currentAircraft = marker._npfTrafficAircraft;
-                const trackedEntry = findTrackedTrafficEntryForAircraft(
-                    currentAircraft
-                );
-                const permanentEntry = isPermanentTrackedTrafficEntry(
-                    trackedEntry
-                );
-
-                trackButton.disabled = permanentEntry;
-                trackButton.textContent = permanentEntry
-                    ? 'Suivi permanent'
-                    : (trackedEntry
-                        ? 'Retirer de la liste suivie'
-                        : 'Ajouter à la liste suivie');
-                trackButton.title = permanentEntry
-                    ? 'Indicatif permanent intégré à NPF'
-                    : '';
-            };
-
-            updateTrackButtonState();
-            trackButton.onclick = () => {
-                const currentAircraft = marker._npfTrafficAircraft;
-                if (!currentAircraft?.hex) return;
-
-                const trackedEntry = findTrackedTrafficEntryForAircraft(
-                    currentAircraft
-                );
-                if (isPermanentTrackedTrafficEntry(trackedEntry)) {
-                    updateTrackButtonState();
-                    return;
-                }
-
-                if (trackedEntry) {
-                    removeTrackedTrafficIdentifier(trackedEntry.id);
-                } else {
-                    addTrackedTrafficIdentifier(currentAircraft);
-                }
-                updateTrackButtonState();
-            };
-        }
-
-        if (ownAircraftButton && ac?.hex) {
-            ownAircraftButton.onclick = () => {
-                const currentAircraft = marker._npfTrafficAircraft;
-                if (!currentAircraft?.hex) return;
-                setOwnTrafficAircraftSession(currentAircraft);
-            };
-        }
+        wireTrafficMarkerPopupButtons(marker);
     });
 }
+
+/*
+ * v15.09 — l’étiquette permanente fait partie visuellement du trafic mais
+ * dépasse largement la boîte 42 × 42 du divIcon. On lui rend les événements
+ * et on ouvre explicitement la popup depuis cette zone.
+ */
+function installTrafficMarkerLabelPopupInteraction(marker) {
+    if (!marker) return;
+
+    const markerElement = marker.getElement?.();
+    const labelElement = markerElement?.querySelector?.(
+        '.traffic-aircraft-altitude-label'
+    );
+    if (
+        !labelElement
+        || labelElement._npfTrafficLabelPopupInteractionInstalled
+    ) {
+        return;
+    }
+
+    labelElement._npfTrafficLabelPopupInteractionInstalled = true;
+
+    labelElement.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        try {
+            marker.openPopup();
+        } catch (_) {}
+    }, {
+        passive: false
+    });
+}
+
 
 /*
  * v14.57 — fermeture de la fiche trafic par clic réel sur le fond de carte.
@@ -15060,6 +15115,20 @@ function updateTrafficMarkerPopup(marker, popupHtml) {
     }
 
     installTrafficMarkerPopupInteraction(marker);
+
+    /*
+     * v15.09 — setContent() remplace le DOM d’une popup ouverte. Les boutons
+     * nouvellement créés doivent donc recevoir leurs onclick immédiatement,
+     * sans attendre un nouveau popupopen.
+     */
+    if (marker.isPopupOpen?.()) {
+        wireTrafficMarkerPopupButtons(marker);
+        requestAnimationFrame(() => {
+            if (marker.isPopupOpen?.()) {
+                wireTrafficMarkerPopupButtons(marker);
+            }
+        });
+    }
 }
 
 function renderTrafficAircraft(aircraftList, meta = {}) {
@@ -15263,6 +15332,9 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 entry.marker,
                 popupHtml
             );
+            installTrafficMarkerLabelPopupInteraction(
+                entry.marker
+            );
             return;
         }
 
@@ -15284,6 +15356,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         marker._npfTrafficAircraft = ac;
         updateTrafficMarkerPopup(marker, popupHtml);
         marker.addTo(trafficLayer);
+        installTrafficMarkerLabelPopupInteraction(marker);
 
         entry = {
             marker,
