@@ -1,3 +1,4 @@
+/* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
 /* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
 /* v15.02 TEST — filtres SafeSky : lignes altitude non sélectionnées non grisées. */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
@@ -13192,3 +13193,26 @@ body.gaar-point-search-open .gaar-editing-banner {
     color: #000000 !important;
     border-color: #000000 !important;
 }
+
+/* ==========================================================================
+   v15.09 — étiquette SafeSky cliquable
+   ========================================================================== */
+
+/*
+ * Les anciennes optimisations rendaient tous les descendants du divIcon
+ * transparents aux événements. L’étiquette dépasse pourtant la boîte 42×42 :
+ * elle doit donc redevenir une vraie zone tactile pour ouvrir la fiche.
+ */
+.traffic-aircraft-icon .traffic-aircraft-altitude-label,
+.leaflet-marker-icon.traffic-aircraft-icon .traffic-aircraft-altitude-label {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+}
+
+/* Les sous-éléments laissent l’étiquette parente recevoir un clic unique. */
+.traffic-aircraft-icon .traffic-aircraft-altitude-label *,
+.leaflet-marker-icon.traffic-aircraft-icon .traffic-aircraft-altitude-label * {
+    pointer-events: none !important;
+}
+
