@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.15';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.16';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.16 TEST — FdS : MAJ directe BFG sans erreur SW + zoom réel iPad
+// - Maj reproduit la chaîne BFG : iframe source -> attente NAS -> téléchargement ;
+// - aucune dépendance à l'action PHP refresh pour déclencher Gmail ;
+// - le SW laisse les requêtes source/NAS sortir directement sans respondWith ;
+// - FdS : grossissement visuel réel ×1,90 du lecteur natif dans un stage compensé ;
+// - aucun polling automatique ajouté, GAAR/Offline/SafeSky inchangés.
+// =========================================================================
 
 // =========================================================================
 // v15.15 TEST — FdS / GAAR : Maj déclenche la source + largeur iPad forcée
@@ -943,6 +952,8 @@ let airportPdfDb = null;
  * saisie du mot de passe, avec expiration à minuit Europe/Paris.
  */
 const NPF_BRIEFING_DOCS_API_URL = 'https://grisonb.synology.me/briefing-api/npf-docs-api.php';
+const NPF_FDS_GMAIL_REFRESH_URL = 'https://script.google.com/macros/s/AKfycbwjw2i5AcY9UT31sRvz1sTessKF4k1EUHMo0KW4Tga-mLTeBhup0IN98dXnAJSoqq_LDQ/exec';
+const NPF_GAAR_IMPORT_REQUEST_URL = 'https://grisonb.synology.me/briefing-api/request-gaar-import.php';
 const NPF_BRIEFING_DOCS_DB_NAME = 'NpfBriefingDocsDB';
 const NPF_BRIEFING_DOCS_DB_VERSION = 1;
 const NPF_BRIEFING_DOCS_STORE_NAME = 'docs';
@@ -17402,10 +17413,9 @@ async function displayBriefingDocInViewer(type, record, options = {}) {
     }
 
     frame.title = `${label} du jour`;
-    // v15.15 : Safari/iPad ignore fréquemment les fragments FitH/page-width dans
-    // un PDF Blob affiché dans un iframe. Pour la FdS, on force donc aussi un
-    // viewport PDF de ratio portrait suffisamment haut : le rendu natif devient
-    // limité par la largeur et la page occupe la largeur de l'écran.
+    // v15.16 : Safari/iPad ignore fréquemment les fragments FitH/page-width.
+    // La FdS est donc grossie réellement par CSS dans le stage du lecteur ;
+    // le fragment reste seulement une indication supplémentaire au moteur PDF.
     modal.classList.toggle('briefing-doc-viewer-fds-width', safeType === 'fds');
     frame.src = `${npfBriefingDocViewerObjectUrl}#page=1&view=FitH&zoom=page-width&pagemode=none`;
     modal.style.display = 'flex';
@@ -17439,18 +17449,95 @@ async function fetchBriefingDocsStatusPayload(session) {
     return payload;
 }
 
-async function fetchBriefingDocsSourceRefreshPayload(type, session) {
+function getBriefingDocSourceRefreshUrl(type) {
     const safeType = String(type || '').toLowerCase();
-    const url = `${NPF_BRIEFING_DOCS_API_URL}?action=refresh&type=${encodeURIComponent(safeType)}&t=${Date.now()}`;
-    const response = await fetchBriefingDocsNas(url, {
-        method: 'GET',
-        headers: briefingDocsAuthHeaders(session)
-    }, 75000);
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload || payload.ok !== true) {
-        throw new Error(payload?.message || payload?.error || `Actualisation source ${getBriefingDocLabel(safeType)} impossible (${response.status})`);
+    const stamp = encodeURIComponent(Date.now());
+    if (safeType === 'fds') {
+        // Même URL / même mode de déclenchement que BFG : navigation iframe opaque.
+        return `${NPF_FDS_GMAIL_REFRESH_URL}?source=npf-v15.16&t=${stamp}`;
     }
-    return payload;
+    if (safeType === 'gaar') {
+        // BFG utilise déjà ce relais NAS pour déclencher l'Apps Script GAAR.
+        return `${NPF_GAAR_IMPORT_REQUEST_URL}?source=npf-v15.16&t=${stamp}`;
+    }
+    return '';
+}
+
+function triggerBriefingDocSourceRefreshInBackground(type) {
+    const safeType = String(type || '').toLowerCase();
+    const url = getBriefingDocSourceRefreshUrl(safeType);
+    if (!url) return Promise.reject(new Error('Type de document inconnu'));
+
+    return new Promise((resolve, reject) => {
+        try {
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.left = '-20px';
+            iframe.style.top = '-20px';
+            iframe.style.width = '1px';
+            iframe.style.height = '1px';
+            iframe.style.border = '0';
+            iframe.style.opacity = '0';
+            iframe.style.pointerEvents = 'none';
+            iframe.setAttribute('aria-hidden', 'true');
+            iframe.tabIndex = -1;
+            iframe.src = url;
+            (document.body || document.documentElement).appendChild(iframe);
+
+            // Comme BFG : on considère la demande lancée rapidement, mais on laisse
+            // l'iframe vivre assez longtemps pour que Gmail -> NAS se termine.
+            setTimeout(() => resolve(true), 1000);
+            setTimeout(() => {
+                try { iframe.remove(); } catch (_) {}
+            }, 120000);
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function waitBriefingDocsMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForBriefingDocSourceRefresh(type, session, previousSignature) {
+    const safeType = String(type || '').toLowerCase();
+    const maxAttempts = 45; // environ 90 secondes, comme l'attente robuste BFG
+    const retrySourceAttempts = new Set([8, 20, 32]);
+    let lastPayload = null;
+    let lastError = null;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        await waitBriefingDocsMs(attempt === 0 ? 2500 : 2000);
+
+        if (retrySourceAttempts.has(attempt)) {
+            setBriefingDocViewerStatus(
+                `Toujours en attente du NAS — relance ${getBriefingDocLabel(safeType)}… (${attempt + 1}/${maxAttempts})`
+            );
+            await triggerBriefingDocSourceRefreshInBackground(safeType).catch(() => {});
+        }
+
+        try {
+            lastPayload = await fetchBriefingDocsStatusPayload(session);
+            const meta = lastPayload?.[safeType];
+            const signature = getBriefingDocsRemoteSignature(meta);
+            if (!previousSignature || (signature && signature !== previousSignature)) {
+                return { payload: lastPayload, changedOnNas: true };
+            }
+            setBriefingDocViewerStatus(
+                `Attente fin import Gmail/NAS… ${attempt + 1}/${maxAttempts}`
+            );
+        } catch (error) {
+            lastError = error;
+            setBriefingDocViewerStatus(
+                `NAS temporairement indisponible… ${attempt + 1}/${maxAttempts}`,
+                { error: false }
+            );
+        }
+    }
+
+    if (lastPayload) return { payload: lastPayload, changedOnNas: false };
+    throw lastError || new Error('Statut FdS / GAAR indisponible après attente.');
 }
 
 async function refreshSingleBriefingDocFromNas(type, options = {}) {
@@ -17465,11 +17552,20 @@ async function refreshSingleBriefingDocFromNas(type, options = {}) {
     npfBriefingDocsSyncInProgress = true;
     await refreshBriefingDocMapButtons().catch(() => {});
     try {
-        // v15.15 : sur un appui explicite Maj, déclencher d'abord la chaîne source
-        // (Gmail / Apps Script -> NAS), puis lire la nouvelle métadonnée renvoyée.
-        const payload = options.sourceRefresh === true
-            ? await fetchBriefingDocsSourceRefreshPayload(safeType, session)
-            : await fetchBriefingDocsStatusPayload(session);
+        let payload;
+        if (options.sourceRefresh === true) {
+            // v15.16 : reproduire le fonctionnement BFG côté navigateur.
+            // On relève d'abord la révision NAS, on déclenche la source dans un
+            // iframe invisible, puis on attend que le NAS expose la nouvelle révision.
+            const beforePayload = await fetchBriefingDocsStatusPayload(session);
+            const beforeMeta = beforePayload?.[safeType];
+            const beforeSignature = getBriefingDocsRemoteSignature(beforeMeta);
+            await triggerBriefingDocSourceRefreshInBackground(safeType);
+            const waitResult = await waitForBriefingDocSourceRefresh(safeType, session, beforeSignature);
+            payload = waitResult.payload;
+        } else {
+            payload = await fetchBriefingDocsStatusPayload(session);
+        }
         const meta = payload[safeType];
         if (!meta || !meta.exists) {
             throw new Error(`Aucune ${getBriefingDocLabel(safeType)} du jour disponible sur le NAS.`);
