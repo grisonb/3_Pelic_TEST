@@ -1,3 +1,68 @@
+VERSION TEST v15.25 — GLR ANTICOLLISION + TOUTES MISSIONS + FdS/GAAR STRICTEMENT DU JOUR
+Date : 12/08/2026
+Base : TEST v15.24
+
+OBJECTIF
+- Empêcher le chevauchement des étiquettes Global Link Rescue sur la carte.
+- Ne plus limiter le relais GLR aux seules missions marquées « secciv » afin d'admettre aussi les autres moyens visibles par le compte, notamment DRAGON / PUMA s'ils sont présents dans le flux missions reçu.
+- Donner au bouton principal FdS / GAAR un contour vert dès qu'au moins un document du jour est chargé.
+- Garantir qu'une FdS ou un GAAR du lendemain, même reçu en fin de journée, ne puisse pas remplacer le document de la date du jour dans NPF.
+
+MODIFICATIONS
+1. GLR — étiquettes sans chevauchement
+- Les symboles avions restent exactement sur leur position réelle.
+- Les étiquettes sont maintenant des marqueurs séparés, placés automatiquement autour de chaque symbole.
+- Plusieurs positions candidates sont testées autour de l'avion puis dans le viewport si la zone est dense.
+- Une étiquette n'est validée que si elle ne chevauche aucune autre étiquette déjà placée et évite les autres symboles avions.
+- En cas extrême où aucun emplacement libre n'existe, le symbole reste visible mais l'étiquette concernée est masquée plutôt que superposée.
+- Le placement est recalculé après déplacement, zoom ou redimensionnement de la carte.
+
+2. GLR — DRAGON / PUMA / autres organisations
+- Suppression dans le relais NAS du filtre strict « organisation = secciv ».
+- Toutes les missions renvoyées par le compte Global Link sont désormais admissibles, puis dédoublonnées par indicatif comme auparavant.
+- L'organisation source est conservée dans les données normalisées du relais pour diagnostic.
+- La fréquence de récupération reste 60 secondes et la logique d'âge des positions reste inchangée.
+
+3. Bouton principal FdS / GAAR
+- Le bouton conserve les deux lignes FdS / GAAR et leur couleur individuelle.
+- Son contour devient vert dès que la FdS du jour OU le GAAR du jour est chargé.
+- Si aucun des deux documents du jour n'est chargé, le contour reste neutre.
+
+4. FdS / GAAR — date du jour uniquement
+- Le client NPF vérifie désormais la date opérationnelle extraite en priorité du nom du PDF, puis de la métadonnée dateKey.
+- Une FdS / un GAAR dont le nom indique une autre date que la date du jour est refusé pour le téléchargement, le stockage et l'affichage.
+- Le relais NAS npf-docs-api.php est également renforcé : la copie « latest » n'est admissible que si ses métadonnées ou son nom déclarent explicitement la date du jour.
+- Le mtime seul n'est plus utilisé pour accepter « latest », car une FdS du lendemain peut être reçue la veille au soir.
+- Le fichier daté du jour reste éligible normalement et les mises à jour successives du même jour restent possibles.
+
+FICHIERS NAS À REMPLACER
+- /web/briefing-api/npf-global-link-api.php
+- /web/briefing-api/npf-docs-api.php
+
+ÉLÉMENTS INCHANGÉS
+- Authentification GLR par captcha, session NAS et protection des identifiants.
+- Bouton GLR et logique de couleur alignée sur SafeSky.
+- Fenêtre FdS / GAAR à deux gros boutons.
+- Lecteur PDF et grossissement FdS.
+- SafeSky et ses filtres.
+- Cartes Online/Offline, VAC, IndexedDB et données utilisateur.
+- Règle 2 doigts et ses échelles NM/km.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.25.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Syntaxe PHP des deux relais NAS contrôlée.
+- Contrôle statique de la règle « document du jour uniquement » côté client et côté NAS.
+- Contrôle statique du retrait du filtre organisation=secciv.
+- Aucun identifiant Global Link, mot de passe Global Link, token FdS/GAAR ou mot de passe NPF ajouté dans les six fichiers publics.
+- Historique v15.24 et antérieur conservé intégralement ci-dessous.
+- Pas de test réel sur iPad ni sur le serveur Global Link depuis cet environnement : validation fonctionnelle finale à effectuer sur NPF TEST.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.24 — REGROUPEMENT FdS / GAAR + BOUTON GLR
 Date : 12/08/2026
 Base : TEST v15.23
