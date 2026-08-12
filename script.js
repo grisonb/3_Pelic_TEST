@@ -1,8 +1,16 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.25';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.26';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v15.25 TEST — GLR anticollision + toutes missions + documents strictement du jour
+// v15.26 TEST — GLR : rafraîchissement 15 s + aucune mission masquée par âge
+// - interrogation du relais GLR toutes les 15 secondes lorsque la couche est active ;
+// - suppression du masquage automatique des positions de plus de 15 minutes ;
+// - les positions anciennes restent visibles et conservent l'état visuel stale ;
+// - anticollision des étiquettes v15.25 conservée.
+// =========================================================================
+
+// =========================================================================
+// v15.26 TEST — GLR anticollision + toutes missions + documents strictement du jour
 // - étiquettes GLR repositionnées automatiquement pour limiter les chevauchements ;
 // - toutes les missions visibles du compte GLR sont admises (DRAGON / PUMA inclus) ;
 // - FdS / GAAR : seul le document correspondant à la date du jour peut être chargé ;
@@ -17515,7 +17523,7 @@ function extractBriefingDocDateKey(value) {
 function getBriefingDocEffectiveDateKey(value) {
     if (!value || typeof value !== 'object') return '';
     /*
-     * v15.25 — le nom du PDF est prioritaire : en fin de journée une FdS du
+     * v15.26 — le nom du PDF est prioritaire : en fin de journée une FdS du
      * lendemain peut être reçue aujourd'hui, donc mailDate / mtime ne prouvent
      * pas que le document concerne la date du jour.
      */
@@ -18133,9 +18141,8 @@ const NPF_GLOBAL_LINK_API_URL = 'https://grisonb.synology.me/briefing-api/npf-gl
 const NPF_GLOBAL_LINK_SESSION_KEY = 'npfGlobalLinkSessionV1';
 const NPF_GLOBAL_LINK_SESSION_EXP_KEY = 'npfGlobalLinkSessionExpV1';
 const NPF_GLOBAL_LINK_LAYER_ENABLED_KEY = 'npfGlobalLinkLayerEnabledV1';
-const NPF_GLOBAL_LINK_REFRESH_MS = 60000;
+const NPF_GLOBAL_LINK_REFRESH_MS = 15000;
 const NPF_GLOBAL_LINK_FRESH_SECONDS = 180;
-const NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS = 900;
 const NPF_GLOBAL_LINK_PANE_NAME = 'npfGlobalLinkPane';
 const NPF_GLOBAL_LINK_PANE_Z_INDEX = 645;
 
@@ -18342,11 +18349,15 @@ function updateGlobalLinkButton(options = {}) {
     const hasSession = !!getStoredGlobalLinkSession();
     const positions = Array.isArray(npfGlobalLinkLastPositions) ? npfGlobalLinkLastPositions : [];
     const now = Date.now();
-    const visible = positions.filter(item => {
-        const ts = Date.parse(String(item.updatedAt || ''));
-        const age = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
-        return age <= NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS;
-    });
+    /* v15.26 — ne plus masquer les missions GLR anciennes.
+     * Global Link conserve certains moyens (DRAGON, PUMA, etc.) visibles même
+     * lorsqu'ils n'ont pas émis depuis plus de 15 min. NPF affiche donc toutes
+     * les positions renvoyées par le relais et utilise uniquement la couleur
+     * pour signaler leur ancienneté.
+     */
+    const visible = positions.filter(item => (
+        Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))
+    ));
     const fresh = visible.filter(item => {
         const ts = Date.parse(String(item.updatedAt || ''));
         const age = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
@@ -18477,7 +18488,6 @@ function renderGlobalLinkPositions(positions) {
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
             const ts = Date.parse(String(item.updatedAt || ''));
             const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
-            if (ageSeconds > NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS) return null;
             const name = String(item.name || 'Global Link').trim();
             return {
                 ...item, lat, lon, ageSeconds, name,
