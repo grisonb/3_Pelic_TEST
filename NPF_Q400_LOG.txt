@@ -1,5 +1,126 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.13 — LECTEUR FdS / GAAR INTÉGRÉ + MISE À JOUR MANUELLE
+Date : 12/08/2026
+Base : TEST v15.12
+
+OBJECTIF
+- Alléger le fonctionnement FdS / GAAR en supprimant les contrôles réseau automatiques périodiques.
+- Ouvrir les PDF FdS / GAAR directement dans NPF afin de pouvoir disposer d’un bouton « Maj » pendant leur consultation.
+- Conserver l’accès rapide depuis les boutons FdS / GAAR de la carte et le stockage local hors ligne.
+
+MODIFICATIONS
+1. Suppression du polling FdS / GAAR
+- Suppression du contrôle automatique toutes les 5 minutes introduit en v15.12.
+- Suppression du contrôle automatique FdS / GAAR au retour au premier plan.
+- Suppression du contrôle automatique FdS / GAAR au retour du réseau.
+- Suppression du téléchargement automatique FdS / GAAR au démarrage.
+- Au démarrage, NPF se contente de lire IndexedDB pour afficher l’état orange/vert des boutons, sans interroger le NAS.
+
+2. Lecteur PDF intégré à NPF
+- Un clic sur FdS ou GAAR ouvre maintenant le PDF du jour dans un lecteur plein écran intégré à NPF.
+- Le PDF n’est plus ouvert dans un nouvel onglet du navigateur.
+- Le lecteur conserve le rendu PDF natif du navigateur dans une zone intégrée, afin de rester léger.
+- Bandeau supérieur avec le nom du document, les informations du fichier, le bouton « Maj » et le bouton « Fermer ».
+
+3. Bouton « Maj »
+- « Maj » interroge le NAS uniquement pour le document actuellement affiché.
+- La signature distante est comparée à la copie IndexedDB.
+- Si le document est identique, aucun PDF n’est retéléchargé et le lecteur indique « Déjà à jour ».
+- Si une nouvelle version existe, seul le PDF affiché est téléchargé, remplace la copie locale et est immédiatement rechargé dans le lecteur.
+- Si la session quotidienne a expiré, le bouton « Maj » repropose le mot de passe.
+- Hors ligne, le PDF local reste consultable et « Maj » indique qu’une connexion Internet est nécessaire.
+
+4. Premier téléchargement
+- Si le PDF du jour n’est pas encore présent localement, un clic sur le bouton FdS ou GAAR récupère uniquement le document demandé.
+- Si le mot de passe n’a pas encore été saisi, la fenêtre d’autorisation est affichée.
+- Après validation du mot de passe, seul le document demandé est récupéré puis ouvert.
+- L’autorisation reste valable jusqu’à minuit comme précédemment.
+
+5. États des boutons carte
+- Fond blanc + texte/contour orange : PDF du jour absent de l’appareil.
+- Bouton vert : PDF du jour présent dans IndexedDB.
+- Aucun accès NAS n’est nécessaire pour calculer ces couleurs au démarrage.
+
+ÉLÉMENTS INCHANGÉS
+- Fichier NAS `npf-docs-api.php` : aucune modification nécessaire.
+- Mot de passe et expiration quotidienne à minuit.
+- Tokens BFG absents des fichiers publics NPF.
+- Stockage IndexedDB FdS / GAAR.
+- Position de l’échelle nautique corrigée en v15.12.
+- SafeSky, filtres trafic, cartes Offline, VAC, calque routier, GPS et simulation.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / SW alignées sur v15.13.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé comme JSON valide.
+- Aucun intervalle automatique FdS / GAAR de 5 minutes actif.
+- Aucun contrôle automatique FdS / GAAR au démarrage, retour au premier plan ou retour réseau.
+- Lecteur intégré FdS / GAAR présent dans Index, avec boutons « Maj » et « Fermer ».
+- Mise à jour manuelle limitée au document affiché.
+- Aucun token BFG ni mot de passe en clair présent dans les six fichiers publics NPF.
+- Historique v15.12 et antérieur conservé intégralement ci-dessous, sans réécriture.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
+VERSION TEST v15.12 — MISE À JOUR FdS / GAAR EN SESSION + ÉCHELLE DÉGAGÉE
+Date : 12/08/2026
+Base : TEST v15.11
+
+OBJECTIF
+- Détecter automatiquement une nouvelle FdS ou un nouveau diagramme GAAR même lorsque NPF reste ouvert plusieurs heures.
+- Ne télécharger un nouveau PDF que lorsque le document du NAS a réellement changé.
+- Empêcher l’échelle nautique fixe de masquer partiellement le bouton SafeSky après l’ajout des boutons FdS et GAAR.
+
+MODIFICATIONS
+1. Mise à jour automatique FdS / GAAR pendant une session ouverte
+- Ajout d’un contrôle automatique toutes les 5 minutes tant que NPF est visible, connecté à Internet et que l’autorisation quotidienne est encore valide.
+- Le contrôle interroge d’abord uniquement le statut du NAS.
+- La signature distante utilise toujours date, date de mise à jour, taille et nom du fichier.
+- Si la signature n’a pas changé, aucun PDF n’est retéléchargé.
+- Si la FdS et/ou la GAAR a changé, seul le ou les PDF concernés sont remplacés dans IndexedDB.
+- Les boutons FdS / GAAR sont recalculés immédiatement après la synchronisation.
+
+2. Retour au premier plan / retour réseau
+- Lorsqu’on revient dans NPF après avoir utilisé une autre application, un contrôle FdS / GAAR est lancé automatiquement si la session quotidienne est valide.
+- Lorsqu’Internet revient après une perte réseau, un contrôle est également lancé automatiquement.
+- Aucun appel NAS n’est effectué lorsque NPF est masqué, hors ligne ou sans autorisation valide.
+
+3. Échelle nautique
+- L’échelle fixe bas-gauche est décalée vers la droite afin de libérer complètement la colonne de boutons de gauche.
+- Décalage adapté aux écrans <= 900 px afin de conserver le maximum de surface cartographique sur mobile/iPad.
+- Le calcul de l’échelle en NM et son fonctionnement sont inchangés.
+
+COMPORTEMENT ATTENDU
+- Si une nouvelle FdS/GAAR est déposée sur le NAS alors que NPF reste ouvert, elle est récupérée automatiquement au plus tard lors du prochain contrôle périodique (environ 5 minutes), ou immédiatement lors d’un retour au premier plan / retour réseau.
+- Un PDF déjà ouvert dans un onglet séparé n’est pas remplacé à l’écran pendant sa consultation ; fermer puis rouvrir FdS/GAAR affiche la nouvelle copie locale.
+
+ÉLÉMENTS INCHANGÉS
+- Fichier NAS `npf-docs-api.php` : aucune modification nécessaire.
+- Mot de passe et expiration quotidienne à minuit.
+- Tokens BFG absents des fichiers publics NPF.
+- IndexedDB FdS / GAAR et logique de comparaison de signature.
+- SafeSky, filtres trafic, cartes Offline, VAC, calque routier, GPS et simulation.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / SW alignées sur v15.12.
+- Syntaxe JavaScript de `script.js` et `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé comme JSON valide.
+- Auto-sync FdS / GAAR : intervalle 5 minutes + retour au premier plan + retour réseau présents.
+- Échelle nautique déplacée hors de la colonne des boutons.
+- Aucun token BFG ni mot de passe en clair présent dans les six fichiers publics NPF.
+- Historique v15.11 et antérieur conservé intégralement ci-dessous, sans réécriture.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.11 — FdS / GAAR DIRECTEMENT SUR LA CARTE
 Date : 12/08/2026
 Base : TEST v15.10
