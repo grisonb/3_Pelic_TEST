@@ -1,4 +1,5 @@
-/* NPF_STYLE_BUILD_VERSION: v15.24 */
+/* NPF_STYLE_BUILD_VERSION: v15.25 */
+/* v15.25 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
 /* v15.23 TEST — Global Link Rescue : authentification captcha NAS + positions carte. */
 /* v15.23 TEST — règle 2 doigts : zéro à gauche + chiffres km dégagés. */
@@ -13388,18 +13389,50 @@ body.gaar-point-search-open .gaar-editing-banner {
 .global-link-aircraft-symbol.stale { background: #e67e22; }
 .global-link-aircraft-label {
     position: absolute;
-    left: 42px;
-    top: 50%;
-    transform: translateY(-50%);
     padding: 3px 6px;
     border-radius: 5px;
     border: 1px solid rgba(11,47,107,.32);
-    background: rgba(255,255,255,.94);
+    background: rgba(255,255,255,.96);
     color: #0b2f6b;
     font: 900 13px/1.05 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     white-space: nowrap;
     box-shadow: 0 1px 4px rgba(0,0,0,.18);
     pointer-events: none;
+}
+/* v15.25 — positions candidates choisies dynamiquement par l'anticollision GLR. */
+.global-link-aircraft-label.glr-label-right { left: 42px; top: 50%; transform: translateY(-50%); }
+.global-link-aircraft-label.glr-label-left { right: 42px; top: 50%; transform: translateY(-50%); }
+.global-link-aircraft-label.glr-label-top { left: 50%; bottom: 42px; transform: translateX(-50%); }
+.global-link-aircraft-label.glr-label-bottom { left: 50%; top: 42px; transform: translateX(-50%); }
+.global-link-aircraft-label.glr-label-upper-right { left: 39px; bottom: 31px; }
+.global-link-aircraft-label.glr-label-lower-right { left: 39px; top: 31px; }
+.global-link-aircraft-label.glr-label-upper-left { right: 39px; bottom: 31px; }
+.global-link-aircraft-label.glr-label-lower-left { right: 39px; top: 31px; }
+
+/* v15.25 — les étiquettes GLR sont des marqueurs Leaflet séparés, placés
+ * dynamiquement par le moteur d'anticollision. */
+.global-link-aircraft-label-marker {
+    background: transparent !important;
+    border: 0 !important;
+    pointer-events: none !important;
+}
+.global-link-aircraft-label-marker .global-link-aircraft-label {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.global-link-aircraft-label-marker .global-link-aircraft-label.stale {
+    border-color: rgba(192,90,0,.48);
+    color: #9a4a00;
 }
 .global-link-popup { font: 14px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 .global-link-popup strong { color: #0b2f6b; }
@@ -13841,6 +13874,11 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
+   v15.25 TEST — GLR anticollision + documents du jour
+   ========================================================================== */
+/* Les règles fonctionnelles v15.25 sont ajoutées aux blocs GLR et FdS/GAAR ci-dessous. */
+
+/* ==========================================================================
    v15.24 TEST — FdS / GAAR groupés + GLR aligné sur la logique SafeSky
    ========================================================================== */
 
@@ -13869,6 +13907,12 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 #briefing-docs-map-button .briefing-docs-main-line.briefing-doc-missing {
     color: #e67e22 !important;
+}
+#briefing-docs-map-button.briefing-docs-group-map-button.briefing-docs-any-loaded {
+    border-color: #198754 !important;
+}
+#briefing-docs-map-button.briefing-docs-group-map-button.briefing-docs-none-loaded {
+    border-color: var(--border-color) !important;
 }
 
 /* Fenêtre de choix construite sur le même langage visuel que le sélecteur France. */
