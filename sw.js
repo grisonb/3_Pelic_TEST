@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-16_bfg_docs_direct_network_fds_zoom';
-const APP_VERSION = 'v15.16';
+const SW_VERSION = 'sw-v15-17_fds_viewer_polish';
+const APP_VERSION = 'v15.17';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
