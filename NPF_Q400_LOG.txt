@@ -1,3 +1,42 @@
+VERSION TEST v15.21 — RÈGLE 2 DOIGTS : SENS INVERSÉ + CHIFFRES AGRANDIS
+Date : 12/08/2026
+Base : TEST v15.20
+
+OBJECTIF
+- Inverser le sens de lecture des échelles NM et km de la règle 2 doigts.
+- Agrandir les chiffres pour améliorer la lisibilité en vol.
+- Ne rien changer à la logique de mise à jour PWA corrigée en v15.20.
+
+MODIFICATIONS
+1. Sens de lecture des échelles
+- Les graduations affichées le long de la règle sont maintenant inversées.
+- L’extrémité qui affichait auparavant 0 affiche désormais la distance totale.
+- L’autre extrémité affiche maintenant 0.
+- L’inversion est appliquée à la fois à l’échelle NM et à l’échelle km.
+
+2. Lisibilité des chiffres
+- Les chiffres inscrits directement sur la règle sont agrandis.
+- Leur largeur de réservation est augmentée afin d’éviter les coupures ou le tassement.
+- Les ancres des libellés sont adaptées à cette nouvelle taille.
+
+ÉLÉMENTS INCHANGÉS
+- Règle 2 doigts au premier plan cartographique, couleur vive et double échelle NM/km opposée.
+- Fiabilisation de mise à jour PWA v15.20.
+- FdS/GAAR et mise à jour manuelle.
+- SafeSky.
+- Cartes Online/Offline, IndexedDB, VAC, calque routier et données utilisateur.
+- Aucun changement NAS.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.21.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Historique v15.20 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.20 — FIABILISATION DE LA MISE À JOUR PWA
 Date : 12/08/2026
 Base : TEST v15.19
