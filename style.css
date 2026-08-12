@@ -13550,3 +13550,15 @@ body.gaar-point-search-open .gaar-editing-banner {
         display: none;
     }
 }
+
+
+/* ==========================================================================
+   v15.14 TEST — FdS / GAAR : PDF ajusté à la largeur disponible
+   ========================================================================== */
+.briefing-doc-viewer-frame {
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    align-self: stretch !important;
+}
