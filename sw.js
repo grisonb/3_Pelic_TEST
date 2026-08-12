@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-15_bfg_docs_source_refresh_fds_width';
-const APP_VERSION = 'v15.15';
+const SW_VERSION = 'sw-v15-16_bfg_docs_direct_network_fds_zoom';
+const APP_VERSION = 'v15.16';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -397,12 +397,12 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
-    // v15.12 — FdS / GAAR : endpoint NAS inchangé ; auto-sync géré côté script.js.
-    // v15.11 — FdS / GAAR : endpoint NAS authentifié, réseau direct uniquement.
-    // Les PDF utiles sont persistés par script.js dans IndexedDB ; le SW ne doit
-    // jamais mettre en cache une réponse liée à un jeton de session.
-    if (isBriefingDocsNasRequest(request.url)) {
-        event.respondWith(fetch(request));
+    // v15.16 — FdS / GAAR : ne pas appeler respondWith() pour la chaîne réseau
+    // de mise à jour. Safari/iPad affichait sinon « FetchEvent.respondWith ...
+    // TypeError: Load failed » quand une navigation/fetch externe échouait.
+    // Sans respondWith, le navigateur effectue sa requête réseau normalement et
+    // script.js gère les erreurs dans le bandeau du lecteur.
+    if (isBriefingDocsNasRequest(request.url) || isBriefingDocsSourceRequest(request.url)) {
         return;
     }
 
@@ -444,6 +444,19 @@ function isBriefingDocsNasRequest(url) {
         const parsed = new URL(url);
         return parsed.hostname === 'grisonb.synology.me'
             && parsed.pathname === '/briefing-api/npf-docs-api.php';
+    } catch (_) {
+        return false;
+    }
+}
+
+function isBriefingDocsSourceRequest(url) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.hostname === 'script.google.com' || parsed.hostname === 'script.googleusercontent.com') {
+            return true;
+        }
+        return parsed.hostname === 'grisonb.synology.me'
+            && parsed.pathname === '/briefing-api/request-gaar-import.php';
     } catch (_) {
         return false;
     }
