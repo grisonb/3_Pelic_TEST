@@ -1,5 +1,96 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.10 — FDS / GAAR NAS AUTOMATIQUES PROTÉGÉES JUSQU'À MINUIT
+Date : 12/08/2026
+Base : TEST v15.09
+
+OBJECTIF
+- Récupérer simplement dans NPF la FDS et la GAAR déjà déposées sur le NAS par la chaîne BFG.
+- Conserver une copie locale sur l’iPad pour consultation hors ligne.
+- Exiger un mot de passe avant d’autoriser les téléchargements NAS.
+- Une autorisation réussie reste valable uniquement jusqu’à minuit, heure de Paris.
+- Ne pas exposer les jetons BFG dans les fichiers publics de NPF.
+
+MODIFICATIONS
+1. Gestion des Cartes — section FDS / GAAR
+- Ajout d’une section « FDS / GAAR » entre Cartes VAC et Doc FdF Réduite / Carte Fréquences.
+- Ajout d’un champ de mot de passe et du bouton « Autoriser jusqu’à minuit ».
+- Après autorisation : affichage de l’échéance de session, bouton « Mettre à jour FDS / GAAR » et boutons « Ouvrir FDS » / « Ouvrir GAAR ».
+- Le mot de passe n’est jamais enregistré dans NPF.
+
+2. Autorisation quotidienne
+- NPF appelle le nouvel endpoint NAS `briefing-api/npf-docs-api.php?action=login`.
+- Le NAS vérifie le mot de passe et renvoie un jeton de session temporaire.
+- Le jeton expire à minuit Europe/Paris.
+- NPF mémorise uniquement ce jeton temporaire et son échéance.
+- Après minuit, le jeton local est supprimé et une nouvelle saisie du mot de passe est nécessaire.
+
+3. Synchronisation automatique
+- Immédiatement après une autorisation réussie, NPF contrôle la FDS et la GAAR du jour sur le NAS et télécharge les documents disponibles.
+- Tant que l’autorisation du jour reste valide, chaque nouveau lancement de NPF effectue automatiquement un contrôle en arrière-plan.
+- Le téléchargement est différentiel : si la taille et la date de mise à jour NAS sont identiques à la copie locale, aucun PDF n’est retéléchargé.
+- Un bouton manuel « Mettre à jour FDS / GAAR » permet de forcer un contrôle pendant la session autorisée.
+
+4. Stockage hors ligne
+- Nouvelle base IndexedDB dédiée : `NpfBriefingDocsDB`.
+- Les PDF FDS et GAAR sont stockés sous deux enregistrements séparés.
+- L’ouverture se fait toujours depuis le Blob IndexedDB local ; elle ne dépend donc pas du réseau au moment de la consultation.
+- En absence de document du jour sur le NAS, une ancienne copie locale n’est pas effacée automatiquement ; sa date reste affichée dans l’état local.
+- Hors connexion, aucune requête NAS n’est lancée et les copies locales restent disponibles.
+
+5. Sécurité des jetons BFG
+- Les jetons FDS et GAAR fournis ne sont PAS intégrés dans `index.html`, `script.js`, `style.css`, `manifest.json` ou `sw.js`.
+- Ils restent uniquement côté NAS dans `npf-docs-api.php`, où ils servent à dériver la clé de signature des sessions temporaires.
+- Le navigateur ne reçoit jamais les jetons BFG bruts.
+- Le mot de passe est vérifié uniquement côté NAS à partir d’un hash ; sa valeur en clair n’est pas présente dans NPF.
+
+6. Service Worker
+- Le nouvel endpoint `grisonb.synology.me/briefing-api/npf-docs-api.php` est explicitement traité comme une ressource réseau directe.
+- Les réponses authentifiées FDS / GAAR ne sont pas mises en cache par le Service Worker.
+- Le cache Offline des cartes, les VAC et les autres données NPF ne sont pas modifiés.
+
+ÉLÉMENTS INCHANGÉS
+- SafeSky et liste suivie.
+- Cartes Offline / IndexedDB des tuiles.
+- Cartes VAC.
+- Calque routier.
+- Doc FdF Réduite / Carte Fréquences et PDF aérodromes existants.
+- GPS, simulation, GAAR cartographique et autres fonctions NPF.
+
+FICHIER NAS À INSTALLER POUR LE TEST
+- `npf-docs-api.php` doit être copié dans `/web/briefing-api/` sur le NAS.
+- Aucun fichier BFG existant n’est remplacé.
+- Le fichier lit directement les PDF du jour déjà présents dans :
+  - `/web/briefing-data/feuille-service/`
+  - `/web/briefing-data/gaar/`
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / SW alignées sur v15.10.
+- Syntaxe JavaScript de `script.js` contrôlée avec Node.js.
+- Syntaxe JavaScript de `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé comme JSON valide.
+- Syntaxe PHP de `npf-docs-api.php` contrôlée.
+- Endpoint NAS écrit sans syntaxe PHP 8 obligatoire afin de rester compatible avec les environnements Synology PHP plus anciens.
+- Test fonctionnel local effectué : refus d’un mauvais mot de passe, autorisation correcte, expiration à minuit, lecture du statut et téléchargement PDF FDS.
+- Aucun jeton BFG brut présent dans les six fichiers publics NPF.
+- Le nouvel endpoint NAS est exclu du cache générique du Service Worker.
+- Historique précédent conservé intégralement.
+
+VALIDATION RÉELLE À EFFECTUER
+- Installer `npf-docs-api.php` sur le NAS avant le premier essai.
+- Ouvrir Gestion des Cartes > FDS / GAAR.
+- Saisir le mot de passe et vérifier l’autorisation jusqu’à minuit.
+- Vérifier le téléchargement de la FDS et de la GAAR du jour lorsqu’elles existent sur le NAS.
+- Passer ensuite l’iPad en mode avion et vérifier que « Ouvrir FDS » et « Ouvrir GAAR » fonctionnent toujours.
+- Fermer/réouvrir NPF le même jour avec Internet : le contrôle doit être automatique sans redemander le mot de passe.
+- Après minuit : vérifier qu’une nouvelle autorisation est demandée avant tout nouveau téléchargement.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.09 — FICHE TRAFIC : ÉTIQUETTE CLIQUABLE / LISTE SUIVIE RÉACTIVE
 Date : 11/08/2026
 Base : TEST v15.08
