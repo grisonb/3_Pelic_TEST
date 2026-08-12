@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.14';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.15';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.15 TEST — FdS / GAAR : Maj déclenche la source + largeur iPad forcée
+// - le bouton Maj ne relit plus seulement le NAS : il demande d'abord au NAS
+//   de déclencher l'import Gmail/Apps Script correspondant, puis recharge le PDF ;
+// - FdS : viewport PDF natif rendu volontairement plus haut que l'écran afin
+//   que Safari/iPad ajuste la page sur sa largeur (les fragments FitH sont ignorés) ;
+// - GAAR : comportement d'affichage conservé ; aucun polling automatique ajouté.
+// =========================================================================
 
 // =========================================================================
 // v15.14 TEST — FdS / GAAR : MAJ forcée NAS + affichage largeur écran
@@ -17358,6 +17367,7 @@ function closeBriefingDocViewer() {
     if (modal) {
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden', 'true');
+        modal.classList.remove('briefing-doc-viewer-fds-width');
     }
     npfBriefingDocViewerType = null;
     setBriefingDocViewerStatus('');
@@ -17392,10 +17402,12 @@ async function displayBriefingDocInViewer(type, record, options = {}) {
     }
 
     frame.title = `${label} du jour`;
-    // v15.14 : demander au lecteur PDF natif un ajustement à la largeur de l'écran.
-    // FitH est le paramètre PDF standard ; page-width est conservé pour les lecteurs
-    // qui l'interprètent explicitement (Chromium/PDF.js et lecteurs compatibles).
-    frame.src = `${npfBriefingDocViewerObjectUrl}#page=1&view=FitH&zoom=page-width`;
+    // v15.15 : Safari/iPad ignore fréquemment les fragments FitH/page-width dans
+    // un PDF Blob affiché dans un iframe. Pour la FdS, on force donc aussi un
+    // viewport PDF de ratio portrait suffisamment haut : le rendu natif devient
+    // limité par la largeur et la page occupe la largeur de l'écran.
+    modal.classList.toggle('briefing-doc-viewer-fds-width', safeType === 'fds');
+    frame.src = `${npfBriefingDocViewerObjectUrl}#page=1&view=FitH&zoom=page-width&pagemode=none`;
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     if (!options.keepStatus) setBriefingDocViewerStatus('');
@@ -17427,6 +17439,20 @@ async function fetchBriefingDocsStatusPayload(session) {
     return payload;
 }
 
+async function fetchBriefingDocsSourceRefreshPayload(type, session) {
+    const safeType = String(type || '').toLowerCase();
+    const url = `${NPF_BRIEFING_DOCS_API_URL}?action=refresh&type=${encodeURIComponent(safeType)}&t=${Date.now()}`;
+    const response = await fetchBriefingDocsNas(url, {
+        method: 'GET',
+        headers: briefingDocsAuthHeaders(session)
+    }, 75000);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload?.message || payload?.error || `Actualisation source ${getBriefingDocLabel(safeType)} impossible (${response.status})`);
+    }
+    return payload;
+}
+
 async function refreshSingleBriefingDocFromNas(type, options = {}) {
     const safeType = String(type || '').toLowerCase();
     if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) throw new Error('Type de document inconnu');
@@ -17439,7 +17465,11 @@ async function refreshSingleBriefingDocFromNas(type, options = {}) {
     npfBriefingDocsSyncInProgress = true;
     await refreshBriefingDocMapButtons().catch(() => {});
     try {
-        const payload = await fetchBriefingDocsStatusPayload(session);
+        // v15.15 : sur un appui explicite Maj, déclencher d'abord la chaîne source
+        // (Gmail / Apps Script -> NAS), puis lire la nouvelle métadonnée renvoyée.
+        const payload = options.sourceRefresh === true
+            ? await fetchBriefingDocsSourceRefreshPayload(safeType, session)
+            : await fetchBriefingDocsStatusPayload(session);
         const meta = payload[safeType];
         if (!meta || !meta.exists) {
             throw new Error(`Aucune ${getBriefingDocLabel(safeType)} du jour disponible sur le NAS.`);
@@ -17556,8 +17586,8 @@ function initializeBriefingDocsUi() {
             try {
                 viewerRefreshButton.disabled = true;
                 viewerRefreshButton.textContent = 'Maj…';
-                setBriefingDocViewerStatus('Récupération de la dernière version sur le NAS…');
-                const result = await refreshSingleBriefingDocFromNas(type, { force: true });
+                setBriefingDocViewerStatus(`Recherche de la dernière ${getBriefingDocLabel(type)} dans Gmail…`);
+                const result = await refreshSingleBriefingDocFromNas(type, { force: true, sourceRefresh: true });
                 await displayBriefingDocInViewer(type, result.record, { keepStatus: true });
                 setBriefingDocViewerStatus(
                     result.changed ? 'Nouvelle version téléchargée.' : 'Document rechargé depuis le NAS.',
