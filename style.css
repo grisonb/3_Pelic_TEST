@@ -1,6 +1,7 @@
 /* v15.13 TEST — lecteur FdS / GAAR intégré + mise à jour manuelle. */
 /* v15.12 TEST — FdS / GAAR auto-sync en session + échelle carte dégagée de SafeSky. */
 /* v15.15 TEST — FdS : viewport PDF portrait forcé pour largeur écran sur iPad. */
+/* v15.16 TEST — FdS zoom réel ×1,90 + MAJ directe BFG. */
 /* v15.11 TEST — boutons FdS / GAAR sur la carte + saisie mot de passe à la demande. */
 /* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
 /* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
@@ -13591,4 +13592,52 @@ body.gaar-point-search-open .gaar-editing-banner {
         height: max(155vw, 100vh) !important;
         min-height: max(155vw, 100vh) !important;
     }
+}
+
+
+/* ==========================================================================
+   v15.16 TEST — FdS : grossissement visuel réel ×1,90 sur iPad/Safari
+   ========================================================================== */
+.briefing-doc-viewer-stage {
+    position: relative !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    background: #ffffff !important;
+}
+
+.briefing-doc-viewer-stage .briefing-doc-viewer-frame {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    border: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    transform-origin: 0 0 !important;
+    background: #ffffff !important;
+}
+
+/*
+ * La capture iPad v15.15 montre une FdS native à environ la moitié de la
+ * largeur disponible. On ne dépend donc plus du zoom PDF de Safari :
+ * l'iframe complète est grossie ×1,90. Sa boîte de mise en page est réduite
+ * à 52,64 % (= 100 / 1,90), ce qui ramène visuellement l'iframe agrandie
+ * exactement à la largeur/hauteur du stage.
+ */
+.briefing-doc-viewer-modal.briefing-doc-viewer-fds-width .briefing-doc-viewer-stage .briefing-doc-viewer-frame {
+    width: 52.64% !important;
+    height: 52.64% !important;
+    min-width: 52.64% !important;
+    min-height: 52.64% !important;
+    max-width: none !important;
+    max-height: none !important;
+    flex: none !important;
+    transform: scale(1.90) !important;
+    transform-origin: 0 0 !important;
 }
