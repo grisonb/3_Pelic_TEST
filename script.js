@@ -1,8 +1,16 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.22';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.23';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v15.22 TEST — règle 2 doigts : zéro à gauche + km dégagés
+// v15.23 TEST — Global Link Rescue : positions via relais NAS
+// - captcha Global Link affiché dans NPF, résolution manuelle ;
+// - identifiants et token Global Link exclusivement côté NAS ;
+// - missions dédoublonnées par indicatif, positions rafraîchies toutes les 60 s ;
+// - aucune modification de SafeSky, FdS/GAAR, Offline ou VAC.
+// =========================================================================
+
+// =========================================================================
+// v15.23 TEST — règle 2 doigts : zéro à gauche + km dégagés
 // - orientation des graduations indépendante de l'ordre des deux touches ;
 // - horizontalement, 0 est toujours à gauche et la distance augmente vers la droite ;
 // - valeurs km davantage décalées du trait pour éviter toute superposition.
@@ -5099,7 +5107,7 @@ function drawTwoFingerRulerFromTouches(event) {
     const ll1 = map.containerPointToLatLng(touchA);
     const ll2 = map.containerPointToLatLng(touchB);
 
-    /* v15.22 — ordre visuel stable des extrémités.
+    /* v15.23 — ordre visuel stable des extrémités.
      * L'ordre event.touches dépend du doigt posé en premier et ne doit pas
      * déterminer le sens de lecture de l'échelle. Sur une règle horizontale,
      * p1 est toujours l'extrémité gauche ; si elle est quasi verticale, p1 est
@@ -5187,7 +5195,7 @@ function drawTwoFingerRulerFromTouches(event) {
             lineCap: 'round'
         }).addTo(layer);
 
-        /* v15.22 — échelle NM : 0 à l’extrémité de départ visuelle (gauche si horizontale). */
+        /* v15.23 — échelle NM : 0 à l’extrémité de départ visuelle (gauche si horizontale). */
         const nmLabelPoint = L.point(
             px + normal.x * nmLabelOffsetPx,
             py + normal.y * nmLabelOffsetPx
@@ -5206,7 +5214,7 @@ function drawTwoFingerRulerFromTouches(event) {
             })
         }).addTo(layer);
 
-        /* v15.22 — échelle km : même sens que NM, mais davantage dégagée du trait. */
+        /* v15.23 — échelle km : même sens que NM, mais davantage dégagée du trait. */
         const kmLabelPoint = L.point(
             px - normal.x * kmLabelOffsetPx,
             py - normal.y * kmLabelOffsetPx
@@ -18001,6 +18009,451 @@ window.syncBriefingDocsFromNas = syncBriefingDocsFromNas;
 window.refreshSingleBriefingDocFromNas = refreshSingleBriefingDocFromNas;
 window.closeBriefingDocViewer = closeBriefingDocViewer;
 
+
+
+// =========================================================================
+// v15.23 TEST — Global Link Rescue : relais NAS, captcha manuel et positions
+// =========================================================================
+const NPF_GLOBAL_LINK_API_URL = 'https://grisonb.synology.me/briefing-api/npf-global-link-api.php';
+const NPF_GLOBAL_LINK_SESSION_KEY = 'npfGlobalLinkSessionV1';
+const NPF_GLOBAL_LINK_SESSION_EXP_KEY = 'npfGlobalLinkSessionExpV1';
+const NPF_GLOBAL_LINK_LAYER_ENABLED_KEY = 'npfGlobalLinkLayerEnabledV1';
+const NPF_GLOBAL_LINK_REFRESH_MS = 60000;
+const NPF_GLOBAL_LINK_FRESH_SECONDS = 180;
+const NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS = 900;
+const NPF_GLOBAL_LINK_PANE_NAME = 'npfGlobalLinkPane';
+const NPF_GLOBAL_LINK_PANE_Z_INDEX = 645;
+
+let npfGlobalLinkLayer = null;
+let npfGlobalLinkRefreshTimer = null;
+let npfGlobalLinkEnabled = false;
+let npfGlobalLinkFetchInProgress = false;
+let npfGlobalLinkAttempt = '';
+let npfGlobalLinkLastPositions = [];
+
+function getStoredGlobalLinkSession() {
+    try {
+        const token = String(localStorage.getItem(NPF_GLOBAL_LINK_SESSION_KEY) || '');
+        const exp = Number(localStorage.getItem(NPF_GLOBAL_LINK_SESSION_EXP_KEY) || 0);
+        if (!token || !Number.isFinite(exp) || exp <= Date.now()) {
+            clearStoredGlobalLinkSession();
+            return null;
+        }
+        return { token, exp };
+    } catch (_) {
+        return null;
+    }
+}
+
+function storeGlobalLinkSession(token, expiresAt) {
+    const exp = Date.parse(String(expiresAt || ''));
+    if (!token || !Number.isFinite(exp) || exp <= Date.now()) return false;
+    try {
+        localStorage.setItem(NPF_GLOBAL_LINK_SESSION_KEY, String(token));
+        localStorage.setItem(NPF_GLOBAL_LINK_SESSION_EXP_KEY, String(exp));
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function clearStoredGlobalLinkSession() {
+    try {
+        localStorage.removeItem(NPF_GLOBAL_LINK_SESSION_KEY);
+        localStorage.removeItem(NPF_GLOBAL_LINK_SESSION_EXP_KEY);
+    } catch (_) {}
+}
+
+function globalLinkAuthHeaders(docsSession, globalSession = null) {
+    const headers = {};
+    if (docsSession?.token) headers.Authorization = `Bearer ${docsSession.token}`;
+    if (globalSession?.token) headers['X-Global-Link-Session'] = globalSession.token;
+    return headers;
+}
+
+async function fetchGlobalLinkNas(action, options = {}, timeoutMs = 20000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const separator = NPF_GLOBAL_LINK_API_URL.includes('?') ? '&' : '?';
+        const url = `${NPF_GLOBAL_LINK_API_URL}${separator}action=${encodeURIComponent(action)}&t=${Date.now()}`;
+        return await fetch(url, { ...options, cache: 'no-store', signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function setGlobalLinkAuthStatus(message = '', type = '') {
+    const el = document.getElementById('global-link-auth-status');
+    if (!el) return;
+    el.textContent = String(message || '');
+    el.classList.toggle('error', type === 'error');
+    el.classList.toggle('success', type === 'success');
+}
+
+function openGlobalLinkAuthModal() {
+    const modal = document.getElementById('global-link-auth-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeGlobalLinkAuthModal() {
+    const modal = document.getElementById('global-link-auth-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    const input = document.getElementById('global-link-captcha-input');
+    if (input) input.value = '';
+}
+
+async function ensureGlobalLinkNpfAuthorization() {
+    let docsSession = getStoredBriefingDocsSession();
+    if (docsSession) return docsSession;
+    if (!navigator.onLine) throw new Error('Connexion Internet requise.');
+    const password = window.prompt('Mot de passe NPF requis pour accéder à Global Link :', '');
+    if (password === null) throw new Error('Autorisation annulée.');
+    docsSession = await authorizeBriefingDocs(password);
+    if (!docsSession) throw new Error('Autorisation NPF impossible.');
+    return docsSession;
+}
+
+async function loadGlobalLinkCaptcha() {
+    const docsSession = await ensureGlobalLinkNpfAuthorization();
+    openGlobalLinkAuthModal();
+    setGlobalLinkAuthStatus('Chargement du code de sécurité…');
+    const image = document.getElementById('global-link-captcha-image');
+    if (image) image.removeAttribute('src');
+    const response = await fetchGlobalLinkNas('captcha', {
+        method: 'GET',
+        headers: globalLinkAuthHeaders(docsSession)
+    }, 20000);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true || !payload.attempt || !payload.imageDataUrl) {
+        if (response.status === 401) clearBriefingDocsSession();
+        throw new Error(payload?.message || payload?.error || `Captcha Global Link impossible (${response.status})`);
+    }
+    npfGlobalLinkAttempt = String(payload.attempt);
+    if (image) image.src = String(payload.imageDataUrl);
+    setGlobalLinkAuthStatus('Saisis le code affiché puis appuie sur Connexion.');
+    const input = document.getElementById('global-link-captcha-input');
+    if (input) {
+        input.value = '';
+        try { input.focus(); } catch (_) {}
+    }
+    return true;
+}
+
+async function submitGlobalLinkCaptcha() {
+    const input = document.getElementById('global-link-captcha-input');
+    const captcha = String(input?.value || '').trim();
+    if (!npfGlobalLinkAttempt) throw new Error('Charge d’abord un code de sécurité.');
+    if (!captcha) throw new Error('Saisis le code de sécurité.');
+    const docsSession = await ensureGlobalLinkNpfAuthorization();
+    setGlobalLinkAuthStatus('Connexion à Global Link…');
+    const response = await fetchGlobalLinkNas('login', {
+        method: 'POST',
+        headers: {
+            ...globalLinkAuthHeaders(docsSession),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ attempt: npfGlobalLinkAttempt, captcha })
+    }, 20000);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true || !payload.session || !payload.expiresAt) {
+        if (response.status === 401 && payload?.error === 'npf_authorization_required') clearBriefingDocsSession();
+        throw new Error(payload?.message || payload?.error || `Connexion Global Link refusée (${response.status})`);
+    }
+    if (!storeGlobalLinkSession(payload.session, payload.expiresAt)) {
+        throw new Error('Session Global Link reçue mais impossible à enregistrer.');
+    }
+    npfGlobalLinkAttempt = '';
+    setGlobalLinkAuthStatus('Connexion Global Link établie.', 'success');
+    setTimeout(closeGlobalLinkAuthModal, 250);
+    return getStoredGlobalLinkSession();
+}
+
+function ensureGlobalLinkPane() {
+    if (!map?.getPane || !map?.createPane) return null;
+    let pane = map.getPane(NPF_GLOBAL_LINK_PANE_NAME);
+    if (!pane) pane = map.createPane(NPF_GLOBAL_LINK_PANE_NAME);
+    if (pane) {
+        pane.style.zIndex = String(NPF_GLOBAL_LINK_PANE_Z_INDEX);
+        pane.style.pointerEvents = 'auto';
+    }
+    return pane;
+}
+
+function ensureGlobalLinkLayer() {
+    if (!map || !window.L) return null;
+    ensureGlobalLinkPane();
+    if (!npfGlobalLinkLayer) npfGlobalLinkLayer = L.layerGroup().addTo(map);
+    return npfGlobalLinkLayer;
+}
+
+function formatGlobalLinkAge(seconds) {
+    const value = Math.max(0, Number(seconds) || 0);
+    if (value < 90) return `${Math.round(value)} s`;
+    return `${Math.round(value / 60)} min`;
+}
+
+function escapeGlobalLinkHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function updateGlobalLinkButton(options = {}) {
+    const button = document.getElementById('global-link-layer-button');
+    const count = document.getElementById('global-link-button-count');
+    if (!button) return;
+    const hasSession = !!getStoredGlobalLinkSession();
+    const positions = Array.isArray(npfGlobalLinkLastPositions) ? npfGlobalLinkLastPositions : [];
+    const now = Date.now();
+    const visible = positions.filter(item => {
+        const ts = Date.parse(String(item.updatedAt || ''));
+        const age = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
+        return age <= NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS;
+    });
+    const fresh = visible.filter(item => {
+        const ts = Date.parse(String(item.updatedAt || ''));
+        const age = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
+        return age <= NPF_GLOBAL_LINK_FRESH_SECONDS;
+    });
+    button.classList.remove('global-link-auth-needed','global-link-ready','global-link-active','global-link-stale','loading');
+    if (options.loading) button.classList.add('loading');
+    if (!hasSession) {
+        button.classList.add('global-link-auth-needed');
+        button.title = 'Global Link — connexion requise';
+    } else if (npfGlobalLinkEnabled && fresh.length) {
+        button.classList.add('global-link-active');
+        button.title = `Global Link — ${fresh.length} appareil(s) actif(s) — appuyer pour masquer`;
+    } else if (npfGlobalLinkEnabled && visible.length) {
+        button.classList.add('global-link-stale');
+        button.title = 'Global Link — positions anciennes ou en attente de mise à jour';
+    } else {
+        button.classList.add('global-link-ready');
+        button.title = npfGlobalLinkEnabled ? 'Global Link — aucune position récente' : 'Global Link — appuyer pour afficher';
+    }
+    if (count) count.textContent = String(npfGlobalLinkEnabled ? visible.length : 0);
+}
+
+function renderGlobalLinkPositions(positions) {
+    npfGlobalLinkLastPositions = Array.isArray(positions) ? positions : [];
+    const layer = ensureGlobalLinkLayer();
+    if (!layer) return;
+    layer.clearLayers();
+    if (!npfGlobalLinkEnabled) {
+        updateGlobalLinkButton();
+        return;
+    }
+    const now = Date.now();
+    npfGlobalLinkLastPositions.forEach(item => {
+        const lat = Number(item.lat);
+        const lon = Number(item.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        const ts = Date.parse(String(item.updatedAt || ''));
+        const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
+        if (ageSeconds > NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS) return;
+        const stale = ageSeconds > NPF_GLOBAL_LINK_FRESH_SECONDS;
+        const name = String(item.name || 'Global Link').trim();
+        const safeName = escapeGlobalLinkHtml(name);
+        const icon = L.divIcon({
+            className: 'global-link-aircraft-marker',
+            html: `<div class="global-link-aircraft-symbol${stale ? ' stale' : ''}">✈<span class="global-link-aircraft-label">${safeName}</span></div>`,
+            iconSize: [34,34],
+            iconAnchor: [17,17]
+        });
+        const marker = L.marker([lat, lon], {
+            pane: NPF_GLOBAL_LINK_PANE_NAME,
+            icon,
+            keyboard: false,
+            title: name
+        });
+        const altitude = item.altitude === null || item.altitude === undefined || item.altitude === ''
+            ? '—'
+            : escapeGlobalLinkHtml(item.altitude);
+        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(ageSeconds))}</div>`);
+        marker.addTo(layer);
+    });
+    updateGlobalLinkButton();
+}
+
+async function refreshGlobalLinkPositions(options = {}) {
+    if (!npfGlobalLinkEnabled || npfGlobalLinkFetchInProgress) return false;
+    if (!navigator.onLine) {
+        updateGlobalLinkButton();
+        return false;
+    }
+    const docsSession = getStoredBriefingDocsSession();
+    const globalSession = getStoredGlobalLinkSession();
+    if (!docsSession || !globalSession) {
+        if (!docsSession) clearBriefingDocsSession();
+        if (!globalSession) clearStoredGlobalLinkSession();
+        updateGlobalLinkButton();
+        if (!options.silent) await loadGlobalLinkCaptcha();
+        return false;
+    }
+    npfGlobalLinkFetchInProgress = true;
+    updateGlobalLinkButton({ loading: true });
+    try {
+        const response = await fetchGlobalLinkNas('positions', {
+            method: 'GET',
+            headers: globalLinkAuthHeaders(docsSession, globalSession)
+        }, 20000);
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload || payload.ok !== true) {
+            if (response.status === 401) {
+                if (payload?.error === 'npf_authorization_required') clearBriefingDocsSession();
+                if (payload?.error === 'global_session_invalid') clearStoredGlobalLinkSession();
+            }
+            throw new Error(payload?.message || payload?.error || `Positions Global Link indisponibles (${response.status})`);
+        }
+        renderGlobalLinkPositions(payload.positions || []);
+        return true;
+    } catch (error) {
+        console.warn('[Global Link]', error);
+        updateGlobalLinkButton();
+        if (!options.silent) alert(`Global Link : ${error.message || error}`);
+        return false;
+    } finally {
+        npfGlobalLinkFetchInProgress = false;
+        updateGlobalLinkButton();
+    }
+}
+
+function stopGlobalLinkRefreshTimer() {
+    if (npfGlobalLinkRefreshTimer) clearInterval(npfGlobalLinkRefreshTimer);
+    npfGlobalLinkRefreshTimer = null;
+}
+
+function startGlobalLinkRefreshTimer() {
+    stopGlobalLinkRefreshTimer();
+    if (!npfGlobalLinkEnabled) return;
+    npfGlobalLinkRefreshTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') refreshGlobalLinkPositions({ silent: true });
+    }, NPF_GLOBAL_LINK_REFRESH_MS);
+}
+
+function setGlobalLinkEnabled(enabled, options = {}) {
+    npfGlobalLinkEnabled = !!enabled;
+    try { localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, npfGlobalLinkEnabled ? '1' : '0'); } catch (_) {}
+    if (!npfGlobalLinkEnabled) {
+        stopGlobalLinkRefreshTimer();
+        if (npfGlobalLinkLayer) npfGlobalLinkLayer.clearLayers();
+        updateGlobalLinkButton();
+        return;
+    }
+    startGlobalLinkRefreshTimer();
+    updateGlobalLinkButton();
+    if (options.refresh !== false) refreshGlobalLinkPositions({ silent: !!options.silent });
+}
+
+async function handleGlobalLinkButtonClick() {
+    if (npfGlobalLinkEnabled) {
+        setGlobalLinkEnabled(false);
+        return;
+    }
+    const docsSession = await ensureGlobalLinkNpfAuthorization();
+    let globalSession = getStoredGlobalLinkSession();
+    if (!globalSession) {
+        await loadGlobalLinkCaptcha();
+        return;
+    }
+    if (!docsSession) return;
+    setGlobalLinkEnabled(true, { refresh: true, silent: false });
+}
+
+function initializeGlobalLinkUi() {
+    const button = document.getElementById('global-link-layer-button');
+    const modal = document.getElementById('global-link-auth-modal');
+    const closeButton = document.getElementById('global-link-auth-close');
+    const refreshButton = document.getElementById('global-link-captcha-refresh');
+    const submitButton = document.getElementById('global-link-auth-submit');
+    const captchaInput = document.getElementById('global-link-captcha-input');
+
+    if (button && button.dataset.bound !== '1') {
+        button.dataset.bound = '1';
+        button.addEventListener('click', () => {
+            handleGlobalLinkButtonClick().catch(error => {
+                console.warn('[Global Link]', error);
+                if (error?.message && error.message !== 'Autorisation annulée.') alert(`Global Link : ${error.message}`);
+                updateGlobalLinkButton();
+            });
+        });
+    }
+    if (closeButton && closeButton.dataset.bound !== '1') {
+        closeButton.dataset.bound = '1';
+        closeButton.addEventListener('click', closeGlobalLinkAuthModal);
+    }
+    if (refreshButton && refreshButton.dataset.bound !== '1') {
+        refreshButton.dataset.bound = '1';
+        refreshButton.addEventListener('click', () => {
+            loadGlobalLinkCaptcha().catch(error => setGlobalLinkAuthStatus(error.message || String(error), 'error'));
+        });
+    }
+    const submit = async () => {
+        const originalText = submitButton?.textContent || 'Connexion';
+        try {
+            if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Connexion…'; }
+            await submitGlobalLinkCaptcha();
+            setGlobalLinkEnabled(true, { refresh: true, silent: false });
+        } catch (error) {
+            setGlobalLinkAuthStatus(error.message || String(error), 'error');
+            try { await loadGlobalLinkCaptcha(); } catch (_) {}
+        } finally {
+            if (submitButton) { submitButton.disabled = false; submitButton.textContent = originalText; }
+        }
+    };
+    if (submitButton && submitButton.dataset.bound !== '1') {
+        submitButton.dataset.bound = '1';
+        submitButton.addEventListener('click', submit);
+    }
+    if (captchaInput && captchaInput.dataset.bound !== '1') {
+        captchaInput.dataset.bound = '1';
+        captchaInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') { event.preventDefault(); submit(); }
+        });
+    }
+    if (modal && modal.dataset.bound !== '1') {
+        modal.dataset.bound = '1';
+        modal.addEventListener('click', event => { if (event.target === modal) closeGlobalLinkAuthModal(); });
+    }
+    if (!window.__npfGlobalLinkLifecycleBound) {
+        window.__npfGlobalLinkLifecycleBound = true;
+        window.addEventListener('online', () => {
+            if (npfGlobalLinkEnabled) refreshGlobalLinkPositions({ silent: true });
+        });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && npfGlobalLinkEnabled) {
+                refreshGlobalLinkPositions({ silent: true });
+            }
+        });
+        window.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && modal?.style.display === 'flex') closeGlobalLinkAuthModal();
+        });
+    }
+    try { npfGlobalLinkEnabled = localStorage.getItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY) === '1'; } catch (_) {}
+    updateGlobalLinkButton();
+    if (npfGlobalLinkEnabled && getStoredGlobalLinkSession() && getStoredBriefingDocsSession()) {
+        startGlobalLinkRefreshTimer();
+        setTimeout(() => refreshGlobalLinkPositions({ silent: true }), 800);
+    } else if (npfGlobalLinkEnabled) {
+        npfGlobalLinkEnabled = false;
+        try { localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, '0'); } catch (_) {}
+        updateGlobalLinkButton();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initializeGlobalLinkUi();
+});
+
+window.refreshGlobalLinkPositions = refreshGlobalLinkPositions;
+window.setGlobalLinkEnabled = setGlobalLinkEnabled;
 
 function initAirportPdfDB() {
     return new Promise((resolve, reject) => {
