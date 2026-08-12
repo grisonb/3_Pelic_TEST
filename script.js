@@ -1,5 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.16';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.17';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.17 TEST — FdS : statut MAJ simplifié + largeur légèrement réduite
+// - aucun compteur de tentative n'est affiché pendant l'attente Gmail/NAS ;
+// - les messages restent simples : recherche / attente / téléchargement ;
+// - grossissement FdS réduit de ×1,90 à ×1,82 pour éviter le léger débordement ;
+// - chaîne BFG validée de v15.16, NAS, GAAR, Offline et SafeSky inchangés.
+// =========================================================================
 
 // =========================================================================
 // v15.16 TEST — FdS : MAJ directe BFG sans erreur SW + zoom réel iPad
@@ -17512,7 +17520,7 @@ async function waitForBriefingDocSourceRefresh(type, session, previousSignature)
 
         if (retrySourceAttempts.has(attempt)) {
             setBriefingDocViewerStatus(
-                `Toujours en attente du NAS — relance ${getBriefingDocLabel(safeType)}… (${attempt + 1}/${maxAttempts})`
+                `Toujours en attente du NAS — relance ${getBriefingDocLabel(safeType)}…`
             );
             await triggerBriefingDocSourceRefreshInBackground(safeType).catch(() => {});
         }
@@ -17525,12 +17533,12 @@ async function waitForBriefingDocSourceRefresh(type, session, previousSignature)
                 return { payload: lastPayload, changedOnNas: true };
             }
             setBriefingDocViewerStatus(
-                `Attente fin import Gmail/NAS… ${attempt + 1}/${maxAttempts}`
+                `Mise à jour ${getBriefingDocLabel(safeType)} en cours…`
             );
         } catch (error) {
             lastError = error;
             setBriefingDocViewerStatus(
-                `NAS temporairement indisponible… ${attempt + 1}/${maxAttempts}`,
+                `NAS temporairement indisponible — nouvelle tentative en cours…`,
                 { error: false }
             );
         }
