@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-25_glr_labels_all_missions_today_docs';
-const APP_VERSION = 'v15.25';
+const SW_VERSION = 'sw-v15-26_glr_15s_no_age_hide';
+const APP_VERSION = 'v15.26';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
