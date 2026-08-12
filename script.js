@@ -1,13 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.10';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.11';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
-// v15.10 TEST — FDS / GAAR NAS automatiques protégées jusqu'à minuit
-// - authentification quotidienne via le NAS ;
-// - jeton de session temporaire, mot de passe jamais stocké dans NPF ;
-// - synchronisation différentielle FDS / GAAR du jour ;
-// - stockage IndexedDB dédié et ouverture 100 % locale après téléchargement ;
-// - jetons BFG bruts absents des fichiers publics NPF.
+// v15.11 TEST — FdS / GAAR directement sur la carte
+// - suppression de toute interface FdS / GAAR dans Gestion des Cartes ;
+// - boutons FdS puis GAAR ajoutés juste au-dessus de SafeSky ;
+// - orange sur fond blanc tant que le PDF du jour n'est pas chargé ;
+// - vert lorsque le PDF du jour est présent dans IndexedDB ;
+// - clic sans session : demande du mot de passe, valable jusqu'à minuit ;
+// - clic avec session : téléchargement si nécessaire puis ouverture locale du PDF.
 // =========================================================================
 
 // =========================================================================
@@ -913,7 +914,7 @@ const OPS_FREQUENCIES_PDF_SERVER_CANDIDATES = [
 let airportPdfDb = null;
 
 /*
- * v15.10 — FDS / GAAR depuis le NAS BFG.
+ * v15.11 — FdS / GAAR depuis le NAS BFG, accès direct depuis la carte.
  * Important : aucun jeton BFG longue durée n'est inclus dans cette PWA publique.
  * Le navigateur ne manipule qu'un jeton de session court émis par le NAS après
  * saisie du mot de passe, avec expiration à minuit Europe/Paris.
@@ -928,6 +929,7 @@ const NPF_BRIEFING_DOCS_LAST_SYNC_KEY = 'npfBriefingDocsLastSyncV1';
 const NPF_BRIEFING_DOC_TYPES = Object.freeze(['fds', 'gaar']);
 let npfBriefingDocsDb = null;
 let npfBriefingDocsSyncInProgress = false;
+let npfBriefingDocsPendingType = null;
 
 const WATER_POINTS_LAYER_KEY = 'showWaterPointsLayer';
 let showWaterPointsLayer = localStorage.getItem(WATER_POINTS_LAYER_KEY) === 'true';
@@ -3503,7 +3505,7 @@ async function initializeApp() {
 
 
     /*
-     * v15.10 — contrôle FDS / GAAR différé : uniquement si l'utilisateur a déjà
+     * v15.11 — contrôle FdS / GAAR différé : uniquement si l'utilisateur a déjà
      * autorisé les téléchargements pour la journée. Aucune fenêtre de mot de passe
      * n'est imposée au démarrage et le hors-ligne reste totalement non bloquant.
      */
@@ -7349,7 +7351,6 @@ function setupEventListeners() {
         displayInstalledMaps();
         displayInstalledAirportPdfs();
         displayVacManagementStatus();
-        displayBriefingDocsStatus().catch(() => {});
         refreshSimulationModeButtonState();
         refreshRoadOverlayInstalledStatus();
     });
@@ -16965,7 +16966,7 @@ window.displayVacManagementStatus = displayVacManagementStatus;
 
 
 // =========================================================================
-// v15.10 — FDS / GAAR NAS : autorisation quotidienne + stockage hors ligne
+// v15.11 — FdS / GAAR NAS : boutons carte + autorisation quotidienne + stockage hors ligne
 // =========================================================================
 
 function initBriefingDocsDB() {
@@ -17204,10 +17205,10 @@ async function syncBriefingDocsFromNas(options = {}) {
         }
 
         try { localStorage.setItem(NPF_BRIEFING_DOCS_LAST_SYNC_KEY, String(Date.now())); } catch (_) {}
-        await displayBriefingDocsStatus({ remoteStatus: payload });
         return downloaded;
     } finally {
         npfBriefingDocsSyncInProgress = false;
+        await refreshBriefingDocMapButtons().catch(() => {});
     }
 }
 
@@ -17216,15 +17217,115 @@ async function syncBriefingDocsAtStartup() {
     return await syncBriefingDocsFromNas({ silent: true });
 }
 
-async function openBriefingDoc(type) {
+function getBriefingDocsParisDateKey() {
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Europe/Paris',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(new Date());
+        const values = {};
+        parts.forEach(part => {
+            if (part.type !== 'literal') values[part.type] = part.value;
+        });
+        if (values.year && values.month && values.day) {
+            return `${values.year}${values.month}${values.day}`;
+        }
+    } catch (_) {}
+    const now = new Date();
+    return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function isBriefingDocRecordForToday(record) {
+    return Boolean(
+        record
+        && record.blob instanceof Blob
+        && String(record.dateKey || '') === getBriefingDocsParisDateKey()
+    );
+}
+
+function getBriefingDocMapButton(type) {
+    return document.getElementById(
+        String(type || '').toLowerCase() === 'gaar'
+            ? 'briefing-gaar-map-button'
+            : 'briefing-fds-map-button'
+    );
+}
+
+async function refreshBriefingDocMapButtons() {
+    const [fds, gaar] = await Promise.all([
+        getBriefingDocRecord('fds').catch(() => null),
+        getBriefingDocRecord('gaar').catch(() => null)
+    ]);
+
+    const update = (type, record) => {
+        const button = getBriefingDocMapButton(type);
+        if (!button) return;
+        const current = isBriefingDocRecordForToday(record);
+        const label = type === 'gaar' ? 'GAAR' : 'FdS';
+        button.classList.toggle('briefing-doc-loaded', current);
+        button.classList.toggle('briefing-doc-missing', !current);
+        button.classList.toggle('loading', npfBriefingDocsSyncInProgress);
+        button.setAttribute('aria-busy', npfBriefingDocsSyncInProgress ? 'true' : 'false');
+        const stateText = current
+            ? `${label} du jour charg${type === 'gaar' ? 'é' : 'ée'} — appuyer pour ouvrir`
+            : `${label} du jour non télécharg${type === 'gaar' ? 'é' : 'ée'} — appuyer pour télécharger`;
+        button.title = stateText;
+        button.setAttribute('aria-label', stateText);
+    };
+
+    update('fds', fds);
+    update('gaar', gaar);
+    return { fds, gaar };
+}
+
+function closeBriefingDocsPasswordModal() {
+    const modal = document.getElementById('briefing-docs-password-modal');
+    const input = document.getElementById('briefing-docs-password-input');
+    const status = document.getElementById('briefing-docs-password-status');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    if (input) input.value = '';
+    if (status) status.textContent = '';
+    npfBriefingDocsPendingType = null;
+}
+
+function openBriefingDocsPasswordModal(type) {
     const safeType = String(type || '').toLowerCase();
     if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
-    const openedWindow = window.open('', '_blank');
+    const modal = document.getElementById('briefing-docs-password-modal');
+    const title = document.getElementById('briefing-docs-password-title');
+    const help = document.getElementById('briefing-docs-password-help');
+    const input = document.getElementById('briefing-docs-password-input');
+    const status = document.getElementById('briefing-docs-password-status');
+    if (!modal) return false;
+
+    npfBriefingDocsPendingType = safeType;
+    const label = safeType === 'gaar' ? 'GAAR' : 'FdS';
+    if (title) title.textContent = `Accès ${label}`;
+    if (help) help.textContent = `Saisis le mot de passe pour autoriser les téléchargements FdS / GAAR jusqu’à minuit.`;
+    if (status) status.textContent = '';
+    if (input) input.value = '';
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => {
+        try { input?.focus({ preventScroll: true }); } catch (_) { try { input?.focus(); } catch (_) {} }
+    }, 60);
+    return true;
+}
+
+async function openBriefingDoc(type, preOpenedWindow = null) {
+    const safeType = String(type || '').toLowerCase();
+    if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
+    const openedWindow = preOpenedWindow || window.open('', '_blank');
     try {
         const record = await getBriefingDocRecord(safeType);
-        if (!record || !(record.blob instanceof Blob)) {
+        if (!isBriefingDocRecordForToday(record)) {
             try { if (openedWindow && !openedWindow.closed) openedWindow.close(); } catch (_) {}
-            alert(`Aucune ${safeType.toUpperCase()} enregistrée sur cet appareil.`);
+            alert(`Aucune ${safeType === 'gaar' ? 'GAAR' : 'FdS'} du jour enregistrée sur cet appareil.`);
             return false;
         }
         const pdfUrl = URL.createObjectURL(record.blob);
@@ -17234,129 +17335,162 @@ async function openBriefingDoc(type) {
         return true;
     } catch (error) {
         try { if (openedWindow && !openedWindow.closed) openedWindow.close(); } catch (_) {}
-        alert(`Ouverture ${safeType.toUpperCase()} impossible : ${error.message || error}`);
+        alert(`Ouverture ${safeType === 'gaar' ? 'GAAR' : 'FdS'} impossible : ${error.message || error}`);
         return false;
     }
 }
 
-async function displayBriefingDocsStatus(options = {}) {
-    const authRow = document.getElementById('briefing-docs-auth-row');
-    const sessionRow = document.getElementById('briefing-docs-session-row');
-    const sessionStatus = document.getElementById('briefing-docs-session-status');
-    const status = document.getElementById('briefing-docs-status');
-    const openFds = document.getElementById('briefing-docs-open-fds-button');
-    const openGaar = document.getElementById('briefing-docs-open-gaar-button');
-    const syncButton = document.getElementById('briefing-docs-sync-button');
-    if (!status) return;
+async function handleBriefingDocMapButtonClick(type, preOpenedWindow = null) {
+    const safeType = String(type || '').toLowerCase();
+    if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
 
-    const session = getStoredBriefingDocsSession();
-    if (authRow) authRow.style.display = session ? 'none' : 'flex';
-    if (sessionRow) sessionRow.style.display = session ? 'flex' : 'none';
-    if (sessionStatus) {
-        sessionStatus.textContent = session ? `Accès autorisé jusqu’à ${formatBriefingDocsExpiry(session.exp)}` : '';
+    if (!getStoredBriefingDocsSession()) {
+        try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+        openBriefingDocsPasswordModal(safeType);
+        return false;
     }
-    if (syncButton) syncButton.disabled = !session || npfBriefingDocsSyncInProgress;
 
-    const [fds, gaar] = await Promise.all([
-        getBriefingDocRecord('fds').catch(() => null),
-        getBriefingDocRecord('gaar').catch(() => null)
-    ]);
-    if (openFds) openFds.disabled = !(fds && fds.blob instanceof Blob);
-    if (openGaar) openGaar.disabled = !(gaar && gaar.blob instanceof Blob);
-
-    const describe = (label, record) => {
-        if (!record) return `${label} locale : aucune.`;
-        const sourceDate = record.mailDate || record.remoteUpdatedAt || record.downloadedAt;
-        const size = formatBriefingDocsSize(record.size);
-        return `${label} locale : ${record.filename || `${label}.pdf`} — ${formatBriefingDocsDate(sourceDate)}${size ? ` — ${size}` : ''}.`;
-    };
-
-    const lines = [];
-    if (!session) lines.push('Accès NAS non autorisé : saisis le mot de passe pour permettre les téléchargements jusqu’à minuit.');
-    else if (npfBriefingDocsSyncInProgress) lines.push('Contrôle FDS / GAAR en cours sur le NAS…');
-    else lines.push(`Accès NAS autorisé jusqu’à ${formatBriefingDocsExpiry(session.exp)}.`);
-    lines.push(describe('FDS', fds));
-    lines.push(describe('GAAR', gaar));
-
-    const lastSync = Number(localStorage.getItem(NPF_BRIEFING_DOCS_LAST_SYNC_KEY) || 0);
-    if (lastSync) lines.push(`Dernier contrôle NAS : ${formatBriefingDocsDate(lastSync)}.`);
-    if (!navigator.onLine) lines.push('Mode hors ligne : aucune requête NAS n’est lancée.');
-    if (options.remoteStatus) {
-        if (options.remoteStatus.fds && !options.remoteStatus.fds.exists) lines.push('Aucune FDS du jour disponible sur le NAS.');
-        if (options.remoteStatus.gaar && !options.remoteStatus.gaar.exists) lines.push('Aucune GAAR du jour disponible sur le NAS.');
+    const localRecord = await getBriefingDocRecord(safeType).catch(() => null);
+    if (isBriefingDocRecordForToday(localRecord)) {
+        return await openBriefingDoc(safeType, preOpenedWindow);
     }
-    status.textContent = lines.join('\n');
+
+    if (!navigator.onLine) {
+        try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+        alert(`${safeType === 'gaar' ? 'GAAR' : 'FdS'} du jour non téléchargée. Une connexion Internet est nécessaire pour la récupérer.`);
+        return false;
+    }
+
+    try {
+        await syncBriefingDocsFromNas({ silent: true });
+        const refreshed = await getBriefingDocRecord(safeType).catch(() => null);
+        await refreshBriefingDocMapButtons();
+        if (!isBriefingDocRecordForToday(refreshed)) {
+            try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+            alert(`Aucune ${safeType === 'gaar' ? 'GAAR' : 'FdS'} du jour disponible sur le NAS.`);
+            return false;
+        }
+        return await openBriefingDoc(safeType, preOpenedWindow);
+    } catch (error) {
+        try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+        alert(`${safeType === 'gaar' ? 'GAAR' : 'FdS'} : ${error.message || error}`);
+        await refreshBriefingDocMapButtons();
+        return false;
+    }
+}
+
+async function displayBriefingDocsStatus() {
+    return await refreshBriefingDocMapButtons();
 }
 
 function initializeBriefingDocsUi() {
+    const fdsButton = document.getElementById('briefing-fds-map-button');
+    const gaarButton = document.getElementById('briefing-gaar-map-button');
+    const modal = document.getElementById('briefing-docs-password-modal');
+    const closeButton = document.getElementById('briefing-docs-password-close');
     const passwordInput = document.getElementById('briefing-docs-password-input');
     const authorizeButton = document.getElementById('briefing-docs-authorize-button');
-    const syncButton = document.getElementById('briefing-docs-sync-button');
-    const openFds = document.getElementById('briefing-docs-open-fds-button');
-    const openGaar = document.getElementById('briefing-docs-open-gaar-button');
+    const passwordStatus = document.getElementById('briefing-docs-password-status');
+
+    const bindDocButton = (button, type) => {
+        if (!button || button.dataset.bound === '1') return;
+        button.dataset.bound = '1';
+        button.addEventListener('click', () => {
+            const session = getStoredBriefingDocsSession();
+            const preOpenedWindow = session ? window.open('', '_blank') : null;
+            handleBriefingDocMapButtonClick(type, preOpenedWindow).catch(error => {
+                try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+                alert(`${type === 'gaar' ? 'GAAR' : 'FdS'} : ${error.message || error}`);
+            });
+        });
+    };
+
+    bindDocButton(fdsButton, 'fds');
+    bindDocButton(gaarButton, 'gaar');
+
+    const closeModal = () => closeBriefingDocsPasswordModal();
+    if (closeButton && closeButton.dataset.bound !== '1') {
+        closeButton.dataset.bound = '1';
+        closeButton.addEventListener('click', closeModal);
+    }
+    if (modal && modal.dataset.bound !== '1') {
+        modal.dataset.bound = '1';
+        modal.addEventListener('click', event => {
+            if (event.target === modal) closeModal();
+        });
+    }
+
+    const authorizePending = async () => {
+        const targetType = npfBriefingDocsPendingType || 'fds';
+        const password = passwordInput?.value || '';
+        if (!password) {
+            if (passwordStatus) passwordStatus.textContent = 'Saisis le mot de passe.';
+            try { passwordInput?.focus(); } catch (_) {}
+            return;
+        }
+
+        const preOpenedWindow = window.open('', '_blank');
+        const originalText = authorizeButton?.textContent || 'Autoriser jusqu’à minuit';
+        try {
+            if (authorizeButton) {
+                authorizeButton.disabled = true;
+                authorizeButton.textContent = 'Autorisation…';
+            }
+            if (passwordStatus) passwordStatus.textContent = 'Vérification du mot de passe…';
+            await authorizeBriefingDocs(password);
+            if (passwordStatus) passwordStatus.textContent = 'Téléchargement des documents du jour…';
+            await syncBriefingDocsFromNas({ silent: true });
+            await refreshBriefingDocMapButtons();
+
+            const record = await getBriefingDocRecord(targetType).catch(() => null);
+            if (!isBriefingDocRecordForToday(record)) {
+                try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+                const label = targetType === 'gaar' ? 'GAAR' : 'FdS';
+                if (passwordStatus) passwordStatus.textContent = `${label} du jour non disponible sur le NAS.`;
+                return;
+            }
+
+            closeBriefingDocsPasswordModal();
+            await openBriefingDoc(targetType, preOpenedWindow);
+        } catch (error) {
+            try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
+            if (passwordStatus) passwordStatus.textContent = error.message || String(error);
+            await refreshBriefingDocMapButtons();
+        } finally {
+            if (authorizeButton) {
+                authorizeButton.disabled = false;
+                authorizeButton.textContent = originalText;
+            }
+        }
+    };
 
     if (authorizeButton && authorizeButton.dataset.bound !== '1') {
         authorizeButton.dataset.bound = '1';
-        const authorize = async () => {
-            const original = authorizeButton.textContent;
-            try {
-                authorizeButton.disabled = true;
-                authorizeButton.textContent = 'Autorisation…';
-                await authorizeBriefingDocs(passwordInput?.value || '');
-                if (passwordInput) passwordInput.value = '';
-                await displayBriefingDocsStatus();
-                await syncBriefingDocsFromNas();
-            } catch (error) {
-                alert(`FDS / GAAR : ${error.message || error}`);
-                await displayBriefingDocsStatus();
-            } finally {
-                authorizeButton.disabled = false;
-                authorizeButton.textContent = original || 'Autoriser jusqu’à minuit';
-            }
-        };
-        authorizeButton.addEventListener('click', authorize);
-        passwordInput?.addEventListener('keydown', event => {
+        authorizeButton.addEventListener('click', authorizePending);
+    }
+    if (passwordInput && passwordInput.dataset.bound !== '1') {
+        passwordInput.dataset.bound = '1';
+        passwordInput.addEventListener('keydown', event => {
             if (event.key === 'Enter') {
                 event.preventDefault();
-                authorize();
+                authorizePending();
             }
         });
     }
 
-    if (syncButton && syncButton.dataset.bound !== '1') {
-        syncButton.dataset.bound = '1';
-        syncButton.addEventListener('click', async () => {
-            const original = syncButton.textContent;
-            try {
-                syncButton.disabled = true;
-                syncButton.textContent = 'Mise à jour…';
-                const count = await syncBriefingDocsFromNas();
-                if (count > 0) alert(`${count} document(s) FDS / GAAR mis à jour.`);
-                else alert('FDS / GAAR déjà à jour.');
-            } catch (error) {
-                alert(`Mise à jour FDS / GAAR impossible : ${error.message || error}`);
-            } finally {
-                syncButton.disabled = false;
-                syncButton.textContent = original || 'Mettre à jour FDS / GAAR';
-                await displayBriefingDocsStatus();
-            }
+    if (!window.__npfBriefingDocsEscapeBound) {
+        window.__npfBriefingDocsEscapeBound = true;
+        window.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && modal?.style.display === 'flex') closeModal();
         });
     }
 
-    if (openFds && openFds.dataset.bound !== '1') {
-        openFds.dataset.bound = '1';
-        openFds.addEventListener('click', () => openBriefingDoc('fds'));
-    }
-    if (openGaar && openGaar.dataset.bound !== '1') {
-        openGaar.dataset.bound = '1';
-        openGaar.addEventListener('click', () => openBriefingDoc('gaar'));
-    }
-
-    displayBriefingDocsStatus().catch(() => {});
+    refreshBriefingDocMapButtons().catch(() => {});
 }
 
 window.openBriefingDoc = openBriefingDoc;
 window.displayBriefingDocsStatus = displayBriefingDocsStatus;
+window.refreshBriefingDocMapButtons = refreshBriefingDocMapButtons;
 window.syncBriefingDocsFromNas = syncBriefingDocsFromNas;
 
 
