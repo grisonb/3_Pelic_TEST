@@ -1,3 +1,62 @@
+VERSION TEST v15.16 — FDS : MAJ DIRECTE BFG SANS ERREUR SW + ZOOM RÉEL IPAD
+Date : 12/08/2026
+Base utilisée : TEST v15.15.
+
+OBJECTIFS
+- Corriger l'erreur « FetchEvent.respondWith received an error: TypeError: Load failed » observée sur iPad lors d'un appui sur « Maj ».
+- Faire fonctionner la mise à jour FdS directement depuis NPF sans devoir lancer auparavant la mise à jour dans BFG.
+- Agrandir réellement la feuille de service : le PDF doit occuper pratiquement toute la largeur de l'écran iPad.
+
+CORRECTION MAJ FDS / GAAR
+- L'action « Maj » ne demande plus à `npf-docs-api.php` de déclencher lui-même Apps Script depuis le NAS.
+- NPF reproduit désormais le mécanisme BFG validé : lancement de la récupération source dans un iframe invisible, puis contrôle du NAS jusqu'à apparition d'une nouvelle révision.
+- FdS : appel direct de l'Apps Script FdS déjà utilisé par BFG, puis attente de l'écriture du PDF sur le NAS.
+- GAAR : appel du relais NAS `request-gaar-import.php` déjà utilisé par BFG, puis attente de l'écriture du PDF sur le NAS.
+- L'attente est robuste : contrôle environ toutes les 2 secondes, jusqu'à ~90 secondes si nécessaire, avec relances source pendant une attente longue.
+- Une fois la nouvelle révision visible sur le NAS, seul le PDF demandé est téléchargé dans IndexedDB et le lecteur est rafraîchi.
+- Si aucune nouvelle révision n'apparaît, le PDF courant du NAS est quand même relu lors d'un appui explicite sur « Maj ».
+- Aucun polling automatique n'est ajouté : ces opérations n'ont lieu que lorsque l'utilisateur appuie sur « Maj ».
+
+CORRECTION SERVICE WORKER
+- Les requêtes `npf-docs-api.php`, Apps Script Google et le relais GAAR ne passent plus dans `respondWith()` du Service Worker.
+- Elles utilisent directement la pile réseau du navigateur ; une erreur réseau est alors gérée par `script.js` dans le bandeau du lecteur au lieu de provoquer le message Safari `FetchEvent.respondWith ... Load failed`.
+- Les cartes Offline, VAC, SafeSky et les autres stratégies de cache restent inchangées.
+
+AFFICHAGE FDS
+- Abandon de la tentative v15.15 consistant à modifier uniquement la hauteur de l'iframe : la capture iPad montre que le lecteur PDF natif conserve alors une page d'environ la moitié de la largeur de l'écran.
+- Ajout d'un conteneur de visualisation dédié autour de l'iframe.
+- Pour la FdS uniquement, l'iframe native est affichée avec un grossissement CSS réel ×1,90 (`transform: scale(1.90)`).
+- Sa largeur et sa hauteur de mise en page sont compensées à 52,64 %, de sorte que l'iframe agrandie occupe exactement toute la zone disponible sans élargir le modal.
+- Le PDF lui-même est donc visuellement agrandi sur iPad, indépendamment du support ou non de `FitH/page-width` par Safari.
+- GAAR conserve son échelle actuelle.
+
+NAS
+- Aucun nouveau fichier NAS à installer pour cette version.
+- Conserver le `npf-docs-api.php` déjà présent (v15.15 convient) : NPF n'utilise plus son action `refresh`, seulement l'autorisation, le statut et le téléchargement.
+
+ÉLÉMENTS INCHANGÉS
+- Mot de passe valable jusqu'à minuit.
+- Boutons FdS / GAAR orange ou verts.
+- Stockage IndexedDB et consultation hors ligne.
+- Position de l'échelle nautique corrigée depuis v15.12.
+- SafeSky, GPS, cartes Online/Offline, VAC, calque routier, simulation et autres fonctions NPF.
+
+VÉRIFICATIONS TECHNIQUES
+- Cohérence des versions v15.16 dans Index / Manifest / Script / SW.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.js.
+- Manifest JSON contrôlé.
+- Déclenchement FdS par iframe sur l'URL Apps Script BFG et attente NAS contrôlés statiquement.
+- Bypass Service Worker des endpoints FdS/GAAR contrôlé statiquement.
+- Conteneur PDF et grossissement CSS ×1,90 contrôlés statiquement.
+- Aucun token ni mot de passe ajouté aux six fichiers publics NPF.
+- Historique v15.15 et antérieur conservé intégralement et exactement à la suite.
+
+VALIDATION APPAREIL
+- À valider sur iPad : appui « Maj » sans ouvrir BFG et largeur réelle de la FdS après grossissement ×1,90.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
 VERSION TEST v15.15 — FDS / GAAR : MAJ DEPUIS GMAIL + FDS LARGEUR IPAD
 Date : 12/08/2026
 Base utilisée : TEST v15.14.
