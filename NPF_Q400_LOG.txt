@@ -1,3 +1,65 @@
+VERSION TEST v15.23 — GLOBAL LINK RESCUE : POSITIONS DANS NPF
+Date : 12/08/2026
+Base : TEST v15.22
+
+OBJECTIF
+- Tester l’affichage dans NPF des positions des appareils Global Link Rescue.
+- Conserver les identifiants, le mot de passe, le token Global Link et le PHPSESSID exclusivement côté NAS.
+- Utiliser le captcha officiel Global Link sans le contourner : l’utilisateur le recopie manuellement dans NPF.
+
+MODIFICATIONS
+1. Relais NAS Global Link
+- Nouveau fichier `npf-global-link-api.php` à installer dans `/web/briefing-api/`.
+- Le relais réutilise l’autorisation NPF déjà employée pour FdS/GAAR afin de ne pas exposer le compte Global Link.
+- Action captcha : ouverture d’une session Global Link, conservation du PHPSESSID côté NAS et récupération de `captcha.php` en PNG.
+- Action login : envoi serveur-à-serveur de l’identifiant, du mot de passe et du captcha saisi manuellement, puis conservation du token Global Link côté NAS.
+- Action positions : appel de `groups/list_nb_jours_v5`, filtrage organisation `secciv`, conversion des coordonnées /100000 et dédoublonnage par indicatif selon `date_last_update`.
+- Le navigateur ne reçoit jamais le token Global Link ni le PHPSESSID.
+
+2. Bouton Global Link sur la carte
+- Nouveau bouton `GL` placé entre GAAR et SafeSky.
+- Orange : authentification Global Link nécessaire.
+- Blanc/vert : session Global Link disponible mais calque masqué.
+- Vert : calque actif avec positions récentes.
+- Orange pâle : positions présentes mais devenues anciennes.
+- Compteur d’appareils visibles directement sur le bouton.
+
+3. Authentification captcha dans NPF
+- Ouverture d’une fenêtre dédiée affichant l’image captcha fournie par Global Link.
+- Saisie manuelle du code puis connexion.
+- Bouton « Nouveau code » disponible.
+- Si l’autorisation NPF FdS/GAAR n’est plus présente, NPF demande d’abord le mot de passe NPF puis récupère le captcha.
+
+4. Affichage des positions
+- Calque Leaflet Global Link dédié, séparé de SafeSky.
+- Symbole avion vert avec indicatif ; orange lorsque la dernière position dépasse 3 minutes.
+- Positions de plus de 15 minutes masquées.
+- Fiche au clic : indicatif, source Global Link Rescue, coordonnées, altitude brute source et âge de la position.
+- Rafraîchissement automatique toutes les 60 secondes lorsque le calque est actif et l’application visible.
+- Actualisation immédiate lors du retour au premier plan ou du retour réseau.
+
+5. Service Worker
+- Les appels au relais Global Link NAS sont laissés au réseau natif et ne passent pas par le cache générique du Service Worker.
+- Aucun changement des caches Offline, VAC, cartes ou données utilisateur.
+
+ÉLÉMENTS INCHANGÉS
+- Règle 2 doigts v15.22.
+- FdS/GAAR et leur PHP existant.
+- SafeSky.
+- Cartes Online/Offline, IndexedDB, VAC, calque routier et données utilisateur.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.23.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Syntaxe PHP du nouveau relais contrôlée.
+- Aucun identifiant, mot de passe, token Global Link ou PHPSESSID ajouté aux six fichiers publics NPF.
+- Historique v15.22 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.22 — RÈGLE 2 DOIGTS : ZÉRO À GAUCHE + KM DÉGAGÉS
 Date : 12/08/2026
 Base : TEST v15.21
