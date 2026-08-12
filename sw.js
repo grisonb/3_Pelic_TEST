@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-20_update_install_retry';
-const APP_VERSION = 'v15.20';
+const SW_VERSION = 'sw-v15-21_ruler_reverse_scale_bigger_labels';
+const APP_VERSION = 'v15.21';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -155,7 +155,7 @@ async function validateVersionSensitiveCoreResponse(url, response) {
 }
 
 /*
- * v15.20 — GitHub Pages peut propager index/script/style/manifest sur quelques
+ * v15.21 — GitHub Pages peut propager index/script/style/manifest sur quelques
  * secondes. Un seul fichier ancien ne doit plus condamner immédiatement
  * l'installation du nouveau Service Worker. Les fichiers versionnés sont donc
  * relus plusieurs fois avec une URL anti-cache différente avant abandon.
