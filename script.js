@@ -1,12 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.20';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.21';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 
 // =========================================================================
-// v15.20 TEST — fiabilisation de la mise à jour PWA
-// - aucune modification fonctionnelle métier ;
-// - la logique de mise à jour est portée par index.html / sw.js ;
-// - règle 2 doigts v15.19 conservée à l’identique.
+// v15.21 TEST — règle 2 doigts : sens inversé + chiffres agrandis
+// - inversion du sens de lecture des échelles NM et km ;
+// - chiffres agrandis pour une meilleure lisibilité ;
+// - fiabilisation de mise à jour PWA v15.20 conservée.
 // =========================================================================
 // =========================================================================
 // v15.19 TEST — règle 2 doigts : premier plan + double échelle NM/km
@@ -4815,9 +4815,9 @@ function injectNauticalScaleStyle() {
         }
         .npf-two-finger-ruler-mark-value {
             display: inline-block;
-            min-width: 48px;
+            min-width: 72px;
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 14px;
+            font-size: 18px;
             font-weight: 1000;
             line-height: 1;
             text-align: center;
@@ -5165,12 +5165,13 @@ function drawTwoFingerRulerFromTouches(event) {
             lineCap: 'round'
         }).addTo(layer);
 
-        /* Échelle NM sur un côté de la règle. */
+        /* v15.21 — échelle NM inversée sur un côté de la règle. */
         const nmLabelPoint = L.point(
             px + normal.x * labelOffsetPx,
             py + normal.y * labelOffsetPx
         );
-        const nmValueText = formatTwoFingerRulerMarkNm(nm * fraction, fraction === 1);
+        const displayFraction = 1 - fraction;
+        const nmValueText = formatTwoFingerRulerMarkNm(nm * displayFraction, fraction === 0);
         L.marker(map.containerPointToLatLng(nmLabelPoint), {
             pane: TWO_FINGER_RULER_PANE_NAME,
             interactive: false,
@@ -5178,17 +5179,17 @@ function drawTwoFingerRulerFromTouches(event) {
             icon: L.divIcon({
                 className: 'npf-two-finger-ruler-mark-label',
                 html: `<div class="npf-two-finger-ruler-mark-value nm">${nmValueText}</div>`,
-                iconSize: [82, 20],
-                iconAnchor: [41, 10]
+                iconSize: [108, 28],
+                iconAnchor: [54, 14]
             })
         }).addTo(layer);
 
-        /* v15.19 — échelle km symétrique, de l'autre côté du trait. */
+        /* v15.21 — échelle km inversée, symétrique de l'autre côté du trait. */
         const kmLabelPoint = L.point(
             px - normal.x * labelOffsetPx,
             py - normal.y * labelOffsetPx
         );
-        const kmValueText = formatTwoFingerRulerMarkKm(km * fraction, fraction === 1);
+        const kmValueText = formatTwoFingerRulerMarkKm(km * displayFraction, fraction === 0);
         L.marker(map.containerPointToLatLng(kmLabelPoint), {
             pane: TWO_FINGER_RULER_PANE_NAME,
             interactive: false,
@@ -5196,8 +5197,8 @@ function drawTwoFingerRulerFromTouches(event) {
             icon: L.divIcon({
                 className: 'npf-two-finger-ruler-mark-label',
                 html: `<div class="npf-two-finger-ruler-mark-value km">${kmValueText}</div>`,
-                iconSize: [82, 20],
-                iconAnchor: [41, 10]
+                iconSize: [108, 28],
+                iconAnchor: [54, 14]
             })
         }).addTo(layer);
     });
@@ -28480,7 +28481,7 @@ function initializeCalculator() {
     td { font-weight: 800; }
     th:nth-child(5), th:nth-child(6) { font-size: 11.8px; }
     td:nth-child(5), td:nth-child(6) { font-size: 12.5px; white-space: nowrap; }
-    td.kg-cell .kg-inline { font-size: 14px; }
+    td.kg-cell .kg-inline { font-size: 18px; }
     td.kg-cell .kg-unit { font-size: .68em; }
     .rlt-export-cell { line-height: 1.06; padding-left: 3px; padding-right: 3px; white-space: nowrap; overflow: hidden; }
     .rlt-export-cell .kg-inline { font-size: 13px; }
