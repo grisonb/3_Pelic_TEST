@@ -1,5 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.18';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.19';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.19 TEST — règle 2 doigts : premier plan + double échelle NM/km
+// - pane Leaflet dédié au-dessus des marqueurs / trafics / pélicandromes ;
+// - règle jaune fluorescent avec halo noir, comme le vecteur temps propre avion ;
+// - valeurs NM d’un côté et km de l’autre, directement le long de la règle.
+// =========================================================================
 
 // =========================================================================
 // v15.18 TEST — règle 2 doigts : décalage perpendiculaire + chiffres sur règle
@@ -4801,8 +4808,7 @@ function injectNauticalScaleStyle() {
         }
         .npf-two-finger-ruler-mark-value {
             display: inline-block;
-            min-width: 42px;
-            color: #003f6b;
+            min-width: 48px;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 14px;
             font-weight: 1000;
@@ -4810,11 +4816,17 @@ function injectNauticalScaleStyle() {
             text-align: center;
             white-space: nowrap;
             text-shadow:
-                -2px -2px 0 #ffffff,
-                 2px -2px 0 #ffffff,
-                -2px  2px 0 #ffffff,
-                 2px  2px 0 #ffffff,
-                 0 2px 6px rgba(0,0,0,.45);
+                -2px -2px 0 #111827,
+                 2px -2px 0 #111827,
+                -2px  2px 0 #111827,
+                 2px  2px 0 #111827,
+                 0 2px 7px rgba(0,0,0,.90);
+        }
+        .npf-two-finger-ruler-mark-value.nm {
+            color: #ffea00;
+        }
+        .npf-two-finger-ruler-mark-value.km {
+            color: #00f5ff;
         }
         .npf-two-finger-ruler-help {
             position: fixed;
@@ -4932,6 +4944,8 @@ let twoFingerRulerWasTouchZoomEnabled = null;
 let twoFingerRulerPreviousTouchAction = null;
 let twoFingerRulerStartPoints = null;
 let twoFingerRulerHelpEl = null;
+const TWO_FINGER_RULER_PANE_NAME = 'npfTwoFingerRulerPane';
+const TWO_FINGER_RULER_PANE_Z_INDEX = 800;
 
 function getTouchContainerPoints(event) {
     if (!map || !map.getContainer || !event || !event.touches || event.touches.length < 2) return null;
@@ -4950,8 +4964,20 @@ function clearTwoFingerRulerLayer() {
     }
 }
 
+function ensureTwoFingerRulerPane() {
+    if (!map || !map.getPane || !map.createPane) return null;
+    let pane = map.getPane(TWO_FINGER_RULER_PANE_NAME);
+    if (!pane) pane = map.createPane(TWO_FINGER_RULER_PANE_NAME);
+    if (pane) {
+        pane.style.zIndex = String(TWO_FINGER_RULER_PANE_Z_INDEX);
+        pane.style.pointerEvents = 'none';
+    }
+    return pane;
+}
+
 function ensureTwoFingerRulerLayer() {
     if (!map || !window.L) return null;
+    ensureTwoFingerRulerPane();
     if (!twoFingerRulerLayer) twoFingerRulerLayer = L.layerGroup().addTo(map);
     return twoFingerRulerLayer;
 }
@@ -4980,6 +5006,17 @@ function formatTwoFingerRulerMarkNm(value, includeUnit = false) {
     else if (numeric < 10) text = Number(numeric.toFixed(numeric % 1 ? 1 : 0)).toString();
     else text = Math.round(numeric).toString();
     return includeUnit ? `${text} NM` : text;
+}
+
+function formatTwoFingerRulerMarkKm(value, includeUnit = false) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return includeUnit ? '-- km' : '--';
+    let text;
+    if (numeric === 0) text = '0';
+    else if (numeric < 1) text = Number(numeric.toFixed(1)).toString();
+    else if (numeric < 10) text = Number(numeric.toFixed(numeric % 1 ? 1 : 0)).toString();
+    else text = Math.round(numeric).toString();
+    return includeUnit ? `${text} km` : text;
 }
 
 function getTwoFingerRulerOffsetNormal(p1, p2) {
@@ -5014,6 +5051,10 @@ function getTwoFingerRulerOffsetNormal(p1, p2) {
                 {
                     x: shifted.x + normal.x * labelOffsetPx,
                     y: shifted.y + normal.y * labelOffsetPx
+                },
+                {
+                    x: shifted.x - normal.x * labelOffsetPx,
+                    y: shifted.y - normal.y * labelOffsetPx
                 }
             ];
         });
@@ -5047,39 +5088,40 @@ function drawTwoFingerRulerFromTouches(event) {
     clearTwoFingerRulerLayer();
 
     const nm = meters / 1852;
+    const km = meters / 1000;
     const { normal, rulerOffsetPx, labelOffsetPx } = getTwoFingerRulerOffsetNormal(p1, p2);
     const visualOffset = L.point(normal.x * rulerOffsetPx, normal.y * rulerOffsetPx);
     const vp1 = p1.add(visualOffset);
     const vp2 = p2.add(visualOffset);
     const vll1 = map.containerPointToLatLng(vp1);
     const vll2 = map.containerPointToLatLng(vp2);
+    const rulerPaneOptions = { pane: TWO_FINGER_RULER_PANE_NAME };
 
-    /* Halo sombre + blanc + trait bleu : lisibilité identique quelle que soit la carte. */
+    /* v15.19 — même langage graphique que le vecteur temps :
+     * halo noir + jaune fluorescent, au premier plan cartographique.
+     */
     L.polyline([vll1, vll2], {
+        ...rulerPaneOptions,
         color: '#111827',
-        weight: 8,
-        opacity: 0.80,
+        weight: 10,
+        opacity: 0.88,
         interactive: false,
-        lineCap: 'round'
+        lineCap: 'round',
+        lineJoin: 'round'
     }).addTo(layer);
     L.polyline([vll1, vll2], {
-        color: '#ffffff',
-        weight: 5,
-        opacity: 0.95,
-        interactive: false,
-        lineCap: 'round'
-    }).addTo(layer);
-    L.polyline([vll1, vll2], {
-        color: '#003f6b',
-        weight: 3,
+        ...rulerPaneOptions,
+        color: '#ffea00',
+        weight: 6,
         opacity: 1,
         interactive: false,
-        lineCap: 'round'
+        lineCap: 'round',
+        lineJoin: 'round'
     }).addTo(layer);
 
     const dx = vp2.x - vp1.x;
     const dy = vp2.y - vp1.y;
-    const tickLength = 16;
+    const tickLength = 18;
     const fractions = [0, 0.25, 0.5, 0.75, 1];
 
     fractions.forEach((fraction) => {
@@ -5093,33 +5135,62 @@ function drawTwoFingerRulerFromTouches(event) {
             px + normal.x * tickLength / 2,
             py + normal.y * tickLength / 2
         );
-        L.polyline([map.containerPointToLatLng(a), map.containerPointToLatLng(b)], {
-            color: '#003f6b',
-            weight: fraction === 0 || fraction === 1 || fraction === 0.5 ? 4 : 3,
+        const tickLatLngs = [
+            map.containerPointToLatLng(a),
+            map.containerPointToLatLng(b)
+        ];
+        const isMajor = fraction === 0 || fraction === 1 || fraction === 0.5;
+
+        L.polyline(tickLatLngs, {
+            ...rulerPaneOptions,
+            color: '#111827',
+            weight: isMajor ? 8 : 7,
+            opacity: 0.90,
+            interactive: false,
+            lineCap: 'round'
+        }).addTo(layer);
+        L.polyline(tickLatLngs, {
+            ...rulerPaneOptions,
+            color: '#ffea00',
+            weight: isMajor ? 5 : 4,
             opacity: 1,
             interactive: false,
             lineCap: 'round'
         }).addTo(layer);
 
-        /*
-         * v15.18 — chiffres directement repérés sur la règle, comme les marques
-         * 2' / 5' / 10' du vecteur temps : pas de cartouche central séparé.
-         */
-        const markNm = nm * fraction;
-        const labelPoint = L.point(
+        /* Échelle NM sur un côté de la règle. */
+        const nmLabelPoint = L.point(
             px + normal.x * labelOffsetPx,
             py + normal.y * labelOffsetPx
         );
-        const labelLatLng = map.containerPointToLatLng(labelPoint);
-        const valueText = formatTwoFingerRulerMarkNm(markNm, fraction === 1);
-        L.marker(labelLatLng, {
+        const nmValueText = formatTwoFingerRulerMarkNm(nm * fraction, fraction === 1);
+        L.marker(map.containerPointToLatLng(nmLabelPoint), {
+            pane: TWO_FINGER_RULER_PANE_NAME,
             interactive: false,
             keyboard: false,
             icon: L.divIcon({
                 className: 'npf-two-finger-ruler-mark-label',
-                html: `<div class="npf-two-finger-ruler-mark-value">${valueText}</div>`,
-                iconSize: [72, 20],
-                iconAnchor: [36, 10]
+                html: `<div class="npf-two-finger-ruler-mark-value nm">${nmValueText}</div>`,
+                iconSize: [82, 20],
+                iconAnchor: [41, 10]
+            })
+        }).addTo(layer);
+
+        /* v15.19 — échelle km symétrique, de l'autre côté du trait. */
+        const kmLabelPoint = L.point(
+            px - normal.x * labelOffsetPx,
+            py - normal.y * labelOffsetPx
+        );
+        const kmValueText = formatTwoFingerRulerMarkKm(km * fraction, fraction === 1);
+        L.marker(map.containerPointToLatLng(kmLabelPoint), {
+            pane: TWO_FINGER_RULER_PANE_NAME,
+            interactive: false,
+            keyboard: false,
+            icon: L.divIcon({
+                className: 'npf-two-finger-ruler-mark-label',
+                html: `<div class="npf-two-finger-ruler-mark-value km">${kmValueText}</div>`,
+                iconSize: [82, 20],
+                iconAnchor: [41, 10]
             })
         }).addTo(layer);
     });
