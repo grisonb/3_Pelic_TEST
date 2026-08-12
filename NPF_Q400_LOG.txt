@@ -1,5 +1,75 @@
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
+VERSION TEST v15.11 — FdS / GAAR DIRECTEMENT SUR LA CARTE
+Date : 12/08/2026
+Base : TEST v15.10
+
+OBJECTIF
+- Retirer complètement la gestion FdS / GAAR de la fenêtre « Gestion des Cartes ».
+- Donner un accès opérationnel direct aux deux documents depuis la carte principale.
+- Conserver l’autorisation NAS jusqu’à minuit et le stockage IndexedDB mis en place en v15.10.
+
+MODIFICATIONS
+1. Fenêtre « Gestion des Cartes »
+- Suppression complète de la section « FDS / GAAR ».
+- Aucun champ, bouton, état ou texte FdS / GAAR ne reste dans cette fenêtre.
+- Les sections Cartes Offline, Type de carte, Calque Routier, Cartes VAC et Doc FdF Réduite / Carte Fréquences sont inchangées.
+
+2. Nouveaux boutons sur la carte
+- Ajout d’un bouton « FdS » immédiatement au-dessus du bouton GAAR.
+- Ajout d’un bouton « GAAR » immédiatement au-dessus du bouton SafeSky.
+- Ordre vertical obtenu dans cette zone : FdS, GAAR, SafeSky.
+- Les deux boutons utilisent la même emprise que les autres boutons latéraux de carte.
+
+3. État visuel FdS / GAAR
+- Si le PDF du jour n’est pas chargé : fond blanc, contour orange et texte orange.
+- Si le PDF du jour est présent dans IndexedDB : bouton vert avec texte blanc.
+- La couleur est déterminée séparément pour FdS et GAAR : un document peut être vert pendant que l’autre reste orange.
+- Une ancienne copie locale d’un jour précédent ne rend pas le bouton vert : seul le PDF correspondant au jour courant Europe/Paris est considéré comme chargé.
+
+4. Saisie du mot de passe à la demande
+- Si l’utilisateur appuie sur FdS ou GAAR sans session NAS valide, une petite fenêtre de saisie du mot de passe s’ouvre.
+- Le mot de passe reste vérifié côté NAS ; il n’est toujours ni stocké ni intégré dans les fichiers publics NPF.
+- Après validation, la session reste valable jusqu’à minuit comme en v15.10.
+- La fenêtre de mot de passe est indépendante de « Gestion des Cartes ».
+
+5. Comportement au clic
+- Avec une session valide et le PDF du jour déjà chargé : ouverture immédiate de la copie locale.
+- Avec une session valide mais le PDF du jour absent : NPF contrôle le NAS, télécharge les documents disponibles puis ouvre le document demandé.
+- Après une saisie correcte du mot de passe : contrôle NAS + téléchargement, mise à jour des couleurs puis ouverture du document demandé s’il est disponible.
+- Hors ligne, une session déjà valide permet l’ouverture du PDF du jour déjà stocké localement.
+- Hors ligne sans PDF du jour, NPF indique qu’une connexion est nécessaire pour le récupérer.
+
+6. Synchronisation automatique
+- Le contrôle automatique au démarrage reste actif tant que la session quotidienne est encore valide.
+- Après toute synchronisation, les couleurs FdS / GAAR sont recalculées immédiatement.
+- Aucun changement du protocole NAS ni du fichier `npf-docs-api.php`.
+
+ÉLÉMENTS INCHANGÉS
+- Fichier NAS `npf-docs-api.php` de v15.10 : aucune modification nécessaire.
+- Mot de passe, expiration à minuit et jetons temporaires.
+- Stockage IndexedDB `NpfBriefingDocsDB`.
+- SafeSky et filtres trafic.
+- Cartes Offline, VAC, calque routier et PDF FdF.
+- GPS, simulation et circuits GAAR cartographiques.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / SW alignées sur v15.11.
+- Syntaxe JavaScript de `script.js` contrôlée avec Node.js.
+- Syntaxe JavaScript de `sw.js` contrôlée avec Node.js.
+- `manifest.json` contrôlé comme JSON valide.
+- Section FDS / GAAR absente de « Gestion des Cartes ».
+- Boutons FdS et GAAR présents immédiatement avant SafeSky dans le DOM.
+- Aucun token BFG ni mot de passe en clair présent dans les six fichiers publics NPF.
+- Service Worker : logique réseau FdS / GAAR inchangée, seul le numéro de cache applicatif évolue.
+- Historique v15.10 et antérieur conservé intégralement ci-dessous, sans réécriture.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
+
 VERSION TEST v15.10 — FDS / GAAR NAS AUTOMATIQUES PROTÉGÉES JUSQU'À MINUIT
 Date : 12/08/2026
 Base : TEST v15.09
