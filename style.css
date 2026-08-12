@@ -1,5 +1,5 @@
-/* NPF_STYLE_BUILD_VERSION: v15.25 */
-/* v15.25 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
+/* NPF_STYLE_BUILD_VERSION: v15.26 */
+/* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
 /* v15.23 TEST — Global Link Rescue : authentification captcha NAS + positions carte. */
 /* v15.23 TEST — règle 2 doigts : zéro à gauche + chiffres km dégagés. */
@@ -13399,7 +13399,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     box-shadow: 0 1px 4px rgba(0,0,0,.18);
     pointer-events: none;
 }
-/* v15.25 — positions candidates choisies dynamiquement par l'anticollision GLR. */
+/* v15.26 — positions candidates choisies dynamiquement par l'anticollision GLR. */
 .global-link-aircraft-label.glr-label-right { left: 42px; top: 50%; transform: translateY(-50%); }
 .global-link-aircraft-label.glr-label-left { right: 42px; top: 50%; transform: translateY(-50%); }
 .global-link-aircraft-label.glr-label-top { left: 50%; bottom: 42px; transform: translateX(-50%); }
@@ -13409,7 +13409,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 .global-link-aircraft-label.glr-label-upper-left { right: 39px; bottom: 31px; }
 .global-link-aircraft-label.glr-label-lower-left { right: 39px; top: 31px; }
 
-/* v15.25 — les étiquettes GLR sont des marqueurs Leaflet séparés, placés
+/* v15.26 — les étiquettes GLR sont des marqueurs Leaflet séparés, placés
  * dynamiquement par le moteur d'anticollision. */
 .global-link-aircraft-label-marker {
     background: transparent !important;
@@ -13874,9 +13874,9 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
-   v15.25 TEST — GLR anticollision + documents du jour
+   v15.26 TEST — GLR anticollision + documents du jour
    ========================================================================== */
-/* Les règles fonctionnelles v15.25 sont ajoutées aux blocs GLR et FdS/GAAR ci-dessous. */
+/* Les règles fonctionnelles v15.26 sont ajoutées aux blocs GLR et FdS/GAAR ci-dessous. */
 
 /* ==========================================================================
    v15.24 TEST — FdS / GAAR groupés + GLR aligné sur la logique SafeSky
