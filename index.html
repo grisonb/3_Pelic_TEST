@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.09" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.09">
-    <link rel="manifest" href="manifest.json?appv=v15.09">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.10" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.10">
+    <link rel="manifest" href="manifest.json?appv=v15.10">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.09';
+        const APP_VERSION = 'v15.10';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -594,7 +594,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.09"></script>
+    <script src="script.js?appv=v15.10"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
@@ -905,6 +905,38 @@
                             <div id="vac-download-progress-bar" class="vac-download-progress-bar"></div>
                         </div>
                         <div id="vac-download-progress-text" class="vac-download-progress-text"></div>
+                    </div>
+                </div>
+
+
+                <div class="briefing-docs-section">
+                    <h3 class="maps-management-title">FDS / GAAR</h3>
+                    <p class="briefing-docs-explanation">
+                        Les documents du jour sont récupérés depuis le NAS puis conservés sur cet appareil pour une ouverture hors ligne.
+                    </p>
+                    <div id="briefing-docs-auth-row" class="briefing-docs-auth-row">
+                        <input id="briefing-docs-password-input" type="password" autocomplete="current-password"
+                               placeholder="Mot de passe" aria-label="Mot de passe FDS et GAAR">
+                        <button id="briefing-docs-authorize-button" type="button" class="import-button briefing-docs-authorize-button">
+                            Autoriser jusqu’à minuit
+                        </button>
+                    </div>
+                    <div id="briefing-docs-session-row" class="briefing-docs-session-row" style="display: none;">
+                        <span id="briefing-docs-session-status" class="briefing-docs-session-status"></span>
+                        <button id="briefing-docs-sync-button" type="button" class="import-button briefing-docs-sync-button">
+                            Mettre à jour FDS / GAAR
+                        </button>
+                    </div>
+                    <div id="briefing-docs-status" class="briefing-docs-status" aria-live="polite">
+                        Accès non autorisé. Les documents déjà enregistrés restent disponibles hors ligne.
+                    </div>
+                    <div class="briefing-docs-open-actions">
+                        <button id="briefing-docs-open-fds-button" type="button" class="import-button briefing-docs-open-button" disabled>
+                            Ouvrir FDS
+                        </button>
+                        <button id="briefing-docs-open-gaar-button" type="button" class="import-button briefing-docs-open-button" disabled>
+                            Ouvrir GAAR
+                        </button>
                     </div>
                 </div>
 
