@@ -1,5 +1,6 @@
-/* NPF_STYLE_BUILD_VERSION: v15.22 */
-/* v15.22 TEST — règle 2 doigts : zéro à gauche + chiffres km dégagés. */
+/* NPF_STYLE_BUILD_VERSION: v15.23 */
+/* v15.23 TEST — Global Link Rescue : authentification captcha NAS + positions carte. */
+/* v15.23 TEST — règle 2 doigts : zéro à gauche + chiffres km dégagés. */
 /* v15.21 TEST — règle 2 doigts : sens inversé des échelles + chiffres agrandis. */
 /* v15.19 TEST — règle 2 doigts : premier plan + jaune vif + double échelle NM/km. */
 /* v15.18 TEST — règle 2 doigts : décalage perpendiculaire + graduations directes sur le tracé. */
@@ -13228,6 +13229,179 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
+
+
+/* ========================================================================== 
+   v15.23 — Global Link Rescue : bouton, captcha et marqueurs
+   ========================================================================== */
+.global-link-map-button {
+    background: #ffffff !important;
+    font-family: inherit;
+    font-size: 23px !important;
+    font-weight: 950;
+    letter-spacing: .02em;
+}
+.global-link-map-button .global-link-map-label { pointer-events: none; }
+.global-link-map-button.global-link-auth-needed,
+.global-link-map-button.global-link-auth-needed:hover,
+.global-link-map-button.global-link-auth-needed:focus-visible {
+    background: #ffffff !important;
+    border-color: #e67e22 !important;
+    color: #e67e22 !important;
+}
+.global-link-map-button.global-link-ready,
+.global-link-map-button.global-link-ready:hover,
+.global-link-map-button.global-link-ready:focus-visible {
+    background: #ffffff !important;
+    border-color: #198754 !important;
+    color: #198754 !important;
+}
+.global-link-map-button.global-link-active,
+.global-link-map-button.global-link-active:hover,
+.global-link-map-button.global-link-active:focus-visible {
+    background: #198754 !important;
+    border-color: #198754 !important;
+    color: #ffffff !important;
+}
+.global-link-map-button.global-link-stale,
+.global-link-map-button.global-link-stale:hover,
+.global-link-map-button.global-link-stale:focus-visible {
+    background: #fff7ed !important;
+    border-color: #e67e22 !important;
+    color: #c05a00 !important;
+}
+.global-link-button-count {
+    position: absolute;
+    right: -7px;
+    top: -7px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border-radius: 999px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b2f6b;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+    font-size: 13px;
+    font-weight: 950;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(0,0,0,.24);
+    pointer-events: none;
+}
+.global-link-auth-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10070;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(9,20,36,.48);
+}
+.global-link-auth-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: min(92vw, 460px);
+    padding: 24px 22px 20px;
+    border: 1px solid #d4dce6;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 12px 34px rgba(0,0,0,.26);
+    color: #1f2937;
+    text-align: center;
+}
+.global-link-auth-dialog h3 { margin: 0 38px 8px; color: #0b2f6b; font-size: 24px; }
+.global-link-auth-explain { margin: 0 0 15px; font-size: 15px; line-height: 1.35; }
+.global-link-auth-close {
+    position: absolute;
+    right: 12px;
+    top: 10px;
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #7f1d1d;
+    font-size: 30px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.global-link-captcha-frame {
+    min-height: 54px;
+    margin: 10px auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.global-link-captcha-frame img {
+    display: block;
+    max-width: 100%;
+    min-height: 36px;
+    image-rendering: auto;
+}
+.global-link-captcha-input {
+    width: min(100%, 260px);
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 2px solid #9aa9ba;
+    border-radius: 10px;
+    font: 800 20px/1.1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    text-align: center;
+    letter-spacing: .08em;
+}
+.global-link-auth-status { min-height: 22px; margin-top: 9px; font-size: 14px; font-weight: 700; color: #41556a; }
+.global-link-auth-status.error { color: #b42318; }
+.global-link-auth-status.success { color: #087443; }
+.global-link-auth-actions { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+.global-link-auth-actions button {
+    min-height: 44px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font: 800 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    cursor: pointer;
+}
+.global-link-secondary-button { border: 2px solid #0b5ed7; background: #ffffff; color: #0b5ed7; }
+.global-link-primary-button { border: 2px solid #198754; background: #198754; color: #ffffff; }
+.global-link-aircraft-marker {
+    background: transparent !important;
+    border: 0 !important;
+}
+.global-link-aircraft-symbol {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 3px solid #ffffff;
+    background: #198754;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 950;
+    box-shadow: 0 2px 8px rgba(0,0,0,.42);
+}
+.global-link-aircraft-symbol.stale { background: #e67e22; }
+.global-link-aircraft-label {
+    position: absolute;
+    left: 42px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 3px 6px;
+    border-radius: 5px;
+    border: 1px solid rgba(11,47,107,.32);
+    background: rgba(255,255,255,.94);
+    color: #0b2f6b;
+    font: 900 13px/1.05 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,.18);
+    pointer-events: none;
+}
+.global-link-popup { font: 14px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.global-link-popup strong { color: #0b2f6b; }
 
 /* ========================================================================== 
    v15.11 — FdS / GAAR : accès direct sur la carte
