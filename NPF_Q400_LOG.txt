@@ -1,3 +1,51 @@
+VERSION TEST v15.24 — REGROUPEMENT FdS / GAAR + BOUTON GLR
+Date : 12/08/2026
+Base : TEST v15.23
+
+OBJECTIF
+- Regrouper les accès FdS et GAAR dans un seul bouton de la carte.
+- Conserver l’état chargé / non chargé de chaque document directement visible.
+- Renommer GL en GLR et aligner sa logique de couleur sur SafeSky.
+
+MODIFICATIONS
+1. Bouton principal FdS / GAAR
+- Les deux anciens boutons séparés FdS et GAAR sont remplacés par un seul bouton.
+- « FdS » et « GAAR » sont écrits l’un au-dessus de l’autre.
+- Chaque ligne conserve son propre état : vert lorsque le document du jour est chargé, orange lorsqu’il manque.
+- Le bouton principal reste neutre afin que les deux états puissent être lus simultanément.
+
+2. Fenêtre FdS / GAAR
+- Un appui sur le bouton principal ouvre une fenêtre construite sur le même principe visuel que le sélecteur rapide de cartes France.
+- La fenêtre contient deux gros boutons : FdS et GAAR.
+- La logique de couleur des anciens boutons est conservée : blanc/orange si le document du jour manque, vert/blanc s’il est chargé.
+- Un appui sur FdS ou GAAR ferme la fenêtre puis conserve exactement la logique existante d’ouverture, d’autorisation et de téléchargement.
+
+3. Global Link Rescue
+- Le libellé « GL » devient « GLR ».
+- La logique visuelle du bouton est alignée sur SafeSky : contour rouge lorsque le suivi est arrêté/non autorisé/non valide, contour vert lorsque GLR est actif avec des positions fraîches.
+- Le fond reste blanc, comme SafeSky.
+- La bulle de comptage reprend le rouge SafeSky et n’est affichée que lorsque GLR est activé.
+
+ÉLÉMENTS INCHANGÉS
+- Authentification Global Link par captcha et relais NAS.
+- Rafraîchissement GLR toutes les 60 secondes et dédoublonnage des missions.
+- Logique FdS / GAAR, lecteur PDF et bouton Maj.
+- SafeSky et ses filtres.
+- Cartes Online/Offline, VAC, IndexedDB et données utilisateur.
+- Aucun changement du PHP NAS.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.24.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Présence du bouton groupé, de la fenêtre FdS/GAAR et du libellé GLR contrôlée.
+- Identifiants / mot de passe / token Global Link absents des six fichiers publics.
+- Historique v15.23 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.23 — GLOBAL LINK RESCUE : POSITIONS DANS NPF
 Date : 12/08/2026
 Base : TEST v15.22
