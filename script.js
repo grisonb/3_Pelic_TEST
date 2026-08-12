@@ -1,5 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.13';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.14';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.14 TEST — FdS / GAAR : MAJ forcée NAS + affichage largeur écran
+// - le bouton Maj force désormais le rechargement du PDF demandé depuis le NAS ;
+// - la révision distante intègre la révision fichier renvoyée par l'API NAS v2 ;
+// - le lecteur PDF demande explicitement un affichage FitH / page-width ;
+// - aucun polling ni contrôle automatique ajouté.
+// =========================================================================
 
 // =========================================================================
 // v15.13 TEST — FdS / GAAR : lecteur intégré + mise à jour manuelle
@@ -17134,6 +17142,7 @@ function getBriefingDocsRemoteSignature(meta) {
     return [
         String(meta.dateKey || ''),
         String(meta.updatedAt || ''),
+        String(meta.revision || meta.fileRevision || ''),
         String(meta.sizeBytes || 0),
         String(meta.originalFilename || meta.filename || '')
     ].join('|');
@@ -17383,7 +17392,10 @@ async function displayBriefingDocInViewer(type, record, options = {}) {
     }
 
     frame.title = `${label} du jour`;
-    frame.src = npfBriefingDocViewerObjectUrl;
+    // v15.14 : demander au lecteur PDF natif un ajustement à la largeur de l'écran.
+    // FitH est le paramètre PDF standard ; page-width est conservé pour les lecteurs
+    // qui l'interprètent explicitement (Chromium/PDF.js et lecteurs compatibles).
+    frame.src = `${npfBriefingDocViewerObjectUrl}#page=1&view=FitH&zoom=page-width`;
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     if (!options.keepStatus) setBriefingDocViewerStatus('');
@@ -17443,14 +17455,17 @@ async function refreshSingleBriefingDocFromNas(type, options = {}) {
         );
 
         let record = localRecord;
-        let changed = false;
+        const changed = !same;
+        let downloaded = false;
         if (!same || options.force === true) {
+            // v15.14 : un appui explicite sur « Maj » doit réellement relire le PDF
+            // courant du NAS, même si une métadonnée distante n'a pas changé.
             record = await downloadBriefingDocFromNas(safeType, meta, session);
-            changed = true;
+            downloaded = true;
         }
 
         try { localStorage.setItem(NPF_BRIEFING_DOCS_LAST_SYNC_KEY, String(Date.now())); } catch (_) {}
-        return { changed, record, meta };
+        return { changed, downloaded, record, meta };
     } finally {
         npfBriefingDocsSyncInProgress = false;
         await refreshBriefingDocMapButtons().catch(() => {});
@@ -17541,14 +17556,13 @@ function initializeBriefingDocsUi() {
             try {
                 viewerRefreshButton.disabled = true;
                 viewerRefreshButton.textContent = 'Maj…';
-                setBriefingDocViewerStatus('Vérification sur le NAS…');
-                const result = await refreshSingleBriefingDocFromNas(type);
-                if (!result.changed) {
-                    setBriefingDocViewerStatus('Déjà à jour.', { success: true });
-                    return;
-                }
+                setBriefingDocViewerStatus('Récupération de la dernière version sur le NAS…');
+                const result = await refreshSingleBriefingDocFromNas(type, { force: true });
                 await displayBriefingDocInViewer(type, result.record, { keepStatus: true });
-                setBriefingDocViewerStatus('Nouvelle version téléchargée.', { success: true });
+                setBriefingDocViewerStatus(
+                    result.changed ? 'Nouvelle version téléchargée.' : 'Document rechargé depuis le NAS.',
+                    { success: true }
+                );
             } catch (error) {
                 if (!getStoredBriefingDocsSession()) {
                     openBriefingDocsPasswordModal(type);
