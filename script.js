@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.17';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.18';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.18 TEST — règle 2 doigts : décalage perpendiculaire + chiffres sur règle
+// - règle décalée perpendiculairement à l’axe des deux doigts ;
+// - bascule automatique de côté à proximité des bords de l’écran ;
+// - suppression du cartouche central NM/km ;
+// - graduations 0 / 25 / 50 / 75 / 100 % avec valeurs NM directement sur la règle ;
+// - FdS/GAAR, SafeSky, Offline, GPS et NAS inchangés.
+// =========================================================================
 
 // =========================================================================
 // v15.17 TEST — FdS : statut MAJ simplifié + largeur légèrement réduite
@@ -4782,6 +4791,31 @@ function injectNauticalScaleStyle() {
         }
         .npf-two-finger-ruler-label .nm { font-size: 15px; }
         .npf-two-finger-ruler-label .km { font-size: 12px; color:#41556a; margin-top:2px; }
+        .npf-two-finger-ruler-mark-label {
+            background: transparent !important;
+            border: 0 !important;
+            box-shadow: none !important;
+            pointer-events: none !important;
+            width: auto !important;
+            height: auto !important;
+        }
+        .npf-two-finger-ruler-mark-value {
+            display: inline-block;
+            min-width: 42px;
+            color: #003f6b;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14px;
+            font-weight: 1000;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            text-shadow:
+                -2px -2px 0 #ffffff,
+                 2px -2px 0 #ffffff,
+                -2px  2px 0 #ffffff,
+                 2px  2px 0 #ffffff,
+                 0 2px 6px rgba(0,0,0,.45);
+        }
         .npf-two-finger-ruler-help {
             position: fixed;
             left: 50%;
@@ -4937,6 +4971,68 @@ function hideTwoFingerRulerHelp() {
     twoFingerRulerHelpEl = null;
 }
 
+function formatTwoFingerRulerMarkNm(value, includeUnit = false) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return includeUnit ? '-- NM' : '--';
+    let text;
+    if (numeric === 0) text = '0';
+    else if (numeric < 1) text = Number(numeric.toFixed(1)).toString();
+    else if (numeric < 10) text = Number(numeric.toFixed(numeric % 1 ? 1 : 0)).toString();
+    else text = Math.round(numeric).toString();
+    return includeUnit ? `${text} NM` : text;
+}
+
+function getTwoFingerRulerOffsetNormal(p1, p2) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nA = { x: -dy / len, y: dx / len };
+    const nB = { x: -nA.x, y: -nA.y };
+
+    /*
+     * Par défaut on choisit le côté qui pointe le plus vers le haut de l'écran,
+     * afin de conserver le comportement historique lorsque les doigts sont horizontaux.
+     * Si ce côté sort de l'écran, le score de débordement fait basculer la règle.
+     */
+    const preferred = nA.y <= nB.y ? nA : nB;
+    const alternate = preferred === nA ? nB : nA;
+    const container = map?.getContainer ? map.getContainer() : null;
+    const width = Math.max(1, Number(container?.clientWidth || container?.getBoundingClientRect?.().width || 0));
+    const height = Math.max(1, Number(container?.clientHeight || container?.getBoundingClientRect?.().height || 0));
+    const rulerOffsetPx = 74;
+    const labelOffsetPx = 23;
+    const edgeMarginPx = 18;
+
+    const overflowScore = (normal) => {
+        const points = [p1, p2].flatMap((point) => {
+            const shifted = {
+                x: point.x + normal.x * rulerOffsetPx,
+                y: point.y + normal.y * rulerOffsetPx
+            };
+            return [
+                shifted,
+                {
+                    x: shifted.x + normal.x * labelOffsetPx,
+                    y: shifted.y + normal.y * labelOffsetPx
+                }
+            ];
+        });
+        let score = 0;
+        points.forEach((point) => {
+            if (point.x < edgeMarginPx) score += edgeMarginPx - point.x;
+            if (point.x > width - edgeMarginPx) score += point.x - (width - edgeMarginPx);
+            if (point.y < edgeMarginPx) score += edgeMarginPx - point.y;
+            if (point.y > height - edgeMarginPx) score += point.y - (height - edgeMarginPx);
+        });
+        return score;
+    };
+
+    const preferredScore = overflowScore(preferred);
+    const alternateScore = overflowScore(alternate);
+    const normal = alternateScore + 2 < preferredScore ? alternate : preferred;
+    return { normal, rulerOffsetPx, labelOffsetPx };
+}
+
 function drawTwoFingerRulerFromTouches(event) {
     const points = getTouchContainerPoints(event);
     const layer = ensureTwoFingerRulerLayer();
@@ -4951,20 +5047,14 @@ function drawTwoFingerRulerFromTouches(event) {
     clearTwoFingerRulerLayer();
 
     const nm = meters / 1852;
-    const km = meters / 1000;
-
-    /* v13.77 — la règle est dessinée au-dessus des doigts, sinon elle est masquée en vol.
-     * La mesure reste basée sur les deux points réellement touchés.
-     */
-    let offsetY = -72;
-    const minTouchY = Math.min(p1.y, p2.y);
-    if (minTouchY + offsetY < 18) offsetY = 18 - minTouchY;
-    const visualOffset = L.point(0, offsetY);
+    const { normal, rulerOffsetPx, labelOffsetPx } = getTwoFingerRulerOffsetNormal(p1, p2);
+    const visualOffset = L.point(normal.x * rulerOffsetPx, normal.y * rulerOffsetPx);
     const vp1 = p1.add(visualOffset);
     const vp2 = p2.add(visualOffset);
     const vll1 = map.containerPointToLatLng(vp1);
     const vll2 = map.containerPointToLatLng(vp2);
 
+    /* Halo sombre + blanc + trait bleu : lisibilité identique quelle que soit la carte. */
     L.polyline([vll1, vll2], {
         color: '#111827',
         weight: 8,
@@ -4989,16 +5079,20 @@ function drawTwoFingerRulerFromTouches(event) {
 
     const dx = vp2.x - vp1.x;
     const dy = vp2.y - vp1.y;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
     const tickLength = 16;
     const fractions = [0, 0.25, 0.5, 0.75, 1];
+
     fractions.forEach((fraction) => {
         const px = vp1.x + dx * fraction;
         const py = vp1.y + dy * fraction;
-        const a = L.point(px - nx * tickLength / 2, py - ny * tickLength / 2);
-        const b = L.point(px + nx * tickLength / 2, py + ny * tickLength / 2);
+        const a = L.point(
+            px - normal.x * tickLength / 2,
+            py - normal.y * tickLength / 2
+        );
+        const b = L.point(
+            px + normal.x * tickLength / 2,
+            py + normal.y * tickLength / 2
+        );
         L.polyline([map.containerPointToLatLng(a), map.containerPointToLatLng(b)], {
             color: '#003f6b',
             weight: fraction === 0 || fraction === 1 || fraction === 0.5 ? 4 : 3,
@@ -5006,21 +5100,29 @@ function drawTwoFingerRulerFromTouches(event) {
             interactive: false,
             lineCap: 'round'
         }).addTo(layer);
+
+        /*
+         * v15.18 — chiffres directement repérés sur la règle, comme les marques
+         * 2' / 5' / 10' du vecteur temps : pas de cartouche central séparé.
+         */
+        const markNm = nm * fraction;
+        const labelPoint = L.point(
+            px + normal.x * labelOffsetPx,
+            py + normal.y * labelOffsetPx
+        );
+        const labelLatLng = map.containerPointToLatLng(labelPoint);
+        const valueText = formatTwoFingerRulerMarkNm(markNm, fraction === 1);
+        L.marker(labelLatLng, {
+            interactive: false,
+            keyboard: false,
+            icon: L.divIcon({
+                className: 'npf-two-finger-ruler-mark-label',
+                html: `<div class="npf-two-finger-ruler-mark-value">${valueText}</div>`,
+                iconSize: [72, 20],
+                iconAnchor: [36, 10]
+            })
+        }).addTo(layer);
     });
-
-    let labelPoint = L.point((vp1.x + vp2.x) / 2, (vp1.y + vp2.y) / 2 - 42);
-    if (labelPoint.y < 20) labelPoint = L.point(labelPoint.x, 20);
-    const labelLatLng = map.containerPointToLatLng(labelPoint);
-
-    L.marker(labelLatLng, {
-        interactive: false,
-        icon: L.divIcon({
-            className: 'npf-two-finger-ruler-label',
-            html: `<div class="nm">${formatNauticalMiles(nm)}</div><div class="km">${formatKilometers(km)}</div>`,
-            iconSize: [112, 44],
-            iconAnchor: [56, 22]
-        })
-    }).addTo(layer);
 }
 
 function cancelTwoFingerRulerTimer() {
