@@ -1,3 +1,43 @@
+VERSION TEST v15.18 — RÈGLE 2 DOIGTS : DÉCALAGE PERPENDICULAIRE + GRADUATIONS DIRECTES
+Date : 12/08/2026
+Base utilisée : TEST v15.17.
+
+OBJECTIFS
+- Empêcher les doigts de masquer la règle lorsque l’axe des deux doigts tourne, notamment en rotation antihoraire.
+- Faire suivre à la règle le même principe visuel que le vecteur temps du propre avion : valeurs directement repérées sur le tracé, sans cartouche séparé.
+- Conserver exactement la mesure entre les deux points réellement touchés.
+
+POSITIONNEMENT DE LA RÈGLE
+- Le décalage fixe vertical hérité de v13.77 est supprimé.
+- La règle est désormais décalée perpendiculairement à l’axe défini par les deux doigts.
+- Pour deux doigts horizontaux, la règle reste au-dessus comme auparavant.
+- Lorsque les doigts tournent, le décalage tourne avec eux : la distance visuelle entre doigts et règle reste donc pratiquement constante.
+- À proximité d’un bord de l’écran, le côté opposé est choisi automatiquement si cela évite de couper la règle ou ses graduations.
+
+GRADUATIONS
+- Suppression de l’étiquette centrale NM / km.
+- Les valeurs sont inscrites directement le long de la règle, sans fond ni cartouche.
+- Graduations affichées à 0 %, 25 %, 50 %, 75 % et 100 % de la longueur.
+- Les repères intermédiaires indiquent directement la distance en NM ; le repère final porte également l’unité « NM ».
+- Les chiffres restent horizontaux à l’écran pour rester lisibles, comme les repères 2’ / 5’ / 10’ du vecteur temps de l’avion.
+
+ÉLÉMENTS INCHANGÉS
+- Activation de la règle par appui prolongé à deux doigts.
+- Suspension du zoom pendant l’utilisation de la règle.
+- Calcul de distance Leaflet entre les deux points touchés.
+- FdS / GAAR et leur chaîne de mise à jour validée en v15.17.
+- SafeSky, cartes Online/Offline, VAC, GPS et simulation.
+- Aucun fichier NAS à modifier.
+
+CONTRÔLES TECHNIQUES
+- Syntaxe JavaScript de script.js contrôlée avec Node.js.
+- Syntaxe JavaScript de sw.js contrôlée avec Node.js.
+- manifest.json contrôlé comme JSON valide.
+- Versions Index / Manifest / Script / SW alignées sur v15.18.
+- Historique précédent conservé intégralement et sans modification.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.17 — FDS : STATUT MAJ SIMPLIFIÉ + LARGEUR AJUSTÉE
 Date : 12/08/2026
 Base utilisée : TEST v15.16.
