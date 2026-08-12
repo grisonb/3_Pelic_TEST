@@ -1,6 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.19';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.20';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
+
+// =========================================================================
+// v15.20 TEST — fiabilisation de la mise à jour PWA
+// - aucune modification fonctionnelle métier ;
+// - la logique de mise à jour est portée par index.html / sw.js ;
+// - règle 2 doigts v15.19 conservée à l’identique.
+// =========================================================================
 // =========================================================================
 // v15.19 TEST — règle 2 doigts : premier plan + double échelle NM/km
 // - pane Leaflet dédié au-dessus des marqueurs / trafics / pélicandromes ;
