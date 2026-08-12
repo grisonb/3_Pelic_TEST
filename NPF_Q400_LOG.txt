@@ -1,3 +1,42 @@
+VERSION TEST v15.22 — RÈGLE 2 DOIGTS : ZÉRO À GAUCHE + KM DÉGAGÉS
+Date : 12/08/2026
+Base : TEST v15.21
+
+OBJECTIF
+- Corriger définitivement le sens de lecture de la règle 2 doigts.
+- Garantir que, lorsque la règle est horizontale, le zéro est toujours à gauche.
+- Éloigner les chiffres km du trait de règle.
+
+MODIFICATIONS
+1. Sens d'échelle déterministe
+- L'ordre natif des deux touches iPad n'est plus utilisé pour définir le sens de l'échelle.
+- Les deux extrémités sont réordonnées visuellement avant dessin : gauche → droite pour une règle non verticale.
+- Pour une règle quasi verticale, l'ordre haut → bas est utilisé pour éviter des inversions aléatoires.
+- Les deux échelles NM et km commencent donc à 0 sur la même extrémité visuelle et augmentent vers l'autre extrémité.
+- Quand la règle est horizontale : 0 est toujours à gauche, distance totale à droite.
+
+2. Chiffres km dégagés
+- L'échelle NM reste proche de son côté de la règle.
+- L'échelle km est davantage décalée de l'autre côté afin que ses chiffres ne recouvrent plus le trait.
+- Le calcul de proximité des bords tient compte de ce nouveau décalage supérieur.
+
+ÉLÉMENTS INCHANGÉS
+- Taille agrandie des chiffres v15.21.
+- Couleur vive et premier plan cartographique.
+- Fiabilisation de mise à jour PWA v15.20.
+- FdS/GAAR, SafeSky, cartes Online/Offline, VAC et données utilisateur.
+- Aucun changement NAS.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.22.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Historique v15.21 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.21 — RÈGLE 2 DOIGTS : SENS INVERSÉ + CHIFFRES AGRANDIS
 Date : 12/08/2026
 Base : TEST v15.20
