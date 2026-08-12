@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-22_ruler_zero_left_km_clear';
-const APP_VERSION = 'v15.22';
+const SW_VERSION = 'sw-v15-23_global_link_relay';
+const APP_VERSION = 'v15.23';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -437,7 +437,7 @@ self.addEventListener('fetch', event => {
     // TypeError: Load failed » quand une navigation/fetch externe échouait.
     // Sans respondWith, le navigateur effectue sa requête réseau normalement et
     // script.js gère les erreurs dans le bandeau du lecteur.
-    if (isBriefingDocsNasRequest(request.url) || isBriefingDocsSourceRequest(request.url)) {
+    if (isBriefingDocsNasRequest(request.url) || isBriefingDocsSourceRequest(request.url) || isGlobalLinkNasRequest(request.url)) {
         return;
     }
 
@@ -473,6 +473,16 @@ self.addEventListener('fetch', event => {
 
 
 
+
+function isGlobalLinkNasRequest(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.hostname === 'grisonb.synology.me'
+            && parsed.pathname === '/briefing-api/npf-global-link-api.php';
+    } catch (_) {
+        return false;
+    }
+}
 
 function isBriefingDocsNasRequest(url) {
     try {
