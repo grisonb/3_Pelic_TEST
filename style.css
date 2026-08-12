@@ -1,3 +1,4 @@
+/* v15.10 TEST — section FDS / GAAR NAS protégée et stockage hors ligne. */
 /* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
 /* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
 /* v15.02 TEST — filtres SafeSky : lignes altitude non sélectionnées non grisées. */
@@ -13216,3 +13217,102 @@ body.gaar-point-search-open .gaar-editing-banner {
     pointer-events: none !important;
 }
 
+
+
+/* ==========================================================================
+   v15.10 — FDS / GAAR NAS dans Gestion des Cartes
+   ========================================================================== */
+.briefing-docs-section {
+    margin-top: 18px;
+    padding-top: 4px;
+}
+
+.briefing-docs-section .maps-management-title {
+    margin-bottom: 10px;
+}
+
+.briefing-docs-explanation {
+    margin: 0 0 12px;
+    color: var(--light-text-color);
+    line-height: 1.35;
+}
+
+.briefing-docs-auth-row,
+.briefing-docs-session-row,
+.briefing-docs-open-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#briefing-docs-password-input {
+    box-sizing: border-box;
+    min-height: 54px;
+    flex: 1 1 190px;
+    min-width: 0;
+    padding: 0 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #ffffff;
+    color: var(--text-color);
+    font-size: 16px;
+}
+
+.briefing-docs-authorize-button,
+.briefing-docs-sync-button,
+.briefing-docs-open-button {
+    box-sizing: border-box;
+    min-height: 54px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.briefing-docs-session-row {
+    justify-content: space-between;
+}
+
+.briefing-docs-session-status {
+    font-weight: 800;
+    color: #176b36;
+}
+
+.briefing-docs-status {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid #d7dee8;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: var(--text-color);
+    white-space: pre-line;
+    line-height: 1.4;
+}
+
+.briefing-docs-open-actions {
+    margin-top: 10px;
+}
+
+.briefing-docs-open-button:disabled,
+.briefing-docs-sync-button:disabled,
+.briefing-docs-authorize-button:disabled {
+    opacity: .55;
+    cursor: default;
+}
+
+@media (max-width: 620px) {
+    .briefing-docs-auth-row,
+    .briefing-docs-session-row {
+        align-items: stretch;
+    }
+    #briefing-docs-password-input,
+    .briefing-docs-authorize-button,
+    .briefing-docs-sync-button {
+        width: 100%;
+        flex-basis: 100%;
+    }
+    .briefing-docs-open-actions .briefing-docs-open-button {
+        flex: 1 1 calc(50% - 5px);
+        min-width: 0;
+    }
+}
