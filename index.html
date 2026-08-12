@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.22" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.22">
-    <link rel="manifest" href="manifest.json?appv=v15.22">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.23" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.23">
+    <link rel="manifest" href="manifest.json?appv=v15.23">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.22';
+        const APP_VERSION = 'v15.23';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -436,6 +436,14 @@
                 aria-label="GAAR du jour non téléchargé">
             <span class="briefing-doc-map-label">GAAR</span>
         </button>
+        <button id="global-link-layer-button"
+                class="left-map-action-button global-link-map-button global-link-auth-needed"
+                type="button"
+                title="Global Link — connexion requise"
+                aria-label="Global Link — afficher ou masquer les appareils suivis">
+            <span class="global-link-map-label">GL</span>
+            <span id="global-link-button-count" class="global-link-button-count">0</span>
+        </button>
         <button id="traffic-layer-button" class="left-map-action-button traffic-map-button" title="SafeSky — afficher/masquer le trafic aérien indicatif — appui long : filtres" aria-label="SafeSky — afficher ou masquer le trafic aérien indicatif">
             <span class="traffic-icon traffic-safesky-icon" aria-hidden="true"></span>
             <span id="traffic-button-count" class="traffic-button-count">0</span>
@@ -448,6 +456,32 @@
         </button>
     </div>
     <div id="traffic-status-display" class="traffic-status-display" style="display: none;"></div>
+
+    <div id="global-link-auth-modal"
+         class="global-link-auth-modal"
+         style="display: none;"
+         aria-hidden="true">
+        <div class="global-link-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="global-link-auth-title">
+            <button id="global-link-auth-close" class="global-link-auth-close" type="button" aria-label="Fermer">×</button>
+            <h3 id="global-link-auth-title">Global Link Rescue</h3>
+            <p class="global-link-auth-explain">Recopie le code de sécurité affiché ci-dessous pour autoriser le suivi Global Link.</p>
+            <div class="global-link-captcha-frame">
+                <img id="global-link-captcha-image" alt="Code de sécurité Global Link" />
+            </div>
+            <input id="global-link-captcha-input"
+                   class="global-link-captcha-input"
+                   type="text"
+                   inputmode="numeric"
+                   autocomplete="off"
+                   maxlength="8"
+                   placeholder="Code de sécurité" />
+            <div id="global-link-auth-status" class="global-link-auth-status" aria-live="polite"></div>
+            <div class="global-link-auth-actions">
+                <button id="global-link-captcha-refresh" type="button" class="global-link-secondary-button">Nouveau code</button>
+                <button id="global-link-auth-submit" type="button" class="global-link-primary-button">Connexion</button>
+            </div>
+        </div>
+    </div>
 
     <div id="briefing-docs-password-modal"
          class="briefing-docs-password-modal"
@@ -664,7 +698,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.22"></script>
+    <script src="script.js?appv=v15.23"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
