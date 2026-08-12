@@ -1,5 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.24';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.25';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.25 TEST — GLR anticollision + toutes missions + documents strictement du jour
+// - étiquettes GLR repositionnées automatiquement pour limiter les chevauchements ;
+// - toutes les missions visibles du compte GLR sont admises (DRAGON / PUMA inclus) ;
+// - FdS / GAAR : seul le document correspondant à la date du jour peut être chargé ;
+// - contour du bouton FdS / GAAR vert dès qu'au moins un document du jour est présent.
+// =========================================================================
 
 // =========================================================================
 // v15.24 TEST — regroupement FdS/GAAR + bouton GLR aligné SafeSky
@@ -17460,7 +17468,7 @@ async function syncBriefingDocsFromNas(options = {}) {
         let downloaded = 0;
         for (const type of NPF_BRIEFING_DOC_TYPES) {
             const meta = payload[type];
-            if (!meta || !meta.exists) continue;
+            if (!isBriefingDocMetaForToday(meta)) continue;
             const remoteSignature = getBriefingDocsRemoteSignature(meta);
             const localRecord = await getBriefingDocRecord(type).catch(() => null);
             if (localRecord && localRecord.remoteSignature === remoteSignature && localRecord.blob instanceof Blob) {
@@ -17498,11 +17506,34 @@ function getBriefingDocsParisDateKey() {
     return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
 }
 
+function extractBriefingDocDateKey(value) {
+    const text = String(value || '');
+    const match = text.match(/(?:^|\D)(20\d{6})(?:\D|$)/);
+    return match ? match[1] : '';
+}
+
+function getBriefingDocEffectiveDateKey(value) {
+    if (!value || typeof value !== 'object') return '';
+    /*
+     * v15.25 — le nom du PDF est prioritaire : en fin de journée une FdS du
+     * lendemain peut être reçue aujourd'hui, donc mailDate / mtime ne prouvent
+     * pas que le document concerne la date du jour.
+     */
+    const filenameDate = extractBriefingDocDateKey(value.originalFilename || value.filename || '');
+    if (filenameDate) return filenameDate;
+    const declared = String(value.dateKey || '').replace(/\D/g, '');
+    return /^20\d{6}$/.test(declared) ? declared : '';
+}
+
+function isBriefingDocMetaForToday(meta) {
+    return Boolean(meta && meta.exists && getBriefingDocEffectiveDateKey(meta) === getBriefingDocsParisDateKey());
+}
+
 function isBriefingDocRecordForToday(record) {
     return Boolean(
         record
         && record.blob instanceof Blob
-        && String(record.dateKey || '') === getBriefingDocsParisDateKey()
+        && getBriefingDocEffectiveDateKey(record) === getBriefingDocsParisDateKey()
     );
 }
 
@@ -17546,6 +17577,9 @@ function updateBriefingDocsMainButtonState(fdsRecord, gaarRecord) {
     updateLine(gaarLine, gaarLoaded);
 
     if (!mainButton) return;
+    const anyLoaded = fdsLoaded || gaarLoaded;
+    mainButton.classList.toggle('briefing-docs-any-loaded', anyLoaded);
+    mainButton.classList.toggle('briefing-docs-none-loaded', !anyLoaded);
     mainButton.classList.toggle('loading', npfBriefingDocsSyncInProgress);
     mainButton.setAttribute('aria-busy', npfBriefingDocsSyncInProgress ? 'true' : 'false');
     const fdsState = fdsLoaded ? 'FdS chargée' : 'FdS non chargée';
@@ -17842,8 +17876,8 @@ async function refreshSingleBriefingDocFromNas(type, options = {}) {
             payload = await fetchBriefingDocsStatusPayload(session);
         }
         const meta = payload[safeType];
-        if (!meta || !meta.exists) {
-            throw new Error(`Aucune ${getBriefingDocLabel(safeType)} du jour disponible sur le NAS.`);
+        if (!isBriefingDocMetaForToday(meta)) {
+            throw new Error(`Aucune ${getBriefingDocLabel(safeType)} de la date du jour disponible sur le NAS.`);
         }
 
         const remoteSignature = getBriefingDocsRemoteSignature(meta);
@@ -18111,6 +18145,7 @@ let npfGlobalLinkEnabled = false;
 let npfGlobalLinkFetchInProgress = false;
 let npfGlobalLinkAttempt = '';
 let npfGlobalLinkLastPositions = [];
+let npfGlobalLinkRelayoutTimer = null;
 
 function getStoredGlobalLinkSession() {
     try {
@@ -18265,10 +18300,23 @@ function ensureGlobalLinkPane() {
     return pane;
 }
 
+function scheduleGlobalLinkLabelRelayout() {
+    if (!npfGlobalLinkEnabled || !npfGlobalLinkLastPositions.length) return;
+    if (npfGlobalLinkRelayoutTimer) clearTimeout(npfGlobalLinkRelayoutTimer);
+    npfGlobalLinkRelayoutTimer = setTimeout(() => {
+        npfGlobalLinkRelayoutTimer = null;
+        renderGlobalLinkPositions(npfGlobalLinkLastPositions);
+    }, 70);
+}
+
 function ensureGlobalLinkLayer() {
     if (!map || !window.L) return null;
     ensureGlobalLinkPane();
     if (!npfGlobalLinkLayer) npfGlobalLinkLayer = L.layerGroup().addTo(map);
+    if (!map.__npfGlobalLinkLabelRelayoutBound) {
+        map.__npfGlobalLinkLabelRelayoutBound = true;
+        map.on('zoomend moveend resize', scheduleGlobalLinkLabelRelayout);
+    }
     return npfGlobalLinkLayer;
 }
 
@@ -18325,6 +18373,93 @@ function updateGlobalLinkButton(options = {}) {
     }
 }
 
+function globalLinkRectsOverlap(a, b, gap = 3) {
+    return !(
+        a.right + gap <= b.left
+        || a.left >= b.right + gap
+        || a.bottom + gap <= b.top
+        || a.top >= b.bottom + gap
+    );
+}
+
+function buildGlobalLinkLabelLayout(items) {
+    const placements = new Map();
+    if (!map?.latLngToContainerPoint || !map?.getSize) return placements;
+    const size = map.getSize();
+    const edge = 8;
+    const occupiedLabels = [];
+    const symbolRects = items.map(item => {
+        const p = map.latLngToContainerPoint([item.lat, item.lon]);
+        return { left: p.x - 21, right: p.x + 21, top: p.y - 21, bottom: p.y + 21 };
+    });
+
+    const insideViewport = rect => (
+        rect.left >= edge && rect.right <= size.x - edge
+        && rect.top >= edge && rect.bottom <= size.y - edge
+    );
+    const isFree = (rect, ownIndex) => (
+        insideViewport(rect)
+        && !occupiedLabels.some(other => globalLinkRectsOverlap(rect, other, 4))
+        && !symbolRects.some((symbol, symbolIndex) => symbolIndex !== ownIndex && globalLinkRectsOverlap(rect, symbol, 2))
+    );
+    const rectFromCenter = (x, y, width, height) => ({
+        left: x - width / 2, right: x + width / 2,
+        top: y - height / 2, bottom: y + height / 2
+    });
+
+    items.forEach((item, index) => {
+        const p = map.latLngToContainerPoint([item.lat, item.lon]);
+        const width = Math.max(68, Math.min(168, 20 + String(item.name || '').length * 8.4));
+        const height = 25;
+        const hGap = 27 + width / 2;
+        const vGap = 27 + height / 2;
+        const shifts = [0, -30, 30, -60, 60, -90, 90, -120, 120];
+        const candidates = [];
+
+        // Priorité à droite/gauche puis dessus/dessous, en décalant progressivement.
+        shifts.forEach(dy => {
+            candidates.push({ x: p.x + hGap, y: p.y + dy });
+            candidates.push({ x: p.x - hGap, y: p.y + dy });
+        });
+        shifts.forEach(dx => {
+            candidates.push({ x: p.x + dx, y: p.y - vGap });
+            candidates.push({ x: p.x + dx, y: p.y + vGap });
+        });
+
+        let chosen = null;
+        for (const candidate of candidates) {
+            const rect = rectFromCenter(candidate.x, candidate.y, width, height);
+            if (isFree(rect, index)) { chosen = { ...candidate, rect }; break; }
+        }
+
+        /*
+         * Filet de sécurité : si un amas très dense occupe toutes les positions
+         * proches, chercher une case libre dans le viewport. Ainsi deux étiquettes
+         * GLR ne sont jamais volontairement superposées.
+         */
+        if (!chosen) {
+            outer:
+            for (let y = edge + height / 2; y <= size.y - edge - height / 2; y += height + 6) {
+                for (let x = edge + width / 2; x <= size.x - edge - width / 2; x += 18) {
+                    const rect = rectFromCenter(x, y, width, height);
+                    if (isFree(rect, index)) { chosen = { x, y, rect }; break outer; }
+                }
+            }
+        }
+
+        /*
+         * Si aucun emplacement libre n'existe réellement dans le viewport, ne
+         * pas afficher cette étiquette plutôt que de la superposer à une autre.
+         * Le symbole avion reste toujours visible et cliquable.
+         */
+        if (!chosen) return;
+
+        placements.set(item.key, { point: L.point(chosen.x, chosen.y), width, height });
+        occupiedLabels.push(chosen.rect);
+    });
+    return placements;
+}
+
 function renderGlobalLinkPositions(positions) {
     npfGlobalLinkLastPositions = Array.isArray(positions) ? positions : [];
     const layer = ensureGlobalLinkLayer();
@@ -18335,33 +18470,61 @@ function renderGlobalLinkPositions(positions) {
         return;
     }
     const now = Date.now();
-    npfGlobalLinkLastPositions.forEach(item => {
-        const lat = Number(item.lat);
-        const lon = Number(item.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-        const ts = Date.parse(String(item.updatedAt || ''));
-        const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
-        if (ageSeconds > NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS) return;
-        const stale = ageSeconds > NPF_GLOBAL_LINK_FRESH_SECONDS;
-        const name = String(item.name || 'Global Link').trim();
-        const safeName = escapeGlobalLinkHtml(name);
-        const icon = L.divIcon({
+    const visibleItems = npfGlobalLinkLastPositions
+        .map((item, sourceIndex) => {
+            const lat = Number(item.lat);
+            const lon = Number(item.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            const ts = Date.parse(String(item.updatedAt || ''));
+            const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
+            if (ageSeconds > NPF_GLOBAL_LINK_VISIBLE_MAX_SECONDS) return null;
+            const name = String(item.name || 'Global Link').trim();
+            return {
+                ...item, lat, lon, ageSeconds, name,
+                stale: ageSeconds > NPF_GLOBAL_LINK_FRESH_SECONDS,
+                key: `${String(item.groupId || item.missionId || name)}|${sourceIndex}`
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => (a.ageSeconds - b.ageSeconds) || a.name.localeCompare(b.name, 'fr'));
+
+    const labelLayout = buildGlobalLinkLabelLayout(visibleItems);
+    visibleItems.forEach(item => {
+        const safeName = escapeGlobalLinkHtml(item.name);
+        const symbolIcon = L.divIcon({
             className: 'global-link-aircraft-marker',
-            html: `<div class="global-link-aircraft-symbol${stale ? ' stale' : ''}">✈<span class="global-link-aircraft-label">${safeName}</span></div>`,
+            html: `<div class="global-link-aircraft-symbol${item.stale ? ' stale' : ''}">✈</div>`,
             iconSize: [34,34],
             iconAnchor: [17,17]
         });
-        const marker = L.marker([lat, lon], {
+        const marker = L.marker([item.lat, item.lon], {
             pane: NPF_GLOBAL_LINK_PANE_NAME,
-            icon,
+            icon: symbolIcon,
             keyboard: false,
-            title: name
+            title: item.name
         });
         const altitude = item.altitude === null || item.altitude === undefined || item.altitude === ''
             ? '—'
             : escapeGlobalLinkHtml(item.altitude);
-        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(ageSeconds))}</div>`);
+        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}</div>`);
         marker.addTo(layer);
+
+        const placement = labelLayout.get(item.key);
+        if (placement) {
+            const labelLatLng = map.containerPointToLatLng(placement.point);
+            const labelIcon = L.divIcon({
+                className: 'global-link-aircraft-label-marker',
+                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}">${safeName}</div>`,
+                iconSize: [placement.width, placement.height],
+                iconAnchor: [placement.width / 2, placement.height / 2]
+            });
+            L.marker(labelLatLng, {
+                pane: NPF_GLOBAL_LINK_PANE_NAME,
+                icon: labelIcon,
+                interactive: false,
+                keyboard: false
+            }).addTo(layer);
+        }
     });
     updateGlobalLinkButton();
 }
