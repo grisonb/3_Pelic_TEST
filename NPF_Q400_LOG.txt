@@ -1,3 +1,51 @@
+VERSION TEST v15.17 — FDS : STATUT MAJ SIMPLIFIÉ + LARGEUR AJUSTÉE
+Date : 12/08/2026
+Base utilisée : TEST v15.16.
+
+OBJECTIFS
+- Ne plus afficher le décompte des tentatives pendant une mise à jour FdS / GAAR.
+- Réduire légèrement la largeur de la FdS, la v15.16 étant un peu trop large sur l'iPad testé.
+- Conserver intégralement la chaîne de mise à jour qui fonctionne en v15.16.
+
+STATUT DE MISE À JOUR
+- Suppression de tous les affichages du type `x/45` dans le bandeau du lecteur.
+- Pendant l'attente Gmail / NAS, l'utilisateur voit uniquement des messages simples : mise à jour en cours, relance éventuelle ou indisponibilité temporaire du NAS.
+- Le nombre réel d'essais, la fréquence de contrôle et les relances automatiques restent inchangés en interne.
+- Aucun allègement de la robustesse de la chaîne FdS / GAAR n'est effectué.
+
+AFFICHAGE FDS
+- Grossissement visuel FdS réduit de ×1,90 à ×1,82.
+- Compensation de la boîte iframe portée de 52,64 % à 54,95 % (`100 / 1,82`) afin de conserver le même principe de cadrage sans débordement du lecteur.
+- La réduction est volontairement faible : environ 4,2 % par rapport à la v15.16.
+- GAAR conserve son affichage actuel.
+
+NAS
+- Aucun fichier NAS à modifier.
+- Conserver le `npf-docs-api.php` déjà installé pour la v15.15 / v15.16.
+
+ÉLÉMENTS INCHANGÉS
+- Mise à jour manuelle par bouton `Maj` uniquement ; aucun polling automatique.
+- Chaîne FdS validée : déclenchement source BFG par iframe invisible, attente NAS, téléchargement puis rafraîchissement du PDF.
+- Mot de passe valable jusqu'à minuit.
+- Stockage IndexedDB et consultation hors ligne.
+- Boutons FdS / GAAR orange ou verts.
+- SafeSky, GPS, cartes Online/Offline, VAC, calque routier, simulation et autres fonctions NPF.
+
+VÉRIFICATIONS TECHNIQUES
+- Cohérence des versions v15.17 dans Index / Manifest / Script / SW.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.js.
+- Manifest JSON contrôlé.
+- Absence des compteurs de tentative dans les messages visibles FdS / GAAR contrôlée statiquement.
+- Override CSS final ×1,82 / 54,95 % contrôlé statiquement.
+- Aucun token ni mot de passe ajouté aux six fichiers publics NPF.
+- Historique v15.16 et antérieur conservé intégralement et exactement à la suite.
+
+VALIDATION APPAREIL
+- À valider sur iPad : absence du décompte pendant `Maj` et largeur FdS légèrement réduite.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
 VERSION TEST v15.16 — FDS : MAJ DIRECTE BFG SANS ERREUR SW + ZOOM RÉEL IPAD
 Date : 12/08/2026
 Base utilisée : TEST v15.15.
