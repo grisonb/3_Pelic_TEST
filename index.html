@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.11" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.11">
-    <link rel="manifest" href="manifest.json?appv=v15.11">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.13" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.13">
+    <link rel="manifest" href="manifest.json?appv=v15.13">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.11';
+        const APP_VERSION = 'v15.13';
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
         const POST_UPDATE_NOTICE_VERSION_KEY = 'npfPostUpdateRestartNoticeVersion';
@@ -478,6 +478,33 @@
         </div>
     </div>
 
+    <div id="briefing-doc-viewer-modal"
+         class="briefing-doc-viewer-modal"
+         style="display: none;"
+         aria-hidden="true">
+        <div class="briefing-doc-viewer-toolbar">
+            <div class="briefing-doc-viewer-heading">
+                <strong id="briefing-doc-viewer-title">FdS / GAAR</strong>
+                <span id="briefing-doc-viewer-meta"></span>
+            </div>
+            <div class="briefing-doc-viewer-actions">
+                <button id="briefing-doc-viewer-refresh"
+                        type="button"
+                        class="briefing-doc-viewer-refresh">Maj</button>
+                <button id="briefing-doc-viewer-close"
+                        type="button"
+                        class="briefing-doc-viewer-close">Fermer</button>
+            </div>
+        </div>
+        <div id="briefing-doc-viewer-status"
+             class="briefing-doc-viewer-status"
+             aria-live="polite"></div>
+        <iframe id="briefing-doc-viewer-frame"
+                class="briefing-doc-viewer-frame"
+                title="Document FdS ou GAAR"
+                src="about:blank"></iframe>
+    </div>
+
     <div id="quick-offline-map-modal"
          class="quick-offline-map-modal"
          style="display: none;"
@@ -636,7 +663,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.11"></script>
+    <script src="script.js?appv=v15.13"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
