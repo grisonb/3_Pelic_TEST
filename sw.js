@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-09_traffic_popup_label_rebind';
-const APP_VERSION = 'v15.09';
+const SW_VERSION = 'sw-v15-10_bfg_docs_secure_sync';
+const APP_VERSION = 'v15.10';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -397,6 +397,14 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
+    // v15.10 — FDS / GAAR : endpoint NAS authentifié, réseau direct uniquement.
+    // Les PDF utiles sont persistés par script.js dans IndexedDB ; le SW ne doit
+    // jamais mettre en cache une réponse liée à un jeton de session.
+    if (isBriefingDocsNasRequest(request.url)) {
+        event.respondWith(fetch(request));
+        return;
+    }
+
  // v14.93 — le dépôt VAC GitHub Pages reste une source réseau pure.
  // Les PDF sont ensuite conservés par script.js dans IndexedDB, pas dans Cache Storage.
     if (isVacRepositoryRequest(request.url)) {
@@ -428,6 +436,17 @@ self.addEventListener('fetch', event => {
 });
 
 
+
+
+function isBriefingDocsNasRequest(url) {
+    try {
+        const parsed = new URL(url);
+        return parsed.hostname === 'grisonb.synology.me'
+            && parsed.pathname === '/briefing-api/npf-docs-api.php';
+    } catch (_) {
+        return false;
+    }
+}
 
 
 function isVacRepositoryRequest(url) {
