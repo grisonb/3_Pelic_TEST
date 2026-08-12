@@ -1,3 +1,48 @@
+VERSION TEST v15.14 — FDS / GAAR : MAJ NAS FIABILISÉE + PDF LARGEUR ÉCRAN
+Date : 12/08/2026
+Base utilisée : TEST v15.13.
+
+OBJECTIFS
+- Corriger le bouton « Maj » du lecteur FdS / GAAR afin qu'il récupère réellement la dernière copie disponible sur le NAS.
+- Afficher la feuille de service ajustée à la largeur disponible de l'écran.
+- Conserver l'architecture légère de v15.13 : aucun polling automatique FdS / GAAR.
+
+CHANGEMENTS NPF
+- Le bouton « Maj » force désormais le téléchargement du document affiché depuis le NAS, même si les métadonnées semblent identiques.
+- La signature distante accepte le nouveau champ « revision » renvoyé par l'API NAS v2.
+- Après Maj, le PDF affiché est remplacé immédiatement par le fichier réellement relu sur le NAS.
+- Le lecteur PDF reçoit les paramètres « view=FitH » et « zoom=page-width » pour demander un ajustement à la largeur de l'écran.
+- La zone iframe reste à 100 % de la largeur disponible, sans marge ni padding.
+- Aucun contrôle périodique, aucun contrôle au retour premier plan et aucun contrôle au retour réseau n'est réintroduit.
+
+CHANGEMENT NAS REQUIS
+- Remplacer /web/briefing-api/npf-docs-api.php par la version v15.14 fournie.
+- L'API v2 compare, pour le jour courant, la copie datée (fds-YYYYMMDD / gaar-YYYYMMDD) et la copie latest de BFG.
+- Elle sert la copie réellement la plus récente du jour.
+- Le champ de révision fichier intègre source, date de modification, taille et date de mise à jour pour fiabiliser la détection.
+- Le mot de passe, les jetons BFG et la règle d'expiration à minuit restent inchangés.
+
+ÉLÉMENTS INCHANGÉS
+- Boutons FdS / GAAR sur la carte et leurs couleurs orange / vert.
+- Stockage local IndexedDB et consultation hors ligne du PDF déjà téléchargé.
+- SafeSky, GPS, cartes Online/Offline, VAC, calque routier et autres fonctions NPF.
+- Position corrigée de l'échelle nautique issue de v15.12.
+
+VÉRIFICATIONS TECHNIQUES
+- Cohérence des versions v15.14 dans Index / Manifest / Script / SW.
+- Syntaxe JavaScript Script et SW contrôlée avec Node après copie temporaire en .js.
+- Manifest JSON contrôlé.
+- Syntaxe PHP de npf-docs-api.php contrôlée.
+- Présence du forçage Maj et des paramètres FitH / page-width contrôlée.
+- Absence de polling FdS / GAAR contrôlée.
+- Historique précédent conservé intégralement et exactement à la suite de cette section.
+
+VALIDATION APPAREIL
+- La récupération de la dernière FdS et le rendu réel « largeur écran » doivent être validés sur l'iPad avec le PHP v15.14 installé sur le NAS.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
 NPF-Q400 — HISTORIQUE CUMULATIF DES MODIFICATIONS
 
 VERSION TEST v15.13 — LECTEUR FdS / GAAR INTÉGRÉ + MISE À JOUR MANUELLE
