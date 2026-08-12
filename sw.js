@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-19_two_finger_ruler_foreground_dual_scale';
-const APP_VERSION = 'v15.19';
+const SW_VERSION = 'sw-v15-20_update_install_retry';
+const APP_VERSION = 'v15.20';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -96,6 +96,7 @@ const memoryTileCache = new Map();
 const VERSION_SENSITIVE_CORE_FILES = new Set([
     'index.html',
     'script.js',
+    'style.css',
     'manifest.json'
 ]);
 
@@ -107,15 +108,18 @@ function getAppShellFilename(url) {
     }
 }
 
-function buildVersionedAppShellUrl(url) {
+function buildVersionedAppShellUrl(url, attempt = 0) {
     const parsed = new URL(url, self.location.href);
     parsed.searchParams.set('appv', APP_VERSION);
     parsed.searchParams.set('swinstall', SW_VERSION);
+    if (attempt > 0) {
+        parsed.searchParams.set('swtry', `${attempt}-${Date.now()}`);
+    }
     return parsed.toString();
 }
 
-async function fetchForAppShell(url, timeoutMs = 12000) {
-    const request = new Request(buildVersionedAppShellUrl(url), {
+async function fetchForAppShell(url, timeoutMs = 12000, attempt = 0) {
+    const request = new Request(buildVersionedAppShellUrl(url, attempt), {
         cache: 'reload',
         mode: url === DEPARTMENTS_GEOJSON_URL ? 'cors' : 'same-origin'
     });
@@ -137,6 +141,9 @@ async function validateVersionSensitiveCoreResponse(url, response) {
         if (filename === 'script.js') {
             return text.includes(`const NPF_SCRIPT_BUILD_VERSION = '${APP_VERSION}'`);
         }
+        if (filename === 'style.css') {
+            return text.includes(`NPF_STYLE_BUILD_VERSION: ${APP_VERSION}`);
+        }
         if (filename === 'manifest.json') {
             const manifest = JSON.parse(text);
             return String(manifest.start_url || '').includes(`appv=${APP_VERSION}`);
@@ -145,6 +152,36 @@ async function validateVersionSensitiveCoreResponse(url, response) {
         return false;
     }
     return false;
+}
+
+/*
+ * v15.20 — GitHub Pages peut propager index/script/style/manifest sur quelques
+ * secondes. Un seul fichier ancien ne doit plus condamner immédiatement
+ * l'installation du nouveau Service Worker. Les fichiers versionnés sont donc
+ * relus plusieurs fois avec une URL anti-cache différente avant abandon.
+ */
+async function fetchValidatedCoreForInstall(url) {
+    const filename = getAppShellFilename(url);
+    const versionSensitive = VERSION_SENSITIVE_CORE_FILES.has(filename);
+    const maxAttempts = versionSensitive ? 6 : 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            const response = await fetchForAppShell(
+                url,
+                versionSensitive ? 6500 : 15000,
+                attempt
+            );
+            const valid = response && response.ok
+                && await validateVersionSensitiveCoreResponse(url, response);
+            if (valid) return response;
+        } catch (_) {}
+
+        if (attempt < maxAttempts) {
+            await swDelay(1400);
+        }
+    }
+    return null;
 }
 
 async function copyExistingCachedAsset(url, targetCache) {
@@ -169,10 +206,8 @@ self.addEventListener('install', event => {
         for (const url of CORE_APP_SHELL_URLS) {
             let stored = false;
             try {
-                const response = await fetchForAppShell(url, 15000);
-                const valid = response && response.ok
-                    && await validateVersionSensitiveCoreResponse(url, response);
-                if (valid) {
+                const response = await fetchValidatedCoreForInstall(url);
+                if (response) {
                     await cache.put(url, response.clone());
                     stored = true;
                 }
