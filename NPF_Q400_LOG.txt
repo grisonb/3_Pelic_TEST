@@ -1,3 +1,51 @@
+VERSION TEST v15.19 — RÈGLE 2 DOIGTS : PREMIER PLAN + COULEUR VIVE + DOUBLE ÉCHELLE NM/KM
+Date : 12/08/2026
+Base utilisée : TEST v15.18.
+
+OBJECTIFS
+- Faire passer systématiquement la règle 2 doigts au premier plan devant les icônes avion, pélicandromes, feux, étiquettes et autres objets cartographiques.
+- Donner à la règle une couleur très vive, sur le même langage visuel que le vecteur temps du propre avion.
+- Afficher deux échelles directement sur la règle : NM d’un côté et km de l’autre, sans cartouche séparé.
+
+PREMIER PLAN CARTOGRAPHIQUE
+- Création d’un pane Leaflet dédié `npfTwoFingerRulerPane` avec z-index 800.
+- Toutes les lignes, graduations et valeurs de la règle utilisent ce pane dédié.
+- La règle passe ainsi au-dessus des panes marqueurs, trafics, pélicandromes, tooltips et popups cartographiques.
+- Les contrôles fixes de l’interface restent prioritaires afin que la règle ne masque pas les boutons de commande de NPF.
+
+COULEUR / LISIBILITÉ
+- Le trait bleu de v15.18 est remplacé par un jaune fluorescent `#ffea00`, identique à la couleur du vecteur temps du propre avion.
+- Un halo noir épais est conservé sous le trait pour garantir la lecture sur cartes claires ou sombres.
+- Les graduations utilisent le même couple halo noir + jaune fluorescent.
+- Les valeurs NM sont également affichées en jaune fluorescent avec contour/ombre noir.
+- Les valeurs km sont affichées en cyan vif pour distinguer immédiatement les deux échelles.
+
+DOUBLE ÉCHELLE
+- Échelle NM conservée du côté extérieur choisi par la règle.
+- Nouvelle échelle km affichée symétriquement de l’autre côté du trait.
+- Graduations communes à 0 %, 25 %, 50 %, 75 % et 100 %.
+- La valeur finale indique explicitement l’unité `NM` sur un côté et `km` sur l’autre.
+- Les chiffres restent horizontaux à l’écran, quelle que soit l’orientation de la règle.
+- La mesure reste calculée entre les deux positions réelles des doigts ; seul le dessin est décalé pour rester visible.
+
+ÉLÉMENTS INCHANGÉS
+- Appui prolongé à deux doigts et suspension temporaire du zoom.
+- Décalage perpendiculaire et bascule automatique de côté introduits en v15.18.
+- FdS / GAAR et leur chaîne de mise à jour.
+- SafeSky, vecteur temps du propre avion, GPS, pélicandromes, cartes Online/Offline, VAC et simulation.
+- Aucun fichier NAS à modifier.
+
+CONTRÔLES TECHNIQUES
+- Syntaxe JavaScript de script.js contrôlée avec Node.js.
+- Syntaxe JavaScript de sw.js contrôlée avec Node.js.
+- manifest.json contrôlé comme JSON valide.
+- Versions Index / Manifest / Script / SW alignées sur v15.19.
+- Pane dédié de règle et z-index 800 contrôlés statiquement.
+- Double échelle NM/km et couleurs vives contrôlées statiquement.
+- Historique précédent conservé intégralement et sans modification.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.18 — RÈGLE 2 DOIGTS : DÉCALAGE PERPENDICULAIRE + GRADUATIONS DIRECTES
 Date : 12/08/2026
 Base utilisée : TEST v15.17.
