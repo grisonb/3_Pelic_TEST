@@ -1,6 +1,7 @@
 /* v15.13 TEST — lecteur FdS / GAAR intégré + mise à jour manuelle. */
 /* v15.12 TEST — FdS / GAAR auto-sync en session + échelle carte dégagée de SafeSky. */
 /* v15.15 TEST — FdS : viewport PDF portrait forcé pour largeur écran sur iPad. */
+/* v15.17 TEST — FdS largeur ajustée ×1,82 + statut MAJ simplifié. */
 /* v15.16 TEST — FdS zoom réel ×1,90 + MAJ directe BFG. */
 /* v15.11 TEST — boutons FdS / GAAR sur la carte + saisie mot de passe à la demande. */
 /* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
@@ -13639,5 +13640,22 @@ body.gaar-point-search-open .gaar-editing-banner {
     max-height: none !important;
     flex: none !important;
     transform: scale(1.90) !important;
+    transform-origin: 0 0 !important;
+}
+
+/* ==========================================================================
+   v15.17 TEST — FdS : largeur légèrement réduite (×1,82)
+   ========================================================================== */
+/*
+ * La v15.16 à ×1,90 est légèrement trop large sur l'iPad testé.
+ * On réduit le grossissement d'environ 4,2 % à ×1,82.
+ * Compensation de boîte : 100 / 1,82 = 54,95 %.
+ */
+.briefing-doc-viewer-modal.briefing-doc-viewer-fds-width .briefing-doc-viewer-stage .briefing-doc-viewer-frame {
+    width: 54.95% !important;
+    height: 54.95% !important;
+    min-width: 54.95% !important;
+    min-height: 54.95% !important;
+    transform: scale(1.82) !important;
     transform-origin: 0 0 !important;
 }
