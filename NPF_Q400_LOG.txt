@@ -1,3 +1,52 @@
+VERSION TEST v15.15 — FDS / GAAR : MAJ DEPUIS GMAIL + FDS LARGEUR IPAD
+Date : 12/08/2026
+Base utilisée : TEST v15.14.
+
+OBJECTIFS
+- Corriger la cause réelle de la FdS non mise à jour : en v15.14, « Maj » relisait le NAS mais ne déclenchait pas la récupération Gmail qui alimente ce NAS.
+- Faire en sorte que « Maj » dans NPF réalise la même chaîne amont que BFG, sans devoir ouvrir BFG au préalable.
+- Forcer l'affichage de la FdS à la largeur de l'écran sur iPad, Safari ignorant le fragment PDF FitH/page-width dans l'iframe Blob.
+
+CHANGEMENTS NPF
+- Le bouton « Maj » du lecteur appelle désormais l'action protégée `refresh` de `npf-docs-api.php`.
+- Pour la FdS, cette action déclenche d'abord la récupération Gmail via l'Apps Script déjà utilisé par BFG, attend l'écriture du nouveau PDF sur le NAS, puis renvoie la nouvelle métadonnée.
+- NPF télécharge ensuite le PDF réellement actualisé, remplace la copie IndexedDB et recharge immédiatement le lecteur.
+- Même architecture prévue pour GAAR : l'action Maj déclenche aussi la récupération source GAAR avant relecture.
+- Aucun polling automatique n'est ajouté : la chaîne Gmail/NAS ne s'exécute que lors d'un appui sur « Maj ».
+
+AFFICHAGE FDS SUR IPAD
+- Le paramètre `#view=FitH&zoom=page-width` est conservé mais n'est plus considéré comme suffisant sur Safari/iPad.
+- Lorsque le document affiché est une FdS, l'iframe native reçoit un viewport portrait volontairement plus haut que l'écran (`max(155vw, 100dvh)`).
+- Ce ratio rend la largeur, et non la hauteur, limitante pour le lecteur PDF natif : la page doit ainsi occuper la largeur disponible.
+- Cette contrainte ne s'applique pas à la GAAR afin de ne pas modifier son cadrage.
+
+CHANGEMENT NAS REQUIS
+- Remplacer uniquement `/web/briefing-api/npf-docs-api.php` par la version v15.15 fournie.
+- Aucun autre fichier BFG / NAS n'est remplacé.
+- Le mot de passe, l'expiration à minuit et les jetons BFG restent côté NAS.
+
+ÉLÉMENTS INCHANGÉS
+- Boutons FdS / GAAR sur la carte et états orange / vert.
+- Stockage IndexedDB et lecture hors ligne du dernier PDF téléchargé.
+- Absence de polling automatique FdS / GAAR.
+- SafeSky, GPS, cartes Online/Offline, VAC, calque routier, simulation et autres fonctions NPF.
+- Position de l'échelle nautique corrigée en v15.12.
+
+VÉRIFICATIONS TECHNIQUES
+- Cohérence des versions v15.15 dans Index / Manifest / Script / SW.
+- Syntaxe JavaScript Script et SW contrôlée avec Node après copie temporaire en .js.
+- Manifest JSON contrôlé.
+- Syntaxe PHP de `npf-docs-api.php` contrôlée.
+- Présence de l'action NAS `refresh` et du déclenchement source FdS/GAAR contrôlée statiquement.
+- Aucun token ni mot de passe ajouté aux six fichiers publics NPF.
+- Historique v15.14 et antérieur conservé intégralement et exactement à la suite.
+
+VALIDATION APPAREIL
+- À valider sur iPad : appui Maj sans ouvrir BFG au préalable, puis cadrage réel de la FdS sur toute la largeur.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
 VERSION TEST v15.14 — FDS / GAAR : MAJ NAS FIABILISÉE + PDF LARGEUR ÉCRAN
 Date : 12/08/2026
 Base utilisée : TEST v15.13.
