@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-23_global_link_relay';
-const APP_VERSION = 'v15.23';
+const SW_VERSION = 'sw-v15-24_fds_gaar_group_glr_safesky_states';
+const APP_VERSION = 'v15.24';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
