@@ -1,5 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.23';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.24';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.24 TEST — regroupement FdS/GAAR + bouton GLR aligné SafeSky
+// - FdS et GAAR regroupés dans un seul bouton carte sur deux lignes ;
+// - fenêtre de sélection à deux gros boutons avec états chargé / manquant ;
+// - état de chaque ligne FdS / GAAR visible directement sur le bouton principal ;
+// - GL devient GLR avec logique rouge / vert identique au bouton SafeSky.
+// =========================================================================
 
 // =========================================================================
 // v15.23 TEST — Global Link Rescue : positions via relais NAS
@@ -17506,6 +17514,47 @@ function getBriefingDocMapButton(type) {
     );
 }
 
+function closeBriefingDocSelectorModal() {
+    const modal = document.getElementById('briefing-doc-selector-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function openBriefingDocSelectorModal() {
+    const modal = document.getElementById('briefing-doc-selector-modal');
+    if (!modal) return false;
+    refreshBriefingDocMapButtons().catch(() => {});
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    return true;
+}
+
+function updateBriefingDocsMainButtonState(fdsRecord, gaarRecord) {
+    const mainButton = document.getElementById('briefing-docs-map-button');
+    const fdsLine = document.getElementById('briefing-docs-main-fds-label');
+    const gaarLine = document.getElementById('briefing-docs-main-gaar-label');
+    const fdsLoaded = isBriefingDocRecordForToday(fdsRecord);
+    const gaarLoaded = isBriefingDocRecordForToday(gaarRecord);
+
+    const updateLine = (element, loaded) => {
+        if (!element) return;
+        element.classList.toggle('briefing-doc-loaded', loaded);
+        element.classList.toggle('briefing-doc-missing', !loaded);
+    };
+    updateLine(fdsLine, fdsLoaded);
+    updateLine(gaarLine, gaarLoaded);
+
+    if (!mainButton) return;
+    mainButton.classList.toggle('loading', npfBriefingDocsSyncInProgress);
+    mainButton.setAttribute('aria-busy', npfBriefingDocsSyncInProgress ? 'true' : 'false');
+    const fdsState = fdsLoaded ? 'FdS chargée' : 'FdS non chargée';
+    const gaarState = gaarLoaded ? 'GAAR chargé' : 'GAAR non chargé';
+    const stateText = `${fdsState} — ${gaarState} — appuyer pour choisir`;
+    mainButton.title = stateText;
+    mainButton.setAttribute('aria-label', stateText);
+}
+
 async function refreshBriefingDocMapButtons() {
     const [fds, gaar] = await Promise.all([
         getBriefingDocRecord('fds').catch(() => null),
@@ -17526,10 +17575,17 @@ async function refreshBriefingDocMapButtons() {
             : `${label} du jour non télécharg${type === 'gaar' ? 'é' : 'ée'} — appuyer pour télécharger`;
         button.title = stateText;
         button.setAttribute('aria-label', stateText);
+        const selectorStatus = document.getElementById(`briefing-${type}-selector-status`);
+        if (selectorStatus) {
+            selectorStatus.textContent = current
+                ? (type === 'gaar' ? 'Chargé aujourd’hui' : 'Chargée aujourd’hui')
+                : (type === 'gaar' ? 'Non téléchargé' : 'Non téléchargée');
+        }
     };
 
     update('fds', fds);
     update('gaar', gaar);
+    updateBriefingDocsMainButtonState(fds, gaar);
     return { fds, gaar };
 }
 
@@ -17855,6 +17911,9 @@ async function displayBriefingDocsStatus() {
 }
 
 function initializeBriefingDocsUi() {
+    const mainButton = document.getElementById('briefing-docs-map-button');
+    const selectorModal = document.getElementById('briefing-doc-selector-modal');
+    const selectorCloseButton = document.getElementById('close-briefing-doc-selector-modal');
     const fdsButton = document.getElementById('briefing-fds-map-button');
     const gaarButton = document.getElementById('briefing-gaar-map-button');
     const modal = document.getElementById('briefing-docs-password-modal');
@@ -17869,11 +17928,27 @@ function initializeBriefingDocsUi() {
         if (!button || button.dataset.bound === '1') return;
         button.dataset.bound = '1';
         button.addEventListener('click', () => {
+            closeBriefingDocSelectorModal();
             handleBriefingDocMapButtonClick(type).catch(error => {
                 alert(`${getBriefingDocLabel(type)} : ${error.message || error}`);
             });
         });
     };
+
+    if (mainButton && mainButton.dataset.bound !== '1') {
+        mainButton.dataset.bound = '1';
+        mainButton.addEventListener('click', openBriefingDocSelectorModal);
+    }
+    if (selectorCloseButton && selectorCloseButton.dataset.bound !== '1') {
+        selectorCloseButton.dataset.bound = '1';
+        selectorCloseButton.addEventListener('click', closeBriefingDocSelectorModal);
+    }
+    if (selectorModal && selectorModal.dataset.bound !== '1') {
+        selectorModal.dataset.bound = '1';
+        selectorModal.addEventListener('click', event => {
+            if (event.target === selectorModal) closeBriefingDocSelectorModal();
+        });
+    }
 
     bindDocButton(fdsButton, 'fds');
     bindDocButton(gaarButton, 'gaar');
@@ -17990,6 +18065,10 @@ function initializeBriefingDocsUi() {
         window.__npfBriefingDocsEscapeBound = true;
         window.addEventListener('keydown', event => {
             if (event.key !== 'Escape') return;
+            if (selectorModal?.style.display === 'flex') {
+                closeBriefingDocSelectorModal();
+                return;
+            }
             if (modal?.style.display === 'flex') {
                 closeModal();
                 return;
@@ -18008,6 +18087,8 @@ window.refreshBriefingDocMapButtons = refreshBriefingDocMapButtons;
 window.syncBriefingDocsFromNas = syncBriefingDocsFromNas;
 window.refreshSingleBriefingDocFromNas = refreshSingleBriefingDocFromNas;
 window.closeBriefingDocViewer = closeBriefingDocViewer;
+window.openBriefingDocSelectorModal = openBriefingDocSelectorModal;
+window.closeBriefingDocSelectorModal = closeBriefingDocSelectorModal;
 
 
 
@@ -18227,18 +18308,21 @@ function updateGlobalLinkButton(options = {}) {
     if (options.loading) button.classList.add('loading');
     if (!hasSession) {
         button.classList.add('global-link-auth-needed');
-        button.title = 'Global Link — connexion requise';
+        button.title = 'GLR — connexion requise';
     } else if (npfGlobalLinkEnabled && fresh.length) {
         button.classList.add('global-link-active');
-        button.title = `Global Link — ${fresh.length} appareil(s) actif(s) — appuyer pour masquer`;
+        button.title = `GLR — ${fresh.length} appareil(s) actif(s) — appuyer pour masquer`;
     } else if (npfGlobalLinkEnabled && visible.length) {
         button.classList.add('global-link-stale');
-        button.title = 'Global Link — positions anciennes ou en attente de mise à jour';
+        button.title = 'GLR — positions anciennes ou en attente de mise à jour';
     } else {
         button.classList.add('global-link-ready');
-        button.title = npfGlobalLinkEnabled ? 'Global Link — aucune position récente' : 'Global Link — appuyer pour afficher';
+        button.title = npfGlobalLinkEnabled ? 'GLR — aucune position récente' : 'GLR — appuyer pour afficher';
     }
-    if (count) count.textContent = String(npfGlobalLinkEnabled ? visible.length : 0);
+    if (count) {
+        count.textContent = String(npfGlobalLinkEnabled ? visible.length : 0);
+        count.style.display = npfGlobalLinkEnabled ? 'inline-flex' : 'none';
+    }
 }
 
 function renderGlobalLinkPositions(positions) {
