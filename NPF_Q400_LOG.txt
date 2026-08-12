@@ -1,3 +1,44 @@
+VERSION TEST v15.20 — FIABILISATION DE LA MISE À JOUR PWA
+Date : 12/08/2026
+Base : TEST v15.19
+
+OBJECTIF
+- Corriger le cas où NPF reste sur l’ancienne version après publication des nouveaux fichiers.
+- Ne modifier ni les données utilisateur, ni les cartes Offline, ni les VAC, ni FdS/GAAR.
+
+MODIFICATIONS
+1. Enregistrement du Service Worker
+- Le navigateur enregistre désormais le Service Worker avec une URL versionnée (`sw.js?appv=...`).
+- `updateViaCache: none` est conservé.
+- Une mise à jour explicite réenregistre toujours l’URL versionnée avant de demander `registration.update()`.
+
+2. Installation atomique plus tolérante à la propagation GitHub Pages
+- Les fichiers sensibles à la version (`index.html`, `script.js`, `style.css`, `manifest.json`) sont contrôlés avant activation.
+- Si GitHub Pages renvoie momentanément un ancien fichier, le Service Worker ne renonce plus immédiatement : plusieurs tentatives espacées sont effectuées avec un paramètre anti-cache différent.
+- L’ancienne version continue de fonctionner pendant cette attente.
+- Le nouveau Service Worker n’est activé que lorsque l’ensemble du shell v15.20 est cohérent.
+
+3. Style inclus dans le contrôle de cohérence
+- `style.css` possède désormais un marqueur de build v15.20 et fait partie des fichiers sensibles à la version.
+- Cela évite une mise à jour mélangeant un nouveau Script avec une ancienne feuille de style.
+
+ÉLÉMENTS INCHANGÉS
+- Règle 2 doigts v15.19 : premier plan, jaune vif, échelles NM/km opposées.
+- FdS/GAAR et mise à jour manuelle.
+- SafeSky.
+- Cartes Online/Offline, IndexedDB, VAC, calque routier et données utilisateur.
+- Aucun changement NAS.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.20.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Historique v15.19 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.19 — RÈGLE 2 DOIGTS : PREMIER PLAN + COULEUR VIVE + DOUBLE ÉCHELLE NM/KM
 Date : 12/08/2026
 Base utilisée : TEST v15.18.
