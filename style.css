@@ -1,5 +1,6 @@
 /* v15.13 TEST — lecteur FdS / GAAR intégré + mise à jour manuelle. */
 /* v15.12 TEST — FdS / GAAR auto-sync en session + échelle carte dégagée de SafeSky. */
+/* v15.15 TEST — FdS : viewport PDF portrait forcé pour largeur écran sur iPad. */
 /* v15.11 TEST — boutons FdS / GAAR sur la carte + saisie mot de passe à la demande. */
 /* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
 /* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
@@ -13561,4 +13562,33 @@ body.gaar-point-search-open .gaar-editing-banner {
     margin: 0 !important;
     padding: 0 !important;
     align-self: stretch !important;
+}
+
+
+/* ==========================================================================
+   v15.15 TEST — FdS : forcer le rendu natif iPad sur la largeur
+   ========================================================================== */
+/*
+ * Safari/iPad ne respecte pas systématiquement #view=FitH / #zoom=page-width
+ * pour un PDF Blob dans un iframe. Le viewport interne de la FdS est donc
+ * volontairement plus haut que l'écran (ratio portrait > A4) : le lecteur
+ * natif est contraint par la largeur et affiche la page à la largeur disponible.
+ * Le modal masque simplement la partie du viewport située sous l'écran ; le
+ * défilement du PDF reste géré par le lecteur natif dans l'iframe.
+ */
+.briefing-doc-viewer-modal.briefing-doc-viewer-fds-width .briefing-doc-viewer-frame {
+    flex: 0 0 auto !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    height: max(155vw, 100dvh) !important;
+    min-height: max(155vw, 100dvh) !important;
+    max-height: none !important;
+    align-self: stretch !important;
+}
+
+@supports not (height: 100dvh) {
+    .briefing-doc-viewer-modal.briefing-doc-viewer-fds-width .briefing-doc-viewer-frame {
+        height: max(155vw, 100vh) !important;
+        min-height: max(155vw, 100vh) !important;
+    }
 }
