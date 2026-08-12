@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-13_bfg_docs_manual_pdf_viewer';
-const APP_VERSION = 'v15.13';
+const SW_VERSION = 'sw-v15-14_bfg_docs_fresh_pdf_fit_width';
+const APP_VERSION = 'v15.14';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
