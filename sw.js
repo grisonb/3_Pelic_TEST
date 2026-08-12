@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-10_bfg_docs_secure_sync';
-const APP_VERSION = 'v15.10';
+const SW_VERSION = 'sw-v15-11_bfg_docs_map_buttons';
+const APP_VERSION = 'v15.11';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -397,7 +397,7 @@ self.addEventListener('fetch', event => {
 
     if (request.method !== 'GET') return;
 
-    // v15.10 — FDS / GAAR : endpoint NAS authentifié, réseau direct uniquement.
+    // v15.11 — FdS / GAAR : endpoint NAS authentifié, réseau direct uniquement.
     // Les PDF utiles sont persistés par script.js dans IndexedDB ; le SW ne doit
     // jamais mettre en cache une réponse liée à un jeton de session.
     if (isBriefingDocsNasRequest(request.url)) {
