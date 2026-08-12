@@ -1,3 +1,5 @@
+/* v15.13 TEST — lecteur FdS / GAAR intégré + mise à jour manuelle. */
+/* v15.12 TEST — FdS / GAAR auto-sync en session + échelle carte dégagée de SafeSky. */
 /* v15.11 TEST — boutons FdS / GAAR sur la carte + saisie mot de passe à la demande. */
 /* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
 /* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
@@ -13365,5 +13367,186 @@ body.gaar-point-search-open .gaar-editing-banner {
     .briefing-docs-password-dialog {
         width: min(94vw, 420px);
         padding: 22px 16px 18px;
+    }
+}
+
+
+/* ==========================================================================
+   v15.13 TEST — lecteur plein écran FdS / GAAR + bouton Maj
+   ========================================================================== */
+.briefing-doc-viewer-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    flex-direction: column;
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100vh;
+    background: #eef1f4;
+    overflow: hidden;
+}
+
+.briefing-doc-viewer-toolbar {
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 66px;
+    padding:
+        calc(env(safe-area-inset-top, 0px) + 8px)
+        calc(env(safe-area-inset-right, 0px) + 12px)
+        8px
+        calc(env(safe-area-inset-left, 0px) + 14px);
+    background: #ffffff;
+    border-bottom: 1px solid #cfd7e2;
+    box-shadow: 0 2px 7px rgba(0,0,0,.10);
+}
+
+.briefing-doc-viewer-heading {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+#briefing-doc-viewer-title {
+    flex: 0 0 auto;
+    color: #0b3154;
+    font-size: 24px;
+    font-weight: 950;
+}
+
+#briefing-doc-viewer-meta {
+    min-width: 0;
+    color: #5c6775;
+    font-size: 13px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.briefing-doc-viewer-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.briefing-doc-viewer-refresh,
+.briefing-doc-viewer-close {
+    box-sizing: border-box;
+    min-width: 76px;
+    min-height: 44px;
+    padding: 0 15px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.briefing-doc-viewer-refresh {
+    border: 2px solid #0b6f34;
+    background: #ffffff;
+    color: #0b6f34;
+}
+
+.briefing-doc-viewer-refresh:active {
+    background: #e8f5ed;
+}
+
+.briefing-doc-viewer-refresh:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+
+.briefing-doc-viewer-close {
+    border: 2px solid #b42318;
+    background: #ffffff;
+    color: #b42318;
+}
+
+.briefing-doc-viewer-close:active {
+    background: #fff0ee;
+}
+
+.briefing-doc-viewer-status {
+    display: none;
+    flex: 0 0 auto;
+    padding: 6px 12px;
+    background: #eef6ff;
+    border-bottom: 1px solid #c7d9ee;
+    color: #174a75;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.briefing-doc-viewer-status.visible {
+    display: block;
+}
+
+.briefing-doc-viewer-status.success {
+    background: #e9f8ef;
+    border-bottom-color: #b7e4c7;
+    color: #0b6f34;
+}
+
+.briefing-doc-viewer-status.error {
+    background: #fff0ee;
+    border-bottom-color: #f1b8b2;
+    color: #9d1c12;
+}
+
+.briefing-doc-viewer-frame {
+    display: block;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    background: #dfe4ea;
+}
+
+@media (max-width: 760px) {
+    .briefing-doc-viewer-toolbar {
+        gap: 8px;
+        min-height: 58px;
+        padding:
+            calc(env(safe-area-inset-top, 0px) + 6px)
+            calc(env(safe-area-inset-right, 0px) + 8px)
+            6px
+            calc(env(safe-area-inset-left, 0px) + 10px);
+    }
+
+    .briefing-doc-viewer-heading {
+        gap: 7px;
+    }
+
+    #briefing-doc-viewer-title {
+        font-size: 19px;
+    }
+
+    #briefing-doc-viewer-meta {
+        font-size: 11px;
+    }
+
+    .briefing-doc-viewer-actions {
+        gap: 6px;
+    }
+
+    .briefing-doc-viewer-refresh,
+    .briefing-doc-viewer-close {
+        min-width: 60px;
+        min-height: 40px;
+        padding: 0 10px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 430px) {
+    #briefing-doc-viewer-meta {
+        display: none;
     }
 }
