@@ -1,3 +1,44 @@
+VERSION TEST v15.26 — GLR : RAFRAÎCHISSEMENT 15 S + POSITIONS ANCIENNES CONSERVÉES
+Date : 12/08/2026
+Base : TEST v15.25
+
+OBJECTIF
+- Rafraîchir les positions Global Link Rescue toutes les 15 secondes dans NPF.
+- Corriger le cas où certains moyens visibles dans Global Link (notamment DRAGON / PUMA) pouvaient être masqués par NPF parce que leur dernière position datait de plus de 15 minutes.
+
+MODIFICATIONS
+1. Cadence GLR
+- L'interrogation du relais NAS passe de 60 secondes à 15 secondes lorsque la couche GLR est active et que NPF est au premier plan.
+- La protection contre les requêtes concurrentes est conservée : une nouvelle interrogation n'est pas lancée si la précédente n'est pas terminée.
+
+2. Visibilité des moyens GLR
+- Suppression de la limite d'affichage à 15 minutes côté NPF.
+- Toutes les positions valides renvoyées par le relais GLR restent affichables, quelle que soit leur ancienneté.
+- Les positions de plus de 3 minutes conservent l'état visuel « stale / ancien » ; elles ne disparaissent plus automatiquement.
+- Le compteur GLR compte désormais toutes les positions valides renvoyées par le relais.
+
+3. Étiquettes
+- Le moteur d'anticollision de la v15.25 est conservé intégralement.
+- Aucune régression volontaire sur le placement automatique des étiquettes.
+
+ÉLÉMENTS INCHANGÉS
+- Relais NAS Global Link v15.25 : aucun filtre organisation=secciv.
+- Authentification GLR par captcha et session NAS.
+- FdS / GAAR du jour uniquement et logique de couleurs du bouton combiné.
+- SafeSky, cartes Online/Offline, VAC, IndexedDB et données utilisateur.
+- Aucun changement NAS requis pour cette version.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.26.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Recherche du filtre d'âge 900 s : supprimé du rendu GLR et du compteur.
+- Historique v15.25 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.25 — GLR ANTICOLLISION + TOUTES MISSIONS + FdS/GAAR STRICTEMENT DU JOUR
 Date : 12/08/2026
 Base : TEST v15.24
