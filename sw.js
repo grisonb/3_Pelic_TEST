@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-17_fds_viewer_polish';
-const APP_VERSION = 'v15.17';
+const SW_VERSION = 'sw-v15-18_two_finger_ruler_vector_marks';
+const APP_VERSION = 'v15.18';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
