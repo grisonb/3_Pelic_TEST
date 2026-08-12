@@ -1,5 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.21';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.22';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.22 TEST — règle 2 doigts : zéro à gauche + km dégagés
+// - orientation des graduations indépendante de l'ordre des deux touches ;
+// - horizontalement, 0 est toujours à gauche et la distance augmente vers la droite ;
+// - valeurs km davantage décalées du trait pour éviter toute superposition.
+// =========================================================================
 
 
 // =========================================================================
@@ -5044,7 +5051,9 @@ function getTwoFingerRulerOffsetNormal(p1, p2) {
     const width = Math.max(1, Number(container?.clientWidth || container?.getBoundingClientRect?.().width || 0));
     const height = Math.max(1, Number(container?.clientHeight || container?.getBoundingClientRect?.().height || 0));
     const rulerOffsetPx = 74;
-    const labelOffsetPx = 23;
+    const nmLabelOffsetPx = 26;
+    const kmLabelOffsetPx = 42;
+    const maxLabelOffsetPx = Math.max(nmLabelOffsetPx, kmLabelOffsetPx);
     const edgeMarginPx = 18;
 
     const overflowScore = (normal) => {
@@ -5056,12 +5065,12 @@ function getTwoFingerRulerOffsetNormal(p1, p2) {
             return [
                 shifted,
                 {
-                    x: shifted.x + normal.x * labelOffsetPx,
-                    y: shifted.y + normal.y * labelOffsetPx
+                    x: shifted.x + normal.x * maxLabelOffsetPx,
+                    y: shifted.y + normal.y * maxLabelOffsetPx
                 },
                 {
-                    x: shifted.x - normal.x * labelOffsetPx,
-                    y: shifted.y - normal.y * labelOffsetPx
+                    x: shifted.x - normal.x * maxLabelOffsetPx,
+                    y: shifted.y - normal.y * maxLabelOffsetPx
                 }
             ];
         });
@@ -5078,7 +5087,7 @@ function getTwoFingerRulerOffsetNormal(p1, p2) {
     const preferredScore = overflowScore(preferred);
     const alternateScore = overflowScore(alternate);
     const normal = alternateScore + 2 < preferredScore ? alternate : preferred;
-    return { normal, rulerOffsetPx, labelOffsetPx };
+    return { normal, rulerOffsetPx, nmLabelOffsetPx, kmLabelOffsetPx };
 }
 
 function drawTwoFingerRulerFromTouches(event) {
@@ -5086,9 +5095,22 @@ function drawTwoFingerRulerFromTouches(event) {
     const layer = ensureTwoFingerRulerLayer();
     if (!points || !layer || !map || !map.containerPointToLatLng || !map.distance) return;
 
-    const [p1, p2] = points;
-    const ll1 = map.containerPointToLatLng(p1);
-    const ll2 = map.containerPointToLatLng(p2);
+    const [touchA, touchB] = points;
+    const ll1 = map.containerPointToLatLng(touchA);
+    const ll2 = map.containerPointToLatLng(touchB);
+
+    /* v15.22 — ordre visuel stable des extrémités.
+     * L'ordre event.touches dépend du doigt posé en premier et ne doit pas
+     * déterminer le sens de lecture de l'échelle. Sur une règle horizontale,
+     * p1 est toujours l'extrémité gauche ; si elle est quasi verticale, p1 est
+     * l'extrémité haute pour éviter les inversions aléatoires.
+     */
+    const mostlyVertical = Math.abs(touchB.x - touchA.x) < Math.abs(touchB.y - touchA.y) * 0.18;
+    const touchAComesFirst = mostlyVertical
+        ? (touchA.y <= touchB.y)
+        : (touchA.x <= touchB.x);
+    const p1 = touchAComesFirst ? touchA : touchB;
+    const p2 = touchAComesFirst ? touchB : touchA;
     const meters = map.distance(ll1, ll2);
     if (!Number.isFinite(meters) || meters <= 0) return;
 
@@ -5096,7 +5118,7 @@ function drawTwoFingerRulerFromTouches(event) {
 
     const nm = meters / 1852;
     const km = meters / 1000;
-    const { normal, rulerOffsetPx, labelOffsetPx } = getTwoFingerRulerOffsetNormal(p1, p2);
+    const { normal, rulerOffsetPx, nmLabelOffsetPx, kmLabelOffsetPx } = getTwoFingerRulerOffsetNormal(p1, p2);
     const visualOffset = L.point(normal.x * rulerOffsetPx, normal.y * rulerOffsetPx);
     const vp1 = p1.add(visualOffset);
     const vp2 = p2.add(visualOffset);
@@ -5165,13 +5187,13 @@ function drawTwoFingerRulerFromTouches(event) {
             lineCap: 'round'
         }).addTo(layer);
 
-        /* v15.21 — échelle NM inversée sur un côté de la règle. */
+        /* v15.22 — échelle NM : 0 à l’extrémité de départ visuelle (gauche si horizontale). */
         const nmLabelPoint = L.point(
-            px + normal.x * labelOffsetPx,
-            py + normal.y * labelOffsetPx
+            px + normal.x * nmLabelOffsetPx,
+            py + normal.y * nmLabelOffsetPx
         );
-        const displayFraction = 1 - fraction;
-        const nmValueText = formatTwoFingerRulerMarkNm(nm * displayFraction, fraction === 0);
+        const displayFraction = fraction;
+        const nmValueText = formatTwoFingerRulerMarkNm(nm * displayFraction, fraction === 1);
         L.marker(map.containerPointToLatLng(nmLabelPoint), {
             pane: TWO_FINGER_RULER_PANE_NAME,
             interactive: false,
@@ -5184,12 +5206,12 @@ function drawTwoFingerRulerFromTouches(event) {
             })
         }).addTo(layer);
 
-        /* v15.21 — échelle km inversée, symétrique de l'autre côté du trait. */
+        /* v15.22 — échelle km : même sens que NM, mais davantage dégagée du trait. */
         const kmLabelPoint = L.point(
-            px - normal.x * labelOffsetPx,
-            py - normal.y * labelOffsetPx
+            px - normal.x * kmLabelOffsetPx,
+            py - normal.y * kmLabelOffsetPx
         );
-        const kmValueText = formatTwoFingerRulerMarkKm(km * displayFraction, fraction === 0);
+        const kmValueText = formatTwoFingerRulerMarkKm(km * displayFraction, fraction === 1);
         L.marker(map.containerPointToLatLng(kmLabelPoint), {
             pane: TWO_FINGER_RULER_PANE_NAME,
             interactive: false,
