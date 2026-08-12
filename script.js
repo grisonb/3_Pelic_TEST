@@ -1,7 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.11';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.13';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // =========================================================================
+// v15.13 TEST — FdS / GAAR : lecteur intégré + mise à jour manuelle
+// - suppression du polling 5 min / retour premier plan / retour réseau ;
+// - ouverture PDF plein écran dans NPF avec boutons Maj et Fermer ;
+// - Maj contrôle uniquement le document affiché et ne télécharge que s'il change ;
+// - premier téléchargement limité au document demandé ;
+// v15.12 TEST — FdS / GAAR : contrôle automatique en session + échelle dégagée
 // v15.11 TEST — FdS / GAAR directement sur la carte
 // - suppression de toute interface FdS / GAAR dans Gestion des Cartes ;
 // - boutons FdS puis GAAR ajoutés juste au-dessus de SafeSky ;
@@ -930,6 +936,8 @@ const NPF_BRIEFING_DOC_TYPES = Object.freeze(['fds', 'gaar']);
 let npfBriefingDocsDb = null;
 let npfBriefingDocsSyncInProgress = false;
 let npfBriefingDocsPendingType = null;
+let npfBriefingDocViewerType = null;
+let npfBriefingDocViewerObjectUrl = null;
 
 const WATER_POINTS_LAYER_KEY = 'showWaterPointsLayer';
 let showWaterPointsLayer = localStorage.getItem(WATER_POINTS_LAYER_KEY) === 'true';
@@ -3505,15 +3513,15 @@ async function initializeApp() {
 
 
     /*
-     * v15.11 — contrôle FdS / GAAR différé : uniquement si l'utilisateur a déjà
-     * autorisé les téléchargements pour la journée. Aucune fenêtre de mot de passe
-     * n'est imposée au démarrage et le hors-ligne reste totalement non bloquant.
+     * v15.13 — aucun contrôle réseau FdS / GAAR au démarrage.
+     * Les boutons sont calculés uniquement depuis IndexedDB. Le NAS n'est interrogé
+     * qu'à la demande : premier téléchargement ou bouton « Maj » du lecteur.
      */
     setTimeout(() => {
-        syncBriefingDocsAtStartup().catch(error => {
-            console.info('[FDS/GAAR] Contrôle de démarrage ignoré:', error?.message || error);
+        refreshBriefingDocMapButtons().catch(error => {
+            console.info('[FDS/GAAR] Lecture locale de démarrage ignorée:', error?.message || error);
         });
-    }, 3200);
+    }, 1200);
 
     setTimeout(() => {
         scheduleOfflineTileWake('startup-post-init');
@@ -4681,7 +4689,8 @@ function injectNauticalScaleStyle() {
     style.textContent = `
         .npf-nautical-scale {
             position: fixed !important;
-            left: calc(env(safe-area-inset-left, 0px) + 12px) !important;
+            /* v15.12 : dégagée de la colonne FdS / GAAR / SafeSky. */
+            left: calc(env(safe-area-inset-left, 0px) + 125px) !important;
             bottom: calc(env(safe-area-inset-bottom, 0px) + 0px) !important;
             z-index: 1350 !important;
             background: rgba(255, 255, 255, 0.95);
@@ -4753,6 +4762,7 @@ function injectNauticalScaleStyle() {
         }
         @media (max-width: 900px) {
             .npf-nautical-scale {
+                left: calc(env(safe-area-inset-left, 0px) + 72px) !important;
                 font-size: 12px;
                 padding: 5px 7px 4px 7px;
             }
@@ -16966,7 +16976,7 @@ window.displayVacManagementStatus = displayVacManagementStatus;
 
 
 // =========================================================================
-// v15.11 — FdS / GAAR NAS : boutons carte + autorisation quotidienne + stockage hors ligne
+// v15.13 — FdS / GAAR NAS : lecteur intégré + mise à jour manuelle + stockage hors ligne
 // =========================================================================
 
 function initBriefingDocsDB() {
@@ -17212,11 +17222,6 @@ async function syncBriefingDocsFromNas(options = {}) {
     }
 }
 
-async function syncBriefingDocsAtStartup() {
-    if (!getStoredBriefingDocsSession() || !navigator.onLine) return false;
-    return await syncBriefingDocsFromNas({ silent: true });
-}
-
 function getBriefingDocsParisDateKey() {
     try {
         const parts = new Intl.DateTimeFormat('en-CA', {
@@ -17317,63 +17322,169 @@ function openBriefingDocsPasswordModal(type) {
     return true;
 }
 
-async function openBriefingDoc(type, preOpenedWindow = null) {
+function getBriefingDocLabel(type) {
+    return String(type || '').toLowerCase() === 'gaar' ? 'GAAR' : 'FdS';
+}
+
+function setBriefingDocViewerStatus(message = '', options = {}) {
+    const status = document.getElementById('briefing-doc-viewer-status');
+    if (!status) return;
+    status.textContent = message || '';
+    status.classList.toggle('visible', Boolean(message));
+    status.classList.toggle('success', Boolean(options.success));
+    status.classList.toggle('error', Boolean(options.error));
+}
+
+function revokeBriefingDocViewerObjectUrl() {
+    if (!npfBriefingDocViewerObjectUrl) return;
+    try { URL.revokeObjectURL(npfBriefingDocViewerObjectUrl); } catch (_) {}
+    npfBriefingDocViewerObjectUrl = null;
+}
+
+function closeBriefingDocViewer() {
+    const modal = document.getElementById('briefing-doc-viewer-modal');
+    const frame = document.getElementById('briefing-doc-viewer-frame');
+    if (frame) frame.src = 'about:blank';
+    revokeBriefingDocViewerObjectUrl();
+    if (modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    }
+    npfBriefingDocViewerType = null;
+    setBriefingDocViewerStatus('');
+}
+
+async function displayBriefingDocInViewer(type, record, options = {}) {
     const safeType = String(type || '').toLowerCase();
     if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
-    const openedWindow = preOpenedWindow || window.open('', '_blank');
+    if (!isBriefingDocRecordForToday(record)) {
+        alert(`Aucune ${getBriefingDocLabel(safeType)} du jour enregistrée sur cet appareil.`);
+        return false;
+    }
+
+    const modal = document.getElementById('briefing-doc-viewer-modal');
+    const frame = document.getElementById('briefing-doc-viewer-frame');
+    const title = document.getElementById('briefing-doc-viewer-title');
+    const meta = document.getElementById('briefing-doc-viewer-meta');
+    if (!modal || !frame) throw new Error('Lecteur PDF FdS / GAAR indisponible.');
+
+    revokeBriefingDocViewerObjectUrl();
+    npfBriefingDocViewerObjectUrl = URL.createObjectURL(record.blob);
+    npfBriefingDocViewerType = safeType;
+
+    const label = getBriefingDocLabel(safeType);
+    if (title) title.textContent = label;
+    if (meta) {
+        const pieces = [];
+        if (record.filename) pieces.push(record.filename);
+        if (record.mailDate) pieces.push(`mail ${formatBriefingDocsDate(record.mailDate)}`);
+        else if (record.remoteUpdatedAt) pieces.push(`MAJ ${formatBriefingDocsDate(record.remoteUpdatedAt)}`);
+        meta.textContent = pieces.join(' · ');
+    }
+
+    frame.title = `${label} du jour`;
+    frame.src = npfBriefingDocViewerObjectUrl;
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    if (!options.keepStatus) setBriefingDocViewerStatus('');
+    return true;
+}
+
+async function openBriefingDoc(type) {
+    const safeType = String(type || '').toLowerCase();
+    if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
     try {
         const record = await getBriefingDocRecord(safeType);
-        if (!isBriefingDocRecordForToday(record)) {
-            try { if (openedWindow && !openedWindow.closed) openedWindow.close(); } catch (_) {}
-            alert(`Aucune ${safeType === 'gaar' ? 'GAAR' : 'FdS'} du jour enregistrée sur cet appareil.`);
-            return false;
-        }
-        const pdfUrl = URL.createObjectURL(record.blob);
-        if (openedWindow) openedWindow.location.href = pdfUrl;
-        else window.location.href = pdfUrl;
-        setTimeout(() => URL.revokeObjectURL(pdfUrl), 120000);
-        return true;
+        return await displayBriefingDocInViewer(safeType, record);
     } catch (error) {
-        try { if (openedWindow && !openedWindow.closed) openedWindow.close(); } catch (_) {}
-        alert(`Ouverture ${safeType === 'gaar' ? 'GAAR' : 'FdS'} impossible : ${error.message || error}`);
+        alert(`Ouverture ${getBriefingDocLabel(safeType)} impossible : ${error.message || error}`);
         return false;
     }
 }
 
-async function handleBriefingDocMapButtonClick(type, preOpenedWindow = null) {
+async function fetchBriefingDocsStatusPayload(session) {
+    const statusUrl = `${NPF_BRIEFING_DOCS_API_URL}?action=status&t=${Date.now()}`;
+    const response = await fetchBriefingDocsNas(statusUrl, {
+        method: 'GET',
+        headers: briefingDocsAuthHeaders(session)
+    }, 12000);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload?.message || payload?.error || `Statut NAS indisponible (${response.status})`);
+    }
+    return payload;
+}
+
+async function refreshSingleBriefingDocFromNas(type, options = {}) {
+    const safeType = String(type || '').toLowerCase();
+    if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) throw new Error('Type de document inconnu');
+    if (npfBriefingDocsSyncInProgress) throw new Error('Une mise à jour FdS / GAAR est déjà en cours.');
+
+    const session = getStoredBriefingDocsSession();
+    if (!session) throw new Error('Autorisation FDS / GAAR requise.');
+    if (!navigator.onLine) throw new Error('Mode hors ligne : le document local reste disponible.');
+
+    npfBriefingDocsSyncInProgress = true;
+    await refreshBriefingDocMapButtons().catch(() => {});
+    try {
+        const payload = await fetchBriefingDocsStatusPayload(session);
+        const meta = payload[safeType];
+        if (!meta || !meta.exists) {
+            throw new Error(`Aucune ${getBriefingDocLabel(safeType)} du jour disponible sur le NAS.`);
+        }
+
+        const remoteSignature = getBriefingDocsRemoteSignature(meta);
+        const localRecord = await getBriefingDocRecord(safeType).catch(() => null);
+        const localIsCurrent = isBriefingDocRecordForToday(localRecord);
+        const same = Boolean(
+            localIsCurrent
+            && localRecord?.blob instanceof Blob
+            && localRecord.remoteSignature === remoteSignature
+        );
+
+        let record = localRecord;
+        let changed = false;
+        if (!same || options.force === true) {
+            record = await downloadBriefingDocFromNas(safeType, meta, session);
+            changed = true;
+        }
+
+        try { localStorage.setItem(NPF_BRIEFING_DOCS_LAST_SYNC_KEY, String(Date.now())); } catch (_) {}
+        return { changed, record, meta };
+    } finally {
+        npfBriefingDocsSyncInProgress = false;
+        await refreshBriefingDocMapButtons().catch(() => {});
+    }
+}
+
+async function handleBriefingDocMapButtonClick(type) {
     const safeType = String(type || '').toLowerCase();
     if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
 
     if (!getStoredBriefingDocsSession()) {
-        try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
         openBriefingDocsPasswordModal(safeType);
         return false;
     }
 
     const localRecord = await getBriefingDocRecord(safeType).catch(() => null);
     if (isBriefingDocRecordForToday(localRecord)) {
-        return await openBriefingDoc(safeType, preOpenedWindow);
+        return await displayBriefingDocInViewer(safeType, localRecord);
     }
 
     if (!navigator.onLine) {
-        try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
-        alert(`${safeType === 'gaar' ? 'GAAR' : 'FdS'} du jour non téléchargée. Une connexion Internet est nécessaire pour la récupérer.`);
+        alert(`${getBriefingDocLabel(safeType)} du jour non téléchargée. Une connexion Internet est nécessaire pour la récupérer.`);
         return false;
     }
 
     try {
-        await syncBriefingDocsFromNas({ silent: true });
-        const refreshed = await getBriefingDocRecord(safeType).catch(() => null);
-        await refreshBriefingDocMapButtons();
-        if (!isBriefingDocRecordForToday(refreshed)) {
-            try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
-            alert(`Aucune ${safeType === 'gaar' ? 'GAAR' : 'FdS'} du jour disponible sur le NAS.`);
+        const result = await refreshSingleBriefingDocFromNas(safeType);
+        if (!isBriefingDocRecordForToday(result.record)) {
+            alert(`Aucune ${getBriefingDocLabel(safeType)} du jour disponible sur le NAS.`);
             return false;
         }
-        return await openBriefingDoc(safeType, preOpenedWindow);
+        return await displayBriefingDocInViewer(safeType, result.record);
     } catch (error) {
-        try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
-        alert(`${safeType === 'gaar' ? 'GAAR' : 'FdS'} : ${error.message || error}`);
+        alert(`${getBriefingDocLabel(safeType)} : ${error.message || error}`);
         await refreshBriefingDocMapButtons();
         return false;
     }
@@ -17391,22 +17502,66 @@ function initializeBriefingDocsUi() {
     const passwordInput = document.getElementById('briefing-docs-password-input');
     const authorizeButton = document.getElementById('briefing-docs-authorize-button');
     const passwordStatus = document.getElementById('briefing-docs-password-status');
+    const viewerCloseButton = document.getElementById('briefing-doc-viewer-close');
+    const viewerRefreshButton = document.getElementById('briefing-doc-viewer-refresh');
 
     const bindDocButton = (button, type) => {
         if (!button || button.dataset.bound === '1') return;
         button.dataset.bound = '1';
         button.addEventListener('click', () => {
-            const session = getStoredBriefingDocsSession();
-            const preOpenedWindow = session ? window.open('', '_blank') : null;
-            handleBriefingDocMapButtonClick(type, preOpenedWindow).catch(error => {
-                try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
-                alert(`${type === 'gaar' ? 'GAAR' : 'FdS'} : ${error.message || error}`);
+            handleBriefingDocMapButtonClick(type).catch(error => {
+                alert(`${getBriefingDocLabel(type)} : ${error.message || error}`);
             });
         });
     };
 
     bindDocButton(fdsButton, 'fds');
     bindDocButton(gaarButton, 'gaar');
+
+    if (viewerCloseButton && viewerCloseButton.dataset.bound !== '1') {
+        viewerCloseButton.dataset.bound = '1';
+        viewerCloseButton.addEventListener('click', closeBriefingDocViewer);
+    }
+    if (viewerRefreshButton && viewerRefreshButton.dataset.bound !== '1') {
+        viewerRefreshButton.dataset.bound = '1';
+        viewerRefreshButton.addEventListener('click', async () => {
+            const type = npfBriefingDocViewerType;
+            if (!type) return;
+
+            if (!getStoredBriefingDocsSession()) {
+                openBriefingDocsPasswordModal(type);
+                return;
+            }
+            if (!navigator.onLine) {
+                setBriefingDocViewerStatus('Hors ligne : impossible de vérifier une mise à jour.', { error: true });
+                return;
+            }
+
+            const originalText = viewerRefreshButton.textContent || 'Maj';
+            try {
+                viewerRefreshButton.disabled = true;
+                viewerRefreshButton.textContent = 'Maj…';
+                setBriefingDocViewerStatus('Vérification sur le NAS…');
+                const result = await refreshSingleBriefingDocFromNas(type);
+                if (!result.changed) {
+                    setBriefingDocViewerStatus('Déjà à jour.', { success: true });
+                    return;
+                }
+                await displayBriefingDocInViewer(type, result.record, { keepStatus: true });
+                setBriefingDocViewerStatus('Nouvelle version téléchargée.', { success: true });
+            } catch (error) {
+                if (!getStoredBriefingDocsSession()) {
+                    openBriefingDocsPasswordModal(type);
+                    setBriefingDocViewerStatus('Autorisation expirée : saisis à nouveau le mot de passe.', { error: true });
+                } else {
+                    setBriefingDocViewerStatus(error.message || String(error), { error: true });
+                }
+            } finally {
+                viewerRefreshButton.disabled = false;
+                viewerRefreshButton.textContent = originalText;
+            }
+        });
+    }
 
     const closeModal = () => closeBriefingDocsPasswordModal();
     if (closeButton && closeButton.dataset.bound !== '1') {
@@ -17429,7 +17584,6 @@ function initializeBriefingDocsUi() {
             return;
         }
 
-        const preOpenedWindow = window.open('', '_blank');
         const originalText = authorizeButton?.textContent || 'Autoriser jusqu’à minuit';
         try {
             if (authorizeButton) {
@@ -17438,22 +17592,17 @@ function initializeBriefingDocsUi() {
             }
             if (passwordStatus) passwordStatus.textContent = 'Vérification du mot de passe…';
             await authorizeBriefingDocs(password);
-            if (passwordStatus) passwordStatus.textContent = 'Téléchargement des documents du jour…';
-            await syncBriefingDocsFromNas({ silent: true });
-            await refreshBriefingDocMapButtons();
+            if (passwordStatus) passwordStatus.textContent = `Téléchargement ${getBriefingDocLabel(targetType)} du jour…`;
 
-            const record = await getBriefingDocRecord(targetType).catch(() => null);
-            if (!isBriefingDocRecordForToday(record)) {
-                try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
-                const label = targetType === 'gaar' ? 'GAAR' : 'FdS';
-                if (passwordStatus) passwordStatus.textContent = `${label} du jour non disponible sur le NAS.`;
+            const result = await refreshSingleBriefingDocFromNas(targetType);
+            if (!isBriefingDocRecordForToday(result.record)) {
+                if (passwordStatus) passwordStatus.textContent = `${getBriefingDocLabel(targetType)} du jour non disponible sur le NAS.`;
                 return;
             }
 
             closeBriefingDocsPasswordModal();
-            await openBriefingDoc(targetType, preOpenedWindow);
+            await displayBriefingDocInViewer(targetType, result.record);
         } catch (error) {
-            try { if (preOpenedWindow && !preOpenedWindow.closed) preOpenedWindow.close(); } catch (_) {}
             if (passwordStatus) passwordStatus.textContent = error.message || String(error);
             await refreshBriefingDocMapButtons();
         } finally {
@@ -17481,7 +17630,13 @@ function initializeBriefingDocsUi() {
     if (!window.__npfBriefingDocsEscapeBound) {
         window.__npfBriefingDocsEscapeBound = true;
         window.addEventListener('keydown', event => {
-            if (event.key === 'Escape' && modal?.style.display === 'flex') closeModal();
+            if (event.key !== 'Escape') return;
+            if (modal?.style.display === 'flex') {
+                closeModal();
+                return;
+            }
+            const viewer = document.getElementById('briefing-doc-viewer-modal');
+            if (viewer?.style.display === 'flex') closeBriefingDocViewer();
         });
     }
 
@@ -17492,6 +17647,8 @@ window.openBriefingDoc = openBriefingDoc;
 window.displayBriefingDocsStatus = displayBriefingDocsStatus;
 window.refreshBriefingDocMapButtons = refreshBriefingDocMapButtons;
 window.syncBriefingDocsFromNas = syncBriefingDocsFromNas;
+window.refreshSingleBriefingDocFromNas = refreshSingleBriefingDocFromNas;
+window.closeBriefingDocViewer = closeBriefingDocViewer;
 
 
 function initAirportPdfDB() {
