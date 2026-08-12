@@ -1,4 +1,4 @@
-/* v15.10 TEST — section FDS / GAAR NAS protégée et stockage hors ligne. */
+/* v15.11 TEST — boutons FdS / GAAR sur la carte + saisie mot de passe à la demande. */
 /* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
 /* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
 /* v15.02 TEST — filtres SafeSky : lignes altitude non sélectionnées non grisées. */
@@ -13219,100 +13219,151 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 
-/* ==========================================================================
-   v15.10 — FDS / GAAR NAS dans Gestion des Cartes
+/* ========================================================================== 
+   v15.11 — FdS / GAAR : accès direct sur la carte
    ========================================================================== */
-.briefing-docs-section {
-    margin-top: 18px;
-    padding-top: 4px;
+.briefing-doc-map-button {
+    background: #ffffff !important;
+    font-family: inherit;
+    font-size: 24px !important;
+    font-weight: 950;
+    letter-spacing: .01em;
+    text-transform: none;
 }
 
-.briefing-docs-section .maps-management-title {
-    margin-bottom: 10px;
+.briefing-doc-map-button .briefing-doc-map-label {
+    display: block;
+    pointer-events: none;
 }
 
-.briefing-docs-explanation {
-    margin: 0 0 12px;
+/* PDF du jour absent : fond blanc, texte + contour orange. */
+.briefing-doc-map-button.briefing-doc-missing,
+.briefing-doc-map-button.briefing-doc-missing:hover,
+.briefing-doc-map-button.briefing-doc-missing:focus-visible {
+    background: #ffffff !important;
+    border-color: #e67e22 !important;
+    color: #e67e22 !important;
+}
+
+/* PDF du jour présent : bouton vert très visible. */
+.briefing-doc-map-button.briefing-doc-loaded,
+.briefing-doc-map-button.briefing-doc-loaded:hover,
+.briefing-doc-map-button.briefing-doc-loaded:focus-visible {
+    background: #198754 !important;
+    border-color: #198754 !important;
+    color: #ffffff !important;
+}
+
+.briefing-doc-map-button.loading {
+    opacity: .68 !important;
+}
+
+.briefing-docs-password-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(9, 20, 36, .42);
+}
+
+.briefing-docs-password-dialog {
+    position: relative;
+    box-sizing: border-box;
+    width: min(92vw, 440px);
+    padding: 24px 20px 20px;
+    border: 1px solid #d4dce6;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
+    text-align: center;
+}
+
+.briefing-docs-password-dialog h2 {
+    margin: 0 40px 10px;
+    color: var(--primary-color);
+    font-size: 25px;
+    line-height: 1.15;
+}
+
+.briefing-docs-password-dialog p {
+    margin: 0 0 14px;
     color: var(--light-text-color);
     line-height: 1.35;
 }
 
-.briefing-docs-auth-row,
-.briefing-docs-session-row,
-.briefing-docs-open-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+.briefing-docs-password-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #333333;
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
 }
 
 #briefing-docs-password-input {
     box-sizing: border-box;
-    min-height: 54px;
-    flex: 1 1 190px;
-    min-width: 0;
+    width: 100%;
+    min-height: 52px;
+    margin: 0 0 12px;
     padding: 0 14px;
-    border: 1px solid var(--border-color);
+    border: 1px solid #bcc8d5;
     border-radius: 10px;
     background: #ffffff;
     color: var(--text-color);
-    font-size: 16px;
+    font-size: 17px;
+    text-align: center;
 }
 
-.briefing-docs-authorize-button,
-.briefing-docs-sync-button,
-.briefing-docs-open-button {
+.briefing-docs-password-submit {
     box-sizing: border-box;
-    min-height: 54px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.briefing-docs-session-row {
-    justify-content: space-between;
-}
-
-.briefing-docs-session-status {
-    font-weight: 800;
-    color: #176b36;
-}
-
-.briefing-docs-status {
-    margin-top: 12px;
-    padding: 10px 12px;
-    border: 1px solid #d7dee8;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 14px;
+    border: 0;
     border-radius: 10px;
-    background: #f8fafc;
-    color: var(--text-color);
-    white-space: pre-line;
-    line-height: 1.4;
+    background: var(--primary-color);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 850;
+    cursor: pointer;
 }
 
-.briefing-docs-open-actions {
+.briefing-docs-password-submit:disabled {
+    opacity: .58;
+    cursor: wait;
+}
+
+.briefing-docs-password-status {
+    min-height: 20px;
     margin-top: 10px;
+    color: #b54708;
+    font-size: 14px;
+    font-weight: 750;
+    line-height: 1.3;
 }
 
-.briefing-docs-open-button:disabled,
-.briefing-docs-sync-button:disabled,
-.briefing-docs-authorize-button:disabled {
-    opacity: .55;
-    cursor: default;
+@media (max-width: 760px) {
+    .briefing-doc-map-button {
+        font-size: 16px !important;
+        letter-spacing: 0 !important;
+    }
 }
 
-@media (max-width: 620px) {
-    .briefing-docs-auth-row,
-    .briefing-docs-session-row {
-        align-items: stretch;
+@media (max-width: 430px) {
+    .briefing-doc-map-button {
+        font-size: 16px !important;
     }
-    #briefing-docs-password-input,
-    .briefing-docs-authorize-button,
-    .briefing-docs-sync-button {
-        width: 100%;
-        flex-basis: 100%;
-    }
-    .briefing-docs-open-actions .briefing-docs-open-button {
-        flex: 1 1 calc(50% - 5px);
-        min-width: 0;
+    .briefing-docs-password-dialog {
+        width: min(94vw, 420px);
+        padding: 22px 16px 18px;
     }
 }
