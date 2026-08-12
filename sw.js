@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-21_ruler_reverse_scale_bigger_labels';
-const APP_VERSION = 'v15.21';
+const SW_VERSION = 'sw-v15-22_ruler_zero_left_km_clear';
+const APP_VERSION = 'v15.22';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
