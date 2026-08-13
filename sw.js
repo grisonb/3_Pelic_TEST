@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-26_glr_15s_no_age_hide';
-const APP_VERSION = 'v15.26';
+const SW_VERSION = 'sw-v15-28_glr_viewport_only_labels';
+const APP_VERSION = 'v15.28';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
