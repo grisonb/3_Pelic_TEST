@@ -1,3 +1,56 @@
+VERSION TEST v15.29 — COMPTEURS SAFESKY CORRIGÉS / LIAISONS GLR RENFORCÉES
+Date : 13/08/2026
+Base : TEST v15.28
+
+OBJECTIF
+- Corriger la signification des deux bulles numériques du bouton SafeSky.
+- Donner exactement la même taille et la même typographie aux bulles jaune et verte.
+- Rendre réellement visible le trait reliant chaque étiquette GLR à son trafic.
+
+MODIFICATIONS
+1. SafeSky — bulle jaune à gauche
+- La bulle jaune représente désormais le nombre de trafics de la liste suivie actuellement détectés par SafeSky.
+- Elle ne représente plus le nombre total d'identifiants mémorisés dans la configuration.
+- Le calcul est réalisé sur les trafics SafeSky éligibles après filtres communs (sol, ancienneté, altitude), avant l'éventuel filtre d'affichage « seulement la liste suivie ».
+
+2. SafeSky — bulle verte à droite
+- La bulle verte représente désormais la totalité des trafics SafeSky éligibles.
+- Ce total est calculé avant l'éventuel filtre « seulement la liste suivie » : le compteur vert reste donc le total même si la carte n'affiche volontairement que les trafics suivis.
+- Le nombre de marqueurs réellement rendus reste conservé séparément pour la logique interne.
+
+3. SafeSky — taille des deux bulles
+- Les bulles jaune et verte utilisent exactement la même largeur minimale, hauteur, padding, taille de police, graisse et hauteur de ligne.
+- Grand écran : 26 px de haut, police 13 px.
+- Écran <= 760 px : 22 px de haut, police 12 px.
+- Jaune à gauche, vert à droite.
+
+4. GLR — trait étiquette / trafic
+- Création d'un pane Leaflet spécifique aux traits GLR, placé immédiatement sous le pane des symboles/étiquettes GLR et au-dessus du fond de carte.
+- Chaque liaison est maintenant dessinée en double :
+  • halo blanc épais de 7 px ;
+  • trait central de 3 px, bleu foncé pour un trafic frais et orange foncé pour un trafic ancien.
+- Le trait conserve exactement la géométrie demandée : centre de l'étiquette vers centre du symbole trafic.
+- Les symboles et étiquettes restent au premier plan.
+
+ÉLÉMENTS INCHANGÉS
+- Correction v15.28 : aucun indicatif GLR hors champ et aucun effet de liste en haut à gauche.
+- Anticollision GLR.
+- Cadence GLR : 15 secondes.
+- Authentification et relais NAS GLR.
+- SafeSky : cadence, filtres, popups, suivi et données.
+- FdS / GAAR, VAC, cartes Online/Offline, GPS, plans d'eau, IndexedDB et données utilisateur.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.29.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Historique v15.28 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.28 — GLR : AUCUN INDICATIF HORS CHAMP / SUPPRESSION EFFET « LISTE »
 Date : 13/08/2026
 Base : TEST v15.27
