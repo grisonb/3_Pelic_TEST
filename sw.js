@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-28_glr_viewport_only_labels';
-const APP_VERSION = 'v15.28';
+const SW_VERSION = 'sw-v15-29_safesky_counts_glr_connectors';
+const APP_VERSION = 'v15.29';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
