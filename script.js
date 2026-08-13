@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.28';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.29';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.29 TEST — compteurs SafeSky corrigés + liaisons GLR renforcées
+// - jaune gauche = trafics de la liste suivie actuellement détectés ;
+// - vert droite = totalité des trafics SafeSky éligibles, avant filtre « liste » ;
+// - taille/typographie des deux bulles strictement identiques ;
+// - liaison GLR dans un pane dédié, sous les symboles mais au-dessus de la carte,
+//   avec halo clair + trait foncé pour rester visible sur tous les fonds.
+// =========================================================================
 
 // =========================================================================
 // v15.28 TEST — GLR : aucun indicatif hors champ
@@ -1116,6 +1125,12 @@ let trafficRefreshTimer = null;
 let lastTrafficRefreshAt = 0;
 let lastTrafficError = '';
 let lastTrafficDisplayedCount = 0;
+/*
+ * v15.29 — compteurs du bouton SafeSky séparés de la quantité réellement
+ * rendue lorsque le filtre « liste suivie » est actif.
+ */
+let lastTrafficTotalEligibleCount = 0;
+let lastTrafficTrackedDetectedCount = 0;
 let lastTrafficAircraftSnapshot = [];
 let lastTrafficRenderMeta = null;
 
@@ -10851,15 +10866,6 @@ function refreshTrackedTrafficListUi() {
             : 'Aucun indicatif suivi';
     }
 
-    const trackedButtonCount = document.getElementById('traffic-tracked-button-count');
-    if (trackedButtonCount) {
-        trackedButtonCount.textContent = String(entries.length);
-        trackedButtonCount.style.display = entries.length > 0 ? 'inline-flex' : 'none';
-        trackedButtonCount.title = entries.length
-            ? `${entries.length} indicatif${entries.length > 1 ? 's' : ''} dans la liste suivie`
-            : 'Aucun indicatif dans la liste suivie';
-    }
-
     if (!entries.length) {
         const empty = document.createElement('div');
         empty.className = 'traffic-tool-empty';
@@ -15547,8 +15553,15 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         : null;
 
     const trackedIdentifierSet = getTrackedTrafficIdentifierSet();
-    const uniqueAircraft = [];
-    const seenAircraft = new Set();
+
+    /*
+     * v15.29 — on calcule d'abord tous les trafics éligibles SafeSky sans
+     * appliquer le filtre « seulement la liste suivie ». Cela permet au badge
+     * vert de toujours représenter la totalité, même lorsque la carte ne rend
+     * volontairement que les trafics de la liste.
+     */
+    const allEligibleAircraft = [];
+    const seenAllEligibleAircraft = new Set();
 
     (Array.isArray(aircraftList) ? aircraftList : [])
         .map(normalizeTrafficAircraft)
@@ -15602,14 +15615,6 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             || ac.altitudeFeet === null
             || ac.altitudeFeet <= groundToAboveMaxAltitudeFt
         ))
-        .filter(ac => (
-            !settings.onlyTrackedIdentifiers
-            || ac.forceDisplay
-            || trackedIdentifierSet.has(
-                String(ac.hex || '').toUpperCase()
-            )
-            || isTrafficAircraftTracked(ac)
-        ))
         .forEach(ac => {
             const reference = getNearestTrafficReference(ac, points);
 
@@ -15627,10 +15632,25 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
 
             ac._trafficReference = showAllTraffic ? null : reference;
             const key = buildTrafficAircraftKey(ac);
-            if (seenAircraft.has(key)) return;
-            seenAircraft.add(key);
-            uniqueAircraft.push(ac);
+            if (seenAllEligibleAircraft.has(key)) return;
+            seenAllEligibleAircraft.add(key);
+            allEligibleAircraft.push(ac);
         });
+
+    lastTrafficTotalEligibleCount = allEligibleAircraft.length;
+    lastTrafficTrackedDetectedCount = allEligibleAircraft.filter(ac => (
+        trackedIdentifierSet.has(String(ac.hex || '').toUpperCase())
+        || isTrafficAircraftTracked(ac)
+    )).length;
+
+    const uniqueAircraft = allEligibleAircraft.filter(ac => (
+        !settings.onlyTrackedIdentifiers
+        || ac.forceDisplay
+        || trackedIdentifierSet.has(
+            String(ac.hex || '').toUpperCase()
+        )
+        || isTrafficAircraftTracked(ac)
+    ));
 
     const renderNow = Date.now();
     const activeAircraftKeys = new Set();
@@ -15752,7 +15772,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
 
     lastTrafficDisplayedCount = uniqueAircraft.length;
     refreshTrackedTrafficListUi();
-    refreshTrafficButtonState(uniqueAircraft.length);
+    refreshTrafficButtonState();
     updateTrafficStatus({
         visible: showTrafficLayer,
         state: 'ok',
@@ -15805,17 +15825,16 @@ function refreshTrafficButtonState(count = null) {
     if (!button) return;
 
     if (trackedCountEl) {
-        const trackedCount = getTrackedTrafficIdentifiers().length;
+        const trackedCount = Math.max(
+            0,
+            Math.round(Number(lastTrafficTrackedDetectedCount) || 0)
+        );
         trackedCountEl.textContent = String(trackedCount);
-        trackedCountEl.style.display = trackedCount > 0 ? 'inline-flex' : 'none';
-        trackedCountEl.title = trackedCount
-            ? `${trackedCount} indicatif${trackedCount > 1 ? 's' : ''} dans la liste suivie`
-            : 'Aucun indicatif dans la liste suivie';
+        trackedCountEl.style.display = showTrafficLayer ? 'inline-flex' : 'none';
+        trackedCountEl.title = `${trackedCount} trafic${trackedCount > 1 ? 's' : ''} de la liste suivie détecté${trackedCount > 1 ? 's' : ''}`;
         trackedCountEl.setAttribute(
             'aria-label',
-            trackedCount
-                ? `${trackedCount} indicatif${trackedCount > 1 ? 's' : ''} dans la liste suivie`
-                : 'Aucun indicatif dans la liste suivie'
+            `${trackedCount} trafic${trackedCount > 1 ? 's' : ''} de la liste suivie détecté${trackedCount > 1 ? 's' : ''}`
         );
     }
 
@@ -15864,7 +15883,9 @@ function refreshTrafficButtonState(count = null) {
             if (lastTrafficError && !isTrafficLoading) {
                 countEl.textContent = '!';
             } else {
-                countEl.textContent = String(lastTrafficDisplayedCount);
+                countEl.textContent = String(
+                    Math.max(0, Math.round(Number(lastTrafficTotalEligibleCount) || 0))
+                );
             }
             countEl.style.display = 'inline-flex';
         } else {
@@ -15901,6 +15922,8 @@ async function refreshTrafficLayer(options = {}) {
     if (!points.length && !trackedIdentifiers.length) {
         lastTrafficError = 'Aucun point de référence';
         lastTrafficDisplayedCount = 0;
+        lastTrafficTotalEligibleCount = 0;
+        lastTrafficTrackedDetectedCount = 0;
         refreshTrafficButtonState(0);
         updateTrafficStatus({ state: 'error', message: 'Trafic : aucun point de référence', visible: true });
         return;
@@ -18188,6 +18211,8 @@ const NPF_GLOBAL_LINK_REFRESH_MS = 15000;
 const NPF_GLOBAL_LINK_FRESH_SECONDS = 180;
 const NPF_GLOBAL_LINK_PANE_NAME = 'npfGlobalLinkPane';
 const NPF_GLOBAL_LINK_PANE_Z_INDEX = 645;
+const NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME = 'npfGlobalLinkConnectorPane';
+const NPF_GLOBAL_LINK_CONNECTOR_PANE_Z_INDEX = 644;
 
 let npfGlobalLinkLayer = null;
 let npfGlobalLinkRefreshTimer = null;
@@ -18341,6 +18366,16 @@ async function submitGlobalLinkCaptcha() {
 
 function ensureGlobalLinkPane() {
     if (!map?.getPane || !map?.createPane) return null;
+
+    let connectorPane = map.getPane(NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME);
+    if (!connectorPane) {
+        connectorPane = map.createPane(NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME);
+    }
+    if (connectorPane) {
+        connectorPane.style.zIndex = String(NPF_GLOBAL_LINK_CONNECTOR_PANE_Z_INDEX);
+        connectorPane.style.pointerEvents = 'none';
+    }
+
     let pane = map.getPane(NPF_GLOBAL_LINK_PANE_NAME);
     if (!pane) pane = map.createPane(NPF_GLOBAL_LINK_PANE_NAME);
     if (pane) {
@@ -18551,13 +18586,32 @@ function renderGlobalLinkPositions(positions) {
          * restent graphiquement au premier plan, tout en reliant leurs centres.
          */
         if (labelLatLng) {
+            const connectorPoints = [[item.lat, item.lon], labelLatLng];
+            /*
+             * v15.29 — double trait pour rester lisible sur orthophoto, fond
+             * clair ou fond sombre. Le centre géométrique reste identique :
+             * centre étiquette -> centre trafic.
+             */
             L.polyline(
-                [[item.lat, item.lon], labelLatLng],
+                connectorPoints,
                 {
-                    pane: NPF_GLOBAL_LINK_PANE_NAME,
-                    color: item.stale ? '#b85c00' : '#166534',
-                    weight: 2,
-                    opacity: 0.82,
+                    pane: NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME,
+                    color: '#ffffff',
+                    weight: 7,
+                    opacity: 0.96,
+                    interactive: false,
+                    keyboard: false,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }
+            ).addTo(layer);
+            L.polyline(
+                connectorPoints,
+                {
+                    pane: NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME,
+                    color: item.stale ? '#c05a00' : '#0b2f6b',
+                    weight: 3,
+                    opacity: 1,
                     interactive: false,
                     keyboard: false,
                     lineCap: 'round',
