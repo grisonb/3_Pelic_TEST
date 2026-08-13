@@ -1,3 +1,94 @@
+VERSION TEST v15.28 — GLR : AUCUN INDICATIF HORS CHAMP / SUPPRESSION EFFET « LISTE »
+Date : 13/08/2026
+Base : TEST v15.27
+
+OBJECTIF
+- Ne plus afficher dans un coin de la carte les noms des trafics GLR qui sont hors du champ visible au niveau de zoom courant.
+- Conserver l'anticollision des étiquettes sans créer d'effet de liste déportée en haut à gauche.
+
+MODIFICATIONS
+1. GLR — filtrage par emprise de carte
+- Avant chaque rendu, NPF vérifie l'emprise Leaflet actuellement visible.
+- Un trafic dont le centre de position est hors de cette emprise n'est pas rendu : ni symbole, ni étiquette, ni trait.
+- Les données de ce trafic restent conservées dans la dernière réponse GLR ; il réapparaît automatiquement dès qu'un zoom ou déplacement de carte le fait entrer dans le champ visible.
+
+2. GLR — suppression du placement de secours global
+- Le moteur d'anticollision ne cherche plus une case libre n'importe où dans le viewport lorsqu'aucun emplacement proche du trafic n'est disponible.
+- Cela supprime l'effet où plusieurs indicatifs pouvaient se ranger dans le coin supérieur gauche alors que leurs trafics étaient éloignés ou hors champ.
+- Si aucune position proche n'est disponible sans chevauchement, seule l'étiquette concernée est masquée ; le trafic lui-même reste visible s'il est dans l'emprise.
+
+3. GLR — liaisons v15.27 conservées
+- Le trait centre étiquette -> centre trafic est conservé pour chaque étiquette effectivement affichée.
+- Aucun trait orphelin n'est créé pour une étiquette masquée ou un trafic hors champ.
+
+ÉLÉMENTS INCHANGÉS
+- Cadence GLR : 15 secondes.
+- Authentification et relais NAS GLR.
+- Dédoublonnage et gestion de l'ancienneté GLR.
+- Bulles vertes GLR/SafeSky et bulle jaune SafeSky de la v15.27.
+- SafeSky, FdS / GAAR, VAC, cartes Online/Offline, GPS, plans d'eau, IndexedDB et données utilisateur.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.28.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Historique v15.27 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION TEST v15.27 — LIAISONS GLR + COMPTEURS TRAFIC VERT/JAUNE
+Date : 13/08/2026
+Base : TEST v15.26
+
+OBJECTIF
+- Relier visuellement chaque étiquette Global Link Rescue au trafic auquel elle appartient.
+- Harmoniser les bulles de comptage GLR et SafeSky sur fond vert.
+- Afficher sur le bouton SafeSky un second compteur jaune correspondant au nombre d'indicatifs enregistrés dans la liste suivie.
+
+MODIFICATIONS
+1. GLR — trait étiquette / trafic
+- Pour chaque étiquette GLR effectivement affichée par le moteur d'anticollision, un trait relie désormais le centre géométrique de l'étiquette au centre du symbole avion associé.
+- Le trait est recalculé avec l'étiquette après zoom, déplacement ou redimensionnement de la carte.
+- Le trait est dessiné avant le symbole et l'étiquette afin que ceux-ci restent au premier plan.
+- Trafic frais : liaison verte foncée.
+- Trafic ancien : liaison orange foncée.
+- Si une étiquette doit être masquée faute d'emplacement libre, aucun trait orphelin n'est affiché.
+
+2. SafeSky — bulle trafic affiché
+- La bulle en haut à droite qui indique le nombre de trafics SafeSky affichés passe du rouge au vert.
+- La logique de comptage et l'affichage uniquement lorsque la couche SafeSky est active restent inchangés.
+
+3. GLR — bulle trafic affiché
+- La bulle qui indique le nombre de positions GLR affichées passe du rouge au vert.
+- La cadence GLR de 15 secondes et la logique d'état du bouton restent inchangées.
+
+4. SafeSky — bulle jaune « liste suivie »
+- Une seconde bulle est ajoutée en haut à gauche du bouton SafeSky.
+- Son fond est jaune et son texte noir.
+- Elle indique le nombre total d'indicatifs enregistrés dans « Liste d'identifiants suivis ».
+- Le compteur est synchronisé immédiatement lors de l'ajout ou de la suppression d'un indicatif et lors du rafraîchissement de l'état SafeSky.
+- La bulle est masquée si la liste suivie est vide.
+
+ÉLÉMENTS INCHANGÉS
+- Flux, filtres, cadence 5 s et logique de rendu SafeSky.
+- Flux GLR, authentification, relais NAS, cadence 15 s, dédoublonnage et anticollision.
+- FdS / GAAR, VAC, cartes Online/Offline, GPS, IndexedDB et données utilisateur.
+- Aucun fichier NAS à remplacer pour cette version.
+- Liste et coordonnées des plans d'eau inchangées.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.27.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Historique v15.26 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.26 — GLR : RAFRAÎCHISSEMENT 15 S + POSITIONS ANCIENNES CONSERVÉES
 Date : 12/08/2026
 Base : TEST v15.25
