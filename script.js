@@ -1,5 +1,23 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.26';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.28';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.28 TEST — GLR : aucun indicatif hors champ
+// - seuls les trafics dont la position est dans l'emprise courante de la carte
+//   sont rendus (symbole, étiquette et liaison) ;
+// - suppression du placement de secours global dans le viewport : une
+//   étiquette sans emplacement libre proche de son trafic est masquée ;
+// - les positions GLR complètes restent conservées en mémoire et réapparaissent
+//   automatiquement lorsqu'elles rentrent dans le champ après zoom/déplacement.
+// =========================================================================
+
+// =========================================================================
+// v15.27 TEST — liaisons GLR + compteurs trafic
+// - un trait relie le centre de chaque étiquette GLR au centre de son trafic ;
+// - bulles de comptage GLR et SafeSky sur fond vert ;
+// - seconde bulle SafeSky jaune en haut à gauche : nombre d'indicatifs suivis ;
+// - logique trafic, anticollision GLR et cadence 15 s inchangées.
+// =========================================================================
 
 // =========================================================================
 // v15.26 TEST — GLR : rafraîchissement 15 s + aucune mission masquée par âge
@@ -10833,6 +10851,15 @@ function refreshTrackedTrafficListUi() {
             : 'Aucun indicatif suivi';
     }
 
+    const trackedButtonCount = document.getElementById('traffic-tracked-button-count');
+    if (trackedButtonCount) {
+        trackedButtonCount.textContent = String(entries.length);
+        trackedButtonCount.style.display = entries.length > 0 ? 'inline-flex' : 'none';
+        trackedButtonCount.title = entries.length
+            ? `${entries.length} indicatif${entries.length > 1 ? 's' : ''} dans la liste suivie`
+            : 'Aucun indicatif dans la liste suivie';
+    }
+
     if (!entries.length) {
         const empty = document.createElement('div');
         empty.className = 'traffic-tool-empty';
@@ -15774,7 +15801,23 @@ function updateTrafficStatus({ visible = showTrafficLayer, state = 'idle', count
 function refreshTrafficButtonState(count = null) {
     const button = document.getElementById('traffic-layer-button');
     const countEl = document.getElementById('traffic-button-count');
+    const trackedCountEl = document.getElementById('traffic-tracked-button-count');
     if (!button) return;
+
+    if (trackedCountEl) {
+        const trackedCount = getTrackedTrafficIdentifiers().length;
+        trackedCountEl.textContent = String(trackedCount);
+        trackedCountEl.style.display = trackedCount > 0 ? 'inline-flex' : 'none';
+        trackedCountEl.title = trackedCount
+            ? `${trackedCount} indicatif${trackedCount > 1 ? 's' : ''} dans la liste suivie`
+            : 'Aucun indicatif dans la liste suivie';
+        trackedCountEl.setAttribute(
+            'aria-label',
+            trackedCount
+                ? `${trackedCount} indicatif${trackedCount > 1 ? 's' : ''} dans la liste suivie`
+                : 'Aucun indicatif dans la liste suivie'
+        );
+    }
 
     if (count !== null && count !== undefined && count !== '') {
         const numericCount = Number(count);
@@ -18444,24 +18487,10 @@ function buildGlobalLinkLabelLayout(items) {
         }
 
         /*
-         * Filet de sécurité : si un amas très dense occupe toutes les positions
-         * proches, chercher une case libre dans le viewport. Ainsi deux étiquettes
-         * GLR ne sont jamais volontairement superposées.
-         */
-        if (!chosen) {
-            outer:
-            for (let y = edge + height / 2; y <= size.y - edge - height / 2; y += height + 6) {
-                for (let x = edge + width / 2; x <= size.x - edge - width / 2; x += 18) {
-                    const rect = rectFromCenter(x, y, width, height);
-                    if (isFree(rect, index)) { chosen = { x, y, rect }; break outer; }
-                }
-            }
-        }
-
-        /*
-         * Si aucun emplacement libre n'existe réellement dans le viewport, ne
-         * pas afficher cette étiquette plutôt que de la superposer à une autre.
-         * Le symbole avion reste toujours visible et cliquable.
+         * v15.28 — ne jamais transformer les étiquettes GLR en « liste » dans
+         * un coin de la carte. Si aucun emplacement proche du trafic n'est libre,
+         * l'étiquette est masquée plutôt que déplacée loin de son symbole.
+         * Le symbole avion reste visible et cliquable.
          */
         if (!chosen) return;
 
@@ -18481,11 +18510,21 @@ function renderGlobalLinkPositions(positions) {
         return;
     }
     const now = Date.now();
+    const currentBounds = map?.getBounds ? map.getBounds() : null;
     const visibleItems = npfGlobalLinkLastPositions
         .map((item, sourceIndex) => {
             const lat = Number(item.lat);
             const lon = Number(item.lon);
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+            /*
+             * v15.28 — aucun trafic hors champ ne doit générer un symbole,
+             * une étiquette ou un trait visible dans le viewport.
+             * Les données restent dans npfGlobalLinkLastPositions et seront
+             * réévaluées au prochain zoom/moveend.
+             */
+            if (currentBounds && !currentBounds.contains(L.latLng(lat, lon))) return null;
+
             const ts = Date.parse(String(item.updatedAt || ''));
             const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
             const name = String(item.name || 'Global Link').trim();
@@ -18501,6 +18540,32 @@ function renderGlobalLinkPositions(positions) {
     const labelLayout = buildGlobalLinkLabelLayout(visibleItems);
     visibleItems.forEach(item => {
         const safeName = escapeGlobalLinkHtml(item.name);
+        const placement = labelLayout.get(item.key);
+        const labelLatLng = placement
+            ? map.containerPointToLatLng(placement.point)
+            : null;
+
+        /*
+         * v15.27 — liaison centre étiquette -> centre trafic.
+         * Le trait est ajouté avant le symbole et l'étiquette afin qu'ils
+         * restent graphiquement au premier plan, tout en reliant leurs centres.
+         */
+        if (labelLatLng) {
+            L.polyline(
+                [[item.lat, item.lon], labelLatLng],
+                {
+                    pane: NPF_GLOBAL_LINK_PANE_NAME,
+                    color: item.stale ? '#b85c00' : '#166534',
+                    weight: 2,
+                    opacity: 0.82,
+                    interactive: false,
+                    keyboard: false,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }
+            ).addTo(layer);
+        }
+
         const symbolIcon = L.divIcon({
             className: 'global-link-aircraft-marker',
             html: `<div class="global-link-aircraft-symbol${item.stale ? ' stale' : ''}">✈</div>`,
@@ -18519,9 +18584,7 @@ function renderGlobalLinkPositions(positions) {
         marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}</div>`);
         marker.addTo(layer);
 
-        const placement = labelLayout.get(item.key);
-        if (placement) {
-            const labelLatLng = map.containerPointToLatLng(placement.point);
+        if (placement && labelLatLng) {
             const labelIcon = L.divIcon({
                 className: 'global-link-aircraft-label-marker',
                 html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}">${safeName}</div>`,
