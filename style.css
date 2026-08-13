@@ -1,4 +1,5 @@
-/* NPF_STYLE_BUILD_VERSION: v15.26 */
+/* NPF_STYLE_BUILD_VERSION: v15.28 */
+/* v15.27 TEST — liaisons GLR + compteurs SafeSky/GLR vert/jaune. */
 /* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
 /* v15.23 TEST — Global Link Rescue : authentification captcha NAS + positions carte. */
@@ -9567,7 +9568,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 #traffic-layer-button.traffic-state-loading .traffic-button-count,
 #traffic-layer-button.traffic-state-ok .traffic-button-count,
 #traffic-layer-button.traffic-state-error .traffic-button-count {
-    background: #e9002f !important;
+    background: #16a34a !important;
     color: #ffffff !important;
     border-color: rgba(255,255,255,.92) !important;
     opacity: 1 !important;
@@ -14073,7 +14074,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     top: -8px !important;
     right: -8px !important;
     z-index: 5 !important;
-    background: #e9002f !important;
+    background: #16a34a !important;
     color: #ffffff !important;
     border-color: rgba(255,255,255,.92) !important;
     opacity: 1 !important;
@@ -14102,5 +14103,54 @@ body.gaar-point-search-open .gaar-editing-banner {
 @media (max-width: 430px) {
     #briefing-docs-map-button.briefing-docs-group-map-button {
         font-size: 15px !important;
+    }
+}
+
+
+/* ==========================================================================
+   v15.27 TEST — compteurs trafic
+   ========================================================================== */
+
+/* Bulle verte : nombre de trafics SafeSky actuellement affichés. */
+#traffic-layer-button .traffic-button-count {
+    background: #16a34a !important;
+}
+
+/* Bulle jaune, coin supérieur gauche : nombre d'indicatifs de la liste suivie. */
+#traffic-layer-button .traffic-tracked-button-count {
+    position: absolute !important;
+    top: -8px !important;
+    left: -8px !important;
+    z-index: 6 !important;
+    min-width: 22px !important;
+    height: 22px !important;
+    padding: 0 5px !important;
+    border-radius: 999px !important;
+    box-sizing: border-box !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #facc15 !important;
+    color: #111827 !important;
+    border: 2px solid rgba(255,255,255,.96) !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,.28) !important;
+    font: 900 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+    pointer-events: none !important;
+    opacity: 1 !important;
+}
+
+/* Bulle verte : nombre de positions GLR affichées. */
+#global-link-layer-button .global-link-button-count {
+    background: #16a34a !important;
+}
+
+@media (max-width: 760px) {
+    #traffic-layer-button .traffic-tracked-button-count {
+        top: -6px !important;
+        left: -6px !important;
+        min-width: 20px !important;
+        height: 20px !important;
+        padding: 0 4px !important;
+        font-size: 11px !important;
     }
 }
