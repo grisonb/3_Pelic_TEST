@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.33 */
+/* NPF_STYLE_BUILD_VERSION: v15.34 */
 /* v15.27 TEST — liaisons GLR + compteurs SafeSky/GLR vert/jaune. */
 /* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
@@ -14277,7 +14277,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     filter: none !important;
     transform-origin: 50% 50% !important;
     pointer-events: none !important;
-    z-index: 0 !important;
+    z-index: 1 !important;
     opacity: 1 !important;
 }
 
@@ -14285,4 +14285,28 @@ body.gaar-point-search-open .gaar-editing-banner {
 .traffic-aircraft-icon .traffic-aircraft-arrow,
 .traffic-aircraft-icon .traffic-aircraft-altitude-label {
     z-index: 2 !important;
+}
+
+
+/* ==========================================================================
+   v15.34 TEST — visibilité garantie des connecteurs
+   ========================================================================== */
+
+.traffic-aircraft-icon .traffic-aircraft-symbol-wrap {
+    position: relative !important;
+    z-index: 3 !important;
+}
+
+.traffic-aircraft-icon .traffic-aircraft-arrow {
+    z-index: 4 !important;
+}
+
+.traffic-aircraft-icon .traffic-aircraft-altitude-label {
+    z-index: 5 !important;
+}
+
+/* Le pane GLR des traits est au-dessus de la carte mais sous les marqueurs GLR. */
+.leaflet-pane.npf-global-link-connector-pane,
+.leaflet-npfGlobalLinkConnectorPane-pane {
+    pointer-events: none !important;
 }
