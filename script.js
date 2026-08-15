@@ -1,5 +1,13 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.33';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.34';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.34 TEST — correction réelle de visibilité des traits SafeSky / GLR
+// - SafeSky : ne lit plus le fond transparent du conteneur de l'icône ;
+//   la couleur est prise sur les formes SVG réellement visibles ;
+// - GLR : le connecteur DOM passe dans son pane dédié, sans z-index négatif ;
+// - traits pleins, opaques, sans halo, derrière l'étiquette et le symbole.
+// =========================================================================
 
 // =========================================================================
 // v15.33 TEST — traits SafeSky / GLR pleins et opaques
@@ -15064,14 +15072,41 @@ function updateTrafficMarkerLabelConnector(marker) {
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
     /*
-     * v15.32 — le trait doit être exactement de la même couleur que l'icône.
-     * On lit la couleur réellement calculée par WebKit après application des
-     * classes d'altitude SafeSky, plutôt que de dupliquer la logique couleur.
+     * v15.34 — la silhouette SafeSky est un SVG sur fond TRANSPARENT.
+     * Les v15.32/v15.33 lisaient backgroundColor du conteneur ; WebKit
+     * renvoyait rgba(0,0,0,0), valeur non vide qui empêchait le fallback,
+     * donc le trait central devenait transparent.
+     *
+     * On lit désormais la couleur de la forme SVG réellement visible :
+     * ss-fill / traffic-symbol-fill, puis le stroke d'une ss-line, puis
+     * seulement la propriété color du conteneur comme dernier secours.
      */
-    const computedSymbolStyle = window.getComputedStyle(symbol);
-    const symbolColor = computedSymbolStyle.backgroundColor
-        || computedSymbolStyle.color
-        || '#64748b';
+    const fillShape = symbol.querySelector(
+        'svg .ss-fill, svg .traffic-symbol-fill'
+    );
+    const lineShape = symbol.querySelector('svg .ss-line');
+    const fillStyle = fillShape ? window.getComputedStyle(fillShape) : null;
+    const lineStyle = lineShape ? window.getComputedStyle(lineShape) : null;
+    const symbolStyle = window.getComputedStyle(symbol);
+
+    const isUsableTrafficColor = value => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return !!normalized
+            && normalized !== 'none'
+            && normalized !== 'transparent'
+            && normalized !== 'rgba(0, 0, 0, 0)'
+            && normalized !== 'rgba(0,0,0,0)';
+    };
+
+    const symbolColorCandidates = [
+        fillStyle?.fill,
+        lineStyle?.stroke,
+        symbolStyle?.color,
+        '#080c13'
+    ];
+    const symbolColor = symbolColorCandidates.find(
+        isUsableTrafficColor
+    ) || '#080c13';
 
     connector.style.display = 'block';
     connector.style.width = `${length.toFixed(1)}px`;
@@ -19044,11 +19079,16 @@ function renderGlobalLinkPositions(positions) {
                 });
 
                 L.marker(midpointLatLng, {
-                    pane: NPF_GLOBAL_LINK_PANE_NAME,
+                    /*
+                     * v15.34 — pane DOM dédié juste sous les marqueurs GLR.
+                     * Aucun zIndexOffset négatif : Safari pouvait placer le
+                     * connecteur derrière le contenu cartographique.
+                     */
+                    pane: NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME,
                     icon: connectorIcon,
                     interactive: false,
                     keyboard: false,
-                    zIndexOffset: -10000
+                    zIndexOffset: 0
                 }).addTo(layer);
             }
         }
