@@ -1,3 +1,65 @@
+VERSION TEST v15.34 — CORRECTION RÉELLE DE VISIBILITÉ DES TRAITS SAFESKY / GLR
+Date : 15/08/2026
+Base : TEST v15.33
+
+OBJECTIF
+- Corriger la disparition du trait après suppression du halo blanc en v15.33.
+- Faire apparaître le trait coloré lui-même, sans réintroduire de halo blanc.
+
+DIAGNOSTIC
+1. SafeSky
+- Les pictogrammes SafeSky actuels sont des silhouettes SVG sur un conteneur dont le fond est transparent.
+- La v15.32 lisait backgroundColor du conteneur .traffic-aircraft-arrow.
+- WebKit renvoie rgba(0,0,0,0) pour ce fond ; cette chaîne étant non vide, elle était retenue comme couleur du trait.
+- En v15.32, le halo blanc rendait donc visible un trait qui était en réalité transparent au centre.
+- La suppression du halo en v15.33 a logiquement fait disparaître le trait.
+
+2. GLR
+- Le connecteur DOM GLR utilisait le même pane que les marqueurs avec zIndexOffset -10000.
+- Ce décalage est supprimé pour éviter que Safari place le connecteur derrière le rendu cartographique.
+
+MODIFICATIONS
+1. SafeSky — couleur réelle de la silhouette
+- NPF lit désormais la couleur sur les éléments SVG réellement visibles : .ss-fill ou .traffic-symbol-fill.
+- Pour une icône tracée uniquement en lignes, NPF lit le stroke de .ss-line.
+- En dernier recours seulement, NPF utilise la propriété color du conteneur.
+- Les valeurs transparent / rgba(0,0,0,0) / none sont explicitement rejetées.
+- Le trait reste plein, opaque, sans halo.
+
+2. SafeSky — empilement
+- Le connecteur passe à z-index 1.
+- Le symbole, la silhouette et l'étiquette sont explicitement au-dessus (z-index 3 à 5).
+- Le segment coloré reste donc visible entre l'icône et l'étiquette sans les recouvrir.
+
+3. GLR — pane dédié
+- Le connecteur DOM GLR est désormais placé dans NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME.
+- Ce pane est déjà positionné juste sous le pane des marqueurs GLR et au-dessus de la carte.
+- zIndexOffset -10000 est supprimé et remplacé par 0.
+- Le trait reste vert #198754 pour une icône GLR verte et orange #e67e22 pour une icône ancienne orange.
+
+ÉLÉMENTS INCHANGÉS
+- Trait pour SafeSky ET GLR.
+- Géométrie centre étiquette -> centre icône.
+- Fusion automatique SafeSky / GLR avec priorité SafeSky.
+- Comparaison générique des indicatifs.
+- Compteurs SafeSky.
+- Anticollision et emprise GLR.
+- Cadence GLR 15 s.
+- FdS / GAAR, VAC, cartes, GPS, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.34.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Rejet explicite des couleurs transparentes SafeSky contrôlé.
+- Connecteur GLR contrôlé dans son pane dédié sans z-index négatif.
+- Historique v15.33 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.33 — TRAITS SAFESKY / GLR PLEINS, OPAQUES, SANS HALO BLANC
 Date : 15/08/2026
 Base : TEST v15.32
