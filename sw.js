@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-40_restore_original_zoom_levels';
-const APP_VERSION = 'v15.40';
+const SW_VERSION = 'sw-v15-41_correct_dole_icao';
+const APP_VERSION = 'v15.41';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
