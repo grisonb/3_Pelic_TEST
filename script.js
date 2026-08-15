@@ -1,5 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.32';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.33';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.33 TEST — traits SafeSky / GLR pleins et opaques
+// - suppression totale du halo blanc autour des liaisons ;
+// - trait 100 % opaque, légèrement épaissi ;
+// - seule la couleur réelle de l'icône associée est utilisée.
+// =========================================================================
 
 // =========================================================================
 // v15.32 TEST — couleur des traits identique à l'icône trafic
@@ -15073,8 +15080,23 @@ function updateTrafficMarkerLabelConnector(marker) {
     connector.style.transform =
         `translate(-50%, -50%) rotate(${angle.toFixed(2)}deg)`;
     connector.style.setProperty(
+        'background',
+        symbolColor,
+        'important'
+    );
+    connector.style.setProperty(
         'background-color',
         symbolColor,
+        'important'
+    );
+    connector.style.setProperty(
+        'opacity',
+        '1',
+        'important'
+    );
+    connector.style.setProperty(
+        'box-shadow',
+        'none',
         'important'
     );
 }
