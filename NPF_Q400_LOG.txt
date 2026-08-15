@@ -1,3 +1,57 @@
+VERSION TEST v15.36 — GLR RÉTABLI DANS LA BRANCHE TEST / CHAT v15.35 CONSERVÉ
+Date : 15/08/2026
+Base : TEST v15.35
+
+OBJECTIF
+- Respecter la règle de branche : le bouton GLR doit rester disponible dans les versions TEST.
+- Conserver intégralement la nouvelle fenêtre de connexion Chat introduite en v15.35.
+- Clarifier le comportement du partage GPS lors d'une déconnexion volontaire du Chat.
+
+MODIFICATIONS
+1. GLR rétabli dans l'interface TEST
+- Le bouton `global-link-layer-button` est réinséré dans l'Index, immédiatement avant SafeSky comme dans la branche TEST v15.34.
+- Le compteur GLR `global-link-button-count` est rétabli.
+- Les styles GLR déjà conservés dans la feuille de style sont réutilisés sans modification.
+- `NPF_GLOBAL_LINK_UI_ENABLED` repasse à `true` dans cette branche TEST.
+- La logique d'authentification, captcha, session, rafraîchissement 15 s, anticollision, fusion SafeSky/GLR et affichage GLR redevient accessible.
+- Cette réactivation concerne uniquement la branche TEST ; la pérenne v2026.65 reste inchangée avec GLR absent de l'interface.
+
+2. Chat — fenêtre de connexion v15.35 conservée
+- Au clic sur « Connexion » lorsque le Chat est hors ligne, la fenêtre GPS / Canal / Pseudo reste utilisée.
+- Canal par défaut `Milan`.
+- Pseudo mémorisé après saisie.
+- État de partage GPS mémorisé.
+
+3. Chat — comportement GPS lors d'une déconnexion volontaire
+- Aucun changement de logique n'est nécessaire.
+- Lorsque l'utilisateur appuie sur « Déconnexion », NPF publie d'abord un message MQTT vide et `retain:true` sur son topic de position afin d'effacer sa dernière position conservée par le broker.
+- Le timer d'envoi GPS est ensuite arrêté avant fermeture du client MQTT.
+- Le réglage « localisation GPS » reste mémorisé sur ON si l'utilisateur l'avait laissé coché.
+- L'utilisateur n'est donc plus publié/visible comme position active pendant la déconnexion volontaire.
+- Lors de la prochaine connexion au Chat, le partage reprend automatiquement si le réglage GPS mémorisé est toujours sur ON.
+
+ÉLÉMENTS INCHANGÉS
+- Pérenne v2026.65 non modifiée.
+- SafeSky et ses compteurs.
+- Traits étiquette / trafic.
+- FdS / GAAR du jour uniquement.
+- VAC, cartes Online/Offline, GPS principal, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.36.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Exactement un bouton GLR et un bouton SafeSky présents dans l'Index.
+- Drapeau `NPF_GLOBAL_LINK_UI_ENABLED = true` contrôlé.
+- Fenêtre Chat v15.35 et ses champs GPS / Milan / Pseudo conservés.
+- Historique v15.35 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.35 — CHAT : FENÊTRE DE CONFIGURATION AVANT CONNEXION
 Date : 15/08/2026
 Base : PÉRENNE v2026.65
