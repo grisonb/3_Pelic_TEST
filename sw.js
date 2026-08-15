@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-35_chat_connection_modal';
-const APP_VERSION = 'v15.35';
+const SW_VERSION = 'sw-v15-36_chat_modal_glr_restored';
+const APP_VERSION = 'v15.36';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
