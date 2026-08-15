@@ -1,51 +1,270 @@
-VERSION PÉRENNE v2026.66 — CHAT : SUPPRESSION DE LA CONNEXION AUTOMATIQUE AU DÉMARRAGE
+VERSION TEST v15.38 — ZOOMS INTERMÉDIAIRES SANS AJOUT DE TUILES
+Date : 15/08/2026
+Base : TEST v15.37
+
+OBJECTIF
+- Tester des niveaux de zoom intermédiaires sur la carte NPF sans générer, télécharger ni stocker de nouvelles tuiles.
+- Obtenir une progression d'échelle plus fine, notamment autour de 15 NM, 7,5 NM, 4 NM et 3 NM.
+- Conserver toutes les optimisations de rafraîchissement introduites en v15.37.
+
+MODIFICATIONS
+1. Zoom Leaflet fractionnaire
+- `zoomSnap` est fixé à 0,25.
+- `zoomDelta` est fixé à 0,25.
+- Il existe donc quatre pas de zoom entre deux niveaux entiers Leaflet.
+- Les boutons + / - utilisent également ces pas de 0,25.
+- Le zoom tactile/pinch peut se terminer sur le quart de niveau le plus proche.
+
+2. Aucun nouveau niveau de tuiles
+- Aucune tuile n'est créée.
+- Aucun pack NPF n'est modifié.
+- Aucun téléchargement supplémentaire n'est requis.
+- Les tuiles restent stockées uniquement sur leurs niveaux natifs entiers.
+- Entre deux niveaux natifs, Leaflet réutilise le niveau de tuiles approprié et applique une mise à l'échelle graphique.
+- La taille IndexedDB des cartes NPF ne change donc pas.
+
+3. Graduations nautiques intermédiaires
+- La liste des valeurs proposées à la barre d'échelle est enrichie.
+- Ajout de 3 NM, 4 NM, 7,5 NM et 15 NM.
+- La progression comprend désormais notamment :
+  `1 / 2 / 3 / 4 / 5 / 7,5 / 10 / 15 / 20 NM`.
+- L'échelle reste calculée à partir de la distance réelle par pixel à la latitude et sur l'écran courants.
+- L'affichage d'une valeur dépend donc de la vue réelle ; il n'est pas artificiellement attaché à un numéro de zoom fixe.
+
+4. Diagnostic TEST
+- `window.getNpfTilePerformanceStatus()` indique maintenant aussi :
+  • le zoom réel courant ;
+  • `zoomSnap` ;
+  • `zoomDelta`.
+- Cela permet de confirmer sur iPad que des valeurs telles que 8,25 / 8,50 / 8,75 sont effectivement utilisées.
+
+5. Qualité d'affichage
+- Aux niveaux fractionnaires, une tuile peut être légèrement agrandie ou réduite par le navigateur.
+- Cela peut produire une très légère perte de netteté par rapport au niveau natif entier.
+- Le but de cette TEST est précisément d'évaluer si le confort apporté par les niveaux intermédiaires est supérieur à cet éventuel effet visuel.
+
+ÉLÉMENTS INCHANGÉS
+- Optimisations NPF v15.37 : redraw conditionnel, concurrence IndexedDB 5, priorité à la vue récente, cache 384.
+- GLR reste présent dans la branche TEST.
+- SafeSky.
+- Chat.
+- Routes / communes / départements.
+- GPS.
+- FdS / GAAR.
+- VAC.
+- Pérenne v2026.67 non modifiée.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.38.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- `zoomSnap: 0.25` et `zoomDelta: 0.25` contrôlés.
+- Graduations 3 / 4 / 7.5 / 15 NM contrôlées.
+- Aucun nouveau chemin de tuile, niveau de pack ou stockage IndexedDB ajouté.
+- GLR TEST conservé.
+- Historique v15.37 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION TEST v15.37 — ACCÉLÉRATION DU RAFRAÎCHISSEMENT DE LA CARTE NPF OFFLINE
+Date : 15/08/2026
+Base : TEST v15.36
+
+OBJECTIF
+- Réduire le délai d'apparition des tuiles de la carte NPF lors des déplacements et changements de zoom.
+- Corriger uniquement la branche TEST pour évaluer le comportement sur iPad avant toute reprise en pérenne.
+- Ne pas modifier pour l'instant les autres couches applicatives (routes, communes, départements, SafeSky, GLR, Chat).
+
+CAUSES CIBLÉES
+1. Redraw complet systématique après chaque zoom
+- La v15.36 appelait `scheduleBaseMapStabilityRefresh()` à chaque `zoomend`.
+- 180 ms après le zoom, cette fonction exécutait systématiquement `baseTileLayer.redraw()`.
+- Leaflet ayant déjà demandé les tuiles du nouveau zoom, ce redraw pouvait provoquer une deuxième vague complète de lectures IndexedDB NPF.
+
+2. Pipeline NPF volontairement très conservateur
+- Les lectures NPF étaient limitées à 3 transactions simultanées.
+- `updateWhenIdle:true` faisait attendre la fin du déplacement avant de demander les nouvelles tuiles.
+- Les nouvelles demandes étaient ajoutées en fin de file, derrière d'éventuelles lectures devenues hors champ.
+
+MODIFICATIONS
+1. Fin du redraw systématique après zoom
+- Le redraw complet à +180 ms est supprimé.
+- Leaflet conserve son chargement naturel des tuiles du nouveau zoom.
+- Un contrôle est effectué à +260 ms puis +760 ms.
+- Le redraw n'est déclenché qu'en secours si aucune tuile réellement chargée n'est visible dans l'emprise de la carte.
+- La protection historique contre une carte totalement vide reste donc présente, mais elle ne double plus systématiquement le travail.
+
+2. Chargement pendant le déplacement — NPF uniquement
+- Pour la sélection NPF Offline, `updateWhenIdle` passe à `false`.
+- Leaflet peut donc commencer à demander les tuiles de la nouvelle zone pendant le déplacement au lieu d'attendre uniquement `moveend`.
+- `updateInterval` passe de 80 ms à 60 ms pour NPF.
+- Les autres cartes/packs conservent leur comportement précédent.
+
+3. Lectures IndexedDB NPF
+- Limite de lectures simultanées portée de 3 à 5.
+- Ce changement ne concerne que la carte reconnue comme NPF.
+- Les autres cartes Offline conservent leur chemin de lecture habituel.
+
+4. Priorité à la nouvelle emprise
+- Les nouvelles demandes NPF sont placées en tête de la file de lecture.
+- Lors d'un déplacement rapide, les tuiles correspondant à la vue la plus récente sont donc traitées avant les anciennes demandes restées en attente.
+- Les lectures déjà actives ne sont pas brutalement interrompues.
+
+5. Cache mémoire NPF
+- Le cache de blobs de tuiles passe de 240 à 384 entrées.
+- Cela augmente les chances de réutiliser immédiatement des tuiles lors d'un petit aller-retour ou d'un zoom/dézoom proche.
+
+6. Diagnostic TEST
+- Ajout de `window.getNpfTilePerformanceStatus()` dans la console.
+- Il indique : lectures actives, file en attente, concurrence maximale, taille du cache, hits/misses et nombre de tuiles visibles chargées.
+- Aucun élément de diagnostic n'est ajouté à l'interface.
+
+ÉLÉMENTS VOLONTAIREMENT INCHANGÉS
+- Pérenne v2026.67 : aucune modification.
+- Calque routier et cartouches.
+- Communes / départements.
+- SafeSky / GLR.
+- Chat.
+- GPS.
+- FdS / GAAR.
+- VAC.
+- Données IndexedDB existantes et format des packs.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.37.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- Redraw systématique `delay:180 + redraw:true` supprimé.
+- Redraw de secours conditionné à `visibleLoaded === 0`.
+- NPF : `updateWhenIdle:false`, concurrence 5, file prioritaire et cache 384.
+- Historique v15.36 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION TEST v15.36 — GLR RÉTABLI DANS LA BRANCHE TEST / CHAT v15.35 CONSERVÉ
+Date : 15/08/2026
+Base : TEST v15.35
+
+OBJECTIF
+- Respecter la règle de branche : le bouton GLR doit rester disponible dans les versions TEST.
+- Conserver intégralement la nouvelle fenêtre de connexion Chat introduite en v15.35.
+- Clarifier le comportement du partage GPS lors d'une déconnexion volontaire du Chat.
+
+MODIFICATIONS
+1. GLR rétabli dans l'interface TEST
+- Le bouton `global-link-layer-button` est réinséré dans l'Index, immédiatement avant SafeSky comme dans la branche TEST v15.34.
+- Le compteur GLR `global-link-button-count` est rétabli.
+- Les styles GLR déjà conservés dans la feuille de style sont réutilisés sans modification.
+- `NPF_GLOBAL_LINK_UI_ENABLED` repasse à `true` dans cette branche TEST.
+- La logique d'authentification, captcha, session, rafraîchissement 15 s, anticollision, fusion SafeSky/GLR et affichage GLR redevient accessible.
+- Cette réactivation concerne uniquement la branche TEST ; la pérenne v2026.65 reste inchangée avec GLR absent de l'interface.
+
+2. Chat — fenêtre de connexion v15.35 conservée
+- Au clic sur « Connexion » lorsque le Chat est hors ligne, la fenêtre GPS / Canal / Pseudo reste utilisée.
+- Canal par défaut `Milan`.
+- Pseudo mémorisé après saisie.
+- État de partage GPS mémorisé.
+
+3. Chat — comportement GPS lors d'une déconnexion volontaire
+- Aucun changement de logique n'est nécessaire.
+- Lorsque l'utilisateur appuie sur « Déconnexion », NPF publie d'abord un message MQTT vide et `retain:true` sur son topic de position afin d'effacer sa dernière position conservée par le broker.
+- Le timer d'envoi GPS est ensuite arrêté avant fermeture du client MQTT.
+- Le réglage « localisation GPS » reste mémorisé sur ON si l'utilisateur l'avait laissé coché.
+- L'utilisateur n'est donc plus publié/visible comme position active pendant la déconnexion volontaire.
+- Lors de la prochaine connexion au Chat, le partage reprend automatiquement si le réglage GPS mémorisé est toujours sur ON.
+
+ÉLÉMENTS INCHANGÉS
+- Pérenne v2026.65 non modifiée.
+- SafeSky et ses compteurs.
+- Traits étiquette / trafic.
+- FdS / GAAR du jour uniquement.
+- VAC, cartes Online/Offline, GPS principal, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.36.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Exactement un bouton GLR et un bouton SafeSky présents dans l'Index.
+- Drapeau `NPF_GLOBAL_LINK_UI_ENABLED = true` contrôlé.
+- Fenêtre Chat v15.35 et ses champs GPS / Milan / Pseudo conservés.
+- Historique v15.35 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION TEST v15.35 — CHAT : FENÊTRE DE CONFIGURATION AVANT CONNEXION
 Date : 15/08/2026
 Base : PÉRENNE v2026.65
 
 OBJECTIF
-- Corriger le blocage observé dans la pérenne v2026.65 : à l'ouverture de la fenêtre Chat, l'état pouvait rester sur « Connexion... » sans permettre d'action.
-- Ne jamais lancer automatiquement le Chat après un démarrage ou rechargement complet de NPF.
-- Conserver les reconnexions automatiques utiles après une connexion volontaire pendant la session courante.
-
-CAUSE IDENTIFIÉE
-- La pérenne v2026.65 mémorisait l'intention de connexion dans `teamChatConnectionDesired`.
-- Si cette valeur était restée sur `true`, `initializeTeamChat()` la relisait au prochain démarrage.
-- NPF positionnait immédiatement l'état sur « Connexion... » puis appelait `reconnectIfNeeded()` et `connectToChat()`.
-- Pendant cet état de connexion, le bouton était désactivé.
-- Si le broker MQTT ou le réseau répondait mal, l'utilisateur pouvait donc rester bloqué sur « Connexion... ».
+- Lorsque l'utilisateur appuie sur « Connexion » dans la fenêtre Chat, ouvrir d'abord une fenêtre de configuration.
+- Demander dans cette fenêtre l'activation éventuelle de la localisation GPS, la confirmation du canal et le pseudo.
+- Mémoriser toutes les valeurs saisies pour les ouvertures et sessions suivantes.
 
 MODIFICATIONS
-1. Démarrage du Chat toujours hors ligne
-- `chatConnectionDesired` est désormais initialisé à `false` à chaque nouveau chargement de la PWA.
-- La valeur persistante `teamChatConnectionDesired` est remise à `false` au démarrage.
-- Aucun ancien état `true` issu d'une version précédente ne peut donc déclencher une connexion automatique.
+1. Nouvelle fenêtre « Connexion au chat »
+- Le bouton « Connexion » n'établit plus immédiatement la liaison MQTT lorsque le chat est hors ligne.
+- Il ouvre une fenêtre dédiée au-dessus du chat.
+- Si le chat est déjà connecté ou qu'une connexion est en cours/demandée, le même bouton garde son comportement de déconnexion.
 
-2. Suppression de la restauration automatique au démarrage
-- Le bloc qui affichait « Connexion... » puis lançait `reconnectIfNeeded('Restauration du dernier état du chat.')` est supprimé.
-- Au démarrage, l'état du Chat est explicitement positionné sur « Hors ligne ».
-- Le bouton reste disponible et affiche « Connexion ».
+2. « Activer localisation GPS »
+- La fenêtre contient la ligne exacte « Activer localisation GPS » avec une case à cocher.
+- La case commande le réglage existant de partage de position du Chat.
+- La valeur est mémorisée dans le stockage local existant `teamChatLocationSharing`.
+- Si elle est cochée au moment de la connexion, le partage GPS démarre automatiquement dès que la connexion au canal est établie.
+- Si elle est décochée, le partage reste désactivé.
+- Le bouton rapide « Position ON/OFF » du Chat reste disponible après connexion.
 
-3. Reconnexion automatique conservée pendant la session
-- Lorsqu'un utilisateur appuie volontairement sur « Connexion », `setChatConnectionDesired(true)` reste utilisé.
-- Si le réseau disparaît puis revient pendant cette même session, `reconnectIfNeeded()` peut toujours reconnecter le Chat.
-- Le retour au premier plan peut également reconnecter après une perte de liaison.
-- Une déconnexion volontaire remet `chatConnectionDesired` à `false` et continue d'empêcher toute reconnexion.
+3. « Confirmer nom du Canal »
+- Le champ est maintenant présenté dans la fenêtre de connexion.
+- Au premier usage, il contient par défaut `Milan`.
+- Après modification, la valeur est mémorisée et rechargée aux ouvertures suivantes.
+- La règle existante de nom de canal est conservée : caractères non admis retirés lors de l'utilisation du canal.
 
-4. Périmètre
-- Aucun changement de protocole MQTT.
-- Aucun changement des canaux, pseudos, messages, présence, GPS Chat ou notifications.
-- Aucun changement SafeSky.
-- GLR reste absent de l'interface pérenne comme en v2026.65.
+4. « Renseigner Pseudo »
+- Le champ est vide au premier usage.
+- Une fois renseigné, son contenu est mémorisé et rechargé aux ouvertures suivantes.
+- Le pseudo reste limité à 24 caractères comme auparavant.
+- La connexion n'est pas lancée tant qu'aucun pseudo n'est renseigné.
+
+5. Mémorisation immédiate
+- Canal et pseudo sont enregistrés au fil de la saisie dans `teamChatConfig`.
+- L'état de la case GPS est enregistré dès son changement.
+- Les valeurs restent donc mémorisées même si l'utilisateur ferme la fenêtre avec « Annuler », touche en dehors de la fenêtre ou utilise Échap.
+- « Valider et se connecter » applique les valeurs puis lance la connexion.
+
+6. Interface Chat
+- Les anciens champs Canal/Pseudo visibles en permanence dans le panneau principal du Chat sont retirés de cette ligne.
+- Ils existent désormais uniquement dans la fenêtre de connexion.
+- Le bouton technique « Valider » de l'ancienne configuration est conservé dans la logique pour compatibilité, mais n'est plus affiché.
+- Le reste de la fenêtre Chat, l'historique, les messages, présence, position des autres utilisateurs et notifications restent inchangés.
+
+ÉLÉMENTS INCHANGÉS
+- Base pérenne v2026.65.
+- SafeSky, GLR masqué, FdS / GAAR, VAC, cartes, GPS principal, plans d'eau, IndexedDB.
 - Aucun fichier NAS à remplacer.
 
 CONTRÔLES TECHNIQUES
-- Versions Index / Manifest / Script / Style / SW alignées sur v2026.66.
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.35.
 - Syntaxe JavaScript Script et SW contrôlée avec Node.
 - Manifest JSON contrôlé.
-- Absence de toute restauration automatique du Chat au démarrage contrôlée.
-- `chatConnectionDesired` initialisé à `false` et stockage persistant réinitialisé à `false`.
-- Reconnexion réseau / retour premier plan toujours présente après connexion volontaire.
-- Bouton GLR toujours absent de l'Index pérenne.
+- Présence d'un seul `chat-room-input` et d'un seul `chat-user-input`.
+- Canal par défaut `Milan` contrôlé dans l'Index et le Script.
+- Case GPS et mémorisation `teamChatLocationSharing` contrôlées.
+- Le clic « Connexion » hors ligne ouvre la fenêtre avant tout appel à `connectToChat()`.
 - Historique v2026.65 et antérieur conservé intégralement et exactement ci-dessous.
 - Aucun secret d'authentification ajouté aux six fichiers publics.
 
