@@ -1,342 +1,8 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.34';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.35';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
-// =========================================================================
-// v15.34 TEST — correction réelle de visibilité des traits SafeSky / GLR
-// - SafeSky : ne lit plus le fond transparent du conteneur de l'icône ;
-//   la couleur est prise sur les formes SVG réellement visibles ;
-// - GLR : le connecteur DOM passe dans son pane dédié, sans z-index négatif ;
-// - traits pleins, opaques, sans halo, derrière l'étiquette et le symbole.
-// =========================================================================
+// Base fonctionnelle : pérenne v2026.65.
 
-// =========================================================================
-// v15.33 TEST — traits SafeSky / GLR pleins et opaques
-// - suppression totale du halo blanc autour des liaisons ;
-// - trait 100 % opaque, légèrement épaissi ;
-// - seule la couleur réelle de l'icône associée est utilisée.
-// =========================================================================
-
-// =========================================================================
-// v15.32 TEST — couleur des traits identique à l'icône trafic
-// - SafeSky : le connecteur lit dynamiquement la couleur réellement calculée
-//   de l'icône (rouge / vert / bleu / gris selon son état) ;
-// - GLR : le connecteur reprend exactement la couleur du symbole GLR
-//   (vert trafic frais / orange trafic ancien) ;
-// - halo blanc conservé uniquement pour la lisibilité.
-// =========================================================================
-
-// =========================================================================
-// v15.31 TEST — trait étiquette <-> trafic pour SafeSky ET GLR
-// - GLR : connecteur DOM v15.30 conservé ;
-// - SafeSky : ajout d'un connecteur DOM mesuré sur le rendu réel ;
-// - le trait SafeSky relie le centre réel de l'étiquette au centre réel du
-//   symbole, quelle que soit la position de l'étiquette ;
-// - fusion automatique SafeSky/GLR v15.30 inchangée.
-// =========================================================================
-
-// =========================================================================
-// v15.30 TEST — fusion automatique SafeSky / GLR + liaison GLR DOM
-// - SafeSky prioritaire lorsqu'un même trafic est rendu par les deux sources ;
-// - appariement automatique d'indicatifs : espaces/tirets ignorés et tolérance
-//   d'un caractère sur le préfixe si le numéro final est identique ;
-// - exemples : MILAN80 <-> MILAN 80, DRAGO13 <-> DRAGON 13 ;
-// - si le trafic n'est pas réellement rendu par SafeSky, GLR reste affiché ;
-// - remplacement des polylines GLR par un connecteur DOM calculé en pixels,
-//   dans le même pane que les marqueurs GLR.
-// =========================================================================
-
-// =========================================================================
-// v15.29 TEST — compteurs SafeSky corrigés + liaisons GLR renforcées
-// - jaune gauche = trafics de la liste suivie actuellement détectés ;
-// - vert droite = totalité des trafics SafeSky éligibles, avant filtre « liste » ;
-// - taille/typographie des deux bulles strictement identiques ;
-// - liaison GLR dans un pane dédié, sous les symboles mais au-dessus de la carte,
-//   avec halo clair + trait foncé pour rester visible sur tous les fonds.
-// =========================================================================
-
-// =========================================================================
-// v15.28 TEST — GLR : aucun indicatif hors champ
-// - seuls les trafics dont la position est dans l'emprise courante de la carte
-//   sont rendus (symbole, étiquette et liaison) ;
-// - suppression du placement de secours global dans le viewport : une
-//   étiquette sans emplacement libre proche de son trafic est masquée ;
-// - les positions GLR complètes restent conservées en mémoire et réapparaissent
-//   automatiquement lorsqu'elles rentrent dans le champ après zoom/déplacement.
-// =========================================================================
-
-// =========================================================================
-// v15.27 TEST — liaisons GLR + compteurs trafic
-// - un trait relie le centre de chaque étiquette GLR au centre de son trafic ;
-// - bulles de comptage GLR et SafeSky sur fond vert ;
-// - seconde bulle SafeSky jaune en haut à gauche : nombre d'indicatifs suivis ;
-// - logique trafic, anticollision GLR et cadence 15 s inchangées.
-// =========================================================================
-
-// =========================================================================
-// v15.26 TEST — GLR : rafraîchissement 15 s + aucune mission masquée par âge
-// - interrogation du relais GLR toutes les 15 secondes lorsque la couche est active ;
-// - suppression du masquage automatique des positions de plus de 15 minutes ;
-// - les positions anciennes restent visibles et conservent l'état visuel stale ;
-// - anticollision des étiquettes v15.25 conservée.
-// =========================================================================
-
-// =========================================================================
-// v15.26 TEST — GLR anticollision + toutes missions + documents strictement du jour
-// - étiquettes GLR repositionnées automatiquement pour limiter les chevauchements ;
-// - toutes les missions visibles du compte GLR sont admises (DRAGON / PUMA inclus) ;
-// - FdS / GAAR : seul le document correspondant à la date du jour peut être chargé ;
-// - contour du bouton FdS / GAAR vert dès qu'au moins un document du jour est présent.
-// =========================================================================
-
-// =========================================================================
-// v15.24 TEST — regroupement FdS/GAAR + bouton GLR aligné SafeSky
-// - FdS et GAAR regroupés dans un seul bouton carte sur deux lignes ;
-// - fenêtre de sélection à deux gros boutons avec états chargé / manquant ;
-// - état de chaque ligne FdS / GAAR visible directement sur le bouton principal ;
-// - GL devient GLR avec logique rouge / vert identique au bouton SafeSky.
-// =========================================================================
-
-// =========================================================================
-// v15.23 TEST — Global Link Rescue : positions via relais NAS
-// - captcha Global Link affiché dans NPF, résolution manuelle ;
-// - identifiants et token Global Link exclusivement côté NAS ;
-// - missions dédoublonnées par indicatif, positions rafraîchies toutes les 60 s ;
-// - aucune modification de SafeSky, FdS/GAAR, Offline ou VAC.
-// =========================================================================
-
-// =========================================================================
-// v15.23 TEST — règle 2 doigts : zéro à gauche + km dégagés
-// - orientation des graduations indépendante de l'ordre des deux touches ;
-// - horizontalement, 0 est toujours à gauche et la distance augmente vers la droite ;
-// - valeurs km davantage décalées du trait pour éviter toute superposition.
-// =========================================================================
-
-
-// =========================================================================
-// v15.21 TEST — règle 2 doigts : sens inversé + chiffres agrandis
-// - inversion du sens de lecture des échelles NM et km ;
-// - chiffres agrandis pour une meilleure lisibilité ;
-// - fiabilisation de mise à jour PWA v15.20 conservée.
-// =========================================================================
-// =========================================================================
-// v15.19 TEST — règle 2 doigts : premier plan + double échelle NM/km
-// - pane Leaflet dédié au-dessus des marqueurs / trafics / pélicandromes ;
-// - règle jaune fluorescent avec halo noir, comme le vecteur temps propre avion ;
-// - valeurs NM d’un côté et km de l’autre, directement le long de la règle.
-// =========================================================================
-
-// =========================================================================
-// v15.18 TEST — règle 2 doigts : décalage perpendiculaire + chiffres sur règle
-// - règle décalée perpendiculairement à l’axe des deux doigts ;
-// - bascule automatique de côté à proximité des bords de l’écran ;
-// - suppression du cartouche central NM/km ;
-// - graduations 0 / 25 / 50 / 75 / 100 % avec valeurs NM directement sur la règle ;
-// - FdS/GAAR, SafeSky, Offline, GPS et NAS inchangés.
-// =========================================================================
-
-// =========================================================================
-// v15.17 TEST — FdS : statut MAJ simplifié + largeur légèrement réduite
-// - aucun compteur de tentative n'est affiché pendant l'attente Gmail/NAS ;
-// - les messages restent simples : recherche / attente / téléchargement ;
-// - grossissement FdS réduit de ×1,90 à ×1,82 pour éviter le léger débordement ;
-// - chaîne BFG validée de v15.16, NAS, GAAR, Offline et SafeSky inchangés.
-// =========================================================================
-
-// =========================================================================
-// v15.16 TEST — FdS : MAJ directe BFG sans erreur SW + zoom réel iPad
-// - Maj reproduit la chaîne BFG : iframe source -> attente NAS -> téléchargement ;
-// - aucune dépendance à l'action PHP refresh pour déclencher Gmail ;
-// - le SW laisse les requêtes source/NAS sortir directement sans respondWith ;
-// - FdS : grossissement visuel réel ×1,90 du lecteur natif dans un stage compensé ;
-// - aucun polling automatique ajouté, GAAR/Offline/SafeSky inchangés.
-// =========================================================================
-
-// =========================================================================
-// v15.15 TEST — FdS / GAAR : Maj déclenche la source + largeur iPad forcée
-// - le bouton Maj ne relit plus seulement le NAS : il demande d'abord au NAS
-//   de déclencher l'import Gmail/Apps Script correspondant, puis recharge le PDF ;
-// - FdS : viewport PDF natif rendu volontairement plus haut que l'écran afin
-//   que Safari/iPad ajuste la page sur sa largeur (les fragments FitH sont ignorés) ;
-// - GAAR : comportement d'affichage conservé ; aucun polling automatique ajouté.
-// =========================================================================
-
-// =========================================================================
-// v15.14 TEST — FdS / GAAR : MAJ forcée NAS + affichage largeur écran
-// - le bouton Maj force désormais le rechargement du PDF demandé depuis le NAS ;
-// - la révision distante intègre la révision fichier renvoyée par l'API NAS v2 ;
-// - le lecteur PDF demande explicitement un affichage FitH / page-width ;
-// - aucun polling ni contrôle automatique ajouté.
-// =========================================================================
-
-// =========================================================================
-// v15.13 TEST — FdS / GAAR : lecteur intégré + mise à jour manuelle
-// - suppression du polling 5 min / retour premier plan / retour réseau ;
-// - ouverture PDF plein écran dans NPF avec boutons Maj et Fermer ;
-// - Maj contrôle uniquement le document affiché et ne télécharge que s'il change ;
-// - premier téléchargement limité au document demandé ;
-// v15.12 TEST — FdS / GAAR : contrôle automatique en session + échelle dégagée
-// v15.11 TEST — FdS / GAAR directement sur la carte
-// - suppression de toute interface FdS / GAAR dans Gestion des Cartes ;
-// - boutons FdS puis GAAR ajoutés juste au-dessus de SafeSky ;
-// - orange sur fond blanc tant que le PDF du jour n'est pas chargé ;
-// - vert lorsque le PDF du jour est présent dans IndexedDB ;
-// - clic sans session : demande du mot de passe, valable jusqu'à minuit ;
-// - clic avec session : téléchargement si nécessaire puis ouverture locale du PDF.
-// =========================================================================
-
-// =========================================================================
-// v15.09 TEST — fiche trafic : étiquette cliquable / liste suivie réactive
-// - clic/appui sur l’étiquette permanente = ouverture de la fiche avion ;
-// - recâblage immédiat des boutons Ajouter/Retirer après setContent() ;
-// - aucune modification des données SafeSky ni des filtres.
-// =========================================================================
-
-
-// =========================================================================
-// v15.08 TEST — boutons d’aide « ? » : fond blanc, cercle noir et ? noir
-// - taille réduite de v15.07 conservée ;
-// - suppression du remplissage noir ;
-// - contour noir et caractère ? noir sur fond blanc ;
-// - fonctionnement des aides et Gestion des Cartes inchangé.
-// =========================================================================
-
-// =========================================================================
-// v15.07 TEST — boutons d’aide « ? » plus petits, noir/blanc
-// - diamètre réduit ;
-// - couleurs inversées : fond noir, « ? » blanc ;
-// - réserve d’alignement VAC adaptée à la nouvelle largeur ;
-// - aucune modification fonctionnelle.
-// =========================================================================
-
-// =========================================================================
-// v15.06 TEST — alignement horizontal de l’action VAC
-// - bouton Télécharger / Mettre à jour les Cartes VAC aligné à gauche
-//   sur les autres boutons d’import ;
-// - aucune modification de la logique VAC, Offline, PDF ou cartographique.
-// =========================================================================
-
-// =========================================================================
-// v15.05 TEST — ajustements visuels Gestion des Cartes
-// - simulation réellement orange malgré la règle générale bleue ;
-// - ONLINE/OFFLINE : mode actif soutenu, mode inactif pastel ;
-// - action VAC déplacée au-dessus du statut et centrée ;
-// - suppression VAC conservée à droite ;
-// - hauteur des boutons d'import uniformisée ;
-// - logique Offline / VAC / PDF / cartes inchangée.
-// =========================================================================
-
-
-// =========================================================================
-// v15.04 TEST — correction couleurs Gestion des Cartes
-// - actions destructives rouges ; actions standards bleues ;
-// - Mode simulation orange ; ONLINE vert ; OFFLINE violet ;
-// - « Tout supprimer » Doc FdF aligné à droite ;
-// - logique Offline / VAC / PDF / cartes inchangée.
-// =========================================================================
-
-
-// =========================================================================
-// v15.03 TEST — réorganisation de « Gestion des Cartes »
-// - « Type de carte » déplacé juste sous « Mode simulation avion » ;
-// - suppression de la section « Maintenance / dépannage » ;
-// - « Réparation stockage offline » placée après les cartes téléchargées ;
-// - titres Cartes Offline / Type de carte / Calque Routier / Cartes VAC renforcés ;
-// - section PDF renommée « Doc FdF Réduite / Carte Fréquences » ;
-// - boutons de Gestion des Cartes harmonisés en bleu ;
-// - logique Offline, VAC, calque routier et imports inchangée.
-// =========================================================================
-
-// =========================================================================
-// v15.02 TEST — filtres SafeSky plus compacts / altitude non grisée
-// - lignes altitude non sélectionnées visuellement identiques aux lignes actives ;
-// - seul le bouton radio bleu/blanc indique le mode d'altitude sélectionné ;
-// - sous-titre « Réglages du calque trafic indicatif » supprimé ;
-// - texte explicatif sous « Mon avion » supprimé pour gagner de la hauteur ;
-// - logique SafeSky, filtres, GPS, VAC et cartes Offline inchangés.
-// =========================================================================
-
-// =========================================================================
-// v2026.63 PÉRENNE — reprise carte unifiée après VAC / retour au premier plan
-// - déduplication focus / visibilitychange / pageshow ;
-// - retour court : un seul invalidateSize léger, sans redraw systématique ;
-// - redraw lourd uniquement si les tuiles sont absentes ou après reprise longue ;
-// - anciens gestionnaires concurrents de reprise Leaflet neutralisés ;
-// - VAC, SafeSky, GPS, cartes Offline et données inchangés.
-// =========================================================================
-
-// =========================================================================
-// v2026.62 PÉRENNE — stabilisation carte / calque routier / SafeSky
-// - priorité au fond de carte après zoom/déplacement ;
-// - rendu SafeSky temporairement suspendu pendant les gestes et le rendu routier ;
-// - calque routier différé et rendu par étapes pour limiter les pics CPU/mémoire ;
-// - animation SafeSky allégée sur iPad lorsque le calque routier est affiché ;
-// - aucune modification des données, filtres SafeSky, VAC, GPS ou cartes Offline.
-// =========================================================================
-
-// =========================================================================
-// v2026.61 PÉRENNE — commune survolée : GeoJSON local + SW finalisé
-// - iPad/tablette : ./data/communes-1000m.geojson (même origine que NPF) ;
-// - aucune dépendance Etalab au runtime pour la commune survolée sur iPad ;
-// - PC : source 50 m existante conservée ;
-// - GPS et algorithme de recherche géométrique inchangés.
-// =========================================================================
-
-// =========================================================================
-// v14.97 — commune survolée : GeoJSON allégé sur iPad
-// - iPad/tablette : communes-1000m.geojson ;
-// - PC : communes-50m.geojson conservé ;
-// - le Service Worker met aussi en cache le fichier 1000 m ;
-// - aucun changement du GPS ni de l'identification géométrique de la commune.
-// =========================================================================
-
-// =========================================================================
-// v14.96 — commune survolée stable dans la PWA iPad
-// - le Service Worker met en cache les GeoJSON Etalab communes 100 m / 50 m ;
-// - cache-first après un premier chargement réussi ;
-// - timeout initial adapté aux gros GeoJSON dans la PWA installée ;
-// - aucun changement du GPS ni de l'identification géométrique de la commune.
-// =========================================================================
-
-// =========================================================================
-// v14.95 — performance carte Offline aux grands dézooms
-// - lecture directe prioritaire par index IndexedDB `tileUrl` ;
-// - les bases isolées modernes n'essaient plus toutes les anciennes clés pack-scopées ;
-// - la base historique commune est ignorée lorsque tous les packs actifs sont confirmés isolés ;
-// - cache négatif borné pour éviter de rechercher plusieurs fois les mêmes tuiles absentes ;
-// - aucune modification du nombre de lectures simultanées, du keepBuffer ou des données cartographiques.
-// =========================================================================
-
-// =========================================================================
-// v14.94 — stabilisation carte / SafeSky / dézoom
-// - un seul rafraîchissement SafeSky à la fois ;
-// - une demande forcée reçue pendant un chargement est regroupée et rejouée ;
-// - les réponses SafeSky devenues obsolètes sont ignorées ;
-// - les lectures NPF de l'ancien niveau de zoom sont invalidées au zoomstart ;
-// - après zoom ou changement SafeSky, la couche de fond est vérifiée/redessinée
-// sans reconstruction de la base de tuiles ni changement de carte active.
-// =========================================================================
-
-// =========================================================================
-// v14.93 — Cartes VAC SIA hors ligne via GitHub Pages
-// - téléchargement des VAC publiées par le dépôt NPF-Q400-VAC ;
-// - stockage IndexedDB dédié et ouverture 100 % hors ligne ;
-// - bouton VAC dans les popups des terrains disposant d’une VAC locale ;
-// - contrôle léger des mises à jour au démarrage, uniquement si le réseau répond ;
-// - téléchargement différentiel par SHA-256 et conservation de l’ancienne VAC
-// tant que le nouveau PDF n’a pas été téléchargé et validé.
-// =========================================================================
-
-// =========================================================================
-// INITIALISATION DE L'APPLICATION
-// =========================================================================
-
-/*
- * v14.12 — blocage global du stylet.
- *
- * Apple Pencil et les autres stylets sont ignorés dans toute la PWA :
- * carte, boutons, listes, fenêtres, recherche de communes et autres champs.
- * Les interactions au doigt, à la souris et au clavier restent disponibles.
- */
 function installGlobalStylusBlocker() {
     if (window.__npfGlobalStylusBlockerInstalled) return;
     window.__npfGlobalStylusBlockerInstalled = true;
@@ -18413,8 +18079,8 @@ window.closeBriefingDocSelectorModal = closeBriefingDocSelectorModal;
 
 
 // =========================================================================
-// v15.23 TEST — Global Link Rescue : relais NAS, captcha manuel et positions
 // =========================================================================
+const NPF_GLOBAL_LINK_UI_ENABLED = false; // accès GLR temporairement absent de l'interface en v2026.65.
 const NPF_GLOBAL_LINK_API_URL = 'https://grisonb.synology.me/briefing-api/npf-global-link-api.php';
 const NPF_GLOBAL_LINK_SESSION_KEY = 'npfGlobalLinkSessionV1';
 const NPF_GLOBAL_LINK_SESSION_EXP_KEY = 'npfGlobalLinkSessionExpV1';
@@ -19216,6 +18882,17 @@ async function handleGlobalLinkButtonClick() {
 
 function initializeGlobalLinkUi() {
     const button = document.getElementById('global-link-layer-button');
+
+    if (!NPF_GLOBAL_LINK_UI_ENABLED) {
+        npfGlobalLinkEnabled = false;
+        stopGlobalLinkRefreshTimer();
+        if (npfGlobalLinkLayer) npfGlobalLinkLayer.clearLayers();
+        try {
+            localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, '0');
+        } catch (_) {}
+        updateGlobalLinkButton();
+        return;
+    }
     const modal = document.getElementById('global-link-auth-modal');
     const closeButton = document.getElementById('global-link-auth-close');
     const refreshButton = document.getElementById('global-link-captcha-refresh');
@@ -27484,7 +27161,12 @@ function initializeTeamChat() {
     const clearLocalButton = document.getElementById('chat-clear-local-button');
     const clearChannelButton = document.getElementById('chat-clear-channel-button');
     const clearCancelButton = document.getElementById('chat-clear-cancel-button');
-    if (!panel || !toggleButton || !minimizeButton || !clearButton || !alertBadge || !offlineBadge || !roomInput || !userInput || !connectButton || !sendButton || !messageInput || !messagesBox || !connectionState || !onlineUsersLabel || !clearModal || !clearLocalButton || !clearChannelButton || !clearCancelButton) return;
+    const chatConnectModal = document.getElementById('chat-connect-modal');
+    const chatConnectGpsCheckbox = document.getElementById('chat-connect-gps-checkbox');
+    const chatConnectModalStatus = document.getElementById('chat-connect-modal-status');
+    const chatConnectModalCancel = document.getElementById('chat-connect-modal-cancel');
+    const chatConnectModalConfirm = document.getElementById('chat-connect-modal-confirm');
+    if (!panel || !toggleButton || !minimizeButton || !clearButton || !alertBadge || !offlineBadge || !roomInput || !userInput || !connectButton || !sendButton || !messageInput || !messagesBox || !connectionState || !onlineUsersLabel || !clearModal || !clearLocalButton || !clearChannelButton || !clearCancelButton || !chatConnectModal || !chatConnectGpsCheckbox || !chatConnectModalStatus || !chatConnectModalCancel || !chatConnectModalConfirm) return;
 
     /*
      * v11.88 — iPad/Safari : éviter l'appel du bandeau de connexion/passkey
@@ -27524,6 +27206,7 @@ function initializeTeamChat() {
     validateChatConfigButton.title = 'Valider le changement de canal ou pseudo';
     validateChatConfigButton.className = 'chat-validate-config-button';
     validateChatConfigButton.disabled = true;
+    validateChatConfigButton.style.display = 'none';
     clearButton.parentNode.insertBefore(validateChatConfigButton, clearButton);
 
     const CHAT_CLIENT_ID_KEY = 'teamChatClientId';
@@ -27563,6 +27246,7 @@ function initializeTeamChat() {
     const savedConfig = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || 'null') || defaultConfig;
     roomInput.value = savedConfig.room || defaultConfig.room;
     userInput.value = savedConfig.user || defaultConfig.user;
+    chatConnectGpsCheckbox.checked = locationSharingEnabled;
 
     const persistedSeenIds = new Set(JSON.parse(localStorage.getItem(CHAT_SEEN_IDS_KEY) || '[]'));
     const history = JSON.parse(localStorage.getItem(CHAT_HISTORY_KEY) || '[]');
@@ -27613,6 +27297,98 @@ function initializeTeamChat() {
         room: (roomInput.value || '').trim().replace(/[^a-zA-Z0-9-_]/g, ''),
         user: (userInput.value || '').trim()
     });
+
+    const setChatConnectModalStatus = (message = '', type = '') => {
+        chatConnectModalStatus.textContent = String(message || '');
+        chatConnectModalStatus.classList.toggle('error', type === 'error');
+    };
+
+    const persistChatConnectForm = () => {
+        persistConfig();
+        locationSharingEnabled = chatConnectGpsCheckbox.checked === true;
+        localStorage.setItem(
+            CHAT_LOCATION_SHARING_KEY,
+            locationSharingEnabled ? 'true' : 'false'
+        );
+    };
+
+    const openChatConnectModal = () => {
+        /*
+         * v15.35 — à chaque ouverture, on repart des valeurs actuellement
+         * mémorisées. Au premier usage le canal vaut Milan et le pseudo est vide.
+         */
+        let storedConfig = null;
+        try {
+            storedConfig = JSON.parse(
+                localStorage.getItem(CHAT_STORAGE_KEY) || 'null'
+            );
+        } catch (_) {}
+
+        roomInput.value = storedConfig?.room || roomInput.value || 'Milan';
+        userInput.value = storedConfig?.user || userInput.value || '';
+        locationSharingEnabled =
+            localStorage.getItem(CHAT_LOCATION_SHARING_KEY) === 'true';
+        chatConnectGpsCheckbox.checked = locationSharingEnabled;
+
+        setChatConnectModalStatus('');
+        chatConnectModal.style.display = 'flex';
+        chatConnectModal.setAttribute('aria-hidden', 'false');
+
+        requestAnimationFrame(() => {
+            try {
+                if (!(userInput.value || '').trim()) {
+                    userInput.focus();
+                } else {
+                    roomInput.focus();
+                    roomInput.select();
+                }
+            } catch (_) {}
+        });
+    };
+
+    const closeChatConnectModal = () => {
+        chatConnectModal.style.display = 'none';
+        chatConnectModal.setAttribute('aria-hidden', 'true');
+        setChatConnectModalStatus('');
+    };
+
+    const confirmChatConnectModal = async () => {
+        persistChatConnectForm();
+
+        const current = getCurrentChatConfig();
+        if (!current.room) {
+            setChatConnectModalStatus(
+                'Confirme le nom du canal.',
+                'error'
+            );
+            try { roomInput.focus(); } catch (_) {}
+            return;
+        }
+        if (!current.user) {
+            setChatConnectModalStatus(
+                'Renseigne un pseudo.',
+                'error'
+            );
+            try { userInput.focus(); } catch (_) {}
+            return;
+        }
+
+        roomInput.value = current.room;
+        userInput.value = current.user.slice(0, 24);
+        persistChatConnectForm();
+
+        lastValidatedChatConfig = {
+            room: current.room,
+            user: current.user
+        };
+        updateChatValidateButtonState();
+        updateLocationShareButton();
+
+        closeChatConnectModal();
+        setChatConnectionDesired(true);
+        setConnectionState(false, 'Connexion...');
+        await connectToChat();
+    };
 
     const updateChatValidateButtonState = () => {
         /*
@@ -28712,26 +28488,83 @@ function initializeTeamChat() {
         closeClearModal();
     });
 
-    roomInput.addEventListener('input', updateChatValidateButtonState);
-    roomInput.addEventListener('change', updateChatValidateButtonState);
-    userInput.addEventListener('input', updateChatValidateButtonState);
-    userInput.addEventListener('change', updateChatValidateButtonState);
+    const persistChatTextFields = () => {
+        persistConfig();
+        updateChatValidateButtonState();
+    };
+
+    roomInput.addEventListener('input', persistChatTextFields);
+    roomInput.addEventListener('change', persistChatTextFields);
+    userInput.addEventListener('input', persistChatTextFields);
+    userInput.addEventListener('change', persistChatTextFields);
     validateChatConfigButton.addEventListener('click', applyChatConfigValidation);
     updateChatValidateButtonState();
 
+    chatConnectGpsCheckbox.addEventListener('change', () => {
+        persistChatConnectForm();
+        updateLocationShareButton();
+    });
+
+    chatConnectModalCancel.addEventListener('click', () => {
+        /*
+         * Même en cas d'annulation, les valeurs saisies restent mémorisées
+         * conformément au comportement demandé.
+         */
+        persistChatConnectForm();
+        closeChatConnectModal();
+    });
+
+    chatConnectModalConfirm.addEventListener('click', () => {
+        confirmChatConnectModal().catch((error) => {
+            setChatConnectModalStatus(
+                `Connexion impossible : ${error.message || error}`,
+                'error'
+            );
+        });
+    });
+
+    chatConnectModal.addEventListener('click', (event) => {
+        if (event.target === chatConnectModal) {
+            persistChatConnectForm();
+            closeChatConnectModal();
+        }
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (
+            event.key === 'Escape'
+            && chatConnectModal.style.display === 'flex'
+        ) {
+            persistChatConnectForm();
+            closeChatConnectModal();
+        }
+    });
+
+    [roomInput, userInput].forEach((input) => {
+        input.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            confirmChatConnectModal().catch((error) => {
+                setChatConnectModalStatus(
+                    `Connexion impossible : ${error.message || error}`,
+                    'error'
+                );
+            });
+        });
+    });
+
     connectButton.addEventListener('click', () => {
         /*
-         * L'intention mémorisée prime sur le seul état MQTT instantané.
-         * Ainsi, même hors réseau, le bouton permet d'annuler une future
-         * reconnexion automatique.
+         * v15.35 — connecté / connexion demandée : le bouton reste une
+         * déconnexion. Hors ligne : "Connexion" ouvre d'abord la fenêtre de
+         * configuration GPS / canal / pseudo.
          */
         if (chatConnectionDesired || chatConnected || isChatConnecting) {
             setChatConnectionDesired(false);
             disconnectFromChat();
+            closeChatConnectModal();
         } else {
-            setChatConnectionDesired(true);
-            setConnectionState(false, 'Connexion...');
-            connectToChat();
+            openChatConnectModal();
         }
     });
     locationShareButton.addEventListener('click', () => {
