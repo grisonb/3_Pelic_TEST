@@ -1,21 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.34 */
-/* v15.27 TEST — liaisons GLR + compteurs SafeSky/GLR vert/jaune. */
-/* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
-/* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
-/* v15.23 TEST — Global Link Rescue : authentification captcha NAS + positions carte. */
-/* v15.23 TEST — règle 2 doigts : zéro à gauche + chiffres km dégagés. */
-/* v15.21 TEST — règle 2 doigts : sens inversé des échelles + chiffres agrandis. */
-/* v15.19 TEST — règle 2 doigts : premier plan + jaune vif + double échelle NM/km. */
-/* v15.18 TEST — règle 2 doigts : décalage perpendiculaire + graduations directes sur le tracé. */
-/* v15.13 TEST — lecteur FdS / GAAR intégré + mise à jour manuelle. */
-/* v15.12 TEST — FdS / GAAR auto-sync en session + échelle carte dégagée de SafeSky. */
-/* v15.15 TEST — FdS : viewport PDF portrait forcé pour largeur écran sur iPad. */
-/* v15.17 TEST — FdS largeur ajustée ×1,82 + statut MAJ simplifié. */
-/* v15.16 TEST — FdS zoom réel ×1,90 + MAJ directe BFG. */
-/* v15.11 TEST — boutons FdS / GAAR sur la carte + saisie mot de passe à la demande. */
-/* v15.09 TEST — étiquette trafic cliquable et ouverture de la fiche depuis le libellé. */
-/* v15.03 TEST — réorganisation et harmonisation bleue de Gestion des Cartes. */
-/* v15.02 TEST — filtres SafeSky : lignes altitude non sélectionnées non grisées. */
+/* NPF_STYLE_BUILD_VERSION: v15.35 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -12737,9 +12720,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 
-/* ==========================================================================
-   v15.02 TEST — le bouton radio est le seul indicateur visuel du mode altitude
-   ========================================================================== */
 #traffic-altitude-absolute-mode-field.traffic-settings-field-disabled,
 #traffic-around-altitude-field.traffic-settings-field-disabled,
 #traffic-ground-altitude-field.traffic-settings-field-disabled {
@@ -12771,9 +12751,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.03 TEST — Gestion des Cartes : hiérarchie visuelle et boutons bleus
-   ========================================================================== */
 #offline-map-modal .map-source-management-section {
     flex: 0 0 auto !important;
     margin-top: 0 !important;
@@ -12838,9 +12815,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.04 TEST — couleurs sémantiques Gestion des Cartes / Doc FdF
-   ========================================================================== */
 /* Actions destructives : rouge. */
 #offline-map-modal .modal-content .danger-inline-btn,
 #offline-map-modal .modal-content .delete-map-btn,
@@ -12923,10 +12897,6 @@ body.gaar-point-search-open .gaar-editing-banner {
         margin-left: auto !important;
     }
 }
-
-/* ==========================================================================
-   v15.05 TEST — corrections finales Gestion des Cartes
-   ========================================================================== */
 
 /*
  * Mode simulation : la règle v15.03 « tous les boutons bleus » possède une
@@ -13064,9 +13034,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.06 TEST — alignement du bouton principal Cartes VAC
-   ========================================================================== */
 /*
  * La rangée reproduit la largeur visuelle d'un import avec son bouton d'aide :
  * colonne principale + espace de 9 px + colonne de 40 px.
@@ -13117,9 +13084,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.07 TEST — boutons d’aide « ? » plus petits, couleurs noir / blanc
-   ========================================================================== */
 /*
  * Ancien aspect : fond blanc, contour et « ? » bleus, diamètre 40 px.
  * Nouveau : fond noir, « ? » blanc, diamètre 30 px.
@@ -13173,9 +13137,6 @@ body.gaar-point-search-open .gaar-editing-banner {
     }
 }
 
-/* ==========================================================================
-   v15.08 TEST — boutons d’aide « ? » : fond blanc / cercle noir / ? noir
-   ========================================================================== */
 /*
  * Correction de l’interprétation v15.07 :
  * - le bouton n’est pas rempli en noir ;
@@ -13588,9 +13549,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.13 TEST — lecteur plein écran FdS / GAAR + bouton Maj
-   ========================================================================== */
 .briefing-doc-viewer-modal {
     position: fixed;
     inset: 0;
@@ -13769,9 +13727,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.14 TEST — FdS / GAAR : PDF ajusté à la largeur disponible
-   ========================================================================== */
 .briefing-doc-viewer-frame {
     width: 100% !important;
     max-width: 100vw !important;
@@ -13781,9 +13736,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.15 TEST — FdS : forcer le rendu natif iPad sur la largeur
-   ========================================================================== */
 /*
  * Safari/iPad ne respecte pas systématiquement #view=FitH / #zoom=page-width
  * pour un PDF Blob dans un iframe. Le viewport interne de la FdS est donc
@@ -13810,9 +13762,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.16 TEST — FdS : grossissement visuel réel ×1,90 sur iPad/Safari
-   ========================================================================== */
 .briefing-doc-viewer-stage {
     position: relative !important;
     flex: 1 1 auto !important;
@@ -13857,9 +13806,6 @@ body.gaar-point-search-open .gaar-editing-banner {
     transform-origin: 0 0 !important;
 }
 
-/* ==========================================================================
-   v15.17 TEST — FdS : largeur légèrement réduite (×1,82)
-   ========================================================================== */
 /*
  * La v15.16 à ×1,90 est légèrement trop large sur l'iPad testé.
  * On réduit le grossissement d'environ 4,2 % à ×1,82.
@@ -13874,14 +13820,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     transform-origin: 0 0 !important;
 }
 
-/* ==========================================================================
-   v15.26 TEST — GLR anticollision + documents du jour
-   ========================================================================== */
 /* Les règles fonctionnelles v15.26 sont ajoutées aux blocs GLR et FdS/GAAR ci-dessous. */
-
-/* ==========================================================================
-   v15.24 TEST — FdS / GAAR groupés + GLR aligné sur la logique SafeSky
-   ========================================================================== */
 
 /* Bouton principal FdS / GAAR : deux lignes, état indépendant par document. */
 #briefing-docs-map-button.briefing-docs-group-map-button {
@@ -14107,10 +14046,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.27 TEST — compteurs trafic
-   ========================================================================== */
-
 /* Bulle verte : nombre de trafics SafeSky actuellement affichés. */
 #traffic-layer-button .traffic-button-count {
     background: #16a34a !important;
@@ -14155,10 +14090,6 @@ body.gaar-point-search-open .gaar-editing-banner {
     }
 }
 
-
-/* ==========================================================================
-   v15.29 TEST — compteurs SafeSky : géométrie et typographie identiques
-   ========================================================================== */
 
 #traffic-layer-button .traffic-button-count,
 #traffic-layer-button .traffic-tracked-button-count {
@@ -14218,10 +14149,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.30 TEST — connecteur GLR DOM
-   ========================================================================== */
-
 /*
  * Le connecteur est un L.divIcon de 1 x 1 px placé au milieu du segment.
  * overflow:visible est indispensable : la ligne déborde volontairement de
@@ -14255,10 +14182,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.31 TEST — trait étiquette / trafic SafeSky
-   ========================================================================== */
-
 .traffic-aircraft-icon {
     overflow: visible !important;
 }
@@ -14288,10 +14211,6 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 
-/* ==========================================================================
-   v15.34 TEST — visibilité garantie des connecteurs
-   ========================================================================== */
-
 .traffic-aircraft-icon .traffic-aircraft-symbol-wrap {
     position: relative !important;
     z-index: 3 !important;
@@ -14309,4 +14228,172 @@ body.gaar-point-search-open .gaar-editing-banner {
 .leaflet-pane.npf-global-link-connector-pane,
 .leaflet-npfGlobalLinkConnectorPane-pane {
     pointer-events: none !important;
+}
+
+
+
+
+/* ==========================================================================
+   v2026.65 PÉRENNE — SafeSky occupe la position trafic principale
+   ========================================================================== */
+
+/* Le bouton GLR n'existe plus dans le DOM ; aucune règle de masquage n'est requise. */
+
+
+/* ==========================================================================
+   v15.35 TEST — fenêtre de configuration avant connexion au chat
+   ========================================================================== */
+
+.chat-config-row {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+}
+
+#chat-connect-button {
+    min-width: 150px;
+}
+
+.chat-connect-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2400;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding:
+        calc(16px + env(safe-area-inset-top))
+        calc(16px + env(safe-area-inset-right))
+        calc(16px + env(safe-area-inset-bottom))
+        calc(16px + env(safe-area-inset-left));
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.48);
+}
+
+.chat-connect-modal-content {
+    width: min(460px, 100%);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
+    padding: 18px;
+}
+
+.chat-connect-modal-content h3 {
+    margin: 0 0 16px;
+    color: var(--primary-color);
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.chat-connect-gps-row,
+.chat-connect-field {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 14px;
+}
+
+.chat-connect-gps-row {
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 46px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #f7f9fc;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#chat-connect-gps-checkbox {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    accent-color: var(--primary-color);
+}
+
+.chat-connect-field {
+    flex-direction: column;
+    gap: 7px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+}
+
+.chat-connect-field input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #ffffff;
+    color: #111827;
+    font-size: 16px;
+    outline: none;
+}
+
+.chat-connect-field input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(0, 90, 156, 0.14);
+}
+
+.chat-connect-modal-status {
+    min-height: 20px;
+    margin: -2px 0 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.chat-connect-modal-status.error {
+    color: var(--secondary-color);
+}
+
+.chat-connect-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.35fr;
+    gap: 10px;
+}
+
+.chat-connect-modal-actions button {
+    min-height: 44px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.chat-connect-modal-secondary {
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    color: #334155;
+}
+
+.chat-connect-modal-primary {
+    border: 1px solid var(--primary-color);
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+@media (max-width: 600px) {
+    .chat-connect-modal {
+        align-items: flex-start;
+        padding-top: calc(12px + env(safe-area-inset-top));
+    }
+
+    .chat-connect-modal-content {
+        width: 100%;
+        padding: 16px;
+    }
+
+    .chat-connect-modal-actions {
+        grid-template-columns: 1fr;
+    }
 }
