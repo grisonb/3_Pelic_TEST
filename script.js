@@ -1,5 +1,25 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.29';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.31';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.31 TEST — trait étiquette <-> trafic pour SafeSky ET GLR
+// - GLR : connecteur DOM v15.30 conservé ;
+// - SafeSky : ajout d'un connecteur DOM mesuré sur le rendu réel ;
+// - le trait SafeSky relie le centre réel de l'étiquette au centre réel du
+//   symbole, quelle que soit la position de l'étiquette ;
+// - fusion automatique SafeSky/GLR v15.30 inchangée.
+// =========================================================================
+
+// =========================================================================
+// v15.30 TEST — fusion automatique SafeSky / GLR + liaison GLR DOM
+// - SafeSky prioritaire lorsqu'un même trafic est rendu par les deux sources ;
+// - appariement automatique d'indicatifs : espaces/tirets ignorés et tolérance
+//   d'un caractère sur le préfixe si le numéro final est identique ;
+// - exemples : MILAN80 <-> MILAN 80, DRAGO13 <-> DRAGON 13 ;
+// - si le trafic n'est pas réellement rendu par SafeSky, GLR reste affiché ;
+// - remplacement des polylines GLR par un connecteur DOM calculé en pixels,
+//   dans le même pane que les marqueurs GLR.
+// =========================================================================
 
 // =========================================================================
 // v15.29 TEST — compteurs SafeSky corrigés + liaisons GLR renforcées
@@ -14945,6 +14965,7 @@ function updateTrafficSmoothPositions(timestamp) {
                     marker,
                     rendered.track
                 );
+                updateTrafficMarkerLabelConnector(marker);
             } catch (_) {}
         });
     }
@@ -14972,6 +14993,101 @@ function startTrafficSmoothAnimation() {
         );
 }
 
+
+
+function updateTrafficMarkerLabelConnector(marker) {
+    const icon = marker?._icon;
+    if (!icon || !icon.isConnected) return;
+
+    const label = icon.querySelector('.traffic-aircraft-altitude-label');
+    const symbol = icon.querySelector('.traffic-aircraft-arrow');
+    let connector = icon.querySelector('.traffic-label-connector');
+
+    if (!label || !symbol) {
+        if (connector) connector.remove();
+        return;
+    }
+
+    const iconRect = icon.getBoundingClientRect();
+    const labelRect = label.getBoundingClientRect();
+    const symbolRect = symbol.getBoundingClientRect();
+
+    if (
+        labelRect.width <= 0
+        || labelRect.height <= 0
+        || symbolRect.width <= 0
+        || symbolRect.height <= 0
+    ) {
+        if (connector) connector.style.display = 'none';
+        return;
+    }
+
+    const x1 = symbolRect.left + symbolRect.width / 2 - iconRect.left;
+    const y1 = symbolRect.top + symbolRect.height / 2 - iconRect.top;
+    const x2 = labelRect.left + labelRect.width / 2 - iconRect.left;
+    const y2 = labelRect.top + labelRect.height / 2 - iconRect.top;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy);
+
+    if (!Number.isFinite(length) || length < 2) {
+        if (connector) connector.style.display = 'none';
+        return;
+    }
+
+    if (!connector) {
+        connector = document.createElement('span');
+        connector.className = 'traffic-label-connector';
+        connector.setAttribute('aria-hidden', 'true');
+        icon.appendChild(connector);
+    }
+
+    const midpointX = (x1 + x2) / 2;
+    const midpointY = (y1 + y2) / 2;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    connector.style.display = 'block';
+    connector.style.width = `${length.toFixed(1)}px`;
+    connector.style.left = `${midpointX.toFixed(1)}px`;
+    connector.style.top = `${midpointY.toFixed(1)}px`;
+    connector.style.transform =
+        `translate(-50%, -50%) rotate(${angle.toFixed(2)}deg)`;
+}
+
+function scheduleTrafficMarkerLabelConnector(marker) {
+    if (!marker) return;
+
+    requestAnimationFrame(() => {
+        updateTrafficMarkerLabelConnector(marker);
+        requestAnimationFrame(() => {
+            updateTrafficMarkerLabelConnector(marker);
+        });
+    });
+}
+
+function refreshAllTrafficLabelConnectors() {
+    if (!showTrafficLayer) return;
+    trafficMarkerRegistry.forEach(entry => {
+        if (entry?.marker) {
+            updateTrafficMarkerLabelConnector(entry.marker);
+        }
+    });
+}
+
+let trafficLabelConnectorMapEventsInstalled = false;
+
+function ensureTrafficLabelConnectorMapEvents() {
+    if (trafficLabelConnectorMapEventsInstalled || !map?.on) return;
+
+    trafficLabelConnectorMapEventsInstalled = true;
+    map.on('zoomend moveend resize', () => {
+        if (!showTrafficLayer) return;
+        requestAnimationFrame(() => {
+            refreshAllTrafficLabelConnectors();
+        });
+    });
+}
 
 function buildTrafficMarkerIcon(aircraft) {
     const hasTrack = Number.isFinite(aircraft.track);
@@ -15490,6 +15606,7 @@ function updateTrafficMarkerPopup(marker, popupHtml) {
 
 function renderTrafficAircraft(aircraftList, meta = {}) {
     if (!trafficLayer) return;
+    ensureTrafficLabelConnectorMapEvents();
 
     if (meta?.skipSnapshot !== true) {
         lastTrafficAircraftSnapshot = Array.isArray(aircraftList)
@@ -15706,6 +15823,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             installTrafficMarkerLabelPopupInteraction(
                 entry.marker
             );
+            scheduleTrafficMarkerLabelConnector(entry.marker);
             return;
         }
 
@@ -15728,6 +15846,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         updateTrafficMarkerPopup(marker, popupHtml);
         marker.addTo(trafficLayer);
         installTrafficMarkerLabelPopupInteraction(marker);
+        scheduleTrafficMarkerLabelConnector(marker);
 
         entry = {
             marker,
@@ -15785,6 +15904,14 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     });
 
     startTrafficSmoothAnimation();
+
+    /*
+     * v15.30 — la liste des marqueurs SafeSky vient de changer : réconcilier
+     * immédiatement la couche GLR pour appliquer/supprimer les doublons.
+     */
+    if (npfGlobalLinkEnabled && npfGlobalLinkLastPositions.length) {
+        renderGlobalLinkPositions(npfGlobalLinkLastPositions);
+    }
 }
 
 function redrawTrafficLayerFromSnapshot() {
@@ -16123,6 +16250,10 @@ function toggleTrafficLayer(forceState = null) {
         if (trafficLayer && map && map.hasLayer(trafficLayer)) map.removeLayer(trafficLayer);
         refreshTrafficButtonState(0);
         updateTrafficStatus({ visible: false });
+
+        if (npfGlobalLinkEnabled && npfGlobalLinkLastPositions.length) {
+            renderGlobalLinkPositions(npfGlobalLinkLastPositions);
+        }
     }
 
     scheduleBaseMapStabilityRefresh(showTrafficLayer ? 'traffic-on' : 'traffic-off');
@@ -18220,6 +18351,9 @@ let npfGlobalLinkEnabled = false;
 let npfGlobalLinkFetchInProgress = false;
 let npfGlobalLinkAttempt = '';
 let npfGlobalLinkLastPositions = [];
+/* v15.30 — état de fusion GLR/SafeSky. */
+let npfGlobalLinkRenderedCount = 0;
+let npfGlobalLinkSafeSkyMatches = [];
 let npfGlobalLinkRelayoutTimer = null;
 
 function getStoredGlobalLinkSession() {
@@ -18420,6 +18554,208 @@ function escapeGlobalLinkHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+
+function normalizeTrafficSourceCallsign(value) {
+    let text = String(value ?? '').trim().toUpperCase();
+    if (!text || text === 'N/A' || text === '--') return '';
+
+    /*
+     * NFD enlève les accents éventuels, puis on retire espaces, tirets,
+     * ponctuation et séparateurs. MILAN 80 et MILAN80 donnent donc la même clé.
+     */
+    try {
+        text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (_) {}
+
+    return text.replace(/[^A-Z0-9]/g, '');
+}
+
+function splitTrafficComparableCallsign(value) {
+    const compact = normalizeTrafficSourceCallsign(value);
+    if (!compact) return { compact: '', base: '', suffix: '' };
+
+    /*
+     * On isole le numéro final, éventuellement suivi d'une lettre.
+     * Le préfixe doit contenir au moins deux lettres pour éviter des
+     * rapprochements trop permissifs.
+     */
+    const match = compact.match(/^([A-Z]{2,})(\d+[A-Z]?)$/);
+    if (!match) return { compact, base: compact, suffix: '' };
+
+    return {
+        compact,
+        base: match[1],
+        suffix: match[2]
+    };
+}
+
+function trafficCallsignEditDistanceAtMostOne(left, right) {
+    const a = String(left || '');
+    const b = String(right || '');
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+
+    /*
+     * Distance de Levenshtein limitée à 1 : substitution, insertion ou
+     * suppression d'un seul caractère. Suffisant pour DRAGO <-> DRAGON.
+     */
+    if (a.length === b.length) {
+        let differences = 0;
+        for (let i = 0; i < a.length; i += 1) {
+            if (a[i] !== b[i] && ++differences > 1) return false;
+        }
+        return differences === 1;
+    }
+
+    const shorter = a.length < b.length ? a : b;
+    const longer = a.length < b.length ? b : a;
+    let i = 0;
+    let j = 0;
+    let differences = 0;
+
+    while (i < shorter.length && j < longer.length) {
+        if (shorter[i] === longer[j]) {
+            i += 1;
+            j += 1;
+            continue;
+        }
+        differences += 1;
+        if (differences > 1) return false;
+        j += 1;
+    }
+
+    if (j < longer.length) differences += 1;
+    return differences <= 1;
+}
+
+function compareTrafficSourceCallsigns(glrName, safeSkyCallsign) {
+    const glr = splitTrafficComparableCallsign(glrName);
+    const ss = splitTrafficComparableCallsign(safeSkyCallsign);
+
+    if (!glr.compact || !ss.compact) {
+        return { match: false, mode: '' };
+    }
+
+    if (glr.compact === ss.compact) {
+        return { match: true, mode: 'exact-normalized' };
+    }
+
+    /*
+     * Tolérance volontairement stricte :
+     * - un numéro final doit exister des deux côtés et être identique ;
+     * - les deux préfixes doivent avoir au moins 4 caractères ;
+     * - une seule différence de caractère maximum est acceptée.
+     *
+     * Ainsi MILAN75 ne peut pas fusionner avec MILAN76, mais
+     * DRAGO13 peut fusionner avec DRAGON13.
+     */
+    if (
+        glr.suffix
+        && ss.suffix
+        && glr.suffix === ss.suffix
+        && glr.base.length >= 4
+        && ss.base.length >= 4
+        && trafficCallsignEditDistanceAtMostOne(glr.base, ss.base)
+    ) {
+        return { match: true, mode: 'same-number-fuzzy-prefix' };
+    }
+
+    return { match: false, mode: '' };
+}
+
+function getRenderedSafeSkyTrafficForGlobalLinkDedup() {
+    if (
+        !showTrafficLayer
+        || !trafficLayer
+        || !map
+        || !map.hasLayer?.(trafficLayer)
+    ) {
+        return [];
+    }
+
+    const result = [];
+    trafficMarkerRegistry.forEach(entry => {
+        const ac = entry?.aircraft;
+        const marker = entry?.marker;
+        if (!ac || !marker) return;
+
+        const callsign = String(ac.callsign || '').trim();
+        if (!callsign || callsign === 'N/A') return;
+
+        const latLng = marker.getLatLng?.();
+        result.push({
+            callsign,
+            lat: Number(latLng?.lat ?? ac.lat),
+            lon: Number(latLng?.lng ?? ac.lon),
+            aircraftKey: marker._trafficAircraftKey || buildTrafficAircraftKey(ac)
+        });
+    });
+    return result;
+}
+
+function findSafeSkyMatchForGlobalLinkItem(item, safeSkyTraffic) {
+    const glrName = String(item?.name || '').trim();
+    if (!glrName || !Array.isArray(safeSkyTraffic) || !safeSkyTraffic.length) {
+        return null;
+    }
+
+    let best = null;
+
+    safeSkyTraffic.forEach(candidate => {
+        const comparison = compareTrafficSourceCallsigns(
+            glrName,
+            candidate.callsign
+        );
+        if (!comparison.match) return;
+
+        let distanceNm = Infinity;
+        if (
+            Number.isFinite(Number(item?.lat))
+            && Number.isFinite(Number(item?.lon))
+            && Number.isFinite(Number(candidate.lat))
+            && Number.isFinite(Number(candidate.lon))
+        ) {
+            distanceNm = calculateDistanceInNm(
+                Number(item.lat),
+                Number(item.lon),
+                Number(candidate.lat),
+                Number(candidate.lon)
+            );
+        }
+
+        const score = comparison.mode === 'exact-normalized' ? 0 : 1;
+        if (
+            !best
+            || score < best.score
+            || (
+                score === best.score
+                && Number(distanceNm) < Number(best.distanceNm)
+            )
+        ) {
+            best = {
+                score,
+                mode: comparison.mode,
+                glrName,
+                safeSkyCallsign: candidate.callsign,
+                safeSkyAircraftKey: candidate.aircraftKey,
+                distanceNm: Number.isFinite(distanceNm) ? distanceNm : null
+            };
+        }
+    });
+
+    return best;
+}
+
+/*
+ * Diagnostic volontairement non graphique : disponible dans la console si
+ * besoin de contrôler les appariements sans encombrer la carte.
+ */
+window.getGlobalLinkSafeSkyMatches = () => (
+    Array.isArray(npfGlobalLinkSafeSkyMatches)
+        ? npfGlobalLinkSafeSkyMatches.map(item => ({ ...item }))
+        : []
+);
+
 function updateGlobalLinkButton(options = {}) {
     const button = document.getElementById('global-link-layer-button');
     const count = document.getElementById('global-link-button-count');
@@ -18457,8 +18793,15 @@ function updateGlobalLinkButton(options = {}) {
         button.title = npfGlobalLinkEnabled ? 'GLR — aucune position récente' : 'GLR — appuyer pour afficher';
     }
     if (count) {
-        count.textContent = String(npfGlobalLinkEnabled ? visible.length : 0);
+        const displayedCount = Math.max(
+            0,
+            Math.round(Number(npfGlobalLinkRenderedCount) || 0)
+        );
+        count.textContent = String(npfGlobalLinkEnabled ? displayedCount : 0);
         count.style.display = npfGlobalLinkEnabled ? 'inline-flex' : 'none';
+        count.title = npfGlobalLinkSafeSkyMatches.length
+            ? `${displayedCount} GLR affiché(s) · ${npfGlobalLinkSafeSkyMatches.length} fusionné(s) avec SafeSky`
+            : `${displayedCount} GLR affiché(s)`;
     }
 }
 
@@ -18541,6 +18884,8 @@ function renderGlobalLinkPositions(positions) {
     if (!layer) return;
     layer.clearLayers();
     if (!npfGlobalLinkEnabled) {
+        npfGlobalLinkRenderedCount = 0;
+        npfGlobalLinkSafeSkyMatches = [];
         updateGlobalLinkButton();
         return;
     }
@@ -18572,8 +18917,32 @@ function renderGlobalLinkPositions(positions) {
         .filter(Boolean)
         .sort((a, b) => (a.ageSeconds - b.ageSeconds) || a.name.localeCompare(b.name, 'fr'));
 
-    const labelLayout = buildGlobalLinkLabelLayout(visibleItems);
-    visibleItems.forEach(item => {
+    /*
+     * v15.30 — SafeSky est prioritaire, mais uniquement pour les trafics
+     * réellement rendus sur sa couche. Un trafic absent/filtré de SafeSky
+     * continue donc à être rendu par GLR.
+     */
+    const renderedSafeSkyTraffic = getRenderedSafeSkyTrafficForGlobalLinkDedup();
+    npfGlobalLinkSafeSkyMatches = [];
+
+    const deduplicatedItems = visibleItems.filter(item => {
+        const match = findSafeSkyMatchForGlobalLinkItem(
+            item,
+            renderedSafeSkyTraffic
+        );
+        if (!match) return true;
+
+        npfGlobalLinkSafeSkyMatches.push({
+            ...match,
+            glrGroupId: item.groupId || '',
+            glrMissionId: item.missionId || ''
+        });
+        return false;
+    });
+
+    npfGlobalLinkRenderedCount = deduplicatedItems.length;
+    const labelLayout = buildGlobalLinkLabelLayout(deduplicatedItems);
+    deduplicatedItems.forEach(item => {
         const safeName = escapeGlobalLinkHtml(item.name);
         const placement = labelLayout.get(item.key);
         const labelLatLng = placement
@@ -18585,39 +18954,50 @@ function renderGlobalLinkPositions(positions) {
          * Le trait est ajouté avant le symbole et l'étiquette afin qu'ils
          * restent graphiquement au premier plan, tout en reliant leurs centres.
          */
-        if (labelLatLng) {
-            const connectorPoints = [[item.lat, item.lon], labelLatLng];
+        if (labelLatLng && placement) {
             /*
-             * v15.29 — double trait pour rester lisible sur orthophoto, fond
-             * clair ou fond sombre. Le centre géométrique reste identique :
-             * centre étiquette -> centre trafic.
+             * v15.30 — connecteur DOM. Les deux extrémités sont calculées à
+             * partir des centres en pixels du trafic et de l'étiquette.
+             * L'élément est un marqueur Leaflet dans le MEME pane que les
+             * symboles GLR : on évite ainsi les problèmes de rendu SVG/canvas
+             * constatés sur l'iPad.
              */
-            L.polyline(
-                connectorPoints,
-                {
-                    pane: NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME,
-                    color: '#ffffff',
-                    weight: 7,
-                    opacity: 0.96,
+            const aircraftPoint = map.latLngToContainerPoint(
+                [item.lat, item.lon]
+            );
+            const labelPoint = placement.point;
+            const dx = labelPoint.x - aircraftPoint.x;
+            const dy = labelPoint.y - aircraftPoint.y;
+            const lengthPx = Math.hypot(dx, dy);
+
+            if (Number.isFinite(lengthPx) && lengthPx >= 2) {
+                const midpoint = L.point(
+                    (aircraftPoint.x + labelPoint.x) / 2,
+                    (aircraftPoint.y + labelPoint.y) / 2
+                );
+                const midpointLatLng = map.containerPointToLatLng(
+                    midpoint
+                );
+                const angleDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+                const connectorClass = item.stale
+                    ? ' stale'
+                    : '';
+
+                const connectorIcon = L.divIcon({
+                    className: 'global-link-connector-marker',
+                    html: `<span class="global-link-connector-line${connectorClass}" style="width:${lengthPx.toFixed(1)}px;transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(2)}deg);"></span>`,
+                    iconSize: [1, 1],
+                    iconAnchor: [0.5, 0.5]
+                });
+
+                L.marker(midpointLatLng, {
+                    pane: NPF_GLOBAL_LINK_PANE_NAME,
+                    icon: connectorIcon,
                     interactive: false,
                     keyboard: false,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                }
-            ).addTo(layer);
-            L.polyline(
-                connectorPoints,
-                {
-                    pane: NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME,
-                    color: item.stale ? '#c05a00' : '#0b2f6b',
-                    weight: 3,
-                    opacity: 1,
-                    interactive: false,
-                    keyboard: false,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                }
-            ).addTo(layer);
+                    zIndexOffset: -10000
+                }).addTo(layer);
+            }
         }
 
         const symbolIcon = L.divIcon({
