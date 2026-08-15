@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.29 */
+/* NPF_STYLE_BUILD_VERSION: v15.31 */
 /* v15.27 TEST — liaisons GLR + compteurs SafeSky/GLR vert/jaune. */
 /* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
@@ -14215,4 +14215,75 @@ body.gaar-point-search-open .gaar-editing-banner {
     #traffic-layer-button .traffic-button-count {
         right: -6px !important;
     }
+}
+
+
+/* ==========================================================================
+   v15.30 TEST — connecteur GLR DOM
+   ========================================================================== */
+
+/*
+ * Le connecteur est un L.divIcon de 1 x 1 px placé au milieu du segment.
+ * overflow:visible est indispensable : la ligne déborde volontairement de
+ * cette boîte jusqu'aux centres du trafic et de son étiquette.
+ */
+.global-link-connector-marker {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+}
+
+.global-link-connector-marker .global-link-connector-line {
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    display: block !important;
+    height: 4px !important;
+    min-height: 4px !important;
+    border-radius: 999px !important;
+    background: #0b2f6b !important;
+    box-shadow:
+        0 0 0 2px rgba(255,255,255,.98),
+        0 1px 4px rgba(0,0,0,.42) !important;
+    transform-origin: 50% 50% !important;
+    pointer-events: none !important;
+    opacity: 1 !important;
+    z-index: 1 !important;
+}
+
+.global-link-connector-marker .global-link-connector-line.stale {
+    background: #c05a00 !important;
+}
+
+
+/* ==========================================================================
+   v15.31 TEST — trait étiquette / trafic SafeSky
+   ========================================================================== */
+
+.traffic-aircraft-icon {
+    overflow: visible !important;
+}
+
+.traffic-aircraft-icon .traffic-label-connector {
+    position: absolute !important;
+    display: block;
+    height: 3px !important;
+    min-height: 3px !important;
+    border-radius: 999px !important;
+    background: #0b2f6b !important;
+    box-shadow:
+        0 0 0 2px rgba(255,255,255,.98),
+        0 1px 4px rgba(0,0,0,.42) !important;
+    transform-origin: 50% 50% !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+    opacity: 1 !important;
+}
+
+.traffic-aircraft-icon .traffic-aircraft-symbol-wrap,
+.traffic-aircraft-icon .traffic-aircraft-arrow,
+.traffic-aircraft-icon .traffic-aircraft-altitude-label {
+    z-index: 2 !important;
 }
