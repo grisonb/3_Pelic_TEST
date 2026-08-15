@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.35';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.36';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -18080,7 +18080,7 @@ window.closeBriefingDocSelectorModal = closeBriefingDocSelectorModal;
 
 // =========================================================================
 // =========================================================================
-const NPF_GLOBAL_LINK_UI_ENABLED = false; // accès GLR temporairement absent de l'interface en v2026.65.
+const NPF_GLOBAL_LINK_UI_ENABLED = true; // TEST v15.36 : bouton et fonctions GLR disponibles.
 const NPF_GLOBAL_LINK_API_URL = 'https://grisonb.synology.me/briefing-api/npf-global-link-api.php';
 const NPF_GLOBAL_LINK_SESSION_KEY = 'npfGlobalLinkSessionV1';
 const NPF_GLOBAL_LINK_SESSION_EXP_KEY = 'npfGlobalLinkSessionExpV1';
