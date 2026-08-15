@@ -1,3 +1,62 @@
+VERSION TEST v15.42 — CORRECTION AFFICHAGE VAC DOLE-TAVAUX LFGJ
+Date : 15/08/2026
+Base : TEST v15.41
+
+OBJECTIF
+- Rétablir l'accès à la carte VAC de Dole-Tavaux après la correction de son code OACI en `LFGJ`.
+- Ne jamais associer à Dole la VAC `LFSJ`, qui correspond à Sedan-Douzy.
+
+DIAGNOSTIC
+1. Source du défaut
+- Le dépôt public `NPF-Q400-VAC` est encore généré depuis le périmètre historique TEST v14.92.
+- Son manifeste associe encore Dole-Tavaux à `LFSJ` et publie `vac/LFSJ.pdf`.
+- Après la correction v15.41, NPF cherche logiquement une VAC `LFGJ` ; aucune VAC locale `LFGJ` n'est donc actuellement présente dans ce dépôt.
+
+2. Vérification aéronautique
+- Dole-Tavaux est bien `LFGJ`.
+- `LFSJ` correspond à Sedan-Douzy.
+- La VAC officielle SIA `AD-2.LFGJ.pdf` existe.
+
+MODIFICATIONS
+1. Ouverture VAC Dole en ligne tant que le dépôt VAC n'est pas régénéré
+- Ajout d'un fallback strictement limité à `LFGJ` vers le lien stable officiel SIA de la VAC Dole-Tavaux.
+- Si une VAC `LFGJ` est déjà stockée dans IndexedDB, elle reste prioritaire et s'ouvre hors ligne comme auparavant.
+- En l'absence de VAC locale `LFGJ`, le bouton VAC de Dole est affiché lorsque l'appareil est connecté et ouvre directement la VAC officielle SIA.
+
+2. Sécurité contre une mauvaise carte
+- Aucun alias `LFGJ -> LFSJ` n'est créé.
+- La VAC `LFSJ` existante n'est jamais utilisée pour Dole.
+- Les autres terrains et toutes les autres VAC restent inchangés.
+
+LIMITATION TEMPORAIRE
+- Tant que le dépôt `NPF-Q400-VAC` n'est pas régénéré avec `LFGJ`, la VAC de Dole nécessite une connexion Internet si aucune copie `LFGJ` n'est déjà présente localement.
+- Le fonctionnement 100 % hors ligne de Dole redeviendra normal dès que le dépôt VAC publiera `vac/LFGJ.pdf` et son entrée manifeste correspondante.
+
+ÉLÉMENTS INCHANGÉS
+- Zooms et performances carte v15.40/v15.37.
+- GLR présent dans la branche TEST.
+- SafeSky.
+- Chat.
+- FdS / GAAR.
+- Toutes les VAC autres que Dole-Tavaux.
+- Pérenne non modifiée.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.42.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- Dole-Tavaux reste `LFGJ` dans les données NPF.
+- Aucun remplacement global de `LFSJ`.
+- Le fallback VAC est limité à `LFGJ` et pointe vers le document officiel SIA.
+- Historique v15.41 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.41 — CORRECTION OACI DOLE-TAVAUX
 Date : 15/08/2026
 Base : TEST v15.40
