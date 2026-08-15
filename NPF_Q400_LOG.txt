@@ -1,3 +1,51 @@
+VERSION TEST v15.33 — TRAITS SAFESKY / GLR PLEINS, OPAQUES, SANS HALO BLANC
+Date : 15/08/2026
+Base : TEST v15.32
+
+OBJECTIF
+- Corriger le rendu observé sur iPad où le trait apparaissait blanc et semi-transparent.
+- Conserver uniquement la couleur de l'icône de trafic associée.
+
+MODIFICATIONS
+1. SafeSky
+- Suppression complète du halo blanc.
+- Suppression de toute ombre ou filtre sur le trait.
+- Trait épaissi de 3 px à 4 px.
+- Opacité forcée à 100 %.
+- La couleur lue sur l'icône avec getComputedStyle() est appliquée explicitement à background ET background-color en style inline prioritaire.
+- Le trait reste donc rouge, vert, bleu ou gris exactement selon l'icône SafeSky.
+
+2. GLR
+- Suppression complète du halo blanc.
+- Suppression de toute ombre ou filtre.
+- Trait épaissi de 4 px à 5 px.
+- Opacité forcée à 100 %.
+- Trafic frais : même vert #198754 que l'icône.
+- Trafic ancien : même orange #e67e22 que l'icône.
+
+ÉLÉMENTS INCHANGÉS
+- Géométrie centre étiquette -> centre icône.
+- Traits présents pour SafeSky ET GLR.
+- Fusion automatique SafeSky / GLR avec priorité SafeSky.
+- Comparaison générique des indicatifs.
+- Compteurs SafeSky.
+- Anticollision et emprise GLR.
+- Cadence GLR 15 s.
+- FdS / GAAR, VAC, cartes, GPS, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.33.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Aucun halo blanc restant dans les règles actives des connecteurs.
+- Opacité des deux connecteurs forcée à 1.
+- Historique v15.32 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.32 — TRAITS SAFESKY / GLR DE LA MÊME COULEUR QUE L'ICÔNE
 Date : 15/08/2026
 Base : TEST v15.31
