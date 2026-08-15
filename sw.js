@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-34_visible_connectors_real_icon_color';
-const APP_VERSION = 'v15.34';
+const SW_VERSION = 'sw-v15-35_chat_connection_modal';
+const APP_VERSION = 'v15.35';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
