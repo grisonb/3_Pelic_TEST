@@ -1,3 +1,75 @@
+VERSION TEST v15.40 — ABANDON DES ZOOMS FRACTIONNAIRES / RETOUR AUX ZOOMS INITIAUX
+Date : 15/08/2026
+Base : TEST v15.39
+Référence de restauration zoom : TEST v15.37
+
+OBJECTIF
+- Abandonner l'essai des niveaux de zoom intermédiaires introduit en v15.38 puis ajusté en v15.39.
+- Revenir exactement au comportement de zoom utilisé avant cet essai.
+- Conserver les optimisations de performances de la carte NPF introduites en v15.37.
+
+MODIFICATIONS
+1. Retour aux zooms Leaflet initiaux
+- Suppression de `zoomSnap: 0.25`.
+- Suppression de `zoomDelta: 0.25`.
+- La carte revient aux niveaux de zoom standards utilisés avant la v15.38.
+- Les niveaux 8,25 / 8,50 / 8,75, etc. ne sont plus utilisés.
+
+2. Suppression du traitement spécial NPF des zooms fractionnaires
+- Suppression de la surcharge `_setView()` ajoutée en v15.39.
+- Le choix du niveau de tuiles revient au comportement standard Leaflet.
+- Suppression de la logique spécifique consistant à maintenir le niveau entier inférieur pendant les quarts de zoom.
+
+3. Échelle nautique restaurée
+- Suppression des graduations ajoutées uniquement pour l'essai :
+  • 3 NM ;
+  • 4 NM ;
+  • 7,5 NM ;
+  • 15 NM.
+- Retour à la liste d'origine :
+  `0.1 / 0.2 / 0.5 / 1 / 2 / 5 / 10 / 20 / 50 / 100 / 200 / 500 NM`.
+
+4. Contrôle des tuiles restauré sur la base v15.37
+- Retour à la version v15.37 de `countVisibleLoadedBaseTiles()`.
+- Suppression du filtrage spécial par `_tileZoom` qui n'était nécessaire que pour le zoom fractionnaire.
+- Le diagnostic `getNpfTilePerformanceStatus()` revient également à sa forme v15.37.
+
+5. Optimisations v15.37 conservées
+- Le redraw systématique après chaque zoom reste supprimé.
+- Le redraw n'intervient qu'en secours si la carte est réellement vide.
+- NPF peut charger des tuiles pendant le déplacement.
+- Concurrence IndexedDB NPF maintenue à 5.
+- Priorité aux demandes correspondant à la vue la plus récente conservée.
+- Cache mémoire de blobs maintenu à 384 tuiles.
+
+ÉLÉMENTS INCHANGÉS
+- GLR reste présent dans la branche TEST.
+- SafeSky.
+- Chat.
+- Routes / communes / départements.
+- GPS.
+- FdS / GAAR.
+- VAC.
+- Pérenne non modifiée.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.40.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- Absence de `zoomSnap: 0.25` et `zoomDelta: 0.25`.
+- Absence de la surcharge `_setView()` spécifique v15.39.
+- Échelle nautique identique à la v15.37.
+- Optimisations NPF v15.37 conservées.
+- GLR TEST conservé.
+- Historique v15.39 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.39 — ZOOM FRACTIONNAIRE NPF : CONSERVATION DU NIVEAU NATIF JUSQU'AU ZOOM ENTIER
 Date : 15/08/2026
 Base : TEST v15.38
