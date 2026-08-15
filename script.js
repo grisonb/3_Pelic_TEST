@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.36';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.38';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -4660,7 +4660,15 @@ function formatKilometers(value) {
 }
 
 function chooseNiceNauticalScale(maxNm) {
-    const candidates = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
+    /*
+     * v15.38 — graduations intermédiaires demandées pour accompagner les
+     * nouveaux pas de zoom fractionnaires, sans créer de tuiles supplémentaires.
+     */
+    const candidates = [
+        0.1, 0.2, 0.5,
+        1, 2, 3, 4, 5, 7.5, 10, 15, 20,
+        50, 100, 200, 500
+    ];
     let selected = candidates[0];
     for (const candidate of candidates) {
         if (candidate <= maxNm) selected = candidate;
@@ -5101,6 +5109,16 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
+
+        /*
+         * v15.38 — quatre sous-niveaux entre deux zooms natifs.
+         * Leaflet conserve les mêmes tuiles entières et les met simplement
+         * à l'échelle entre deux niveaux : aucun nouveau niveau de tuiles
+         * n'est nécessaire dans les packs NPF.
+         */
+        zoomSnap: 0.25,
+        zoomDelta: 0.25,
+
  // v13.58 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
         zoomAnimation: false,
         fadeAnimation: false,
@@ -5318,21 +5336,64 @@ function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
     }
 }
 
+
+function countVisibleLoadedBaseTiles() {
+    if (!map || !baseTileLayer) return 0;
+
+    try {
+        const container = baseTileLayer.getContainer?.();
+        if (!container) return 0;
+
+        const mapRect = map.getContainer().getBoundingClientRect();
+        const tiles = container.querySelectorAll(
+            'img.leaflet-tile.leaflet-tile-loaded'
+        );
+
+        let visibleLoaded = 0;
+
+        tiles.forEach(tile => {
+            if (!tile || tile.style.display === 'none') return;
+
+            const rect = tile.getBoundingClientRect();
+            if (
+                rect.width <= 1
+                || rect.height <= 1
+                || rect.right <= mapRect.left
+                || rect.left >= mapRect.right
+                || rect.bottom <= mapRect.top
+                || rect.top >= mapRect.bottom
+            ) {
+                return;
+            }
+
+            visibleLoaded += 1;
+        });
+
+        return visibleLoaded;
+    } catch (_) {
+        return 0;
+    }
+}
+
 function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
     if (!map || !baseTileLayer) return;
     const token = ++baseMapStabilityRefreshToken;
 
     /*
-     * v15.00 — un seul redraw lourd du fond. Le second passage ne force plus
-     * toutes les tuiles une deuxième fois : il vérifie seulement que la couche
-     * est présente et réapplique la limite de zoom Offline.
+     * v15.37 — ne plus redessiner systématiquement toutes les tuiles après
+     * chaque zoom. Leaflet a déjà demandé le nouveau niveau de zoom.
+     *
+     * Le redraw forcé v15.00 provoquait une seconde vague de lectures
+     * IndexedDB sur la carte NPF. On conserve uniquement un filet de sécurité :
+     * si aucune tuile chargée n'est réellement visible après stabilisation,
+     * on déclenche alors un redraw unique.
      */
     const passes = [
-        { delay: 180, redraw: true },
-        { delay: 620, redraw: false }
+        { delay: 260, rescueRedraw: true },
+        { delay: 760, rescueRedraw: true }
     ];
 
-    passes.forEach(pass => {
+    passes.forEach((pass, index) => {
         setTimeout(() => {
             if (token !== baseMapStabilityRefreshToken) return;
             if (!map || !baseTileLayer) return;
@@ -5342,11 +5403,28 @@ function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
                     baseTileLayer.addTo(map);
                 }
 
-                if (pass.redraw) {
-                    map.invalidateSize?.({ animate: false, pan: false });
-                    baseTileLayer.redraw?.();
-                } else if (offlineTilesMode) {
+                if (offlineTilesMode) {
                     enforceOfflineZoomLimit();
+                }
+
+                const visibleLoaded = countVisibleLoadedBaseTiles();
+
+                if (
+                    pass.rescueRedraw
+                    && visibleLoaded === 0
+                    && typeof baseTileLayer.redraw === 'function'
+                ) {
+                    /*
+                     * Premier secours à 260 ms ; le second ne s'exécute que si
+                     * la carte est toujours réellement vide à 760 ms.
+                     */
+                    if (index === 0) {
+                        map.invalidateSize?.({
+                            animate: false,
+                            pan: false
+                        });
+                    }
+                    baseTileLayer.redraw();
                 }
             } catch (error) {
                 console.warn(
@@ -5951,7 +6029,7 @@ function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
  * les bases IndexedDB existantes. Le service worker reste utilisé pour le cache
  * applicatif et comme chemin de compatibilité secondaire.
  */
-const DIRECT_OFFLINE_TILE_CACHE_MAX = 240;
+const DIRECT_OFFLINE_TILE_CACHE_MAX = 384;
 const DIRECT_OFFLINE_TILE_MISS_CACHE_MAX = 512;
 const DIRECT_OFFLINE_TILE_MISS_CACHE_TTL_MS = 30000;
 const directOfflineTileBlobCache = new Map();
@@ -5982,7 +6060,7 @@ let directOfflineLastRecoveryReason = '';
  * rafale de transactions parallèles au premier affichage. On limite donc la
  * concurrence uniquement pour le groupe NPF ; OACI conserve son chemin rapide.
  */
-const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 3;
+const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 5;
 let directOfflineNpfActiveReads = 0;
 const directOfflineNpfReadQueue = [];
 let directOfflineTileReadGeneration = 0;
@@ -6025,7 +6103,14 @@ function runNextDirectOfflineNpfRead() {
 
 function enqueueDirectOfflineNpfRead(task) {
     return new Promise((resolve, reject) => {
-        directOfflineNpfReadQueue.push({ task, resolve, reject });
+        /*
+         * v15.37 — priorité à la vue courante.
+         * Lors d'un déplacement rapide, les dernières demandes correspondent
+         * généralement aux tuiles de la nouvelle emprise. Les placer en tête
+         * évite qu'une longue file de tuiles devenues hors champ retarde
+         * l'affichage de la zone que l'utilisateur regarde maintenant.
+         */
+        directOfflineNpfReadQueue.unshift({ task, resolve, reject });
         runNextDirectOfflineNpfRead();
     });
 }
@@ -6557,6 +6642,27 @@ window.getNpfOfflineRecoveryStatus = function getNpfOfflineRecoveryStatus() {
     };
 };
 
+/*
+ * v15.37 TEST — diagnostic léger, accessible uniquement depuis la console.
+ * Permet de vérifier si un ralentissement vient encore de la file IndexedDB.
+ */
+window.getNpfTilePerformanceStatus = function getNpfTilePerformanceStatus() {
+    return {
+        npfSelected: isNpfOfflinePackSelection(),
+        activeReads: directOfflineNpfActiveReads,
+        queuedReads: directOfflineNpfReadQueue.length,
+        maxConcurrentReads: DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS,
+        blobCacheSize: directOfflineTileBlobCache.size,
+        blobCacheMax: DIRECT_OFFLINE_TILE_CACHE_MAX,
+        tileHits: directOfflineTileHitCount,
+        tileMisses: directOfflineTileMissCount,
+        visibleLoadedTiles: countVisibleLoadedBaseTiles(),
+        mapZoom: map?.getZoom?.() ?? null,
+        zoomSnap: map?.options?.zoomSnap ?? null,
+        zoomDelta: map?.options?.zoomDelta ?? null
+    };
+};
+
 async function findDirectOfflineTileBlobUnqueued(coords) {
     const cacheKey = [
         coords.z,
@@ -6770,6 +6876,10 @@ function setupBaseTileLayer() {
     const tileHostPrefix = offlineTilesMode ? normalizeOfflineTileHostPrefix(activeTilePackName) : 'a';
     const tileLayerUrl = `https://${tileHostPrefix}.tile.openstreetmap.org/{z}/{x}/{y}.png`;
 
+    const isNpfDirectOfflineLayer =
+        offlineTilesMode
+        && isNpfOfflinePackSelection();
+
     const tileLayerOptions = {
         minNativeZoom: effectiveMinZoom,
         maxNativeZoom: effectiveMaxZoom,
@@ -6778,8 +6888,16 @@ function setupBaseTileLayer() {
         attribution: '© OpenStreetMap',
         keepBuffer: OFFLINE_TILE_KEEP_BUFFER,
         updateWhenZooming: false,
-        updateWhenIdle: true,
-        updateInterval: OFFLINE_TILE_UPDATE_INTERVAL_MS,
+
+        /*
+         * v15.37 — NPF uniquement : commencer à charger les nouvelles tuiles
+         * pendant le déplacement, au lieu d'attendre obligatoirement moveend.
+         * Les autres packs conservent le comportement précédent.
+         */
+        updateWhenIdle: !isNpfDirectOfflineLayer,
+        updateInterval: isNpfDirectOfflineLayer
+            ? 60
+            : OFFLINE_TILE_UPDATE_INTERVAL_MS,
         noWrap: true,
         errorTileUrl: OFFLINE_TILE_PLACEHOLDER_DATA_URL
     };
