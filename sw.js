@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-38_fractional_zoom_no_new_tiles';
-const APP_VERSION = 'v15.38';
+const SW_VERSION = 'sw-v15-39_fractional_zoom_stable_native_tiles';
+const APP_VERSION = 'v15.39';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
