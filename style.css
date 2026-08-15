@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.32 */
+/* NPF_STYLE_BUILD_VERSION: v15.33 */
 /* v15.27 TEST — liaisons GLR + compteurs SafeSky/GLR vert/jaune. */
 /* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
@@ -14240,13 +14240,14 @@ body.gaar-point-search-open .gaar-editing-banner {
     left: 50% !important;
     top: 50% !important;
     display: block !important;
-    height: 4px !important;
-    min-height: 4px !important;
+    height: 5px !important;
+    min-height: 5px !important;
+    border: 0 !important;
     border-radius: 999px !important;
     background: var(--glr-connector-color, #198754) !important;
-    box-shadow:
-        0 0 0 2px rgba(255,255,255,.98),
-        0 1px 4px rgba(0,0,0,.42) !important;
+    background-color: var(--glr-connector-color, #198754) !important;
+    box-shadow: none !important;
+    filter: none !important;
     transform-origin: 50% 50% !important;
     pointer-events: none !important;
     opacity: 1 !important;
@@ -14265,14 +14266,15 @@ body.gaar-point-search-open .gaar-editing-banner {
 .traffic-aircraft-icon .traffic-label-connector {
     position: absolute !important;
     display: block;
-    height: 3px !important;
-    min-height: 3px !important;
+    height: 4px !important;
+    min-height: 4px !important;
+    border: 0 !important;
     border-radius: 999px !important;
-    /* v15.32 : valeur de secours uniquement ; JS reprend la couleur calculée de l'icône. */
+    /* v15.33 : valeur de secours ; JS applique la couleur réelle de l'icône. */
     background: #64748b !important;
-    box-shadow:
-        0 0 0 2px rgba(255,255,255,.98),
-        0 1px 4px rgba(0,0,0,.42) !important;
+    background-color: #64748b !important;
+    box-shadow: none !important;
+    filter: none !important;
     transform-origin: 50% 50% !important;
     pointer-events: none !important;
     z-index: 0 !important;
