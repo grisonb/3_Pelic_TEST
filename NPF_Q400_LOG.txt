@@ -1,3 +1,81 @@
+VERSION TEST v15.39 — ZOOM FRACTIONNAIRE NPF : CONSERVATION DU NIVEAU NATIF JUSQU'AU ZOOM ENTIER
+Date : 15/08/2026
+Base : TEST v15.38
+
+CONSTAT
+- Les niveaux intermédiaires v15.38 fonctionnent visuellement.
+- Sur certains quarts de zoom, la carte NPF peut toutefois mettre longtemps à se compléter ou rester partiellement vide.
+- Le problème apparaît au changement du niveau de tuiles sous-jacent, pas dans le principe du zoom fractionnaire lui-même.
+
+CAUSE CIBLÉE
+- Leaflet choisit normalement le niveau `_tileZoom` à partir du zoom visuel arrondi.
+- Avec des pas de 0,25, un zoom visuel intermédiaire peut donc provoquer une bascule prématurée vers le niveau entier supérieur.
+- Exemple typique : autour de z8,50, Leaflet peut demander les tuiles z9 alors que l'utilisateur n'a pas encore atteint z9,00.
+- Pour NPF Offline, cela déclenche une nouvelle vague de lectures IndexedDB et peut donner une longue phase de chargement.
+- Le contrôle de secours v15.37/v15.38 pouvait également compter une ancienne tuile encore transformée comme « visible », même si le nouveau niveau n'était pas réellement chargé.
+
+MODIFICATIONS
+1. Niveau natif NPF conservé pendant les quarts intermédiaires
+- Cette règle s'applique uniquement à la couche NPF Offline directe.
+- Le zoom visuel reste fractionnaire par pas de 0,25.
+- Le niveau de tuiles utilisé est désormais le niveau entier inférieur :
+  • 8,00 / 8,25 / 8,50 / 8,75 utilisent les tuiles z8 ;
+  • 9,00 / 9,25 / 9,50 / 9,75 utilisent les tuiles z9 ;
+  • etc.
+- Le niveau supérieur n'est donc chargé qu'au moment où le zoom entier est réellement atteint.
+- Aucun nouveau fichier de tuile n'est créé.
+
+2. Réutilisation graphique des tuiles
+- Entre deux zooms entiers, Leaflet continue d'appliquer sa transformation graphique au niveau natif existant.
+- Les quarts de zoom restent disponibles.
+- Le nombre de lectures IndexedDB est fortement réduit par rapport au comportement v15.38 lors de la traversée des niveaux intermédiaires.
+
+3. Contrôle de secours plus précis
+- `countVisibleLoadedBaseTiles()` sait maintenant limiter son comptage au `_tileZoom` actuellement demandé.
+- Les anciennes tuiles d'un niveau précédent, encore visibles pendant une transformation Leaflet, ne peuvent plus masquer l'absence réelle des tuiles du niveau courant.
+- Le redraw de secours reste conditionnel et n'est déclenché que si le niveau courant n'a aucune tuile chargée visible.
+
+4. Buffer mémoire d'affichage NPF
+- `keepBuffer` passe à au moins 8 pour NPF Offline uniquement.
+- Les tuiles proches de l'écran sont conservées plus longtemps lors de petits déplacements et zooms/dézooms.
+- Cela ne modifie pas la taille des packs ni le stockage IndexedDB.
+
+5. Diagnostic TEST
+- `window.getNpfTilePerformanceStatus()` affiche maintenant :
+  • `mapZoom` = zoom visuel fractionnaire ;
+  • `tileZoom` = niveau entier réellement utilisé pour les tuiles ;
+  • nombre de tuiles visibles total ;
+  • nombre de tuiles visibles du niveau courant.
+- Exemple attendu à zoom visuel 8,75 : `mapZoom = 8.75`, `tileZoom = 8`.
+
+ÉLÉMENTS INCHANGÉS
+- Zooms fractionnaires par pas de 0,25.
+- Graduations 3 / 4 / 7,5 / 15 NM.
+- Optimisations v15.37 : concurrence 5, priorité à la vue récente, cache 384, chargement pendant déplacement.
+- Aucun niveau de tuile supplémentaire.
+- Aucun téléchargement de carte supplémentaire.
+- GLR présent dans la TEST.
+- SafeSky, Chat, routes, communes, FdS / GAAR, VAC et GPS inchangés.
+- Pérenne non modifiée.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.39.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- Zoom visuel 0,25 conservé.
+- Sélection du `_tileZoom` NPF par `Math.floor()` contrôlée.
+- Comportement standard Leaflet conservé pour les autres packs.
+- Secours fond de carte vérifie le niveau courant.
+- GLR TEST conservé.
+- Historique v15.38 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.38 — ZOOMS INTERMÉDIAIRES SANS AJOUT DE TUILES
 Date : 15/08/2026
 Base : TEST v15.37
