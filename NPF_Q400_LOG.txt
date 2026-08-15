@@ -1,117 +1,51 @@
-VERSION TEST v15.36 — GLR RÉTABLI DANS LA BRANCHE TEST / CHAT v15.35 CONSERVÉ
-Date : 15/08/2026
-Base : TEST v15.35
-
-OBJECTIF
-- Respecter la règle de branche : le bouton GLR doit rester disponible dans les versions TEST.
-- Conserver intégralement la nouvelle fenêtre de connexion Chat introduite en v15.35.
-- Clarifier le comportement du partage GPS lors d'une déconnexion volontaire du Chat.
-
-MODIFICATIONS
-1. GLR rétabli dans l'interface TEST
-- Le bouton `global-link-layer-button` est réinséré dans l'Index, immédiatement avant SafeSky comme dans la branche TEST v15.34.
-- Le compteur GLR `global-link-button-count` est rétabli.
-- Les styles GLR déjà conservés dans la feuille de style sont réutilisés sans modification.
-- `NPF_GLOBAL_LINK_UI_ENABLED` repasse à `true` dans cette branche TEST.
-- La logique d'authentification, captcha, session, rafraîchissement 15 s, anticollision, fusion SafeSky/GLR et affichage GLR redevient accessible.
-- Cette réactivation concerne uniquement la branche TEST ; la pérenne v2026.65 reste inchangée avec GLR absent de l'interface.
-
-2. Chat — fenêtre de connexion v15.35 conservée
-- Au clic sur « Connexion » lorsque le Chat est hors ligne, la fenêtre GPS / Canal / Pseudo reste utilisée.
-- Canal par défaut `Milan`.
-- Pseudo mémorisé après saisie.
-- État de partage GPS mémorisé.
-
-3. Chat — comportement GPS lors d'une déconnexion volontaire
-- Aucun changement de logique n'est nécessaire.
-- Lorsque l'utilisateur appuie sur « Déconnexion », NPF publie d'abord un message MQTT vide et `retain:true` sur son topic de position afin d'effacer sa dernière position conservée par le broker.
-- Le timer d'envoi GPS est ensuite arrêté avant fermeture du client MQTT.
-- Le réglage « localisation GPS » reste mémorisé sur ON si l'utilisateur l'avait laissé coché.
-- L'utilisateur n'est donc plus publié/visible comme position active pendant la déconnexion volontaire.
-- Lors de la prochaine connexion au Chat, le partage reprend automatiquement si le réglage GPS mémorisé est toujours sur ON.
-
-ÉLÉMENTS INCHANGÉS
-- Pérenne v2026.65 non modifiée.
-- SafeSky et ses compteurs.
-- Traits étiquette / trafic.
-- FdS / GAAR du jour uniquement.
-- VAC, cartes Online/Offline, GPS principal, plans d'eau, IndexedDB.
-- Aucun fichier NAS à remplacer.
-
-CONTRÔLES TECHNIQUES
-- Versions Index / Manifest / Script / Style / SW alignées sur v15.36.
-- Syntaxe JavaScript Script et SW contrôlée avec Node.
-- Manifest JSON contrôlé.
-- Exactement un bouton GLR et un bouton SafeSky présents dans l'Index.
-- Drapeau `NPF_GLOBAL_LINK_UI_ENABLED = true` contrôlé.
-- Fenêtre Chat v15.35 et ses champs GPS / Milan / Pseudo conservés.
-- Historique v15.35 et antérieur conservé intégralement et exactement ci-dessous.
-- Aucun secret d'authentification ajouté aux six fichiers publics.
-
-======================================================================
-HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
-======================================================================
-
-VERSION TEST v15.35 — CHAT : FENÊTRE DE CONFIGURATION AVANT CONNEXION
+VERSION PÉRENNE v2026.66 — CHAT : SUPPRESSION DE LA CONNEXION AUTOMATIQUE AU DÉMARRAGE
 Date : 15/08/2026
 Base : PÉRENNE v2026.65
 
 OBJECTIF
-- Lorsque l'utilisateur appuie sur « Connexion » dans la fenêtre Chat, ouvrir d'abord une fenêtre de configuration.
-- Demander dans cette fenêtre l'activation éventuelle de la localisation GPS, la confirmation du canal et le pseudo.
-- Mémoriser toutes les valeurs saisies pour les ouvertures et sessions suivantes.
+- Corriger le blocage observé dans la pérenne v2026.65 : à l'ouverture de la fenêtre Chat, l'état pouvait rester sur « Connexion... » sans permettre d'action.
+- Ne jamais lancer automatiquement le Chat après un démarrage ou rechargement complet de NPF.
+- Conserver les reconnexions automatiques utiles après une connexion volontaire pendant la session courante.
+
+CAUSE IDENTIFIÉE
+- La pérenne v2026.65 mémorisait l'intention de connexion dans `teamChatConnectionDesired`.
+- Si cette valeur était restée sur `true`, `initializeTeamChat()` la relisait au prochain démarrage.
+- NPF positionnait immédiatement l'état sur « Connexion... » puis appelait `reconnectIfNeeded()` et `connectToChat()`.
+- Pendant cet état de connexion, le bouton était désactivé.
+- Si le broker MQTT ou le réseau répondait mal, l'utilisateur pouvait donc rester bloqué sur « Connexion... ».
 
 MODIFICATIONS
-1. Nouvelle fenêtre « Connexion au chat »
-- Le bouton « Connexion » n'établit plus immédiatement la liaison MQTT lorsque le chat est hors ligne.
-- Il ouvre une fenêtre dédiée au-dessus du chat.
-- Si le chat est déjà connecté ou qu'une connexion est en cours/demandée, le même bouton garde son comportement de déconnexion.
+1. Démarrage du Chat toujours hors ligne
+- `chatConnectionDesired` est désormais initialisé à `false` à chaque nouveau chargement de la PWA.
+- La valeur persistante `teamChatConnectionDesired` est remise à `false` au démarrage.
+- Aucun ancien état `true` issu d'une version précédente ne peut donc déclencher une connexion automatique.
 
-2. « Activer localisation GPS »
-- La fenêtre contient la ligne exacte « Activer localisation GPS » avec une case à cocher.
-- La case commande le réglage existant de partage de position du Chat.
-- La valeur est mémorisée dans le stockage local existant `teamChatLocationSharing`.
-- Si elle est cochée au moment de la connexion, le partage GPS démarre automatiquement dès que la connexion au canal est établie.
-- Si elle est décochée, le partage reste désactivé.
-- Le bouton rapide « Position ON/OFF » du Chat reste disponible après connexion.
+2. Suppression de la restauration automatique au démarrage
+- Le bloc qui affichait « Connexion... » puis lançait `reconnectIfNeeded('Restauration du dernier état du chat.')` est supprimé.
+- Au démarrage, l'état du Chat est explicitement positionné sur « Hors ligne ».
+- Le bouton reste disponible et affiche « Connexion ».
 
-3. « Confirmer nom du Canal »
-- Le champ est maintenant présenté dans la fenêtre de connexion.
-- Au premier usage, il contient par défaut `Milan`.
-- Après modification, la valeur est mémorisée et rechargée aux ouvertures suivantes.
-- La règle existante de nom de canal est conservée : caractères non admis retirés lors de l'utilisation du canal.
+3. Reconnexion automatique conservée pendant la session
+- Lorsqu'un utilisateur appuie volontairement sur « Connexion », `setChatConnectionDesired(true)` reste utilisé.
+- Si le réseau disparaît puis revient pendant cette même session, `reconnectIfNeeded()` peut toujours reconnecter le Chat.
+- Le retour au premier plan peut également reconnecter après une perte de liaison.
+- Une déconnexion volontaire remet `chatConnectionDesired` à `false` et continue d'empêcher toute reconnexion.
 
-4. « Renseigner Pseudo »
-- Le champ est vide au premier usage.
-- Une fois renseigné, son contenu est mémorisé et rechargé aux ouvertures suivantes.
-- Le pseudo reste limité à 24 caractères comme auparavant.
-- La connexion n'est pas lancée tant qu'aucun pseudo n'est renseigné.
-
-5. Mémorisation immédiate
-- Canal et pseudo sont enregistrés au fil de la saisie dans `teamChatConfig`.
-- L'état de la case GPS est enregistré dès son changement.
-- Les valeurs restent donc mémorisées même si l'utilisateur ferme la fenêtre avec « Annuler », touche en dehors de la fenêtre ou utilise Échap.
-- « Valider et se connecter » applique les valeurs puis lance la connexion.
-
-6. Interface Chat
-- Les anciens champs Canal/Pseudo visibles en permanence dans le panneau principal du Chat sont retirés de cette ligne.
-- Ils existent désormais uniquement dans la fenêtre de connexion.
-- Le bouton technique « Valider » de l'ancienne configuration est conservé dans la logique pour compatibilité, mais n'est plus affiché.
-- Le reste de la fenêtre Chat, l'historique, les messages, présence, position des autres utilisateurs et notifications restent inchangés.
-
-ÉLÉMENTS INCHANGÉS
-- Base pérenne v2026.65.
-- SafeSky, GLR masqué, FdS / GAAR, VAC, cartes, GPS principal, plans d'eau, IndexedDB.
+4. Périmètre
+- Aucun changement de protocole MQTT.
+- Aucun changement des canaux, pseudos, messages, présence, GPS Chat ou notifications.
+- Aucun changement SafeSky.
+- GLR reste absent de l'interface pérenne comme en v2026.65.
 - Aucun fichier NAS à remplacer.
 
 CONTRÔLES TECHNIQUES
-- Versions Index / Manifest / Script / Style / SW alignées sur v15.35.
+- Versions Index / Manifest / Script / Style / SW alignées sur v2026.66.
 - Syntaxe JavaScript Script et SW contrôlée avec Node.
 - Manifest JSON contrôlé.
-- Présence d'un seul `chat-room-input` et d'un seul `chat-user-input`.
-- Canal par défaut `Milan` contrôlé dans l'Index et le Script.
-- Case GPS et mémorisation `teamChatLocationSharing` contrôlées.
-- Le clic « Connexion » hors ligne ouvre la fenêtre avant tout appel à `connectToChat()`.
+- Absence de toute restauration automatique du Chat au démarrage contrôlée.
+- `chatConnectionDesired` initialisé à `false` et stockage persistant réinitialisé à `false`.
+- Reconnexion réseau / retour premier plan toujours présente après connexion volontaire.
+- Bouton GLR toujours absent de l'Index pérenne.
 - Historique v2026.65 et antérieur conservé intégralement et exactement ci-dessous.
 - Aucun secret d'authentification ajouté aux six fichiers publics.
 
