@@ -1,3 +1,53 @@
+VERSION TEST v15.32 — TRAITS SAFESKY / GLR DE LA MÊME COULEUR QUE L'ICÔNE
+Date : 15/08/2026
+Base : TEST v15.31
+
+OBJECTIF
+- Faire correspondre exactement la couleur du trait de liaison à la couleur de l'icône du trafic associé, pour SafeSky comme pour GLR.
+
+MODIFICATIONS
+1. SafeSky — couleur dynamique du trait
+- NPF ne fixe plus une couleur unique au trait SafeSky.
+- Après rendu, NPF lit avec getComputedStyle() la couleur de fond réellement appliquée à l'icône du trafic.
+- Le trait reçoit immédiatement cette même couleur.
+- Les états existants sont donc suivis automatiquement :
+  • rouge lorsque l'icône SafeSky est rouge ;
+  • vert lorsque l'icône est verte ;
+  • bleu lorsque l'icône est bleue ;
+  • gris lorsque l'icône est grise.
+- Si la logique de couleur SafeSky évolue ultérieurement, le trait suivra automatiquement sans table de correspondance séparée.
+
+2. GLR — couleur identique au symbole
+- Trafic GLR frais : symbole vert #198754 et trait vert #198754.
+- Trafic GLR ancien : symbole orange #e67e22 et trait orange #e67e22.
+- La couleur est transmise au connecteur DOM par variable CSS.
+
+3. Lisibilité
+- Le halo blanc autour des traits SafeSky et GLR est conservé.
+- Le halo n'affecte pas la couleur centrale du trait ; il sert uniquement à garder la liaison visible sur tous les fonds de carte.
+
+ÉLÉMENTS INCHANGÉS
+- Géométrie centre étiquette -> centre icône pour SafeSky et GLR.
+- Fusion automatique SafeSky / GLR avec priorité SafeSky.
+- Normalisation et comparaison tolérante des indicatifs.
+- Compteurs SafeSky.
+- Anticollision GLR et suppression des éléments hors champ.
+- Cadence GLR 15 s.
+- FdS / GAAR, VAC, cartes, GPS, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.32.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Couleur SafeSky récupérée depuis le style calculé de l'icône.
+- Couleurs GLR alignées sur les valeurs exactes du symbole.
+- Historique v15.31 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.31 — TRAIT ÉTIQUETTE / TRAFIC POUR SAFESKY ET GLR
 Date : 15/08/2026
 Base : TEST v15.30
