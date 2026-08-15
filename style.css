@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.31 */
+/* NPF_STYLE_BUILD_VERSION: v15.32 */
 /* v15.27 TEST — liaisons GLR + compteurs SafeSky/GLR vert/jaune. */
 /* v15.26 TEST — GLR anticollision/toutes missions + FdS/GAAR strictement du jour. */
 /* v15.24 TEST — bouton FdS/GAAR groupé + GLR avec états SafeSky. */
@@ -14243,7 +14243,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     height: 4px !important;
     min-height: 4px !important;
     border-radius: 999px !important;
-    background: #0b2f6b !important;
+    background: var(--glr-connector-color, #198754) !important;
     box-shadow:
         0 0 0 2px rgba(255,255,255,.98),
         0 1px 4px rgba(0,0,0,.42) !important;
@@ -14251,10 +14251,6 @@ body.gaar-point-search-open .gaar-editing-banner {
     pointer-events: none !important;
     opacity: 1 !important;
     z-index: 1 !important;
-}
-
-.global-link-connector-marker .global-link-connector-line.stale {
-    background: #c05a00 !important;
 }
 
 
@@ -14272,7 +14268,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     height: 3px !important;
     min-height: 3px !important;
     border-radius: 999px !important;
-    background: #0b2f6b !important;
+    /* v15.32 : valeur de secours uniquement ; JS reprend la couleur calculée de l'icône. */
+    background: #64748b !important;
     box-shadow:
         0 0 0 2px rgba(255,255,255,.98),
         0 1px 4px rgba(0,0,0,.42) !important;
