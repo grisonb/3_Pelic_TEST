@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.39';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.40';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -4660,15 +4660,7 @@ function formatKilometers(value) {
 }
 
 function chooseNiceNauticalScale(maxNm) {
-    /*
-     * v15.38 — graduations intermédiaires demandées pour accompagner les
-     * nouveaux pas de zoom fractionnaires, sans créer de tuiles supplémentaires.
-     */
-    const candidates = [
-        0.1, 0.2, 0.5,
-        1, 2, 3, 4, 5, 7.5, 10, 15, 20,
-        50, 100, 200, 500
-    ];
+    const candidates = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
     let selected = candidates[0];
     for (const candidate of candidates) {
         if (candidate <= maxNm) selected = candidate;
@@ -5109,16 +5101,6 @@ function initMap() {
         attributionControl: false,
         zoomControl: false,
         maxZoom: GLOBAL_MAX_ZOOM,
-
-        /*
-         * v15.38 — quatre sous-niveaux entre deux zooms natifs.
-         * Leaflet conserve les mêmes tuiles entières et les met simplement
-         * à l'échelle entre deux niveaux : aucun nouveau niveau de tuiles
-         * n'est nécessaire dans les packs NPF.
-         */
-        zoomSnap: 0.25,
-        zoomDelta: 0.25,
-
  // v13.58 — iPad : moins d'animations Leaflet pour éviter les anciennes tuiles étirées/bleues après zoom.
         zoomAnimation: false,
         fadeAnimation: false,
@@ -5337,67 +5319,19 @@ function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
 }
 
 
-function countVisibleLoadedBaseTiles(options = {}) {
+function countVisibleLoadedBaseTiles() {
     if (!map || !baseTileLayer) return 0;
 
-    const currentLevelOnly = options.currentLevelOnly === true;
-
     try {
-        const mapRect = map.getContainer().getBoundingClientRect();
-        const currentTileZoom = Number(baseTileLayer._tileZoom);
-        let visibleLoaded = 0;
-
-        /*
-         * v15.39 — préférer le registre interne Leaflet : il permet de ne
-         * compter que les tuiles du niveau actuellement demandé. Avec les
-         * zooms fractionnaires, un ancien niveau peut encore être transformé
-         * et visible quelques instants ; il ne doit pas empêcher le secours.
-         */
-        if (baseTileLayer._tiles && typeof baseTileLayer._tiles === 'object') {
-            Object.values(baseTileLayer._tiles).forEach(record => {
-                const tile = record?.el;
-                const coords = record?.coords;
-                if (!tile || tile.style.display === 'none') return;
-
-                if (
-                    currentLevelOnly
-                    && Number.isFinite(currentTileZoom)
-                    && Number(coords?.z) !== currentTileZoom
-                ) {
-                    return;
-                }
-
-                const loaded = Boolean(
-                    record.loaded
-                    || tile.complete
-                    || tile.classList?.contains('leaflet-tile-loaded')
-                );
-                if (!loaded) return;
-
-                const rect = tile.getBoundingClientRect();
-                if (
-                    rect.width <= 1
-                    || rect.height <= 1
-                    || rect.right <= mapRect.left
-                    || rect.left >= mapRect.right
-                    || rect.bottom <= mapRect.top
-                    || rect.top >= mapRect.bottom
-                ) {
-                    return;
-                }
-
-                visibleLoaded += 1;
-            });
-
-            return visibleLoaded;
-        }
-
         const container = baseTileLayer.getContainer?.();
         if (!container) return 0;
 
+        const mapRect = map.getContainer().getBoundingClientRect();
         const tiles = container.querySelectorAll(
             'img.leaflet-tile.leaflet-tile-loaded'
         );
+
+        let visibleLoaded = 0;
 
         tiles.forEach(tile => {
             if (!tile || tile.style.display === 'none') return;
@@ -6704,13 +6638,7 @@ window.getNpfTilePerformanceStatus = function getNpfTilePerformanceStatus() {
         blobCacheMax: DIRECT_OFFLINE_TILE_CACHE_MAX,
         tileHits: directOfflineTileHitCount,
         tileMisses: directOfflineTileMissCount,
-        visibleLoadedTiles: countVisibleLoadedBaseTiles(),
-        visibleLoadedCurrentLevelTiles:
-            countVisibleLoadedBaseTiles({ currentLevelOnly: true }),
-        mapZoom: map?.getZoom?.() ?? null,
-        tileZoom: baseTileLayer?._tileZoom ?? null,
-        zoomSnap: map?.options?.zoomSnap ?? null,
-        zoomDelta: map?.options?.zoomDelta ?? null
+        visibleLoadedTiles: countVisibleLoadedBaseTiles()
     };
 };
 
@@ -6843,80 +6771,7 @@ async function findDirectOfflineTileBlob(coords) {
 }
 
 function buildDirectOfflineLeafletLayer(options = {}) {
-    const useNpfFractionalNativeZoom =
-        isNpfOfflinePackSelection()
-        && Number(map?.options?.zoomSnap) > 0
-        && Number(map?.options?.zoomSnap) < 1;
-
     const DirectOfflineGridLayer = L.GridLayer.extend({
-        /*
-         * v15.39 — Leaflet arrondit normalement le zoom de carte pour choisir
-         * `_tileZoom`. Avec zoomSnap=0.25, z8.50 peut donc basculer sur les
-         * tuiles z9, ce qui relance trop tôt une lecture complète IndexedDB.
-         *
-         * Pour NPF Offline uniquement, on conserve le niveau natif inférieur
-         * pendant tous les quarts intermédiaires :
-         * 8.00 / 8.25 / 8.50 / 8.75 => tuiles z8
-         * 9.00 / 9.25 / ...       => tuiles z9
-         *
-         * Les méthodes internes Leaflet restent inchangées en dehors du choix
-         * de tileZoom. Les autres packs utilisent le comportement standard.
-         */
-        _setView(center, zoom, noPrune, noUpdate) {
-            if (
-                !useNpfFractionalNativeZoom
-                || !Number.isFinite(Number(zoom))
-            ) {
-                return L.GridLayer.prototype._setView.call(
-                    this,
-                    center,
-                    zoom,
-                    noPrune,
-                    noUpdate
-                );
-            }
-
-            let tileZoom = Math.floor(Number(zoom) + 1e-7);
-
-            if (
-                (this.options.maxZoom !== undefined
-                    && tileZoom > this.options.maxZoom)
-                || (this.options.minZoom !== undefined
-                    && tileZoom < this.options.minZoom)
-            ) {
-                tileZoom = undefined;
-            } else {
-                tileZoom = this._clampZoom(tileZoom);
-            }
-
-            const tileZoomChanged =
-                this.options.updateWhenZooming
-                && (tileZoom !== this._tileZoom);
-
-            if (!noUpdate || tileZoomChanged) {
-                this._tileZoom = tileZoom;
-
-                if (this._abortLoading) {
-                    this._abortLoading();
-                }
-
-                this._updateLevels();
-                this._resetGrid();
-
-                if (tileZoom !== undefined) {
-                    this._update(center);
-                }
-
-                if (!noPrune) {
-                    this._pruneTiles();
-                }
-
-                this._noPrune = noPrune;
-            }
-
-            this._setZoomTransforms(center, zoom);
-        },
-
         createTile(coords, done) {
             const tile = document.createElement('img');
             tile.alt = '';
@@ -7010,9 +6865,7 @@ function setupBaseTileLayer() {
         minZoom: effectiveMinZoom,
         maxZoom: effectiveMaxZoom,
         attribution: '© OpenStreetMap',
-        keepBuffer: isNpfDirectOfflineLayer
-            ? Math.max(8, OFFLINE_TILE_KEEP_BUFFER)
-            : OFFLINE_TILE_KEEP_BUFFER,
+        keepBuffer: OFFLINE_TILE_KEEP_BUFFER,
         updateWhenZooming: false,
 
         /*
