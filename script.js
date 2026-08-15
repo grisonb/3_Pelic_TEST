@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.41';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.42';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -717,6 +717,19 @@ const VAC_EXPECTED_COUNT_KEY = 'npfVacExpectedCountV1';
 const VAC_REMOTE_CYCLE_KEY = 'npfVacRemoteCycleV1';
 const VAC_REMOTE_TOTAL_SIZE_KEY = 'npfVacRemoteTotalSizeV1';
 const VAC_LAST_SUCCESSFUL_SYNC_KEY = 'npfVacLastSuccessfulSyncV1';
+
+/*
+ * v15.42 — correction transitoire Dole-Tavaux.
+ * Le dépôt NPF-Q400-VAC a été généré depuis l'ancienne référence v14.92,
+ * dans laquelle Dole était encore associé à tort à LFSJ. La VAC locale LFSJ
+ * ne doit surtout pas être réutilisée pour LFGJ (LFSJ = Sedan-Douzy).
+ * Tant que le dépôt VAC n'a pas été régénéré avec LFGJ, l'ouverture en ligne
+ * de Dole utilise le lien stable officiel SIA. Les autres VAC restent strictement
+ * inchangées et continuent d'utiliser IndexedDB hors ligne.
+ */
+const VAC_ONLINE_FALLBACK_URLS = Object.freeze({
+    LFGJ: 'https://www.sia.aviation-civile.gouv.fr/documents/download/f/d/14983863/'
+});
 
 let vacDb = null;
 let vacSyncInProgress = false;
@@ -17202,6 +17215,16 @@ async function openVacPdf(oaci) {
     try {
         const record = await getVacRecord(safeOaci);
         if (!record || !(record.blob instanceof Blob)) {
+            const onlineFallbackUrl = VAC_ONLINE_FALLBACK_URLS[safeOaci] || '';
+            if (onlineFallbackUrl && navigator.onLine) {
+                if (openedWindow) {
+                    openedWindow.location.href = onlineFallbackUrl;
+                } else {
+                    window.location.href = onlineFallbackUrl;
+                }
+                return true;
+            }
+
             try {
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
             } catch (_) {}
@@ -17228,8 +17251,16 @@ async function openVacPdf(oaci) {
 
 function buildVacButtonHtml(oaci) {
     const safeOaci = normalizeVacOaci(oaci);
-    if (!safeOaci || !vacInstalledOaciSet.has(safeOaci)) return '';
-    return `<div class="popup-buttons popup-vac-buttons"><button type="button" class="vac-btn" onclick="window.openVacPdf('${safeOaci}')">VAC</button></div>`;
+    if (!safeOaci) return '';
+
+    const hasLocalVac = vacInstalledOaciSet.has(safeOaci);
+    const hasOnlineFallback = Boolean(VAC_ONLINE_FALLBACK_URLS[safeOaci] && navigator.onLine);
+    if (!hasLocalVac && !hasOnlineFallback) return '';
+
+    const title = hasLocalVac
+        ? `VAC ${safeOaci} hors ligne`
+        : `VAC ${safeOaci} — ouverture SIA en ligne`;
+    return `<div class="popup-buttons popup-vac-buttons"><button type="button" class="vac-btn" title="${title}" onclick="window.openVacPdf('${safeOaci}')">VAC</button></div>`;
 }
 
 function closeVacUpdatePrompt() {
