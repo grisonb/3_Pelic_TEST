@@ -1,3 +1,186 @@
+VERSION TEST v15.35 — CHAT : FENÊTRE DE CONFIGURATION AVANT CONNEXION
+Date : 15/08/2026
+Base : PÉRENNE v2026.65
+
+OBJECTIF
+- Lorsque l'utilisateur appuie sur « Connexion » dans la fenêtre Chat, ouvrir d'abord une fenêtre de configuration.
+- Demander dans cette fenêtre l'activation éventuelle de la localisation GPS, la confirmation du canal et le pseudo.
+- Mémoriser toutes les valeurs saisies pour les ouvertures et sessions suivantes.
+
+MODIFICATIONS
+1. Nouvelle fenêtre « Connexion au chat »
+- Le bouton « Connexion » n'établit plus immédiatement la liaison MQTT lorsque le chat est hors ligne.
+- Il ouvre une fenêtre dédiée au-dessus du chat.
+- Si le chat est déjà connecté ou qu'une connexion est en cours/demandée, le même bouton garde son comportement de déconnexion.
+
+2. « Activer localisation GPS »
+- La fenêtre contient la ligne exacte « Activer localisation GPS » avec une case à cocher.
+- La case commande le réglage existant de partage de position du Chat.
+- La valeur est mémorisée dans le stockage local existant `teamChatLocationSharing`.
+- Si elle est cochée au moment de la connexion, le partage GPS démarre automatiquement dès que la connexion au canal est établie.
+- Si elle est décochée, le partage reste désactivé.
+- Le bouton rapide « Position ON/OFF » du Chat reste disponible après connexion.
+
+3. « Confirmer nom du Canal »
+- Le champ est maintenant présenté dans la fenêtre de connexion.
+- Au premier usage, il contient par défaut `Milan`.
+- Après modification, la valeur est mémorisée et rechargée aux ouvertures suivantes.
+- La règle existante de nom de canal est conservée : caractères non admis retirés lors de l'utilisation du canal.
+
+4. « Renseigner Pseudo »
+- Le champ est vide au premier usage.
+- Une fois renseigné, son contenu est mémorisé et rechargé aux ouvertures suivantes.
+- Le pseudo reste limité à 24 caractères comme auparavant.
+- La connexion n'est pas lancée tant qu'aucun pseudo n'est renseigné.
+
+5. Mémorisation immédiate
+- Canal et pseudo sont enregistrés au fil de la saisie dans `teamChatConfig`.
+- L'état de la case GPS est enregistré dès son changement.
+- Les valeurs restent donc mémorisées même si l'utilisateur ferme la fenêtre avec « Annuler », touche en dehors de la fenêtre ou utilise Échap.
+- « Valider et se connecter » applique les valeurs puis lance la connexion.
+
+6. Interface Chat
+- Les anciens champs Canal/Pseudo visibles en permanence dans le panneau principal du Chat sont retirés de cette ligne.
+- Ils existent désormais uniquement dans la fenêtre de connexion.
+- Le bouton technique « Valider » de l'ancienne configuration est conservé dans la logique pour compatibilité, mais n'est plus affiché.
+- Le reste de la fenêtre Chat, l'historique, les messages, présence, position des autres utilisateurs et notifications restent inchangés.
+
+ÉLÉMENTS INCHANGÉS
+- Base pérenne v2026.65.
+- SafeSky, GLR masqué, FdS / GAAR, VAC, cartes, GPS principal, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.35.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Présence d'un seul `chat-room-input` et d'un seul `chat-user-input`.
+- Canal par défaut `Milan` contrôlé dans l'Index et le Script.
+- Case GPS et mémorisation `teamChatLocationSharing` contrôlées.
+- Le clic « Connexion » hors ligne ouvre la fenêtre avant tout appel à `connectToChat()`.
+- Historique v2026.65 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION PÉRENNE v2026.65 — CORRECTION STRUCTURELLE : BOUTON GLR SUPPRIMÉ / SAFESKY À SA PLACE
+Date : 15/08/2026
+Base : PÉRENNE v2026.64
+
+OBJECTIF
+- Corriger définitivement la présence visuelle persistante de l'icône GLR.
+- Ne plus dépendre d'un attribut `hidden` ou d'une règle CSS pour masquer ce bouton.
+- Faire occuper physiquement à SafeSky la position libérée.
+
+MODIFICATIONS
+1. Bouton GLR supprimé du HTML
+- Le bloc `<button id="global-link-layer-button">...</button>` est entièrement supprimé de l'Index.
+- Le bouton GLR n'existe donc plus dans le DOM.
+- Il ne peut plus réapparaître à cause d'une ancienne règle CSS, d'un `display:flex !important`, du cache de style ou d'une interaction entre `hidden` et les styles auteur.
+
+2. SafeSky prend réellement sa place
+- Le bouton SafeSky existant reste unique.
+- Comme il suit directement FdS/GAAR dans le conteneur des commandes carte, il occupe maintenant physiquement la position précédemment utilisée par GLR.
+- Aucune copie de l'icône SafeSky n'est créée.
+- Toute la logique SafeSky, ses états et ses compteurs restent inchangés.
+
+3. GLR conservé mais sans interface
+- Le code GLR reste présent dans Script pour une réactivation future.
+- `NPF_GLOBAL_LINK_UI_ENABLED = false` reste actif.
+- GLR est forcé OFF au démarrage, son timer est arrêté et sa couche est vidée.
+- L'absence du bouton est gérée sans erreur : `getElementById('global-link-layer-button')` peut retourner `null`.
+
+4. Nettoyage
+- La règle CSS finale servant uniquement à cacher le bouton GLR est supprimée puisqu'elle n'est plus nécessaire.
+- Les anciennes règles fonctionnelles GLR restent dans la feuille de style pour une éventuelle réactivation future.
+
+ÉLÉMENTS INCHANGÉS
+- Base fonctionnelle v2026.64.
+- SafeSky et ses deux compteurs.
+- Traits étiquette / trafic.
+- FdS / GAAR du jour uniquement.
+- VAC, cartes Online/Offline, GPS, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v2026.65.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Vérification : aucun `id="global-link-layer-button"` dans l'Index.
+- Vérification : exactement un `id="traffic-layer-button"` dans l'Index.
+- GLR forcé OFF dans Script.
+- Historique v2026.64 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret ou identifiant d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION PÉRENNE v2026.64 — BASE v15.34 / SAFESKY VISIBLE / GLR TEMPORAIREMENT MASQUÉ
+Date : 15/08/2026
+Base : TEST v15.34
+
+OBJECTIF
+- Passer la branche validée jusqu'à la TEST v15.34 en version pérenne.
+- Conserver toutes les corrections SafeSky, FdS / GAAR, règle deux doigts, carte et trafic intégrées depuis la précédente version pérenne.
+- Masquer temporairement l'accès GLR sur la carte et laisser SafeSky reprendre son emplacement visuel.
+
+PASSAGE EN VERSION PÉRENNE
+- Version applicative portée à `v2026.64` dans Index, Manifest, Script, Style et Service Worker.
+- Service Worker porté à `sw-v2026-64_perenne_safesky_primary_glr_hidden`.
+- Marqueurs/commentaires explicitement TEST retirés des fichiers de code de production lorsque cela n'affecte pas la logique.
+- Aucun historique TEST n'est supprimé du présent fichier Modifications : l'historique v15.34 et tous les historiques antérieurs sont conservés intégralement ci-dessous.
+
+MODIFICATIONS SPÉCIFIQUES v2026.64
+1. Interface trafic — GLR temporairement masqué
+- Le bouton `global-link-layer-button` reste présent dans le DOM pour une réactivation future.
+- Il est masqué par l'attribut `hidden` et par `display:none !important`.
+- Il est retiré de la navigation clavier avec `tabindex=-1` et `aria-hidden=true`.
+
+2. SafeSky reprend la place de GLR
+- Aucun second bouton SafeSky n'est créé.
+- Le bouton SafeSky existant conserve toute sa logique, ses états et ses deux compteurs.
+- La disparition visuelle du bouton GLR fait automatiquement remonter SafeSky dans l'emplacement auparavant occupé par GLR.
+- Bulle jaune à gauche : trafics de la liste suivie détectés.
+- Bulle verte à droite : totalité des trafics SafeSky éligibles.
+
+3. GLR neutralisé tant que son accès est masqué
+- La logique GLR reste dans le code pour une réactivation ultérieure.
+- `NPF_GLOBAL_LINK_UI_ENABLED = false` neutralise temporairement son interface.
+- Une valeur `localStorage` provenant d'une TEST antérieure ne peut pas laisser GLR actif sans bouton visible.
+- Au démarrage : GLR est forcé sur OFF, son timer est arrêté, sa couche est vidée et l'état mémorisé est remis à 0.
+- Aucun rafraîchissement périodique GLR n'est lancé tant que l'interface reste masquée.
+
+4. Base fonctionnelle v15.34 conservée
+- Fusion automatique SafeSky / GLR conservée dans le code pour une future réactivation.
+- Comparaison générique des indicatifs conservée.
+- Traits étiquette / trafic SafeSky et GLR conservés dans le code.
+- Compteurs SafeSky conservés.
+- FdS / GAAR strictement limités aux documents de la date du jour.
+- VAC, cartes Online/Offline, GPS, plans d'eau, IndexedDB et données utilisateur inchangés.
+
+FICHIERS NAS
+- Aucun changement NAS dans cette version.
+- Les PHP déjà en place ne doivent pas être remplacés.
+
+CONTRÔLES TECHNIQUES
+- Syntaxe JavaScript Script et Service Worker contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Versions actives croisées : v2026.64.
+- Marqueur Style : v2026.64.
+- Validation atomique du Service Worker sur Index / Script / Style / Manifest conservée.
+- Bouton GLR masqué dans Index ET Style.
+- Initialisation GLR forcée à OFF lorsque l'interface est désactivée.
+- Un seul bouton SafeSky conservé et visible.
+- Historique v15.34 et antérieur conservé intégralement, exactement après la présente section.
+- Recherche de données d'authentification sensibles dans les six fichiers publics : aucune donnée ajoutée.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.34 — CORRECTION RÉELLE DE VISIBILITÉ DES TRAITS SAFESKY / GLR
 Date : 15/08/2026
 Base : TEST v15.33
