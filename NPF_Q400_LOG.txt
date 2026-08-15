@@ -1,3 +1,121 @@
+VERSION TEST v15.31 — TRAIT ÉTIQUETTE / TRAFIC POUR SAFESKY ET GLR
+Date : 15/08/2026
+Base : TEST v15.30
+
+OBJECTIF
+- Corriger la demande : le trait de liaison doit exister pour SafeSky ET GLR.
+- Conserver la fusion automatique SafeSky / GLR de la v15.30.
+
+MODIFICATIONS
+1. GLR
+- Le connecteur DOM v15.30 est conservé.
+- Il relie le centre de l'étiquette GLR au centre du symbole GLR.
+
+2. SafeSky
+- Ajout d'un connecteur DOM pour chaque trafic SafeSky possédant une étiquette visible.
+- NPF mesure directement dans le navigateur le rectangle réellement rendu du symbole et celui de l'étiquette.
+- Le trait relie donc le centre réel de l'icône au centre réel de l'étiquette, quelle que soit sa position autour du trafic.
+- Trait bleu foncé de 3 px avec halo blanc de 2 px.
+- Le trait reste derrière l'icône et derrière l'étiquette.
+- Si les étiquettes SafeSky sont masquées, le trait n'est pas créé.
+
+3. Mise à jour du trait SafeSky
+- Recalcul après création du marqueur.
+- Recalcul après mise à jour de l'icône.
+- Double recalcul requestAnimationFrame pour tenir compte du rendu WebKit/iPad.
+- Recalcul pendant le lissage de position.
+- Recalcul après zoom, déplacement et redimensionnement de la carte.
+
+ÉLÉMENTS INCHANGÉS
+- Fusion automatique SafeSky/GLR v15.30 et priorité SafeSky.
+- Normalisation des indicatifs et rapprochement tolérant.
+- Compteurs SafeSky.
+- Anticollision et affichage GLR uniquement dans l'emprise.
+- Cadence GLR 15 s.
+- FdS / GAAR, VAC, cartes, GPS, plans d'eau, IndexedDB.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.31.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Connecteurs GLR et SafeSky présents.
+- Historique v15.30 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
+VERSION TEST v15.30 — FUSION AUTOMATIQUE SAFESKY / GLR + TRAIT GLR DOM
+Date : 15/08/2026
+Base : TEST v15.29
+
+OBJECTIF
+- Eviter le double affichage d'un même aéronef lorsque SafeSky et GLR sont activés simultanément.
+- Donner la priorité visuelle à SafeSky.
+- Reconnaître automatiquement les variantes usuelles d'indicatifs entre les deux sources.
+- Corriger définitivement le trait GLR invisible sur l'iPad en abandonnant le rendu polyline SVG/canvas.
+
+MODIFICATIONS
+1. SafeSky / GLR — priorité SafeSky
+- Lorsque les deux couches sont actives, NPF construit la liste des trafics réellement rendus par SafeSky.
+- Chaque trafic GLR visible dans l'emprise est comparé à cette liste.
+- En cas de correspondance, l'icône, l'étiquette et le trait GLR sont masqués : seul le trafic SafeSky reste affiché.
+- Si le trafic SafeSky n'est pas réellement rendu (absent, filtré ou couche SafeSky désactivée), le trafic GLR reste affiché.
+- A la désactivation de SafeSky, les trafics GLR précédemment fusionnés réapparaissent immédiatement.
+- A chaque nouveau rendu SafeSky, GLR est réconcilié immédiatement.
+
+2. Appariement automatique des indicatifs
+- Les indicatifs sont convertis en majuscules.
+- Espaces, tirets, ponctuation et séparateurs sont ignorés.
+- Correspondance exacte après normalisation :
+  • MILAN80 = MILAN 80 ;
+  • PELICAN45 = PELICAN 45.
+- Correspondance tolérante lorsque le numéro final est strictement identique :
+  • le préfixe doit avoir au moins 4 caractères ;
+  • une seule insertion, suppression ou substitution est acceptée.
+- Exemple explicitement pris en charge :
+  • SafeSky DRAGO13 = GLR DRAGON 13.
+- Les numéros différents ne sont jamais rapprochés : MILAN75 ne peut pas correspondre à MILAN76.
+- Aucun filtrage par une liste fixe de mots MILAN/DRAGON/PUMA/etc. n'est utilisé : la logique est générique.
+
+3. Diagnostic des appariements
+- NPF conserve la liste des correspondances GLR/SafeSky détectées avec les deux indicatifs, le mode de comparaison et, lorsqu'elle est calculable, leur distance.
+- Cette liste est disponible sans encombrer l'interface via getGlobalLinkSafeSkyMatches() dans la console.
+- Le compteur GLR représente désormais les icônes GLR réellement affichées après fusion.
+- Le titre du compteur GLR indique aussi combien de trafics ont été fusionnés avec SafeSky.
+
+4. GLR — trait étiquette / trafic
+- Les polylines Leaflet des v15.27-v15.29 sont remplacées par un connecteur DOM.
+- Le connecteur est placé dans le même pane Leaflet que les marqueurs GLR, ce qui évite les problèmes de renderer SVG/canvas observés sur l'iPad.
+- Le segment est calculé en pixels entre le centre exact du symbole trafic et le centre exact de l'étiquette.
+- Il est positionné à leur milieu puis orienté suivant l'angle entre les deux centres.
+- Trait bleu foncé de 4 px pour un trafic frais, orange pour un trafic ancien.
+- Halo blanc de 2 px et ombre pour rester lisible sur tous les fonds.
+- Le connecteur est placé derrière le symbole et l'étiquette par zIndexOffset négatif.
+
+ÉLÉMENTS INCHANGÉS
+- Anticollision et suppression des étiquettes GLR hors champ de la v15.28.
+- Cadence GLR : 15 secondes.
+- Authentification et relais NAS GLR.
+- Bulles SafeSky corrigées en v15.29 : jaune gauche = liste suivie détectée, vert droite = totalité.
+- SafeSky : cadence, filtres, popups et suivi.
+- FdS / GAAR, VAC, cartes Online/Offline, GPS, plans d'eau, IndexedDB et données utilisateur.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.30.
+- Syntaxe JavaScript Script et SW contrôlée.
+- Manifest JSON contrôlé.
+- Appariement MILAN80 / MILAN 80 contrôlé.
+- Appariement DRAGO13 / DRAGON 13 contrôlé.
+- Non-appariement MILAN75 / MILAN76 contrôlé.
+- Historique v15.29 et antérieur conservé intégralement ci-dessous.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.29 — COMPTEURS SAFESKY CORRIGÉS / LIAISONS GLR RENFORCÉES
 Date : 13/08/2026
 Base : TEST v15.28
