@@ -1,5 +1,14 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.31';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.32';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
+
+// =========================================================================
+// v15.32 TEST — couleur des traits identique à l'icône trafic
+// - SafeSky : le connecteur lit dynamiquement la couleur réellement calculée
+//   de l'icône (rouge / vert / bleu / gris selon son état) ;
+// - GLR : le connecteur reprend exactement la couleur du symbole GLR
+//   (vert trafic frais / orange trafic ancien) ;
+// - halo blanc conservé uniquement pour la lisibilité.
+// =========================================================================
 
 // =========================================================================
 // v15.31 TEST — trait étiquette <-> trafic pour SafeSky ET GLR
@@ -15047,12 +15056,27 @@ function updateTrafficMarkerLabelConnector(marker) {
     const midpointY = (y1 + y2) / 2;
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
 
+    /*
+     * v15.32 — le trait doit être exactement de la même couleur que l'icône.
+     * On lit la couleur réellement calculée par WebKit après application des
+     * classes d'altitude SafeSky, plutôt que de dupliquer la logique couleur.
+     */
+    const computedSymbolStyle = window.getComputedStyle(symbol);
+    const symbolColor = computedSymbolStyle.backgroundColor
+        || computedSymbolStyle.color
+        || '#64748b';
+
     connector.style.display = 'block';
     connector.style.width = `${length.toFixed(1)}px`;
     connector.style.left = `${midpointX.toFixed(1)}px`;
     connector.style.top = `${midpointY.toFixed(1)}px`;
     connector.style.transform =
         `translate(-50%, -50%) rotate(${angle.toFixed(2)}deg)`;
+    connector.style.setProperty(
+        'background-color',
+        symbolColor,
+        'important'
+    );
 }
 
 function scheduleTrafficMarkerLabelConnector(marker) {
@@ -18982,10 +19006,17 @@ function renderGlobalLinkPositions(positions) {
                 const connectorClass = item.stale
                     ? ' stale'
                     : '';
+                /*
+                 * v15.32 — mêmes couleurs que le symbole GLR défini dans le
+                 * style : #198754 (frais) / #e67e22 (ancien).
+                 */
+                const connectorColor = item.stale
+                    ? '#e67e22'
+                    : '#198754';
 
                 const connectorIcon = L.divIcon({
                     className: 'global-link-connector-marker',
-                    html: `<span class="global-link-connector-line${connectorClass}" style="width:${lengthPx.toFixed(1)}px;transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(2)}deg);"></span>`,
+                    html: `<span class="global-link-connector-line${connectorClass}" style="--glr-connector-color:${connectorColor};width:${lengthPx.toFixed(1)}px;transform:translate(-50%,-50%) rotate(${angleDeg.toFixed(2)}deg);"></span>`,
                     iconSize: [1, 1],
                     iconAnchor: [0.5, 0.5]
                 });
