@@ -1,3 +1,47 @@
+VERSION TEST v15.41 — CORRECTION OACI DOLE-TAVAUX
+Date : 15/08/2026
+Base : TEST v15.40
+
+OBJECTIF
+- Corriger le code OACI erroné associé à Dole-Tavaux dans la branche TEST.
+
+MODIFICATIONS
+1. Dole-Tavaux
+- Correction du code OACI : `LFSJ` → `LFGJ`.
+- Correction effectuée dans l'entrée aérodrome Dole-Tavaux.
+- Correction effectuée dans les données de piste 05/23 associées à Dole-Tavaux.
+
+2. Préservation de LFSJ
+- L'entrée `LFSJ` correspondant à Sedan-Douzy est conservée et n'est pas modifiée.
+
+ÉLÉMENTS INCHANGÉS
+- Comportement de zoom identique à la v15.40.
+- Optimisations de performances carte NPF v15.37 conservées.
+- GLR reste présent dans la branche TEST.
+- SafeSky.
+- Chat.
+- Routes / communes / départements.
+- GPS.
+- FdS / GAAR.
+- VAC.
+- Pérenne non modifiée.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.41.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- Dole-Tavaux présent sous `LFGJ` dans les deux sources concernées.
+- Absence de Dole-Tavaux sous `LFSJ`.
+- LFSJ Sedan-Douzy conservé.
+- Historique v15.40 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.40 — ABANDON DES ZOOMS FRACTIONNAIRES / RETOUR AUX ZOOMS INITIAUX
 Date : 15/08/2026
 Base : TEST v15.39
