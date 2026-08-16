@@ -1,3 +1,36 @@
+VERSION TEST v15.46 — ICÔNE POSITION PROPRE Q400 JAUNE À CONTOUR NOIR
+Date : 16/08/2026
+Base : TEST v15.45
+
+OBJECTIF
+- Reprendre exactement le principe visuel validé : silhouette de Dash 8 Q400 vue de dessus, pleine jaune vif, avec contour noir.
+- Rendre l’icône de position propre sensiblement plus grande que dans v15.45 afin qu’elle soit immédiatement identifiable sur la carte.
+
+MODIFICATIONS
+1. Icône de position propre
+- La silhouette Q400 de v15.45 est remplacée par la forme visuelle validée : fuselage long, ailes droites, empennage de Dash et deux turbopropulseurs vus de dessus.
+- Remplissage jaune vif conservé.
+- Ajout d’un contour noir franc autour de toute la silhouette pour augmenter fortement le contraste sur les cartes NPF et OACI.
+- Aucun disque, halo coloré ou pictogramme de police n’est ajouté autour de l’avion.
+- La silhouette utilisée par NPF est intégrée directement dans le Script afin de ne nécessiter aucun fichier image supplémentaire lors du déploiement.
+
+2. Taille et orientation
+- L’icône passe d’environ 36 px à 48 px : elle est donc environ 33 % plus grande que dans v15.45.
+- Le point d’ancrage Leaflet est ajusté pour conserver la position GPS au même endroit.
+- La silhouette pointe nativement vers le nord et continue de tourner selon la route GPS réelle.
+
+3. Continuité
+- Étiquettes des autres pélicandromes bleues #00A8FF conservées.
+- Pélicandrome sélectionné / le plus proche vert clair #39FF14 conservé.
+- Routes Feu → pélicandromes épaisses, opaques et bordées de blanc conservées.
+- Route pointillée Feu → Base épaissie et bordée de blanc conservée.
+- Migration automatique ciblée VAC Dole LFSJ → LFGJ conservée.
+- Déduplication « mon avion » SafeSky / GLR conservée.
+- Sur-zoom OACI jusqu’au niveau ≈ 2 NM conservé.
+- Aucun changement NAS.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.45 — ÉTIQUETTES PÉLICANDROMES / SILHOUETTE Q400 / MIGRATION VAC DOLE
 Date : 16/08/2026
 Base : TEST v15.44
