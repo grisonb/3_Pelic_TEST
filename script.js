@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.43';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.44';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -16357,14 +16357,29 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         layer = lftwRouteLayer;
     } else if (oaci) {
         const isSelected = selectedPelicanOACI === oaci;
-        /* v15.43 — couleurs très vives, sans changement d'épaisseur. */
-        color = isSelected ? '#ffea00' : '#00e5ff';
+        /* v15.44 — routes pélicandromes : couleur vive + bord blanc, 100 % opaque. */
+        color = isSelected ? '#39ff14' : '#00a8ff';
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon' : 'route-tooltip route-tooltip-near-icon';
         labelText = `<div class="route-label-oaci">${oaci}</div><div class="route-label-sub">${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</div>`;
 
-        L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 1 }).addTo(layer);
+        L.polyline([startLatLng, endLatLng], {
+            color: '#ffffff',
+            weight: 9,
+            opacity: 1,
+            interactive: false,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(layer);
+        L.polyline([startLatLng, endLatLng], {
+            color,
+            weight: 5,
+            opacity: 1,
+            interactive: false,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(layer);
 
-        const hitbox = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 20, opacity: 0 }).addTo(layer);
+        const hitbox = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 24, opacity: 0 }).addTo(layer);
         const selectPelicRoute = (event) => {
             try {
                 if (event && event.originalEvent && typeof event.originalEvent.stopPropagation === 'function') {
@@ -16418,7 +16433,29 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         return;
     }
 
-    L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
+    if (isLftwRoute) {
+        /* v15.44 — route Feu -> Base : pointillés plus épais et bordés de blanc. */
+        L.polyline([startLatLng, endLatLng], {
+            color: '#ffffff',
+            weight: 9,
+            opacity: 1,
+            dashArray,
+            interactive: false,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(layer);
+        L.polyline([startLatLng, endLatLng], {
+            color,
+            weight: 5,
+            opacity: 1,
+            dashArray,
+            interactive: false,
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(layer);
+    } else {
+        L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8, dashArray }).addTo(layer);
+    }
 
     if (isLftwRoute) {
         const tooltipOptions = getRouteLabelNearAirportOptions(startLatLng, endLatLng, 'base');
@@ -22072,7 +22109,7 @@ function buildOwnGpsIcon(altitudeLabel = '', options = {}) {
 
     return L.divIcon({
         className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}${isSimulation ? ' own-gps-simulation-icon' : ''}`,
-        html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈</span></div>`,
+        html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈︎</span></div>`,
         iconSize: [74, 58],
         iconAnchor: [37, 38]
     });
