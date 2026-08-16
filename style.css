@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.42 */
+/* NPF_STYLE_BUILD_VERSION: v15.43 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14397,3 +14397,52 @@ body.gaar-point-search-open .gaar-editing-banner {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==========================================================================
+   v15.43 — CARTES : bouton de réinitialisation seul et centré
+   ========================================================================== */
+#offline-map-modal .offline-map-reset-line {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 8px 0 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+#offline-map-modal .offline-map-reset-line .offline-full-reset-btn {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+
+/* ==========================================================================
+   v15.43 — position propre : couleurs vives, dimensions inchangées
+   ========================================================================== */
+.own-gps-plane-body {
+    background: rgba(255, 0, 212, 0.28) !important;
+    border-color: #ffffff !important;
+    box-shadow:
+        0 0 0 2px #111827,
+        0 0 9px rgba(255, 0, 212, 0.95),
+        0 2px 10px rgba(0,0,0,.50) !important;
+}
+
+.own-gps-plane-shape {
+    color: #ff00d4 !important;
+    text-shadow:
+        -1px -1px 0 #ffffff,
+         1px -1px 0 #ffffff,
+        -1px  1px 0 #ffffff,
+         1px  1px 0 #ffffff,
+         0 0 4px #111827 !important;
+}
+
+.own-gps-plane-altitude {
+    border-color: #ff00d4 !important;
+}
+
