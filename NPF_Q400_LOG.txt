@@ -1,3 +1,150 @@
+VERSION TEST v15.47 — DONNÉES AÉRONAUTIQUES SIA / FILTRES INDÉPENDANTS / AVION PRIORITAIRE
+Date : 16/08/2026
+Base : TEST v15.46
+Source de données test : export officiel SIA AIRAC 08/26 fourni par l'utilisateur
+Fichier principal traité : AIXM4.5_all_FR_OM_2026-08-06.xml
+Date d'effet : 06/08/2026
+Révision source : v04
+
+OBJECTIFS
+- Intégrer une première version réellement exploitable des données aéronautiques SIA hors ligne dans NPF.
+- Permettre d'activer ou masquer séparément chaque famille de données retenue.
+- Ne pas intégrer les points IFR Dpn de type ICAO.
+- Ne pas modifier le clic court du bouton de changement de carte : l'appui long ouvre les filtres SIA.
+- Garantir que l'icône de position propre reste au-dessus de toutes les autres icônes de la carte.
+- Rendre le jaune de l'icône Q400 nettement plus vif sans modifier sa forme validée.
+
+MODIFICATIONS
+
+1. Base SIA intégrée pour cette phase TEST
+- 5 066 objets Ase (espaces aériens et zones) sont conservés.
+- 4 452 géométries directes Abd sont exploitées.
+- 597 définitions dérivées Adg sont exploitées lorsque nécessaires pour reconstruire les espaces.
+- 877 Ahp sont intégrés :
+  - 536 aérodromes AD ;
+  - 275 hélistations HP ;
+  - 66 landing sites LS.
+- 1 899 Dpn non-IFR sont intégrés :
+  - 1 094 VRP ;
+  - 12 autres points OTHER ;
+  - 793 points ADHP.
+- Les 2 377 Dpn de type ICAO / points IFR sont explicitement exclus.
+- Les relations Spa ne génèrent pas de couche autonome dans cette TEST : les relations du fichier portent sur des points significatifs IFR exclus du périmètre retenu.
+- Les objets géométriques/relations strictement nécessaires à la reconstruction des espaces restent gérés automatiquement, sans case utilisateur séparée.
+
+2. Géométries des espaces
+- Les segments GRC et RHL sont interprétés.
+- Les arcs CWA / CCA sont pré-échantillonnés afin de conserver la courbure des limites.
+- Les limites FNT utilisant les frontières Gbr sont reconstruites à partir des frontières officielles du même export.
+- Les limites circulaires Circle sont converties en polygones.
+- Les Adg de même emprise et les Adg constitués par UNION de plusieurs espaces sont reconstruits avant intégration.
+- Les géométries sont légèrement simplifiées à très faible tolérance pour limiter la charge iPad sans modifier sensiblement le dessin opérationnel.
+- Les espaces sans géométrie exploitable restent conservés dans la base et dans les comptes, mais ne sont naturellement pas dessinés.
+
+3. Stockage hors ligne
+- Création d'une base IndexedDB dédiée : NpfSiaDB.
+- Le jeu AIRAC 08/26 v04 de cette TEST est embarqué de façon compressée dans le Script puis initialisé dans IndexedDB à la première utilisation.
+- Une fois initialisé, l'affichage des données SIA ne nécessite aucune connexion Internet.
+- Les préférences de filtres sont stockées séparément dans localStorage et restaurées après redémarrage.
+- Cette TEST valide d'abord affichage, filtres, performances et stockage ; le dépôt externe / workflow de mise à jour AIRAC automatique sera ajouté après validation de cette architecture, conformément au déroulement progressif demandé.
+
+4. Filtres SIA — appui long sur le bouton actuel de changement de carte
+- Clic court : comportement actuel strictement conservé, ouverture du sélecteur de cartes Offline.
+- Appui long d'environ 650 ms : ouverture du panneau « CALQUES AÉRONAUTIQUES SIA ».
+- L'appui long neutralise le clic court qui suit afin d'éviter la double ouverture.
+- Les filtres sont tous indépendants.
+
+Terrains :
+- Aérodromes AD
+- Hélistations HP
+- Landing sites LS
+
+Points :
+- VRP
+- Autres points OTHER
+- Points ADHP
+- Aucun filtre IFR n'est créé.
+
+Espaces Ase — chaque type séparé :
+- CTR
+- TMA
+- CTA
+- FIR
+- UIR
+- UIR-P
+- UTA
+- OCA
+- SECTOR
+- SECTOR-C
+- RAS
+- TRA
+- P
+- R
+- D
+
+Sous-types D-OTHER — chaque sous-type séparé :
+- AER
+- VOL
+- SUR
+- PJE
+- PRN
+- TRVL
+- TRPLA
+- AP
+- LTA
+- BAL
+- UAC
+- ACC
+- TRPVL
+
+Commandes globales :
+- Tout afficher
+- Tout masquer
+
+5. Rendu et performances iPad
+- Les données SIA sont des overlays indépendants du fond de carte.
+- Elles restent présentes lors du basculement entre les différents fonds Offline/Online.
+- Les espaces utilisent un pane et un renderer Canvas dédiés.
+- Les points utilisent un second pane / renderer Canvas.
+- Seuls les objets dont le filtre est actif et dont l'emprise intersecte la zone visible sont construits dans Leaflet.
+- Le rafraîchissement est différé après moveend/zoomend afin de ne pas recalculer les couches pendant le déplacement de la carte.
+- Les libellés permanents des points sont limités aux niveaux de zoom utiles pour éviter de saturer l'affichage.
+- Les VRP affichent le code court pilote lorsqu'il peut être extrait du nom SIA.
+- Un clic sur un terrain, un point ou un espace ouvre une fiche avec les informations disponibles.
+
+6. Bloc « Données aéronautiques SIA » dans CARTES
+- Ajout d'un bloc dédié après les Cartes VAC.
+- Affichage de :
+  - AIRAC 08/26 ;
+  - date d'effet 06/08/2026 ;
+  - révision v04 ;
+  - état local.
+- Le bouton « Vérifier / initialiser » contrôle la version locale et installe/réinstalle le jeu embarqué de cette TEST si nécessaire.
+- Un bouton de suppression permet d'effacer uniquement la base SIA locale sans toucher aux cartes, VAC ou autres données NPF.
+- Cette première version ne prétend pas encore effectuer une recherche réseau du prochain AIRAC : cette partie sera raccordée au futur dépôt NPF-Q400-SIA après validation.
+
+7. Icône de position propre
+- La forme Q400 validée en v15.46 est conservée exactement.
+- La teinte dorée précédente est remplacée directement dans le PNG embarqué par un jaune pur très vif : #FFFF00.
+- Le contour noir est conservé.
+- La taille 48 px de v15.46 est conservée.
+- Création d'un pane Leaflet dédié ownAircraftPane avec z-index 698.
+- Le marqueur de position propre est déplacé dans ce pane.
+- Il passe ainsi au-dessus des marqueurs standards, pélicandromes, couches SIA, GLR et trafics SafeSky, tout en laissant les popups Leaflet au-dessus.
+- Orientation selon la route GPS conservée.
+
+8. Continuité
+- Toutes les fonctions de v15.46 restent conservées.
+- Étiquettes pélicandromes bleues #00A8FF conservées.
+- Pélicandrome sélectionné / le plus proche vert clair #39FF14 conservé.
+- Migration automatique ciblée VAC Dole LFSJ → LFGJ conservée.
+- Déduplication « mon avion » SafeSky / GLR conservée.
+- Sur-zoom OACI jusqu'au niveau ≈ 2 NM conservé.
+- Bouton GLR conservé dans la branche TEST.
+- Aucun changement NAS.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.46 — ICÔNE POSITION PROPRE Q400 JAUNE À CONTOUR NOIR
 Date : 16/08/2026
 Base : TEST v15.45
