@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.44 */
+/* NPF_STYLE_BUILD_VERSION: v15.45 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14492,6 +14492,67 @@ body.gaar-point-search-open .gaar-editing-banner {
     background: #ff00ff !important;
     color: #ffffff !important;
     border-color: #ffffff !important;
+    box-shadow:
+        0 0 0 1px #111827,
+        0 1px 6px rgba(0,0,0,.45) !important;
+}
+
+
+/* ==========================================================================
+   v15.45 — étiquettes pélicandromes bleues + silhouette Q400 jaune
+   ========================================================================== */
+.leaflet-tooltip.route-tooltip-other-pelic,
+.leaflet-tooltip.route-tooltip-other-pelic.route-tooltip-near-icon {
+    background-color: #00a8ff !important;
+    color: #ffffff !important;
+    border: 2px solid #ffffff !important;
+    box-shadow:
+        0 0 0 1px #111827,
+        0 2px 8px rgba(0,0,0,.45) !important;
+}
+
+.leaflet-tooltip-top.route-tooltip-other-pelic::before { border-top-color: #00a8ff !important; }
+.leaflet-tooltip-bottom.route-tooltip-other-pelic::before { border-bottom-color: #00a8ff !important; }
+.leaflet-tooltip-left.route-tooltip-other-pelic::before { border-left-color: #00a8ff !important; }
+.leaflet-tooltip-right.route-tooltip-other-pelic::before { border-right-color: #00a8ff !important; }
+
+.own-gps-plane-body {
+    width: 36px !important;
+    height: 36px !important;
+    margin-left: -18px !important;
+    margin-top: -12px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.own-gps-plane-shape {
+    display: block !important;
+    width: 36px !important;
+    height: 36px !important;
+    color: #fff200 !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    -webkit-text-stroke: 0 !important;
+    text-shadow: none !important;
+    filter:
+        drop-shadow(0 0 1px #ffffff)
+        drop-shadow(0 0 2px #ffffff)
+        drop-shadow(0 1px 2px rgba(0,0,0,.95));
+}
+
+.own-gps-plane-shape .own-gps-q400-svg {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+}
+
+.own-gps-plane-altitude {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 2px solid #fff200 !important;
     box-shadow:
         0 0 0 1px #111827,
         0 1px 6px rgba(0,0,0,.45) !important;
