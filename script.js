@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.42';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.43';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -1003,6 +1003,8 @@ const OFFLINE_TILE_UPDATE_INTERVAL_MS = 80;
 const OFFLINE_TILE_PLACEHOLDER_DATA_URL = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22256%22%20height%3D%22256%22%3E%3Crect%20width%3D%22256%22%20height%3D%22256%22%20fill%3D%22%23d8e2e8%22/%3E%3C/svg%3E';
 // Carte OACI/IGN : plafond plus strict pour éviter de demander des tuiles inexistantes.
 const OACI_OFFLINE_MAX_NATIVE_ZOOM = 10;
+/* v15.43 — OACI : un seul niveau de sur-zoom entier, sans nouvelle tuile. */
+const OACI_OFFLINE_MAX_DISPLAY_ZOOM = 11;
 const OFFLINE_TILE_WAKE_DELAYS_MS = [250, 900, 1800, 3500, 6500, 10000];
 const OFFLINE_AUX_LAYER_START_DELAY_MS = 6500;
 const OFFLINE_DISABLE_STARTUP_FORCE_SCAN = true;
@@ -5436,13 +5438,17 @@ function enforceOfflineZoomLimit() {
     if (!map || !offlineTilesMode) return;
 
     const activeOfflineMaxZoomLimit = getOfflinePackMaxNativeZoomLimitForPacks(activeOfflinePacks);
-    const safeMaxZoom = Math.max(
+    const safeNativeMaxZoom = Math.max(
         GLOBAL_MIN_ZOOM,
         Math.min(
             GLOBAL_MAX_ZOOM,
             activeOfflineMaxZoomLimit,
             Number.isFinite(baseTileMaxNativeZoom) ? baseTileMaxNativeZoom : activeOfflineMaxZoomLimit
         )
+    );
+    const safeMaxZoom = getOfflinePackMaxDisplayZoomForPacks(
+        activeOfflinePacks,
+        safeNativeMaxZoom
     );
 
     map.options.maxZoom = safeMaxZoom;
@@ -5527,6 +5533,37 @@ function getOfflinePackMaxNativeZoomLimitForPacks(packs = activeOfflinePacks) {
         return Math.min(OFFLINE_HARD_MAX_NATIVE_ZOOM, OACI_OFFLINE_MAX_NATIVE_ZOOM);
     }
     return OFFLINE_HARD_MAX_NATIVE_ZOOM;
+}
+
+function getOfflinePackMaxDisplayZoomForPacks(
+    packs = activeOfflinePacks,
+    nativeMaxZoom = getOfflinePackMaxNativeZoomLimitForPacks(packs)
+) {
+    const safeNativeMax = Math.max(
+        GLOBAL_MIN_ZOOM,
+        Math.min(GLOBAL_MAX_ZOOM, Number(nativeMaxZoom))
+    );
+    const packList = Array.isArray(packs) ? packs.filter(Boolean) : [];
+    const hasOaciPack = packList.some(name => {
+        const simplified = String(name || '')
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+        return isOaciOfflinePackName(name)
+            || /\boaci\b|carte\s*oaci|scan\s*oaci|\bsia\b/.test(simplified);
+    });
+
+    if (!hasOaciPack) return safeNativeMax;
+
+    /*
+     * v15.43 — un seul niveau entier au-dessus de la dernière tuile native.
+     * Avec la carte OACI z10, l'affichage peut donc atteindre z11 (~2 NM).
+     */
+    return Math.min(
+        GLOBAL_MAX_ZOOM,
+        OACI_OFFLINE_MAX_DISPLAY_ZOOM,
+        safeNativeMax + 1
+    );
 }
 
 function buildOfflineTileUrlForPack(tilePath, packName, isLargeZip = false) {
@@ -6830,9 +6867,10 @@ function setupBaseTileLayer() {
 
     /*
      * Mode offline ultra stable :
-     * - pas de sur-zoom ;
-     * - pas de fallback parent ;
-     * - plafond dur z12 pour éviter que Leaflet demande des tuiles absentes ;
+     * - pas de zoom fractionnaire ;
+     * - un seul sur-zoom entier autorisé pour OACI (z10 natif -> z11 affiché) ;
+     * - pas de fallback parent hors mécanisme natif de sur-zoom Leaflet ;
+     * - plafond natif strict pour éviter les lectures de tuiles inexistantes ;
      * - animations désactivées pour éviter le flash blanc pendant le rafraîchissement.
      */
     const activeOfflineMaxZoomLimit = getOfflinePackMaxNativeZoomLimitForPacks(activeOfflinePacks);
@@ -6849,8 +6887,15 @@ function setupBaseTileLayer() {
         ? Math.max(GLOBAL_MIN_ZOOM, Math.min(baseTileMinNativeZoom, offlineNativeMaxZoom))
         : GLOBAL_MIN_ZOOM;
 
+    const offlineDisplayMaxZoom = offlineTilesMode
+        ? getOfflinePackMaxDisplayZoomForPacks(
+            activeOfflinePacks,
+            offlineNativeMaxZoom
+        )
+        : offlineNativeMaxZoom;
+
     const effectiveMaxZoom = offlineTilesMode
-        ? offlineNativeMaxZoom
+        ? offlineDisplayMaxZoom
         : Math.min(GLOBAL_MAX_ZOOM, baseTileMaxNativeZoom + 2);
 
     map.options.minZoom = effectiveMinZoom;
@@ -6874,7 +6919,7 @@ function setupBaseTileLayer() {
 
     const tileLayerOptions = {
         minNativeZoom: effectiveMinZoom,
-        maxNativeZoom: effectiveMaxZoom,
+        maxNativeZoom: offlineTilesMode ? offlineNativeMaxZoom : effectiveMaxZoom,
         minZoom: effectiveMinZoom,
         maxZoom: effectiveMaxZoom,
         attribution: '© OpenStreetMap',
@@ -10998,6 +11043,18 @@ function redrawTrafficAfterOwnAircraftChange(reason) {
             force: true,
             reason
         });
+    }
+
+    /*
+     * v15.43 — « mon avion » doit aussi disparaître/réapparaître
+     * immédiatement dans GLR sans attendre le prochain rafraîchissement.
+     */
+    if (
+        typeof renderGlobalLinkPositions === 'function'
+        && Array.isArray(npfGlobalLinkLastPositions)
+        && npfGlobalLinkLastPositions.length
+    ) {
+        renderGlobalLinkPositions(npfGlobalLinkLastPositions);
     }
 }
 
@@ -16300,11 +16357,12 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         layer = lftwRouteLayer;
     } else if (oaci) {
         const isSelected = selectedPelicanOACI === oaci;
-        color = isSelected ? 'var(--success-color)' : 'var(--primary-color)';
+        /* v15.43 — couleurs très vives, sans changement d'épaisseur. */
+        color = isSelected ? '#ffea00' : '#00e5ff';
         const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon' : 'route-tooltip route-tooltip-near-icon';
         labelText = `<div class="route-label-oaci">${oaci}</div><div class="route-label-sub">${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</div>`;
 
-        L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 0.8 }).addTo(layer);
+        L.polyline([startLatLng, endLatLng], { color, weight: 3, opacity: 1 }).addTo(layer);
 
         const hitbox = L.polyline([startLatLng, endLatLng], { color: 'transparent', weight: 20, opacity: 0 }).addTo(layer);
         const selectPelicRoute = (event) => {
@@ -18538,33 +18596,68 @@ function compareTrafficSourceCallsigns(glrName, safeSkyCallsign) {
     return { match: false, mode: '' };
 }
 
-function getRenderedSafeSkyTrafficForGlobalLinkDedup() {
+function getSafeSkyTrafficForGlobalLinkDedup() {
+    /*
+     * v15.43 — les trafics SafeSky réellement rendus restent prioritaires,
+     * mais « mon avion » est aussi conservé comme candidat de déduplication
+     * même lorsqu'il est volontairement masqué de la couche SafeSky.
+     */
+    const result = [];
+
     if (
-        !showTrafficLayer
-        || !trafficLayer
-        || !map
-        || !map.hasLayer?.(trafficLayer)
+        showTrafficLayer
+        && trafficLayer
+        && map
+        && map.hasLayer?.(trafficLayer)
     ) {
-        return [];
+        trafficMarkerRegistry.forEach(entry => {
+            const ac = entry?.aircraft;
+            const marker = entry?.marker;
+            if (!ac || !marker) return;
+
+            const callsign = String(ac.callsign || '').trim();
+            if (!callsign || callsign === 'N/A') return;
+
+            const latLng = marker.getLatLng?.();
+            result.push({
+                callsign,
+                lat: Number(latLng?.lat ?? ac.lat),
+                lon: Number(latLng?.lng ?? ac.lon),
+                aircraftKey: marker._trafficAircraftKey || buildTrafficAircraftKey(ac),
+                ownAircraft: false
+            });
+        });
     }
 
-    const result = [];
-    trafficMarkerRegistry.forEach(entry => {
-        const ac = entry?.aircraft;
-        const marker = entry?.marker;
-        if (!ac || !marker) return;
+    const ownAircraft = getOwnTrafficAircraftSession();
+    if (ownAircraft) {
+        const ownLabels = [
+            ownAircraft.callsign,
+            ownAircraft.registration
+        ]
+            .map(value => String(value || '').trim())
+            .filter(value => value && value !== 'N/A');
 
-        const callsign = String(ac.callsign || '').trim();
-        if (!callsign || callsign === 'N/A') return;
+        const knownNormalized = new Set(
+            result
+                .map(item => normalizeTrafficSourceCallsign(item.callsign))
+                .filter(Boolean)
+        );
 
-        const latLng = marker.getLatLng?.();
-        result.push({
-            callsign,
-            lat: Number(latLng?.lat ?? ac.lat),
-            lon: Number(latLng?.lng ?? ac.lon),
-            aircraftKey: marker._trafficAircraftKey || buildTrafficAircraftKey(ac)
+        ownLabels.forEach(callsign => {
+            const normalized = normalizeTrafficSourceCallsign(callsign);
+            if (!normalized || knownNormalized.has(normalized)) return;
+            knownNormalized.add(normalized);
+            result.push({
+                callsign,
+                lat: null,
+                lon: null,
+                aircraftKey: `own:${ownAircraft.id}`,
+                ownAircraft: true
+            });
         });
-    });
+    }
+
     return result;
 }
 
@@ -18793,11 +18886,11 @@ function renderGlobalLinkPositions(positions) {
         .sort((a, b) => (a.ageSeconds - b.ageSeconds) || a.name.localeCompare(b.name, 'fr'));
 
     /*
-     * v15.30 — SafeSky est prioritaire, mais uniquement pour les trafics
-     * réellement rendus sur sa couche. Un trafic absent/filtré de SafeSky
-     * continue donc à être rendu par GLR.
+     * v15.43 — SafeSky reste prioritaire. En plus des trafics réellement
+     * rendus, l'avion SafeSky défini comme « mon avion » participe à la
+     * déduplication GLR même s'il est volontairement masqué de la carte.
      */
-    const renderedSafeSkyTraffic = getRenderedSafeSkyTrafficForGlobalLinkDedup();
+    const renderedSafeSkyTraffic = getSafeSkyTrafficForGlobalLinkDedup();
     npfGlobalLinkSafeSkyMatches = [];
 
     const deduplicatedItems = visibleItems.filter(item => {
@@ -25441,17 +25534,11 @@ function displayInstalledMaps() {
         list.appendChild(li);
     });
 
-    // v15.03 — dépannage profond affiché sous les cartes téléchargées.
+    // v15.43 — une seule commande, centrée, sans texte de réparation.
     const resetLi = document.createElement('li');
     resetLi.className = 'offline-map-reset-line';
     resetLi.innerHTML = `
-        <span class="offline-map-name-line">
-            <strong>Réparation stockage offline</strong><br>
-            <small>À utiliser si une suppression reste bloquée.</small>
-        </span>
-        <div class="offline-map-actions">
-            <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Réinitialiser profond</button>
-        </div>
+        <button class="delete-map-btn offline-full-reset-btn" onclick="window.resetAllOfflineMapsStorage()">Réinitialiser Cartes Offline</button>
     `;
     list.appendChild(resetLi);
 
