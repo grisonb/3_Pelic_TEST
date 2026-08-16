@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.44';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.45';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -727,9 +727,15 @@ const VAC_LAST_SUCCESSFUL_SYNC_KEY = 'npfVacLastSuccessfulSyncV1';
  * de Dole utilise le lien stable officiel SIA. Les autres VAC restent strictement
  * inchangées et continuent d'utiliser IndexedDB hors ligne.
  */
-const VAC_ONLINE_FALLBACK_URLS = Object.freeze({
-    LFGJ: 'https://www.sia.aviation-civile.gouv.fr/documents/download/f/d/14983863/'
-});
+const VAC_ONLINE_FALLBACK_URLS = Object.freeze({});
+
+/*
+ * v15.45 — migration ciblée de l'ancienne VAC Dole mal étiquetée LFSJ.
+ * Ce SHA correspond uniquement au PDF Dole publié historiquement sous LFSJ
+ * dans le dépôt VAC avant la correction LFGJ. Il ne doit jamais entraîner la
+ * suppression d'une vraie VAC Sedan-Douzy portant un autre SHA.
+ */
+const VAC_LEGACY_DOLE_LFSJ_SHA256 = '17c83cb0e4f607e336962e05bb593d6d8054327581444fbf5f8aa463669b6e28';
 
 let vacDb = null;
 let vacSyncInProgress = false;
@@ -16359,7 +16365,9 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         const isSelected = selectedPelicanOACI === oaci;
         /* v15.44 — routes pélicandromes : couleur vive + bord blanc, 100 % opaque. */
         color = isSelected ? '#39ff14' : '#00a8ff';
-        const tooltipClass = isSelected ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon' : 'route-tooltip route-tooltip-near-icon';
+        const tooltipClass = isSelected
+            ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon'
+            : 'route-tooltip route-tooltip-other-pelic route-tooltip-near-icon';
         labelText = `<div class="route-label-oaci">${oaci}</div><div class="route-label-sub">${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</div>`;
 
         L.polyline([startLatLng, endLatLng], {
@@ -17301,6 +17309,102 @@ async function deleteAllVacPdfs() {
     return true;
 }
 
+
+async function deleteVacRecordByOaciSilently(oaci) {
+    const safeOaci = normalizeVacOaci(oaci);
+    if (!safeOaci) return false;
+
+    try {
+        const database = await initVacDB();
+        await new Promise((resolve, reject) => {
+            const tx = database.transaction(VAC_STORE_NAME, 'readwrite');
+            tx.objectStore(VAC_STORE_NAME).delete(safeOaci);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error || new Error(`Suppression ${safeOaci} impossible`));
+            tx.onabort = () => reject(tx.error || new Error(`Suppression ${safeOaci} interrompue`));
+        });
+        return true;
+    } catch (error) {
+        console.warn(`[VAC] Suppression silencieuse ${safeOaci} impossible:`, error);
+        return false;
+    }
+}
+
+async function migrateDoleVacReferenceIfNeeded(manifest, localRecords = []) {
+    /*
+     * v15.45 — migration automatique et strictement ciblée Dole LFSJ -> LFGJ.
+     * Elle ne s'exécute que pour un appareil possédant déjà une bibliothèque
+     * VAC locale : elle ne transforme donc pas le premier téléchargement VAC
+     * en téléchargement automatique général.
+     */
+    if (!navigator.onLine || !Array.isArray(localRecords) || !localRecords.length) {
+        return { changed: false, records: localRecords || [] };
+    }
+
+    const remoteLfgj = getVacAvailableEntries(manifest)
+        .find(entry => entry.oaci === 'LFGJ');
+    if (!remoteLfgj) {
+        return { changed: false, records: localRecords };
+    }
+
+    const localByOaci = new Map(
+        localRecords.map(record => [normalizeVacOaci(record?.oaci), record])
+    );
+    let changed = false;
+
+    const legacyLfsj = localByOaci.get('LFSJ');
+    if (
+        legacyLfsj
+        && String(legacyLfsj.sha256 || '').toLowerCase() === VAC_LEGACY_DOLE_LFSJ_SHA256
+    ) {
+        if (await deleteVacRecordByOaciSilently('LFSJ')) {
+            changed = true;
+            localByOaci.delete('LFSJ');
+            console.info('[VAC] Ancienne VAC Dole mal étiquetée LFSJ supprimée.');
+        }
+    }
+
+    const localLfgj = localByOaci.get('LFGJ');
+    const lfgjNeedsUpdate = (
+        !localLfgj
+        || !(localLfgj.blob instanceof Blob)
+        || String(localLfgj.sha256 || '').toLowerCase() !== String(remoteLfgj.sha256 || '').toLowerCase()
+    );
+
+    if (lfgjNeedsUpdate) {
+        try {
+            const validated = await downloadAndValidateVacEntry(remoteLfgj, 30000);
+            await putVacRecord({
+                oaci: 'LFGJ',
+                blob: validated.blob,
+                size: validated.size,
+                sha256: validated.sha256,
+                cycle: String(remoteLfgj.cycle || manifest.sourceCycle || ''),
+                updatedAt: Date.now(),
+                source: String(remoteLfgj.source || 'SIA'),
+                sourceUrl: validated.sourceUrl
+            });
+            changed = true;
+            console.info('[VAC] VAC Dole-Tavaux LFGJ migrée automatiquement.');
+        } catch (error) {
+            console.warn('[VAC] Migration automatique Dole LFGJ impossible:', error);
+        }
+    }
+
+    if (!changed) {
+        return { changed: false, records: localRecords };
+    }
+
+    try {
+        localStorage.setItem(VAC_LAST_SUCCESSFUL_SYNC_KEY, String(Date.now()));
+    } catch (_) {}
+
+    const records = await reconcileVacInstalledIndexFromDb();
+    await displayVacManagementStatus();
+    refreshUI();
+    return { changed: true, records };
+}
+
 async function openVacPdf(oaci) {
     const safeOaci = normalizeVacOaci(oaci);
     if (!safeOaci) return false;
@@ -17401,7 +17505,17 @@ async function checkVacUpdatesAtStartup() {
         return false;
     }
 
-    const targets = getVacEntriesNeedingDownload(manifest, localRecords);
+    let recordsForComparison = localRecords;
+    try {
+        const migration = await migrateDoleVacReferenceIfNeeded(manifest, localRecords);
+        if (migration && Array.isArray(migration.records)) {
+            recordsForComparison = migration.records;
+        }
+    } catch (error) {
+        console.info('[VAC] Migration Dole ignorée:', error.message || error);
+    }
+
+    const targets = getVacEntriesNeedingDownload(manifest, recordsForComparison);
     if (!targets.length) return false;
 
     return showVacUpdatePrompt(manifest, targets.length);
@@ -22107,9 +22221,27 @@ function buildOwnGpsIcon(altitudeLabel = '', options = {}) {
         : '';
     const simulationHtml = isSimulation ? '<div class="own-gps-sim-badge">SIM</div>' : '';
 
+    /*
+     * v15.45 — silhouette Q400 vue de dessus.
+     * Le dessin est volontairement simple, plein et monochrome comme les
+     * pictogrammes trafic SafeSky, avec les deux nacelles caractéristiques.
+     */
+    const q400Svg = `
+        <svg class="own-gps-q400-svg" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true">
+            <g class="own-gps-q400-fill" fill="#fff200" stroke="#111827" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+                <path d="M32 2.5 C29.5 5.2 28.6 9.2 28.7 15.2 L29.1 23.2 L28.4 45.5 L29.5 57.8 L32 62 L34.5 57.8 L35.6 45.5 L34.9 23.2 L35.3 15.2 C35.4 9.2 34.5 5.2 32 2.5 Z"/>
+                <path d="M29.4 21.4 L4 29.2 L3 33.2 L29.1 30.1 L34.9 30.1 L61 33.2 L60 29.2 L34.6 21.4 Z"/>
+                <path d="M29.1 48.2 L14.3 53.4 L14 56.8 L30 53.5 L34 53.5 L50 56.8 L49.7 53.4 L34.9 48.2 Z"/>
+                <rect x="15.1" y="24.2" width="7.3" height="16.5" rx="3.4"/>
+                <rect x="41.6" y="24.2" width="7.3" height="16.5" rx="3.4"/>
+                <path d="M18.75 20.4 L18.75 44.2 M10.9 32.3 L26.6 32.3" fill="none" stroke="#fff200" stroke-width="2.6"/>
+                <path d="M45.25 20.4 L45.25 44.2 M37.4 32.3 L53.1 32.3" fill="none" stroke="#fff200" stroke-width="2.6"/>
+            </g>
+        </svg>`;
+
     return L.divIcon({
         className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}${isSimulation ? ' own-gps-simulation-icon' : ''}`,
-        html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">✈︎</span></div>`,
+        html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">${q400Svg}</span></div>`,
         iconSize: [74, 58],
         iconAnchor: [37, 38]
     });
@@ -22121,11 +22253,8 @@ function applyOwnGpsPlaneHeading(courseDegrees) {
     const plane = element ? element.querySelector('.own-gps-plane-body') : null;
     if (!plane) return;
 
-    /*
-     * Le symbole ✈ pointe visuellement vers le NE dans la police emoji.
-     * On compense par -45° pour que 0° corresponde au nord.
-     */
-    plane.style.transform = `rotate(${courseDegrees - 45}deg)`;
+    /* v15.45 — la silhouette SVG Q400 pointe nativement vers le nord. */
+    plane.style.transform = `rotate(${courseDegrees}deg)`;
 }
 
 
