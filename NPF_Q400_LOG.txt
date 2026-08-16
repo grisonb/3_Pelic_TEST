@@ -1,3 +1,45 @@
+VERSION TEST v15.45 — ÉTIQUETTES PÉLICANDROMES / SILHOUETTE Q400 / MIGRATION VAC DOLE
+Date : 16/08/2026
+Base : TEST v15.44
+
+OBJECTIF
+- Harmoniser la couleur des étiquettes des pélicandromes avec leurs routes.
+- Remplacer le repère de position propre par une silhouette de Dash 8 Q400 vue de dessus, jaune vif, dans le langage graphique des trafics SafeSky.
+- Préparer la future version pérenne pour corriger automatiquement la VAC de Dole-Tavaux sans imposer une mise à jour manuelle des cartes VAC.
+
+MODIFICATIONS
+1. Étiquettes des autres pélicandromes
+- Les étiquettes des pélicandromes autres que le pélicandrome sélectionné utilisent désormais exactement le même bleu électrique que leur route : #00A8FF.
+- Fond bleu #00A8FF, texte blanc, bordure blanche renforcée et liseré sombre pour conserver le contraste sur les fonds OACI/NPF.
+- La pointe de l’étiquette Leaflet utilise également le même bleu.
+- Le pélicandrome sélectionné / le plus proche conserve le vert clair #39FF14 de v15.44.
+
+2. Icône de position propre — silhouette Dash 8 Q400
+- Suppression du disque magenta et du pictogramme avion de police de caractères.
+- Remplacement par une silhouette SVG dédiée de Dash 8 Q400 vue de dessus.
+- Silhouette jaune vif #FFF200 avec contour sombre fin et léger halo blanc pour rester visible sur tous les fonds de carte.
+- L’icône conserve une taille comparable au repère actuel : aucun agrandissement général n’est appliqué.
+- La silhouette est orientée directement selon la route GPS ; la compensation de -45° nécessaire à l’ancien caractère avion est supprimée.
+- L’étiquette d’altitude existante reste disponible lorsqu’elle est activée et adopte un liseré jaune.
+
+3. VAC Dole-Tavaux — migration automatique ciblée
+- Le dépôt NPF-Q400-VAC étant désormais corrigé avec Dole-Tavaux = LFGJ, la branche TEST sait réparer automatiquement les appareils qui possèdent encore l’ancienne bibliothèque VAC.
+- Au premier démarrage connecté avec des VAC déjà installées, NPF contrôle le manifeste distant.
+- Si LFGJ est absent ou possède un ancien SHA-256, seule la VAC LFGJ est téléchargée et vérifiée automatiquement.
+- Si une ancienne entrée locale LFSJ correspond exactement au PDF historiquement mal étiqueté comme Dole, cette seule entrée héritée est supprimée.
+- Aucun téléchargement complet des VAC n’est déclenché par cette migration.
+- Les autres mises à jour VAC continuent d’utiliser le mécanisme normal de détection par SHA-256 et la demande de confirmation existante.
+- Le fallback SIA temporaire LFGJ de v15.42 est supprimé : la source de référence redevient le dépôt VAC corrigé.
+
+4. Continuité
+- Traits Feu → pélicandromes de v15.44 conservés : 5 px, 100 % opaques, bord blanc 9 px.
+- Route pointillée Feu → Base de v15.44 conservée : 5 px, 100 % opaque, bord blanc 9 px.
+- Déduplication « mon avion » SafeSky / GLR de v15.43 conservée.
+- Sur-zoom OACI jusqu’au niveau ≈ 2 NM conservé.
+- Aucun changement NAS.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.44 — VISIBILITÉ AVION / ROUTES PÉLICANDROMES / ROUTE BASE
 Date : 16/08/2026
 Base : TEST v15.43
