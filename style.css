@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.43 */
+/* NPF_STYLE_BUILD_VERSION: v15.44 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14446,3 +14446,53 @@ body.gaar-point-search-open .gaar-editing-banner {
     border-color: #ff00d4 !important;
 }
 
+
+
+/* ==========================================================================
+   v15.44 — routes pélicandromes et position propre à contraste maximal
+   ========================================================================== */
+.leaflet-tooltip.route-tooltip-selected,
+.leaflet-tooltip.route-tooltip-selected.route-tooltip-near-icon {
+    background-color: #39ff14 !important;
+    color: #111111 !important;
+    border: 2px solid #ffffff !important;
+    box-shadow:
+        0 0 0 1px #111827,
+        0 2px 8px rgba(0,0,0,.45) !important;
+}
+
+.leaflet-tooltip-top.route-tooltip-selected::before { border-top-color: #39ff14 !important; }
+.leaflet-tooltip-bottom.route-tooltip-selected::before { border-bottom-color: #39ff14 !important; }
+.leaflet-tooltip-left.route-tooltip-selected::before { border-left-color: #39ff14 !important; }
+.leaflet-tooltip-right.route-tooltip-selected::before { border-right-color: #39ff14 !important; }
+
+.own-gps-plane-body {
+    background: #ff00ff !important;
+    border: 3px solid #ffffff !important;
+    box-shadow:
+        0 0 0 2px #111827,
+        0 0 10px rgba(255, 0, 255, 1),
+        0 2px 10px rgba(0,0,0,.60) !important;
+}
+
+.own-gps-plane-shape {
+    color: #ffff00 !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-weight: 900 !important;
+    -webkit-text-stroke: 0.7px #111827;
+    text-shadow:
+        -1px -1px 0 #111827,
+         1px -1px 0 #111827,
+        -1px  1px 0 #111827,
+         1px  1px 0 #111827,
+         0 0 5px #ffffff !important;
+}
+
+.own-gps-plane-altitude {
+    background: #ff00ff !important;
+    color: #ffffff !important;
+    border-color: #ffffff !important;
+    box-shadow:
+        0 0 0 1px #111827,
+        0 1px 6px rgba(0,0,0,.45) !important;
+}
