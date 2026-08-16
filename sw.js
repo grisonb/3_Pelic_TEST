@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-44_map_visibility';
-const APP_VERSION = 'v15.44';
+const SW_VERSION = 'sw-v15-45_pelic_labels_q400_vac_migration';
+const APP_VERSION = 'v15.45';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
