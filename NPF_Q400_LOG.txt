@@ -1,3 +1,52 @@
+VERSION TEST v15.44 — VISIBILITÉ AVION / ROUTES PÉLICANDROMES / ROUTE BASE
+Date : 16/08/2026
+Base : TEST v15.43
+
+OBJECTIF
+- Renforcer nettement la lisibilité sur la carte sans augmenter la taille de l’icône avion.
+- Donner aux routes Feu → Pélicandromes un contraste maximal sur les fonds OACI/NPF.
+- Renforcer de la même manière la route pointillée Feu → Base.
+
+MODIFICATIONS
+1. Route Feu → pélicandrome sélectionné / le plus proche à l’ouverture
+- Le jaune est remplacé par un vert clair fluorescent : #39FF14.
+- Le trait principal passe de 3 px à 5 px.
+- Opacité portée à 100 %.
+- Ajout d’un bord blanc continu de 9 px sous le trait vert.
+- Extrémités et raccords arrondis pour conserver une lecture nette.
+
+2. Étiquette du pélicandrome sélectionné
+- Le fond vert de l’étiquette utilise exactement la même couleur que le trait : #39FF14.
+- Texte noir pour conserver un contraste élevé.
+- Bordure blanche renforcée.
+
+3. Routes Feu → autres pélicandromes
+- Bleu électrique vif : #00A8FF.
+- Trait principal porté à 5 px.
+- Opacité à 100 %.
+- Ajout d’un bord blanc continu de 9 px sous chaque trait bleu.
+- Zone tactile invisible conservée pour la sélection d’un pélicandrome.
+
+4. Route pointillée Feu → Base
+- Style pointillé conservé.
+- Trait coloré porté à 5 px et 100 % opaque.
+- Ajout d’un bord blanc pointillé de 9 px sous le trait afin de détacher chaque segment du fond de carte.
+- Couleur fonctionnelle de la route Base conservée.
+
+5. Icône de position propre
+- Dimensions inchangées.
+- Suppression de la transparence du disque : fond magenta fluorescent #FF00FF à 100 %.
+- Contour blanc renforcé et liseré noir extérieur conservé pour le contraste.
+- Symbole avion forcé en rendu texte et affiché en jaune fluorescent #FFFF00 afin que sa couleur CSS soit respectée sur iPad.
+- Ombre/contour sombre renforcé autour du symbole.
+- Étiquette altitude assortie au magenta vif.
+
+6. Continuité
+- Les changements v15.43 (CARTES, déduplication SafeSky/GLR et zoom OACI 2 NM) sont conservés.
+- Aucun changement NAS.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.43 — CARTES / VISIBILITÉ CARTE / DÉDUPLICATION SS-GLR / ZOOM OACI 2 NM
 Date : 16/08/2026
 Base : TEST v15.42
