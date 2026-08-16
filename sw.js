@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-46_q400_yellow_black_large';
-const APP_VERSION = 'v15.46';
+const SW_VERSION = 'sw-v15-47_sia_filters_own_aircraft_top';
+const APP_VERSION = 'v15.47';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
