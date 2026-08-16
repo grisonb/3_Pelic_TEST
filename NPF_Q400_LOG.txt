@@ -1,3 +1,88 @@
+VERSION TEST v15.43 — CARTES / VISIBILITÉ CARTE / DÉDUPLICATION SS-GLR / ZOOM OACI 2 NM
+Date : 16/08/2026
+Base : TEST v15.42
+
+OBJECTIF
+- Simplifier la commande de réinitialisation des cartes offline.
+- Rendre la position propre et les traits Feu → Pélicandromes beaucoup plus visibles par la couleur, sans augmenter leur taille.
+- Éviter qu'un avion SafeSky défini comme « mon avion » réapparaisse simultanément sous forme de trafic GLR.
+- Ajouter un niveau de sur-zoom entier à la carte OACI offline afin d'atteindre environ l'échelle 2 NM.
+
+MODIFICATIONS
+1. Fenêtre CARTES — réinitialisation offline
+- Le bouton « Réinitialiser profond » est renommé « Réinitialiser Cartes Offline ».
+- Suppression complète du libellé « Réparation stockage offline ».
+- Suppression du texte « À utiliser si une suppression reste bloquée. ».
+- La ligne de dépannage ne contient plus que le bouton rouge « Réinitialiser Cartes Offline ».
+- Le bouton est centré horizontalement dans la fenêtre CARTES.
+- Le comportement technique de la réinitialisation profonde est inchangé.
+
+2. Position propre — couleurs plus vives, taille inchangée
+- La taille de l'icône avion GPS n'est pas modifiée.
+- La forme de l'avion passe en magenta/fuchsia vif.
+- Le fond du repère utilise le même magenta vif avec transparence.
+- Le contour blanc et le liseré/ombre sombre assurent le contraste sur les fonds OACI, NPF et OpenStreet.
+- Aucun agrandissement de l'icône n'est appliqué dans cette version.
+
+3. Traits Feu → Pélicandromes — couleurs plus vives, épaisseur inchangée
+- L'épaisseur reste à 3 px.
+- Les routes vers les pélicandromes non sélectionnés passent en cyan électrique vif.
+- La route vers le pélicandrome sélectionné passe en jaune vif.
+- L'opacité est portée à 100 % pour conserver la saturation des couleurs.
+- Aucun halo ni épaississement supplémentaire n'est ajouté dans cette version.
+
+4. SafeSky « mon avion » → déduplication GLR
+- L'avion SafeSky défini comme « mon avion » reste masqué de la couche SafeSky comme auparavant.
+- Son indicatif reste désormais pris en compte par le moteur de déduplication GLR, même s'il n'est plus rendu graphiquement par SafeSky.
+- Les indicatifs SafeSky et immatriculations mémorisés pour « mon avion » sont utilisés comme candidats de comparaison GLR.
+- Un doublon GLR correspondant à « mon avion » est donc masqué automatiquement.
+- La comparaison existante MILAN 75 / MILAN75 et la tolérance stricte de type DRAGO13 / DRAGON13 sont conservées.
+- La modification ou la suppression de « mon avion » force aussi immédiatement le recalcul de l'affichage GLR.
+
+5. Carte OACI offline — niveau 2 NM
+- Le zoom natif de la carte OACI reste plafonné à z10 : aucune tuile z11 supplémentaire n'est requise.
+- Un seul niveau de sur-zoom entier est autorisé pour les packs identifiés OACI : affichage jusqu'à z11.
+- z11 correspond approximativement au niveau 2 NM utilisé dans NPF.
+- Leaflet réutilise/agrandit les tuiles natives z10 au niveau z11.
+- La taille du pack OACI à télécharger n'augmente donc pas.
+- Les packs offline non OACI conservent leur comportement de zoom précédent.
+- Aucun zoom fractionnaire n'est réintroduit.
+
+VAC DOLE-TAVAUX
+- Le dépôt séparé NPF-Q400-VAC a été corrigé et régénéré avec Dole-Tavaux sous LFGJ.
+- `vac/LFGJ.pdf` est désormais publié et le fonctionnement VAC de Dole a été validé.
+- Le fallback SIA strictement limité à LFGJ introduit en v15.42 est conservé sans modification.
+
+ÉLÉMENTS INCHANGÉS
+- Taille de l'icône avion GPS.
+- Épaisseur des traits Feu → Pélicandromes.
+- Zooms fractionnaires toujours désactivés.
+- Optimisations de performances carte NPF v15.37/v15.40 conservées.
+- GLR reste présent dans la branche TEST.
+- SafeSky hors logique « mon avion ».
+- Chat.
+- FdS / GAAR.
+- Pérenne non modifiée.
+- Aucun fichier NAS à remplacer.
+
+CONTRÔLES TECHNIQUES
+- Versions Index / Manifest / Script / Style / SW alignées sur v15.43.
+- Syntaxe JavaScript Script et SW contrôlée avec Node.
+- Manifest JSON contrôlé.
+- Accolades CSS contrôlées.
+- Bouton de réinitialisation vérifié : nouveau libellé uniquement, texte d'aide supprimé.
+- Taille avion GPS inchangée à 34 px ; couleurs vives appliquées par surcharge CSS finale.
+- Traits pélicandromes vérifiés à 3 px avec couleurs cyan/jaune et opacité 1.
+- Déduplication GLR vérifiée avec ajout de « mon avion » SafeSky aux candidats même lorsqu'il est masqué.
+- Recalcul GLR immédiat lors de la définition/suppression de « mon avion ».
+- OACI : zoom natif z10 conservé et zoom d'affichage z11 autorisé uniquement pour un pack OACI.
+- Historique v15.42 et antérieur conservé intégralement et exactement ci-dessous.
+- Aucun secret d'authentification ajouté aux six fichiers publics.
+
+======================================================================
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+======================================================================
+
 VERSION TEST v15.42 — CORRECTION AFFICHAGE VAC DOLE-TAVAUX LFGJ
 Date : 15/08/2026
 Base : TEST v15.41
