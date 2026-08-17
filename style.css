@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.48 */
+/* NPF_STYLE_BUILD_VERSION: v15.49 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14946,4 +14946,19 @@ body.gaar-point-search-open .gaar-editing-banner {
     background: #eef5ff;
     color: #34506f;
     font-size: 11px;
+}
+
+
+/* ==========================================================================
+   v15.49 — HITBOXES TACTILES DOM
+   ========================================================================== */
+.npf-airport-touch-hitbox,
+.sia-point-touch-hitbox {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
