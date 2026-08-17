@@ -1,3 +1,241 @@
+VERSION TEST v15.59 — CORRECTIONS GÉNÉRALES SIA + AUBENAS + BASE/PÉLIC
+Date : 17/08/2026
+Base : TEST v15.58
+
+OBJECTIFS
+- Fiabiliser l'appui long sur toutes les zones SIA sélectionnables, y compris R et D-OTHER ponctuels.
+- Empêcher la fenêtre « Créer Feu / Sélection Zone » de disparaître au relâchement du doigt.
+- Rendre la coloration de la zone sélectionnée persistante pendant l'autoPan / refresh SIA.
+- Supprimer les « ? » visibles sur certains D-OTHER ponctuels.
+- Rendre sélectionnables les D-OTHER ponctuels AER/VOL/SUR/PJE/PRN/TRVL/TRPLA/AP/BAL, etc.
+- Ajouter la signification des codes courts dans le menu SIA.
+- Corriger la position du pélicandrome d'Aubenas LFHO avec les coordonnées fournies.
+- Afficher « BASE » au-dessus du code OACI lorsqu'une base fait partie des pélicandromes proches retenus.
+
+1. APPUI LONG — OUVERTURE AU RELÂCHEMENT
+- Le seuil d'appui long reste inchangé à 1,2 seconde.
+- La tolérance de déplacement reste inchangée à 14 px.
+- À 1,2 s, l'appui long est seulement VALIDÉ.
+- La fenêtre ou l'action n'est plus ouverte pendant que le doigt est encore posé.
+- L'action est exécutée au relâchement (`pointerup`).
+- Cela corrige le comportement observé sur iPad/Safari où, notamment sur une zone R, la fenêtre :
+  « Créer Feu / Sélection Zone »
+  apparaissait pendant l'appui puis disparaissait au relâchement.
+- Le clic synthétique Safari suivant l'appui long est neutralisé uniquement près du point touché.
+- Les vrais clics dans les boutons de popup restent autorisés.
+
+2. RÈGLE FEU / ZONE CONSERVÉE
+- Aucune zone au point d'appui :
+  -> création directe du feu après validation de l'appui long et relâchement.
+- Une ou plusieurs zones au point d'appui :
+  -> fenêtre « Créer Feu / Sélection Zone ».
+- « Sélection Zone » :
+  - une zone -> fiche directe ;
+  - plusieurs zones -> « ESPACES À CET ENDROIT ».
+- L'appui court sur une zone reste neutralisé.
+
+3. AUTO-PAN ET CANDIDATS SIA
+- À l'appui sur « Sélection Zone », les candidats sont recalculés au point touché.
+- Cela évite de conserver des références Leaflet obsolètes si l'ouverture de la première popup a déplacé la carte et déclenché un `moveend`.
+- Dans « ESPACES À CET ENDROIT », la géométrie est transmise explicitement lors du choix.
+
+4. COLORATION DE LA ZONE SÉLECTIONNÉE
+- La coloration ne repose plus sur la surface tactile elle-même.
+- Une couche indépendante `siaSelectionPane` est ajoutée au-dessus des couches SIA.
+- Cette couche est non interactive et ne gêne pas les gestes carte.
+- La sélection est affichée :
+  - polygone/multipolygone : contour renforcé + remplissage 18 % ;
+  - point : cercle de sélection visible autour du point ;
+  - ligne éventuelle : trait renforcé.
+- Un `moveend` / `zoomend` provoqué par l'autoPan ne supprime plus immédiatement la coloration.
+- La coloration disparaît à la fermeture de la fiche ou lors d'une nouvelle sélection.
+
+5. D-OTHER PONCTUELS — SÉLECTION
+- Une grande partie des D-OTHER SIA est publiée en géométrie AIXM ponctuelle.
+- La détection de sélection prend maintenant en charge :
+  - Point : tolérance tactile 30 px ;
+  - MultiPoint : tolérance tactile 30 px ;
+  - LineString : tolérance 18 px ;
+  - MultiLineString : tolérance 18 px ;
+  - Polygon / MultiPolygon : détection intérieure existante conservée.
+- Cela rend les AER, VOL, SUR, PJE, PRN, TRVL, TRPLA, AP, BAL, etc. utilisables avec le même appui long que les CTR/TMA/R/P/D/TRA.
+
+6. SUPPRESSION DES « ? » SUR LA CARTE
+- Cause identifiée :
+  les géométries SIA `Point` passaient dans `L.geoJSON` sans `pointToLayer`.
+- Leaflet créait alors son Marker image par défaut dans la couche tactile.
+- Dans la PWA, cette image pouvait être absente et apparaître comme un « ? ».
+- Les surfaces tactiles ponctuelles utilisent désormais un `L.circleMarker` SVG quasi invisible de 30 px.
+- Aucun Marker PNG Leaflet par défaut n'est créé pour ces objets.
+- Le symbole « ? » parasite doit donc disparaître.
+
+7. MENU D-OTHER — CODE + SIGNIFICATION
+- Les codes courts sont conservés et leur signification est affichée à côté :
+  AER — Aéromodélisme
+  VOL — Voltige
+  SUR — Restriction de survol
+  PJE — Parachutage
+  PRN — Parcs / réserves naturelles
+  TRVL — Treuillage vol libre
+  TRPLA — Treuillage planeurs
+  AP — Activité particulière / UAS
+  LTA — Lower Traffic Area
+  BAL — Ballons
+  UAC — Contrôle supérieur
+  ACC — Contrôle régional
+  TRPVL — Treuillage planeurs / vol libre
+
+8. RAS / TRA DANS LE MENU
+- RAS devient :
+  `RAS — Autres espaces réglementés`
+- TRA devient :
+  `TRA — Zone temporairement réservée`
+- Les codes RAS et TRA restent visibles.
+
+9. AUBENAS LFHO — POSITION DU PÉLICANDROME
+- Coordonnées fournies :
+  Latitude : 44°32'17.69"N
+  Longitude : 4°22'13.19"E
+- Conversion décimale utilisée :
+  latitude = 44.53824722
+  longitude = 4.37033056
+- Ancienne position NPF :
+  44.54500000 / 4.38500000
+- Nouvelle position :
+  44.53824722 / 4.37033056
+- Seul le repère opérationnel du pélicandrome LFHO est déplacé.
+- La piste 18/36 d'Aubenas n'est pas modifiée.
+
+10. BASE ÉGALEMENT PÉLICANDROME PROCHE
+- Si la base sélectionnée fait partie des pélicandromes retenus parmi les plus proches du feu, l'étiquette du pélic affiche désormais :
+  BASE
+  LFxx
+  distance / temps
+- `BASE` est placé au-dessus du code OACI.
+- Aucun second symbole n'est créé.
+- Le pélic conserve sa couleur et son comportement normal de pélicandrome.
+- Cette règle fonctionne quelle que soit la base sélectionnée, pas uniquement LFTW.
+
+11. TMA SANS ALTITUDE
+- La correction v15.58 est conservée intégralement.
+- Les TMA génériques sans plancher/plafond redondantes restent filtrées pour toutes les familles.
+- Les secteurs TMA réels avec tranches verticales restent sélectionnables.
+
+12. DONNÉES SIA
+- Le payload SIA n'est pas modifié dans cette version.
+- `npfDatasetRevision` reste 15.57.
+- Aucun nouveau téléchargement SIA n'est nécessaire du seul fait de v15.59.
+
+13. ÉLÉMENTS INCHANGÉS
+- Fréquences TMA v15.56 conservées.
+- Marqueurs de fréquences supplétives `(s)` conservés.
+- Titre TMA sans code technique conservé.
+- Tranches verticales dans « ESPACES À CET ENDROIT » conservées.
+- Contours et bandes intérieures estompées des zones polygonales conservés.
+- Mode OACI invisible mais sélectionnable conservé.
+- VRP fuchsia / texte blanc / contour noir conservés.
+- GLR, Q400, VAC, routes, ADS-B et autres fonctions non concernées inchangés.
+- Aucun changement NAS.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.57` vérifiée.
+- Coordonnées LFHO converties et présentes dans `pelicanAirports`.
+- Menu D-OTHER : libellés code + signification vérifiés.
+- RAS / TRA : libellés explicites vérifiés.
+- Détection Point / MultiPoint / LineString / MultiLineString présente.
+- Surface tactile Point : `L.circleMarker`, sans Marker image Leaflet par défaut.
+- Appui long tactile : action exécutée au `pointerup`, pas dans le timer 1,2 s.
+- Couche indépendante `siaSelectionPane` présente.
+- Coloration liée à la clé métier et non à une ancienne référence Leaflet.
+- Étiquette BASE au-dessus du code OACI du pélic proche vérifiée.
+- Historique v15.58 et antérieur conservé intégralement.
+- Validation réelle Safari/iPadOS à effectuer sur l'appareil.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
+VERSION TEST v15.58 — SUPPRESSION GÉNÉRALE DES TMA SANS ALTITUDE REDONDANTES
+Date : 17/08/2026
+Base : TEST v15.57
+
+OBJECTIF
+- Supprimer de « ESPACES À CET ENDROIT » toutes les TMA génériques sans plancher/plafond lorsqu'elles correspondent au regroupement d'autres secteurs TMA de la même famille.
+- Appliquer la règle à toutes les TMA, sans traitement particulier PROVENCE/NICE.
+
+1. CAUSE DU PROBLÈME v15.57
+- Le script contient deux définitions successives de `refreshSiaLayers()`.
+- Le filtre des parents techniques TMA avait été ajouté dans la première définition.
+- La seconde définition, qui est celle réellement utilisée par JavaScript, ne contenait pas ce filtre.
+- Cela explique pourquoi `TMA / PROVENCE`, `TMA / NICE`, etc. pouvaient encore apparaître malgré la correction précédente.
+
+2. CORRECTION DU FILTRE v15.57
+- Le filtre `isSiaTechnicalTmaUnionParent(item)` est maintenant appliqué dans la DERNIÈRE définition effective de `refreshSiaLayers()`.
+- Les parents AIXM marqués `tp:1` ne sont donc réellement plus dessinés ni rendus tactiles.
+
+3. NOUVELLE RÈGLE GÉNÉRALE POUR TOUTES LES TMA
+- NPF construit automatiquement les familles à partir des TMA possédant de vraies limites verticales.
+- Exemples :
+  PROVENCE 1 -> famille PROVENCE
+  PROVENCE 4.1 -> famille PROVENCE
+  NICE 2 -> famille NICE
+  MONTPELLIER 3.2 -> famille MONTPELLIER
+- Le suffixe numérique final, simple ou décimal, est le seul élément retiré pour déterminer la famille.
+- Si une TMA :
+  - n'a ni plancher ni plafond ;
+  - et son nom correspond exactement à une famille possédant des secteurs verticaux ;
+  alors cette TMA générique est masquée.
+
+4. APPLICATION À TOUTES LES TMA
+- Aucun nom PROVENCE, NICE, LFML ou LFMN n'est codé en dur.
+- La logique s'applique automatiquement à toutes les familles TMA présentes dans le jeu SIA.
+
+5. AFFICHAGE / SURFACE TACTILE
+- Une TMA générique sans altitude identifiée par cette règle :
+  - n'est plus dessinée ;
+  - ne reçoit plus la bande intérieure ;
+  - ne reçoit plus de surface tactile ;
+  - ne peut plus être proposée à la sélection.
+- Les vraies tranches TMA restent affichées normalement.
+
+6. SÉCURITÉ DANS « ESPACES À CET ENDROIT »
+- Un second filtre est appliqué directement dans `getSiaAirspaceTouchCandidates()`.
+- Les parents techniques `tp:1` et les TMA génériques sans altitude sont retirés de la liste avant le calcul de la superposition.
+- Même en présence d'une ancienne couche tactile résiduelle, le bouton générique sans altitude ne doit donc plus apparaître.
+
+7. DONNÉES SIA
+- Aucun changement du payload.
+- `npfDatasetRevision` reste 15.57.
+- Pas de reconstruction inutile de la base SIA IndexedDB.
+
+8. ÉLÉMENTS INCHANGÉS
+- Appui long sans zone -> création directe du feu.
+- Appui long avec zone(s) -> « Créer Feu » / « Sélection Zone ».
+- Appui court sur zone : aucune sélection.
+- TMA affichées sous la forme `TMA / PROVENCE 2`, sans code LFML2.
+- Tranche verticale dans la liste conservée.
+- Fréquences TMA et marqueurs `(s)` conservés.
+- Popup au point de l'appui long conservée.
+- Contour fin + bande intérieure estompée conservés.
+- Mode OACI invisible mais tactile conservé.
+- VRP fuchsia / texte blanc / contour noir conservés.
+- GLR, Q400 et VAC inchangés.
+- Aucun changement NAS.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.57` vérifiée.
+- Filtre appliqué dans la dernière définition effective de `refreshSiaLayers()`.
+- Double sécurité appliquée dans `getSiaAirspaceTouchCandidates()`.
+- Historique v15.57 et antérieur conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.57 — APPUI LONG FEU / SÉLECTION ZONE + NETTOYAGE TMA
 Date : 17/08/2026
 Base : TEST v15.56
