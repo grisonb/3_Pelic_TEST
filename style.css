@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.54 */
+/* NPF_STYLE_BUILD_VERSION: v15.55 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15133,4 +15133,60 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 .sia-airspace-choice-button:active {
     transform: scale(0.99);
+}
+
+
+/* ==========================================================================
+   v15.55 — BANDES INTÉRIEURES / FICHES ZONES COMPLÈTES / ANCRAGE AU CLIC
+   ========================================================================== */
+
+.sia-airspace-popup-compact {
+    min-width: 250px;
+    max-width: 360px;
+    font-size: 16px !important;
+    line-height: 1.30 !important;
+    font-weight: 800 !important;
+}
+
+.sia-airspace-popup-compact,
+.sia-airspace-popup-compact * {
+    font-weight: 800 !important;
+}
+
+.sia-airspace-frequency-block {
+    margin-top: 7px;
+}
+
+.sia-airspace-frequency-detail {
+    margin-top: 2px;
+    padding-left: 8px;
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+    font-weight: 800 !important;
+}
+
+.sia-airspace-extra-row {
+    margin-top: 5px;
+    font-size: 15px !important;
+    line-height: 1.30 !important;
+    font-weight: 800 !important;
+}
+
+.sia-airspace-section {
+    margin-top: 9px;
+    padding-top: 7px;
+    border-top: 1px solid rgba(17, 24, 39, .20);
+}
+
+.sia-airspace-section-title {
+    font-size: 13px !important;
+    line-height: 1.2 !important;
+    font-weight: 900 !important;
+    letter-spacing: .02em;
+}
+
+.sia-airspace-remark {
+    max-height: 170px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
