@@ -1,3 +1,50 @@
+VERSION TEST v15.53 — CORRECTION RÉGRESSION AFFICHAGE SIA
+Date : 17/08/2026
+Base : TEST v15.52
+
+OBJECTIF
+- Corriger uniquement la régression v15.52 qui empêchait l'affichage des zones SIA et des points SIA.
+- Ne modifier aucune des évolutions fonctionnelles validées ou demandées en v15.50 à v15.52.
+
+CAUSE IDENTIFIÉE
+- Lors de la réécriture du bloc de fiche CTR en v15.52, la fonction utilitaire `isCurrentOfflineOaciMap()` a été supprimée par erreur.
+- `getSiaAirspaceStyle()` et `addSiaCtrInnerBand()` continuaient pourtant à appeler cette fonction.
+- Au premier rendu d'une CTR, JavaScript déclenchait donc une erreur de type `ReferenceError: isCurrentOfflineOaciMap is not defined`.
+- Le rafraîchissement SIA s'interrompait à ce moment-là, avant de terminer l'ajout des zones et des points.
+- Cela explique que les zones ET les points disparaissaient ensemble.
+
+CORRECTION
+- Restauration exacte de `isCurrentOfflineOaciMap()` avant `getSiaAirspaceStyle()`.
+- Le comportement v15.51 est rétabli :
+  - fond OACI : géométrie CTR normale invisible mais couche tactile active ;
+  - autres fonds : géométrie CTR affichée normalement.
+- Aucun changement du système tactile v15.50.
+- Aucun changement des seuils d'affichage des points.
+- Aucun changement des données AIRAC.
+- Aucun changement des fréquences supplétives v15.52.
+- Aucun changement du rendu VRP fuchsia / texte blanc / cercle noir.
+- Aucun changement de la fiche CTR v15.52.
+- Aucun changement GLR.
+- Aucun changement VAC.
+- Aucun changement NAS.
+
+DONNÉES SIA
+- Le payload SIA v15.52 est conservé strictement.
+- `npfDatasetRevision` reste 15.52 car le jeu de données lui-même n'est pas modifié.
+- L'iPad n'a donc pas besoin de reconstruire inutilement la base SIA pour cette correction de code.
+
+VALIDATION STATIQUE EFFECTUÉE
+- Présence unique de `function isCurrentOfflineOaciMap()` vérifiée.
+- Appels depuis `getSiaAirspaceStyle()` et `addSiaCtrInnerBand()` résolus.
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.52` vérifiée.
+- Historique v15.52 et antérieur conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.52 — VRP BLANC / FICHE CTR ÉPURÉE / FRÉQUENCES SUPPLÉTIVES
 Date : 17/08/2026
 Base : TEST v15.51
