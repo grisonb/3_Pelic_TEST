@@ -1,3 +1,100 @@
+VERSION TEST v15.52 — VRP BLANC / FICHE CTR ÉPURÉE / FRÉQUENCES SUPPLÉTIVES
+Date : 17/08/2026
+Base : TEST v15.51
+
+OBJECTIFS
+- Conserver le système tactile validé en v15.50/v15.51.
+- Tester les points VFR sur fond fuchsia avec caractères blancs et cercle noir.
+- Épurer encore la fiche des CTR.
+- Afficher chaque type de fréquence sur sa propre ligne.
+- Conserver l'information officielle « fréquence supplétive » issue de XML_SIA pour tous les types de services concernés.
+
+MODIFICATIONS
+
+1. Points VFR / VRP
+- Fond conservé en fuchsia pur #FF00FF.
+- Texte / code du point passe en blanc #FFFFFF.
+- Cercle / contour noir conservé.
+- Aucun changement de taille ni de zone tactile.
+- Seuil d'apparition à l'échelle 5 NM inchangé.
+
+2. Fiche CTR — suppression des intitulés
+- Le titre reste sous la forme :
+  CTR / OACI / NOM
+- Exemple :
+  CTR / LFML / PROVENCE
+- Les libellés « Type », « Classe », « Plancher », « Plafond » et « Fréquence » ne sont plus affichés.
+- Les deux premières lignes deviennent simplement :
+  CTR / D
+  SFC / 2500 ft AMSL
+- Les fréquences conservent uniquement le type de service utile :
+  TWR : ...
+  APP : ...
+  SOL : ...
+  ATIS : ...
+  INFO : ...
+  etc.
+
+3. Fiche CTR — présentation
+- Toutes les informations de la fiche CTR sont affichées en gras.
+- Taille de police du contenu portée à 16 px.
+- Titre porté à 17 px et graisse renforcée.
+- Chaque type de service radio est affiché sur une ligne distincte.
+- Un retour à la ligne est donc systématique entre TWR, APP, SOL et tout autre service.
+
+4. Fréquences supplétives — source officielle XML_SIA
+- Le fichier officiel XML_SIA_2026-08-06.xml est maintenant utilisé pour enrichir les fréquences déjà reliées aux espaces.
+- Aucune fréquence n'est déclarée supplétive par approximation ou proximité géographique.
+- Le suffixe « (s) » est ajouté uniquement lorsque XML_SIA contient explicitement :
+  <Suppletive>oui</Suppletive>
+- Cette règle est générique et vaut pour tous les types de service présents : TWR, APP, SOL/GND, ATIS, INFO, AFIS, FIS, etc.
+- Les fréquences non supplétives sont affichées avant les fréquences supplétives d'un même service.
+- Les fréquences MHz restent normalisées sur trois décimales.
+
+5. LFML / PROVENCE — contrôle explicite
+- XML_SIA donne pour TWR PROVENCE :
+  133.100 MHz : non indiquée supplétive.
+  123.725 MHz : Suppletive = oui.
+- NPF affiche donc :
+  TWR : 133.100 / 123.725 (s)
+- XML_SIA indique également comme supplétives dans les fréquences APP de PROVENCE :
+  127.725 MHz
+  129.475 MHz
+- Elles reçoivent elles aussi automatiquement le suffixe « (s) ».
+
+6. Jeu SIA embarqué
+- npfDatasetRevision passe de 15.49 à 15.52 pour forcer le remplacement de l'ancien jeu IndexedDB sur l'iPad.
+- Source du marqueur supplétif enregistrée : XML_SIA.
+- 34 occurrences de fréquences associées aux espaces sont marquées supplétives.
+- Elles correspondent à 24 couples uniques OACI / service / fréquence.
+- Les autres données AIRAC restent celles de AIRAC 08/26 v04.
+
+7. Éléments inchangés
+- Correction tactile v15.50 conservée.
+- Zones tactiles aéroports/pélicandromes et points SIA inchangées.
+- CTR sélectionnée toujours colorée.
+- Mode carte OACI v15.51 conservé.
+- Ancrage des fenêtres au centre du symbole/zone conservé.
+- Correction GLR v15.51 conservée.
+- Taille et couleur du Q400 v15.51 conservées.
+- Aucun changement VAC.
+- Aucun changement NAS.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe vérifiée.
+- Service Worker : syntaxe vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- Métadonnées du payload : npfDatasetRevision 15.52 vérifiée.
+- Contrôle LFML :
+  TWR 133.100 = non supplétive.
+  TWR 123.725 = supplétive.
+  APP 127.725 = supplétive.
+  APP 129.475 = supplétive.
+- Historique v15.51 et antérieur conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.51 — CTR COMPACTES / OACI / GLR / POSITION PROPRE / VRP
 Date : 17/08/2026
 Base : TEST v15.50
