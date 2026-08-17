@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-48_touch_vrp_ctr_info';
-const APP_VERSION = 'v15.48';
+const SW_VERSION = 'sw-v15-49_touch_ctr_vrp_firehold';
+const APP_VERSION = 'v15.49';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
