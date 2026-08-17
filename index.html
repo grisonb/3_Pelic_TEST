@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.50" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.50">
-    <link rel="manifest" href="manifest.json?appv=v15.50">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.51" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.51">
+    <link rel="manifest" href="manifest.json?appv=v15.51">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.50';
+        const APP_VERSION = 'v15.51';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -487,6 +487,29 @@
         </div>
     </div>
 
+    <div id="global-link-password-modal"
+         class="global-link-auth-modal"
+         style="display: none;"
+         aria-hidden="true">
+        <div class="global-link-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="global-link-password-title">
+            <button id="global-link-password-close" class="global-link-auth-close" type="button" aria-label="Fermer">×</button>
+            <h3 id="global-link-password-title">Global Link Rescue</h3>
+            <p class="global-link-auth-explain">Saisis le mot de passe NPF pour accéder à Global Link.</p>
+            <input id="global-link-password-input"
+                   class="global-link-password-input"
+                   type="password"
+                   autocomplete="current-password"
+                   autocapitalize="none"
+                   spellcheck="false"
+                   placeholder="Mot de passe NPF"
+                   aria-label="Mot de passe NPF Global Link" />
+            <div id="global-link-password-status" class="global-link-auth-status" aria-live="polite"></div>
+            <div class="global-link-auth-actions">
+                <button id="global-link-password-submit" type="button" class="global-link-primary-button">Continuer</button>
+            </div>
+        </div>
+    </div>
+
     <div id="global-link-auth-modal"
          class="global-link-auth-modal"
          style="display: none;"
@@ -783,7 +806,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.50"></script>
+    <script src="script.js?appv=v15.51"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
