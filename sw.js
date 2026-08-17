@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-55_all_airspace_inner_band_details_click_anchor';
-const APP_VERSION = 'v15.55';
+const SW_VERSION = 'sw-v15-56_tma_altitude_chooser_frequencies';
+const APP_VERSION = 'v15.56';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
