@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.49 */
+/* NPF_STYLE_BUILD_VERSION: v15.50 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14961,4 +14961,28 @@ body.gaar-point-search-open .gaar-editing-banner {
     padding: 0 !important;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+}
+
+
+/* ==========================================================================
+   v15.50 — FIABILITÉ TACTILE iPad : TERRAIN / PÉLIC / POINTS SIA
+   ========================================================================== */
+.leaflet-pane.leaflet-npfTouchPane-pane,
+.leaflet-pane.leaflet-siaPointTouchPane-pane {
+    pointer-events: auto !important;
+}
+
+.leaflet-pane.leaflet-npfTouchPane-pane > svg,
+.leaflet-pane.leaflet-siaPointTouchPane-pane > svg,
+.leaflet-pane.leaflet-npfTouchPane-pane path.leaflet-interactive,
+.leaflet-pane.leaflet-siaPointTouchPane-pane path.leaflet-interactive {
+    pointer-events: auto !important;
+}
+
+/* Les anciennes classes DIV restent neutralisées si un cache transitoire les conserve. */
+.npf-airport-touch-hitbox,
+.sia-point-touch-hitbox {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+    background: rgba(0, 0, 0, 0.002) !important;
 }
