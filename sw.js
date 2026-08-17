@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-52_sia_suppletive_ctr_popup_vrp';
-const APP_VERSION = 'v15.52';
+const SW_VERSION = 'sw-v15-53_restore_oaci_sia_helper';
+const APP_VERSION = 'v15.53';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
