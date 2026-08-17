@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.54';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.55';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -41011,38 +41011,106 @@ function formatSiaCtrFrequencyRows(item) {
 
     services.forEach(service => {
         const type = normalizeSiaFrequencyServiceLabel(service?.[0]);
+        const unitName = String(service?.[1] || '').trim();
         const frequencies = Array.isArray(service?.[2]) ? service[2] : [];
-        if (!grouped.has(type)) grouped.set(type, []);
+
+        if (!grouped.has(type)) {
+            grouped.set(type, {
+                unitNames: [],
+                frequencies: []
+            });
+        }
+
+        const group = grouped.get(type);
+        if (unitName && !group.unitNames.includes(unitName)) {
+            group.unitNames.push(unitName);
+        }
 
         frequencies.forEach(freq => {
             const formatted = formatSiaCtrFrequencyValue(freq?.[0], freq?.[1]);
             if (!formatted) return;
 
             const supplementary = Number(freq?.[4] || 0) === 1;
-            const key = `${formatted}|${supplementary ? 1 : 0}`;
-            const list = grouped.get(type);
-            if (!list.some(entry => entry.key === key)) {
-                list.push({ key, value: formatted, supplementary });
+            const hours = String(freq?.[2] || '').trim();
+            const callsign = String(freq?.[3] || '').trim();
+            const key = [
+                formatted,
+                supplementary ? 1 : 0,
+                hours,
+                callsign
+            ].join('|');
+
+            if (!group.frequencies.some(entry => entry.key === key)) {
+                group.frequencies.push({
+                    key,
+                    value: formatted,
+                    supplementary,
+                    hours,
+                    callsign
+                });
             }
         });
     });
 
     return [...grouped.entries()]
-        .filter(([, values]) => values.length)
-        .map(([type, values]) => {
-            /*
-             * Les fréquences normales restent d'abord dans leur ordre SIA/AIXM ;
-             * les fréquences explicitement supplétives sont placées ensuite et
-             * reçoivent le suffixe (s).
-             */
+        .filter(([, group]) => group.frequencies.length)
+        .map(([type, group]) => {
             const ordered = [
-                ...values.filter(v => !v.supplementary),
-                ...values.filter(v => v.supplementary)
+                ...group.frequencies.filter(v => !v.supplementary),
+                ...group.frequencies.filter(v => v.supplementary)
             ];
-            const text = ordered
+
+            const frequencyText = ordered
                 .map(v => `${v.value}${v.supplementary ? ' (s)' : ''}`)
                 .join(' / ');
-            return `<div class="sia-ctr-frequency-row">${escapeHtml(type)} : ${escapeHtml(text)}</div>`;
+
+            const detailPairs = ordered.map(v => ({
+                frequency: `${v.value}${v.supplementary ? ' (s)' : ''}`,
+                hours: v.hours,
+                callsign: v.callsign
+            }));
+
+            const uniqueDetails = new Map();
+            detailPairs.forEach(detail => {
+                const key = `${detail.hours}|${detail.callsign}`;
+                if (!uniqueDetails.has(key)) uniqueDetails.set(key, detail);
+            });
+
+            let detailsHtml = '';
+            if (uniqueDetails.size === 1) {
+                const detail = [...uniqueDetails.values()][0];
+                const detailText = [detail.hours, detail.callsign].filter(Boolean).join(' — ');
+                if (detailText) {
+                    detailsHtml += `<div class="sia-airspace-frequency-detail">${escapeHtml(detailText)}</div>`;
+                }
+            } else {
+                detailPairs.forEach(detail => {
+                    const detailText = [
+                        detail.frequency,
+                        detail.hours,
+                        detail.callsign
+                    ].filter(Boolean).join(' — ');
+                    if (detailText) {
+                        detailsHtml += `<div class="sia-airspace-frequency-detail">${escapeHtml(detailText)}</div>`;
+                    }
+                });
+            }
+
+            const zoneCode = String(item?.c || '').trim().toUpperCase();
+            const zoneName = String(item?.n || '').trim().toUpperCase();
+            const redundantUnit = group.unitNames.length === 1
+                && String(group.unitNames[0]).trim().toUpperCase() === `${zoneCode} ${zoneName}`.trim();
+
+            if (group.unitNames.length && !redundantUnit) {
+                detailsHtml += `<div class="sia-airspace-frequency-detail">${escapeHtml(group.unitNames.join(' / '))}</div>`;
+            }
+
+            return `
+                <div class="sia-airspace-frequency-block">
+                    <div class="sia-ctr-frequency-row">${escapeHtml(type)} : ${escapeHtml(frequencyText)}</div>
+                    ${detailsHtml}
+                </div>
+            `;
         })
         .join('');
 }
@@ -41056,6 +41124,14 @@ function getSiaAirspaceDisplayType(item) {
     return type || 'ESPACE';
 }
 
+function hasSiaVerticalValue(raw) {
+    return Array.isArray(raw) && String(raw?.[1] || '').trim() !== '';
+}
+
+function formatSiaAirspaceRemark(value) {
+    return escapeHtml(String(value || '').trim()).replace(/#|\n/g, '<br>');
+}
+
 function buildSiaAirspacePopup(item) {
     const displayType = getSiaAirspaceDisplayType(item);
     const title = [displayType, item?.c, item?.n].filter(Boolean).join(' / ');
@@ -41063,17 +41139,57 @@ function buildSiaAirspacePopup(item) {
     const vertical = `${formatSiaVertical(item?.lo)} / ${formatSiaVertical(item?.up)}`;
     const frequencyRows = formatSiaCtrFrequencyRows(item);
 
+    const minVertical = hasSiaVerticalValue(item?.mi)
+        ? formatSiaVertical(item.mi)
+        : '';
+    const maxVertical = hasSiaVerticalValue(item?.ma)
+        ? formatSiaVertical(item.ma)
+        : '';
+
+    const activity = String(item?.a || '').trim();
+    const identifier = String(item?.i || '').trim();
+    const code = String(item?.c || '').trim();
+    const remark = String(item?.r || '').trim();
+
     /*
-     * v15.54 — toutes les zones suivent la présentation CTR :
-     * titre TYPE / CODE / NOM, puis TYPE / CLASSE, limites verticales,
-     * puis une ligne distincte par service radio.
+     * v15.55 — présentation identique pour toutes les zones :
+     * - les 3 lignes principales restent sans libellés ;
+     * - toutes les autres données opérationnelles réellement présentes dans
+     *   le payload SIA sont ajoutées ;
+     * - aucune information n'est déduite par proximité.
      */
     return `
         <div class="sia-popup sia-ctr-popup sia-ctr-popup-compact sia-airspace-popup-compact">
             <div class="sia-popup-title">${escapeHtml(title || displayType)}</div>
+
             <div class="sia-ctr-info-row">${escapeHtml(typeClass || displayType)}</div>
             <div class="sia-ctr-info-row">${escapeHtml(vertical)}</div>
+
+            ${minVertical ? `<div class="sia-airspace-extra-row">MIN : ${escapeHtml(minVertical)}</div>` : ''}
+            ${maxVertical ? `<div class="sia-airspace-extra-row">MAX : ${escapeHtml(maxVertical)}</div>` : ''}
+
             ${frequencyRows}
+
+            ${activity ? `
+                <div class="sia-airspace-section">
+                    <div class="sia-airspace-section-title">ACTIVITÉ</div>
+                    <div class="sia-airspace-extra-row">${formatSiaAirspaceRemark(activity)}</div>
+                </div>
+            ` : ''}
+
+            ${identifier && identifier !== code ? `
+                <div class="sia-airspace-section">
+                    <div class="sia-airspace-section-title">IDENTIFIANT</div>
+                    <div class="sia-airspace-extra-row">${escapeHtml(identifier)}</div>
+                </div>
+            ` : ''}
+
+            ${remark ? `
+                <div class="sia-airspace-section">
+                    <div class="sia-airspace-section-title">REMARQUES</div>
+                    <div class="sia-airspace-extra-row sia-airspace-remark">${formatSiaAirspaceRemark(remark)}</div>
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -41300,15 +41416,18 @@ function selectSiaCtrTouchLayer(layer, item, latlng) {
     } catch (_) {}
 
     /*
-     * La fiche finale est toujours ancrée au centre de la géométrie,
-     * pas à la position exacte du doigt.
+     * v15.55 — la fiche s'ouvre au point réellement touché. Cela garantit
+     * qu'elle reste dans le contexte de la zone actuellement visible, même
+     * lorsqu'une grande TMA/CTR/FIR a son centre géométrique hors écran.
      */
-    let popupLatLng = null;
-    try { popupLatLng = layer.getBounds().getCenter(); } catch (_) {}
-    if (!popupLatLng) popupLatLng = latlng;
+    const popupLatLng = latlng;
     if (!popupLatLng) return;
 
-    const popup = L.popup({ maxWidth: 380 })
+    const popup = L.popup({
+        maxWidth: 400,
+        autoPan: true,
+        keepInView: true
+    })
         .setLatLng(popupLatLng)
         .setContent(buildSiaAirspacePopup(item))
         .openOn(map);
@@ -41445,7 +41564,12 @@ function openSiaAirspaceChoicePopup(latlng, candidates) {
 
     container.appendChild(list);
 
-    L.popup({ maxWidth: 390, closeButton: true })
+    L.popup({
+        maxWidth: 390,
+        closeButton: true,
+        autoPan: true,
+        keepInView: true
+    })
         .setLatLng(latlng)
         .setContent(container)
         .openOn(map);
@@ -41574,21 +41698,23 @@ async function refreshSiaLayers(reason = 'manual') {
         airspaceLayer.addTo(siaLayerGroup);
 
         /*
-         * CTR v15.48 : deuxième trait placé réellement à l'intérieur de la
-         * géométrie. Le trait principal reste fin et opaque ; la bande interne
-         * est plus large et semi-transparente. Les CTR composites n'ajoutent
-         * pas une deuxième bande afin d'éviter de foncer les secteurs.
+         * v15.55 : la règle graphique CTR est appliquée à TOUS les espaces :
+         * un trait principal fin + une bande large estompée, décalée vers
+         * l'intérieur de la géométrie. Sur OACI, addSiaCtrInnerBand() ne trace
+         * rien afin de conserver les zones SIA invisibles mais tactiles.
          */
         visibleAirspaceFeatures.forEach(feature => {
             const item = feature.properties.siaItem;
 
-            // v15.54 : toute zone SIA visible reçoit une surface tactile exacte.
+            // Toute zone visible garde sa surface tactile exacte.
             addSiaCtrTouchSurface(feature);
 
-            // La bande interne reste un choix graphique propre aux CTR sur les
-            // fonds non-OACI ; les autres types conservent leur dessin normal.
-            if (item?.t !== 'CTR' || Number(item?.co || 0) === 1) return;
-            addSiaCtrInnerBand(feature.geometry, '#0066ff');
+            // Les objets composites ne redessinent pas une seconde bande afin
+            // d'éviter de foncer artificiellement les limites partagées.
+            if (Number(item?.co || 0) === 1) return;
+
+            const airspaceStyle = getSiaAirspaceStyle(item);
+            addSiaCtrInnerBand(feature.geometry, airspaceStyle.color);
         });
 
         rendered += visibleAirspaceFeatures.length;
