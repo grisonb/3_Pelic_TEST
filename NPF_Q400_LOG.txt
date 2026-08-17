@@ -1,3 +1,47 @@
+VERSION TEST v15.50 — CORRECTION TACTILE CIBLÉE iPad
+Date : 17/08/2026
+Base : TEST v15.49
+
+OBJECTIF UNIQUE
+- Corriger avant toute autre évolution l'impossibilité de sélectionner au toucher les pélicandromes, aérodromes NPF et points SIA/VRP sur iPad.
+
+MODIFICATIONS
+
+1. Retour à une hitbox Leaflet SVG
+- Les hitboxes DOM transparentes introduites en v15.49 sont abandonnées pour les terrains NPF et les points SIA.
+- Retour au principe L.circleMarker qui fonctionnait avant l'intégration SIA, mais avec un renderer SVG dédié.
+- Le remplissage est quasi invisible (opacité 0,002) et non strictement transparent afin de forcer un hit-testing fiable par Safari/WebKit.
+
+2. Pélicandromes / aérodromes NPF
+- Zone tactile maintenue à 64 px de diamètre (rayon 32 px).
+- Pane tactile NPF porté à z-index 665, au-dessus des points et labels SIA, mais sous SafeSky/GLR.
+- pointer-events explicitement activé sur le pane et son SVG.
+- bubblingMouseEvents désactivé afin que le clic carte ne prenne pas le pas sur le clic terrain.
+- Le symbole visible n'est pas agrandi.
+
+3. Points SIA / VRP / ADHP / OTHER
+- Zone tactile maintenue à 56 px de diamètre (rayon 28 px).
+- Pane tactile SIA porté à z-index 660.
+- Hitbox SVG quasi invisible + pointer-events explicite.
+- En sécurité supplémentaire, le symbole SIA visible lui-même devient également cliquable et ouvre la même fiche.
+
+4. Périmètre volontairement inchangé
+- Aucun changement de rendu VRP.
+- Aucun changement de filtre ou d'échelle 5 NM.
+- Aucun changement CTR.
+- Aucun changement AIRAC/IndexedDB : le jeu SIA 15.49 reste valide et n'est pas retéléchargé/réécrit.
+- Aucun changement VAC.
+- Aucun changement NAS.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Versions/cache-busters : contrôlés.
+- Historique : v15.49 et antérieur conservés intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.49 — TACTILE / CTR / VRP FR / ÉCHELLE 5 NM / APPUI FEU
 Date : 17/08/2026
 Base : TEST v15.48
