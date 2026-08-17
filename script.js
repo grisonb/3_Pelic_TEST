@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.57';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.59';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -1099,7 +1099,7 @@ let mqttLoaderPromise = null;
  * Elles ne modifient pas les seuils ni la géométrie des pistes.
  */
 const pelicanAirports = [
-    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.91247778, lon: 4.96578056 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.32189444, lon: 3.35176667 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.545, lon: 4.385 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.85165833, lon: 1.71544444 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.91028611, lon: -0.50519722 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.86016944, lon: 1.17707222 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.38329444, lon: -0.41828611 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.09991111, lon: 6.14021111 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.32211667, lon: 6.06405833 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.52093889, lon: 8.79163889 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.55473889, lon: 6.95103333 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.55261389, lon: 9.48029444 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.53076944, lon: 4.29550556 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.50246667, lon: 9.09424444 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.34998611, lon: 1.47577778 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.43285833, lon: 5.20693889 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.92130278, lon: 8.80351944 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.21362500, lon: 2.31550278 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.71971667, lon: -2.72451111 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.74950833, lon: 4.41295000 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.73623611, lon: 2.87433333 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.82121944, lon: -0.71088333 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }, { oaci: "LFGJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }
+    { oaci: "LFLU", name: "Valence-Chabeuil", lat: 44.91247778, lon: 4.96578056 }, { oaci: "LFMU", name: "Béziers-Vias", lat: 43.32189444, lon: 3.35176667 }, { oaci: "LFJR", name: "Angers-Marcé", lat: 47.560, lon: -0.312 }, { oaci: "LFHO", name: "Aubenas-Ardèche Méridionale", lat: 44.53824722, lon: 4.37033056 }, { oaci: "LFLX", name: "Châteauroux-Déols", lat: 46.85165833, lon: 1.71544444 }, { oaci: "LFBM", name: "Mont-de-Marsan", lat: 43.91028611, lon: -0.50519722 }, { oaci: "LFBL", name: "Limoges-Bellegarde", lat: 45.86016944, lon: 1.17707222 }, { oaci: "LFAQ", name: "Albert-Bray", lat: 49.972, lon: 2.698 }, { oaci: "LFBP", name: "Pau-Pyrénées", lat: 43.38329444, lon: -0.41828611 }, { oaci: "LFTH", name: "Toulon-Hyères", lat: 43.09991111, lon: 6.14021111 }, { oaci: "LFSG", name: "Épinal-Mirecourt", lat: 48.32211667, lon: 6.06405833 }, { oaci: "LFKC", name: "Calvi-Sainte-Catherine", lat: 42.52093889, lon: 8.79163889 }, { oaci: "LFMD", name: "Cannes-Mandelieu", lat: 43.55473889, lon: 6.95103333 }, { oaci: "LFKB", name: "Bastia-Poretta", lat: 42.55261389, lon: 9.48029444 }, { oaci: "LFMH", name: "Saint-Étienne-Bouthéon", lat: 45.53076944, lon: 4.29550556 }, { oaci: "LFKF", name: "Figari-Sud-Corse", lat: 41.50246667, lon: 9.09424444 }, { oaci: "LFCC", name: "Cahors-Lalbenque", lat: 44.34998611, lon: 1.47577778 }, { oaci: "LFML", name: "Marseille-Provence", lat: 43.43285833, lon: 5.20693889 }, { oaci: "LFKJ", name: "Ajaccio-Napoléon-Bonaparte", lat: 41.92130278, lon: 8.80351944 }, { oaci: "LFMK", name: "Carcassonne-Salvaza", lat: 43.21362500, lon: 2.31550278 }, { oaci: "LFRV", name: "Vannes-Meucon", lat: 47.71971667, lon: -2.72451111 }, { oaci: "LFTW", name: "Nîmes-Garons", lat: 43.74950833, lon: 4.41295000 }, { oaci: "LFMP", name: "Perpignan-Rivesaltes", lat: 42.73623611, lon: 2.87433333 }, { oaci: "LFBD", name: "Bordeaux-Mérignac", lat: 44.82121944, lon: -0.71088333 }, { oaci: "LFCR", name: "Rodez-Aveyron", lat: 44.4079, lon: 2.4827 }, { oaci: "LFBN", name: "Niort-Souché", lat: 46.3135, lon: -0.3945 }, { oaci: "LFGJ", name: "Dole-Tavaux", lat: 47.039, lon: 5.428 }
 ];
 
 
@@ -16425,7 +16425,10 @@ function drawRoute(startLatLng, endLatLng, options = {}) {
         const tooltipClass = isSelected
             ? 'route-tooltip route-tooltip-selected route-tooltip-near-icon'
             : 'route-tooltip route-tooltip-other-pelic route-tooltip-near-icon';
-        labelText = `<div class="route-label-oaci">${oaci}</div><div class="route-label-sub">${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</div>`;
+        const baseFlag = selectedBaseOACI === oaci
+            ? '<div class="route-label-base-flag">BASE</div>'
+            : '';
+        labelText = `${baseFlag}<div class="route-label-oaci">${oaci}</div><div class="route-label-sub">${Math.round(distance)} Nm / ${formatFlightTimeLabel(distance)}</div>`;
 
         L.polyline([startLatLng, endLatLng], {
             color: '#ffffff',
@@ -32572,16 +32575,27 @@ function openMapLongPressActionPopup(latlng, zoneCandidates) {
         event.stopPropagation();
         try { map.closePopup(); } catch (_) {}
 
-        if (zoneCandidates.length === 1) {
+        /*
+         * L'autoPan de cette popup peut avoir déclenché un refresh SIA.
+         * On recalcule donc les candidats à l'instant du choix.
+         */
+        let currentCandidates = [];
+        try {
+            currentCandidates = getSiaAirspaceTouchCandidates(latlng);
+        } catch (_) {}
+        if (!currentCandidates.length) currentCandidates = zoneCandidates;
+
+        if (currentCandidates.length === 1) {
             selectSiaCtrTouchLayer(
-                zoneCandidates[0].layer,
-                zoneCandidates[0].item,
-                latlng
+                currentCandidates[0].layer,
+                currentCandidates[0].item,
+                latlng,
+                currentCandidates[0].geometry
             );
             return;
         }
 
-        openSiaAirspaceChoicePopup(latlng, zoneCandidates);
+        openSiaAirspaceChoicePopup(latlng, currentCandidates);
     });
 
     container.appendChild(fireButton);
@@ -32642,7 +32656,12 @@ function installMapFireLongPressDelay() {
         startX: 0,
         startY: 0,
         timer: null,
-        suppressContextMenuUntil: 0
+        longPressReady: false,
+        pendingLatLng: null,
+        suppressContextMenuUntil: 0,
+        suppressSyntheticClickUntil: 0,
+        suppressClickX: 0,
+        suppressClickY: 0
     };
 
     const clearTimer = () => {
@@ -32652,16 +32671,17 @@ function installMapFireLongPressDelay() {
         }
     };
 
-    const reset = () => {
+    const resetGesture = () => {
         clearTimer();
         state.active = false;
         state.pointerId = null;
+        state.longPressReady = false;
+        state.pendingLatLng = null;
     };
 
     const isInteractiveTarget = target => {
         try {
-            // La surface des zones SIA doit laisser passer l'appui long vers
-            // le gestionnaire carte, contrairement aux autres objets interactifs.
+            // Les surfaces des espaces SIA doivent recevoir l'appui long carte.
             if (target?.closest?.('.sia-airspace-touch-surface')) return false;
 
             return !!target?.closest?.(
@@ -32672,26 +32692,44 @@ function installMapFireLongPressDelay() {
         }
     };
 
+    /*
+     * Neutralise uniquement le clic synthétique envoyé par Safari après
+     * l'appui long. Les vrais clics dans la popup restent toujours autorisés.
+     */
+    container.addEventListener('click', event => {
+        if (Date.now() >= Number(state.suppressSyntheticClickUntil || 0)) return;
+        if (event?.target?.closest?.('.leaflet-popup')) return;
+
+        const dx = (Number(event.clientX) || 0) - Number(state.suppressClickX || 0);
+        const dy = (Number(event.clientY) || 0) - Number(state.suppressClickY || 0);
+        if (Math.hypot(dx, dy) > 48) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+        state.suppressSyntheticClickUntil = 0;
+    }, true);
+
     container.addEventListener('pointerdown', event => {
         if (String(event.pointerType || '').toLowerCase() !== 'touch') return;
 
         if (event.isPrimary === false) {
-            reset();
+            resetGesture();
             return;
         }
 
         if (isDrawingMode || isInteractiveTarget(event.target)) {
-            reset();
+            resetGesture();
             return;
         }
 
-        reset();
+        resetGesture();
         state.active = true;
         state.pointerId = event.pointerId;
         state.startX = Number(event.clientX) || 0;
         state.startY = Number(event.clientY) || 0;
 
-        state.timer = setTimeout(async () => {
+        state.timer = setTimeout(() => {
             if (!state.active || state.pointerId !== event.pointerId) return;
 
             const rect = container.getBoundingClientRect();
@@ -32699,16 +32737,15 @@ function installMapFireLongPressDelay() {
                 state.startX - rect.left,
                 state.startY - rect.top
             );
-            const latlng = map.containerPointToLatLng(point);
 
             state.timer = null;
-            state.suppressContextMenuUntil = Date.now() + 1100;
+            state.longPressReady = true;
+            state.pendingLatLng = map.containerPointToLatLng(point);
+            state.suppressContextMenuUntil = Date.now() + 1800;
 
             try {
                 if (navigator.vibrate) navigator.vibrate(30);
             } catch (_) {}
-
-            await executeMapLongPressAction(latlng);
         }, NPF_FIRE_LONG_PRESS_DELAY_MS);
     }, { passive: true });
 
@@ -32716,15 +32753,59 @@ function installMapFireLongPressDelay() {
         if (!state.active || state.pointerId !== event.pointerId) return;
         const dx = (Number(event.clientX) || 0) - state.startX;
         const dy = (Number(event.clientY) || 0) - state.startY;
+
         if (Math.hypot(dx, dy) > NPF_FIRE_LONG_PRESS_MOVE_TOLERANCE_PX) {
-            reset();
+            resetGesture();
         }
     }, { passive: true });
 
-    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
+    /*
+     * v15.59 — la popup n'est PLUS ouverte pendant que le doigt est posé.
+     * Le seuil de 1,2 s valide l'appui long ; l'action est exécutée seulement
+     * au pointerup. Cela évite que le relâchement ferme immédiatement la popup
+     * sur iPad/Safari, notamment sur les zones R.
+     */
+    container.addEventListener('pointerup', event => {
+        if (state.pointerId !== null
+            && event.pointerId !== undefined
+            && event.pointerId !== state.pointerId) {
+            return;
+        }
+
+        const shouldExecute = state.active
+            && state.longPressReady
+            && !!state.pendingLatLng;
+
+        const pendingLatLng = state.pendingLatLng;
+        const clickX = state.startX;
+        const clickY = state.startY;
+
+        if (shouldExecute) {
+            state.suppressContextMenuUntil = Date.now() + 1400;
+            state.suppressSyntheticClickUntil = Date.now() + 1100;
+            state.suppressClickX = clickX;
+            state.suppressClickY = clickY;
+        }
+
+        resetGesture();
+
+        if (shouldExecute) {
+            setTimeout(() => {
+                executeMapLongPressAction(pendingLatLng).catch(error => {
+                    console.warn('[Carte] Appui long impossible:', error);
+                });
+            }, 0);
+        }
+    }, { passive: true });
+
+    ['pointercancel', 'lostpointercapture'].forEach(type => {
         container.addEventListener(type, event => {
-            if (state.pointerId !== null && event.pointerId !== undefined && event.pointerId !== state.pointerId) return;
-            reset();
+            if (state.pointerId !== null
+                && event.pointerId !== undefined
+                && event.pointerId !== state.pointerId) {
+                return;
+            }
+            resetGesture();
         }, { passive: true });
     });
 }
@@ -40091,10 +40172,13 @@ let siaLayerGroup = null;
 let siaAirspaceRenderer = null;
 let siaCtrTouchRenderer = null;
 let siaPointRenderer = null;
+let siaSelectionRenderer = null;
+let siaSelectionLayer = null;
 /* v15.54 — la surface tactile "CTR" est généralisée à tous les espaces SIA. */
 let siaSelectedCtrTouchLayer = null;
 let siaSelectedCtrKey = null;
 let siaSelectedAirspaceItem = null;
+let siaSelectedAirspaceGeometry = null;
 let siaAirspaceTouchEntries = [];
 let siaRefreshTimer = null;
 let siaFilterPrefs = null;
@@ -40265,6 +40349,15 @@ function ensureSiaMapPanes() {
         if (pane) pane.style.zIndex = '445';
     }
 
+    if (!map.getPane('siaSelectionPane')) {
+        map.createPane('siaSelectionPane');
+        const pane = map.getPane('siaSelectionPane');
+        if (pane) {
+            pane.style.zIndex = '448';
+            pane.style.pointerEvents = 'none';
+        }
+    }
+
     if (!map.getPane('siaPointPane')) {
         map.createPane('siaPointPane');
         const pane = map.getPane('siaPointPane');
@@ -40304,15 +40397,20 @@ function ensureSiaMapPanes() {
     if (!siaCtrTouchRenderer && L.svg) {
         siaCtrTouchRenderer = L.svg({ padding: 0.35, pane: 'siaCtrTouchPane' });
     }
+    if (!siaSelectionRenderer && L.svg) {
+        siaSelectionRenderer = L.svg({ padding: 0.35, pane: 'siaSelectionPane' });
+    }
     if (!siaPointRenderer && L.canvas) {
         siaPointRenderer = L.canvas({ padding: 0.35, pane: 'siaPointPane' });
     }
 }
 
 function clearSiaRenderedLayers() {
+    clearSiaSelectionHighlight();
     siaSelectedCtrTouchLayer = null;
     siaSelectedCtrKey = null;
     siaSelectedAirspaceItem = null;
+    siaSelectedAirspaceGeometry = null;
     siaAirspaceTouchEntries = [];
     if (siaLayerGroup) {
         try { siaLayerGroup.clearLayers(); } catch (_) {}
@@ -40347,8 +40445,8 @@ function getSiaFilterSections(dataset) {
         OCA: 'OCA',
         SECTOR: 'SECTOR',
         'SECTOR-C': 'SECTOR-C',
-        RAS: 'RAS',
-        TRA: 'TRA',
+        RAS: 'RAS — Autres espaces réglementés',
+        TRA: 'TRA — Zone temporairement réservée',
         P: 'Zones P',
         R: 'Zones R',
         D: 'Zones D'
@@ -40358,6 +40456,21 @@ function getSiaFilterSections(dataset) {
         'AER', 'VOL', 'SUR', 'PJE', 'PRN', 'TRVL', 'TRPLA',
         'AP', 'LTA', 'BAL', 'UAC', 'ACC', 'TRPVL'
     ];
+    const dOtherLabels = {
+        AER: 'AER — Aéromodélisme',
+        VOL: 'VOL — Voltige',
+        SUR: 'SUR — Restriction de survol',
+        PJE: 'PJE — Parachutage',
+        PRN: 'PRN — Parcs / réserves naturelles',
+        TRVL: 'TRVL — Treuillage vol libre',
+        TRPLA: 'TRPLA — Treuillage planeurs',
+        AP: 'AP — Activité particulière / UAS',
+        LTA: 'LTA — Lower Traffic Area',
+        BAL: 'BAL — Ballons',
+        UAC: 'UAC — Contrôle supérieur',
+        ACC: 'ACC — Contrôle régional',
+        TRPVL: 'TRPVL — Treuillage planeurs / vol libre'
+    };
 
     const sections = [
         {
@@ -40391,7 +40504,7 @@ function getSiaFilterSections(dataset) {
             items: dOtherOrder
                 .map(type => ({
                     key: `ase:D-OTHER:${type}`,
-                    label: type,
+                    label: dOtherLabels[type] || type,
                     count: count(`ase:D-OTHER:${type}`)
                 }))
                 .filter(item => item.count > 0)
@@ -41345,6 +41458,50 @@ function isSiaTechnicalTmaUnionParent(item) {
         && Number(item?.tp || 0) === 1;
 }
 
+function normalizeSiaTmaFamilyName(value) {
+    return String(value || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, ' ');
+}
+
+function getSiaTmaFamilyBaseFromSectorName(value) {
+    const normalized = normalizeSiaTmaFamilyName(value);
+    if (!normalized) return '';
+    return normalized.replace(/\s+\d+(?:\.\d+)*$/, '').trim();
+}
+
+function hasSiaTmaVerticalLimits(item) {
+    return hasSiaVerticalValue(item?.lo) || hasSiaVerticalValue(item?.up);
+}
+
+function buildSiaTmaOperationalFamilySet(dataset) {
+    const families = new Set();
+
+    for (const item of dataset?.airspaces || []) {
+        if (String(item?.t || '').toUpperCase() !== 'TMA') continue;
+        if (!hasSiaTmaVerticalLimits(item)) continue;
+
+        const name = normalizeSiaTmaFamilyName(item?.n);
+        const family = getSiaTmaFamilyBaseFromSectorName(name);
+
+        if (family && family !== name) {
+            families.add(family);
+        }
+    }
+    return families;
+}
+
+function isSiaGenericTmaWithoutAltitude(item, operationalFamilies) {
+    if (String(item?.t || '').toUpperCase() !== 'TMA') return false;
+    if (hasSiaTmaVerticalLimits(item)) return false;
+
+    const name = normalizeSiaTmaFamilyName(item?.n);
+    return !!name
+        && operationalFamilies instanceof Set
+        && operationalFamilies.has(name);
+}
+
 function hasSiaVerticalValue(raw) {
     return Array.isArray(raw) && String(raw?.[1] || '').trim() !== '';
 }
@@ -41595,52 +41752,109 @@ function getSiaAirspaceSelectionColor(item) {
     }
 }
 
-function resetSelectedSiaCtrTouchLayer(clearKey = true) {
-    if (siaSelectedCtrTouchLayer && typeof siaSelectedCtrTouchLayer.setStyle === 'function') {
-        try {
-            siaSelectedCtrTouchLayer.setStyle({
-                color: 'transparent',
-                weight: 0,
-                opacity: 0,
-                fillColor: getSiaAirspaceSelectionColor(siaSelectedAirspaceItem),
-                fillOpacity: 0.001
-            });
-        } catch (_) {}
+function ensureSiaSelectionLayer() {
+    if (!map) return null;
+    ensureSiaMapPanes();
+
+    if (!siaSelectionLayer) {
+        siaSelectionLayer = L.layerGroup().addTo(map);
     }
+    return siaSelectionLayer;
+}
+
+function clearSiaSelectionHighlight() {
+    if (siaSelectionLayer) {
+        try { siaSelectionLayer.clearLayers(); } catch (_) {}
+    }
+}
+
+function drawSiaSelectionHighlight(item, geometry) {
+    if (!map || !item || !geometry) return;
+
+    const targetLayer = ensureSiaSelectionLayer();
+    if (!targetLayer) return;
+
+    clearSiaSelectionHighlight();
+
+    const selectionColor = getSiaAirspaceSelectionColor(item);
+    const feature = {
+        type: 'Feature',
+        properties: {},
+        geometry
+    };
+
+    const highlight = L.geoJSON(feature, {
+        pane: 'siaSelectionPane',
+        renderer: siaSelectionRenderer || undefined,
+        interactive: false,
+        style: {
+            color: selectionColor,
+            weight: 2.6,
+            opacity: 1,
+            fillColor: selectionColor,
+            fillOpacity: 0.18,
+            lineCap: 'round',
+            lineJoin: 'round',
+            interactive: false
+        },
+        pointToLayer: (_feature, latlng) => L.circleMarker(latlng, {
+            pane: 'siaSelectionPane',
+            renderer: siaSelectionRenderer || undefined,
+            radius: 11,
+            color: selectionColor,
+            weight: 3,
+            opacity: 1,
+            fillColor: selectionColor,
+            fillOpacity: 0.35,
+            interactive: false
+        })
+    });
+
+    highlight.addTo(targetLayer);
+}
+
+function resetSelectedSiaCtrTouchLayer(clearKey = true) {
+    clearSiaSelectionHighlight();
     siaSelectedCtrTouchLayer = null;
     siaSelectedAirspaceItem = null;
+    siaSelectedAirspaceGeometry = null;
     if (clearKey) siaSelectedCtrKey = null;
 }
 
-function selectSiaCtrTouchLayer(layer, item, latlng) {
-    if (!map || !layer || !item) return;
+function selectSiaCtrTouchLayer(layer, item, latlng, geometry = null) {
+    if (!map || !item) return;
 
-    if (siaSelectedCtrTouchLayer && siaSelectedCtrTouchLayer !== layer) {
+    const selectionKey = getSiaCtrSelectionKey(item);
+
+    if (siaSelectedCtrKey && siaSelectedCtrKey !== selectionKey) {
         resetSelectedSiaCtrTouchLayer(false);
     }
 
-    siaSelectedCtrTouchLayer = layer;
-    siaSelectedCtrKey = getSiaCtrSelectionKey(item);
-    siaSelectedAirspaceItem = item;
-
-    const selectionColor = getSiaAirspaceSelectionColor(item);
-
-    try {
-        layer.setStyle({
-            color: selectionColor,
-            weight: 1.6,
-            opacity: 0.78,
-            fillColor: selectionColor,
-            fillOpacity: 0.18
-        });
-        layer.bringToFront?.();
-    } catch (_) {}
-
     /*
-     * v15.55 — la fiche s'ouvre au point réellement touché. Cela garantit
-     * qu'elle reste dans le contexte de la zone actuellement visible, même
-     * lorsqu'une grande TMA/CTR/FIR a son centre géométrique hors écran.
+     * v15.59 — la coloration ne dépend plus de la couche tactile.
+     * Une popup Leaflet avec autoPan peut déclencher moveend puis reconstruire
+     * les couches SIA. La géométrie sélectionnée est donc surlignée dans une
+     * couche indépendante qui survit au rafraîchissement.
      */
+    let selectedGeometry = geometry;
+    if (!selectedGeometry) {
+        const currentEntry = siaAirspaceTouchEntries.find(entry =>
+            entry?.layer === layer
+            || getSiaCtrSelectionKey(entry?.item) === selectionKey
+        );
+        selectedGeometry = currentEntry?.geometry || null;
+        if (currentEntry?.layer) layer = currentEntry.layer;
+    }
+
+    siaSelectedCtrTouchLayer = layer || null;
+    siaSelectedCtrKey = selectionKey;
+    siaSelectedAirspaceItem = item;
+    siaSelectedAirspaceGeometry = selectedGeometry;
+
+    if (selectedGeometry) {
+        drawSiaSelectionHighlight(item, selectedGeometry);
+    }
+
     const popupLatLng = latlng;
     if (!popupLatLng) return;
 
@@ -41656,7 +41870,12 @@ function selectSiaCtrTouchLayer(layer, item, latlng) {
     const onPopupClose = event => {
         if (event?.popup !== popup) return;
         map.off('popupclose', onPopupClose);
-        if (siaSelectedCtrTouchLayer === layer) {
+
+        /*
+         * La couche tactile a pu être reconstruite pendant l'autoPan.
+         * On compare donc la clé métier, pas la référence Leaflet du layer.
+         */
+        if (siaSelectedCtrKey === selectionKey) {
             resetSelectedSiaCtrTouchLayer(true);
         }
     };
@@ -41697,6 +41916,53 @@ function siaPointInPolygonCoordinates(lng, lat, polygonCoordinates) {
     return true;
 }
 
+function siaDistancePointToSegmentPx(point, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return Infinity;
+
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq <= 1e-9) return point.distanceTo(a);
+
+    let t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq;
+    t = Math.max(0, Math.min(1, t));
+
+    return point.distanceTo(L.point(
+        a.x + t * dx,
+        a.y + t * dy
+    ));
+}
+
+function siaPointGeometryDistancePx(latlng, coordinate) {
+    if (!map || !latlng || !Array.isArray(coordinate) || coordinate.length < 2) return Infinity;
+    const lng = Number(coordinate[0]);
+    const lat = Number(coordinate[1]);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return Infinity;
+
+    const a = map.latLngToLayerPoint(latlng);
+    const b = map.latLngToLayerPoint(L.latLng(lat, lng));
+    return a.distanceTo(b);
+}
+
+function siaLineGeometryDistancePx(latlng, coordinates) {
+    if (!map || !latlng || !Array.isArray(coordinates) || coordinates.length < 2) return Infinity;
+
+    const point = map.latLngToLayerPoint(latlng);
+    let best = Infinity;
+
+    for (let i = 1; i < coordinates.length; i += 1) {
+        const c1 = coordinates[i - 1];
+        const c2 = coordinates[i];
+        if (!Array.isArray(c1) || !Array.isArray(c2) || c1.length < 2 || c2.length < 2) continue;
+
+        const a = map.latLngToLayerPoint(L.latLng(Number(c1[1]), Number(c1[0])));
+        const b = map.latLngToLayerPoint(L.latLng(Number(c2[1]), Number(c2[0])));
+        best = Math.min(best, siaDistancePointToSegmentPx(point, a, b));
+    }
+
+    return best;
+}
+
 function siaGeometryContainsLatLng(geometry, latlng) {
     if (!geometry || !latlng) return false;
     const lng = Number(latlng.lng);
@@ -41706,11 +41972,39 @@ function siaGeometryContainsLatLng(geometry, latlng) {
     if (geometry.type === 'Polygon') {
         return siaPointInPolygonCoordinates(lng, lat, geometry.coordinates);
     }
+
     if (geometry.type === 'MultiPolygon') {
         return (geometry.coordinates || []).some(poly =>
             siaPointInPolygonCoordinates(lng, lat, poly)
         );
     }
+
+    /*
+     * v15.59 — une grande partie des D-OTHER SIA (AER, VOL, SUR, PJE,
+     * PRN, TRVL, TRPLA, AP, BAL...) est publiée comme un point AIXM.
+     * La sélection est donc faite avec une tolérance tactile en pixels.
+     */
+    if (geometry.type === 'Point') {
+        return siaPointGeometryDistancePx(latlng, geometry.coordinates) <= 30;
+    }
+
+    if (geometry.type === 'MultiPoint') {
+        return (geometry.coordinates || []).some(coord =>
+            siaPointGeometryDistancePx(latlng, coord) <= 30
+        );
+    }
+
+    // Prévu également pour d'éventuelles géométries linéaires futures.
+    if (geometry.type === 'LineString') {
+        return siaLineGeometryDistancePx(latlng, geometry.coordinates) <= 18;
+    }
+
+    if (geometry.type === 'MultiLineString') {
+        return (geometry.coordinates || []).some(line =>
+            siaLineGeometryDistancePx(latlng, line) <= 18
+        );
+    }
+
     return false;
 }
 
@@ -41728,7 +42022,11 @@ function getSiaAirspaceChoicePriority(item) {
 }
 
 function getSiaAirspaceTouchCandidates(latlng) {
+    const operationalFamilies = buildSiaTmaOperationalFamilySet(siaDataset);
+
     return siaAirspaceTouchEntries
+        .filter(entry => !isSiaTechnicalTmaUnionParent(entry.item))
+        .filter(entry => !isSiaGenericTmaWithoutAltitude(entry.item, operationalFamilies))
         .filter(entry => siaGeometryContainsLatLng(entry.geometry, latlng))
         .sort((a, b) => {
             const pa = getSiaAirspaceChoicePriority(a.item);
@@ -41795,7 +42093,7 @@ function openSiaAirspaceChoicePopup(latlng, candidates) {
             event.preventDefault();
             event.stopPropagation();
             try { map.closePopup(); } catch (_) {}
-            selectSiaCtrTouchLayer(entry.layer, entry.item, latlng);
+            selectSiaCtrTouchLayer(entry.layer, entry.item, latlng, entry.geometry);
         });
 
         list.appendChild(button);
@@ -41819,7 +42117,12 @@ function handleSiaAirspaceTouch(latlng) {
 
     if (!candidates.length) return;
     if (candidates.length === 1) {
-        selectSiaCtrTouchLayer(candidates[0].layer, candidates[0].item, latlng);
+        selectSiaCtrTouchLayer(
+            candidates[0].layer,
+            candidates[0].item,
+            latlng,
+            candidates[0].geometry
+        );
         return;
     }
 
@@ -41835,32 +42138,72 @@ function addSiaCtrTouchSurface(feature) {
     const item = feature.properties.siaItem;
     const selectionColor = getSiaAirspaceSelectionColor(item);
 
+    const neutralizeShortClick = event => {
+        try {
+            if (event?.originalEvent) {
+                L.DomEvent.stopPropagation(event.originalEvent);
+                L.DomEvent.preventDefault(event.originalEvent);
+            }
+        } catch (_) {}
+    };
+
     const touchGeoJson = L.geoJSON(feature, {
         pane: 'siaCtrTouchPane',
         renderer: siaCtrTouchRenderer || undefined,
-        style: {
-            color: 'transparent',
-            weight: 0,
+
+        /*
+         * v15.59 — important pour les D-OTHER ponctuels :
+         * sans pointToLayer, Leaflet crée son Marker PNG par défaut. Dans la
+         * PWA, l'icône peut être absente et apparaître sous forme de « ? ».
+         * On utilise maintenant un cercle SVG tactile quasi invisible.
+         */
+        pointToLayer: (_feature, latlng) => L.circleMarker(latlng, {
+            pane: 'siaCtrTouchPane',
+            renderer: siaCtrTouchRenderer || undefined,
+            radius: 30,
+            stroke: false,
+            color: selectionColor,
             opacity: 0,
+            fill: true,
             fillColor: selectionColor,
-            fillOpacity: 0.001,
+            fillOpacity: 0.002,
             interactive: true,
+            bubblingMouseEvents: false,
+            keyboard: false,
             className: 'sia-airspace-touch-surface'
+        }),
+
+        style: geoFeature => {
+            const geometryType = String(geoFeature?.geometry?.type || '');
+
+            if (geometryType === 'LineString' || geometryType === 'MultiLineString') {
+                return {
+                    color: selectionColor,
+                    weight: 30,
+                    opacity: 0.002,
+                    fillOpacity: 0,
+                    interactive: true,
+                    className: 'sia-airspace-touch-surface'
+                };
+            }
+
+            return {
+                color: 'transparent',
+                weight: 0,
+                opacity: 0,
+                fillColor: selectionColor,
+                fillOpacity: 0.001,
+                interactive: true,
+                className: 'sia-airspace-touch-surface'
+            };
         },
+
         onEachFeature: (_feature, layer) => {
             /*
-             * v15.57 — un appui court sur une zone ne la sélectionne plus.
-             * Le click est neutralisé ; la sélection passe exclusivement par
-             * l'appui long carte (1,2 s) puis « Sélection Zone ».
+             * L'appui court reste neutralisé : toute sélection d'espace se fait
+             * par appui long puis « Sélection Zone ».
              */
-            layer.on('click', event => {
-                try {
-                    if (event?.originalEvent) {
-                        L.DomEvent.stopPropagation(event.originalEvent);
-                        L.DomEvent.preventDefault(event.originalEvent);
-                    }
-                } catch (_) {}
-            });
+            layer.on('click', neutralizeShortClick);
         }
     });
 
@@ -41884,12 +42227,16 @@ async function refreshSiaLayers(reason = 'manual') {
     }
 
     const dataset = await ensureSiaDatasetLoaded();
+    const siaTmaOperationalFamilies = buildSiaTmaOperationalFamilySet(dataset);
+
     if (!siaLayerGroup) {
         siaLayerGroup = L.layerGroup().addTo(map);
     }
+    /*
+     * v15.59 — un moveend/zoomend ne doit plus effacer la sélection en cours.
+     * Seule la référence à l'ancienne surface tactile est abandonnée.
+     */
     siaSelectedCtrTouchLayer = null;
-    siaSelectedCtrKey = null;
-    siaSelectedAirspaceItem = null;
     siaAirspaceTouchEntries = [];
     siaLayerGroup.clearLayers();
 
@@ -41900,6 +42247,16 @@ async function refreshSiaLayers(reason = 'manual') {
     const visibleAirspaceFeatures = [];
     for (const item of dataset.airspaces || []) {
         if (!isSiaFilterEnabled(item.k)) continue;
+
+        // Parents techniques AIXM déjà identifiés en v15.57.
+        if (isSiaTechnicalTmaUnionParent(item)) continue;
+
+        // v15.58 : règle générale pour TOUTES les familles TMA.
+        // Si une TMA sans altitude porte le nom générique d'une famille
+        // possédant des secteurs verticaux (ex. PROVENCE, NICE...), elle
+        // n'est ni dessinée ni rendue sélectionnable.
+        if (isSiaGenericTmaWithoutAltitude(item, siaTmaOperationalFamilies)) continue;
+
         if (!item.g) continue;
         if (!siaBoundsIntersects(item.b, bounds)) continue;
 
