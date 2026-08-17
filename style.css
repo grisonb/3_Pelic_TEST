@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.55 */
+/* NPF_STYLE_BUILD_VERSION: v15.56 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15189,4 +15189,25 @@ body.gaar-point-search-open .gaar-editing-banner {
     max-height: 170px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+}
+
+
+/* ==========================================================================
+   v15.56 — SUPERPOSITION TMA : NOM + TRANCHE VERTICALE
+   ========================================================================== */
+
+.sia-airspace-choice-name {
+    display: block;
+    font-size: 14px;
+    line-height: 1.20;
+    font-weight: 900;
+}
+
+.sia-airspace-choice-vertical {
+    display: block;
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.18;
+    font-weight: 800;
+    opacity: .78;
 }
