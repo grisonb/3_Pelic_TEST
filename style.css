@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.51 */
+/* NPF_STYLE_BUILD_VERSION: v15.52 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15041,4 +15041,42 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 .sia-ctr-popup-compact > div:not(.sia-popup-title) {
     margin-top: 5px;
+}
+
+
+/* ==========================================================================
+   v15.52 — VRP FUCHSIA / FICHE CTR / FRÉQUENCES SUPPLÉTIVES
+   ========================================================================== */
+
+/* VRP : fond fuchsia, texte blanc, cercle noir. */
+.sia-vrp-symbol {
+    background: #ff00ff !important;
+    color: #ffffff !important;
+    border-color: #000000 !important;
+    font-weight: 900 !important;
+}
+
+/* Fiche CTR : informations seules, plus grandes et toutes en gras. */
+.sia-ctr-popup-compact {
+    min-width: 240px;
+    font-size: 16px !important;
+    line-height: 1.30 !important;
+    font-weight: 800 !important;
+}
+.sia-ctr-popup-compact .sia-popup-title {
+    font-size: 17px !important;
+    line-height: 1.25 !important;
+    font-weight: 900 !important;
+    margin-bottom: 7px !important;
+}
+.sia-ctr-info-row,
+.sia-ctr-frequency-row {
+    display: block;
+    margin-top: 4px;
+    font-size: 16px !important;
+    line-height: 1.30 !important;
+    font-weight: 800 !important;
+}
+.sia-ctr-frequency-row {
+    white-space: normal;
 }
