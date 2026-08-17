@@ -1,3 +1,107 @@
+VERSION TEST v15.55 — CONTOURS INTÉRIEURS / INFOS ZONES COMPLÈTES / FENÊTRE AU CLIC
+Date : 17/08/2026
+Base : TEST v15.54
+
+OBJECTIFS
+- Appliquer à tous les espaces/zones le même rendu de limite utilisé pour les CTR :
+  trait principal + trait large estompé placé à l'intérieur.
+- Afficher toutes les informations opérationnelles disponibles dans le payload SIA pour la zone sélectionnée.
+- Ouvrir la fenêtre d'information exactement à l'endroit du clic, y compris pour les CTR.
+
+1. CONTOUR DES ZONES — RÈGLE CTR GÉNÉRALISÉE
+- Toutes les zones SIA visibles et activées utilisent désormais :
+  - le contour principal fin ;
+  - une bande plus large, semi-transparente, décalée à l'intérieur de la zone.
+- La bande interne utilise la couleur propre au type de zone.
+- Le principe s'applique notamment à :
+  CTR, TMA, CTA, P, R, D, TRA, FIR, UIR, UIR-P, UTA, OCA, SECTOR, SECTOR-C, RAS et D-OTHER.
+- L'algorithme géométrique utilisé est le même que celui validé précédemment pour les CTR :
+  décalage intérieur d'environ 6 px, largeur 10 px, opacité 0,22.
+- Les objets composites `co:1` ne reçoivent pas de deuxième bande afin d'éviter de foncer artificiellement les limites communes.
+- Sur fond OACI, aucune bande interne SIA n'est dessinée : toutes les zones restent invisibles mais tactiles, conformément à la règle précédente.
+
+2. FICHE DE ZONE — INFORMATIONS PRINCIPALES
+- Le format compact demandé est conservé.
+- Titre :
+  TYPE / CODE / NOM
+- Ligne suivante :
+  TYPE / CLASSE
+- Puis :
+  PLANCHER / PLAFOND
+- Les libellés « Type », « Classe », « Plancher », « Plafond » et « Fréquence » restent supprimés.
+- Toutes les informations sont affichées en gras.
+
+3. LIMITES VERTICALES COMPLÉMENTAIRES
+- Lorsque les données SIA fournissent les champs verticaux complémentaires `mi` ou `ma`, ils sont maintenant affichés.
+- Ils apparaissent sous la forme :
+  MIN : ...
+  MAX : ...
+- La conversion reste cohérente avec les autres limites :
+  SFC, ft AGL, ft AMSL, FL, etc.
+- Ces lignes n'apparaissent que si la donnée existe réellement.
+
+4. FRÉQUENCES — INFORMATIONS COMPLÈTES
+- Une ligne principale distincte reste affichée par service :
+  TWR, APP, SOL, INFO, ATIS, AFIS, FIS, etc.
+- Toutes les fréquences liées au service sont conservées.
+- Les MHz sont normalisés à trois décimales.
+- Le suffixe `(s)` est conservé pour toute fréquence explicitement marquée supplétive dans XML_SIA.
+- Les horaires associés à la fréquence sont maintenant affichés lorsqu'ils existent :
+  H24, HO, HX, etc.
+- L'indicatif radio associé est également affiché lorsqu'il existe.
+- Si toutes les fréquences d'un même service partagent les mêmes horaires et le même indicatif, cette information n'est affichée qu'une seule fois sous la ligne des fréquences.
+- Si les informations diffèrent selon les fréquences, le détail est donné fréquence par fréquence.
+- Le nom de l'organisme/service est également affiché lorsqu'il apporte une information différente du simple CODE + NOM de la zone.
+- Aucune fréquence, horaire, supplétivité ou relation de service n'est déduite par proximité géographique.
+
+5. AUTRES INFORMATIONS SIA
+- Le champ Activité est affiché lorsqu'il existe.
+- L'identifiant supplémentaire est affiché lorsqu'il existe et n'est pas un simple doublon du code.
+- Les remarques SIA sont affichées intégralement lorsqu'elles existent.
+- Les séparateurs `#` et les retours à la ligne du SIA sont rendus comme des retours à la ligne lisibles.
+- Les très longues remarques disposent d'un défilement interne afin de ne pas créer une fenêtre démesurée.
+- Les champs techniques internes de rendu (géométrie, bbox, clés internes) ne sont volontairement pas affichés car ils ne constituent pas une information opérationnelle.
+
+6. POSITION DE LA FENÊTRE — CTR ET TOUTES LES ZONES
+- La règle « popup au centre de la géométrie » introduite en v15.51 est supprimée pour les zones.
+- La fiche s'ouvre maintenant exactement aux coordonnées du clic/toucher.
+- Cette règle est valable pour les CTR comme pour tous les autres espaces.
+- Leaflet conserve `autoPan` et `keepInView` afin de maintenir la fenêtre visible.
+- Lorsqu'il existe plusieurs zones superposées :
+  - la liste « ESPACES À CET ENDROIT » s'ouvre au point touché ;
+  - après choix, la fiche de la zone choisie s'ouvre au même point touché.
+- Les aéroports, pélicandromes et points conservent leur ancrage sur leur symbole : cette modification concerne uniquement les espaces/zones.
+
+7. ÉLÉMENTS INCHANGÉS
+- Système tactile v15.50 conservé.
+- Surfaces tactiles de toutes les zones v15.54 conservées.
+- Gestion des superpositions v15.54 conservée.
+- Mode OACI invisible/tactile conservé.
+- VRP fuchsia, texte blanc, contour noir conservés.
+- Fréquences supplétives v15.52 conservées.
+- GLR v15.51 conservé.
+- Q400 jaune agrandi conservé.
+- VAC inchangé.
+- Aucun changement NAS.
+
+8. DONNÉES SIA
+- Aucun changement du payload AIRAC.
+- `npfDatasetRevision` reste 15.52.
+- Cette version modifie uniquement l'affichage et l'exploitation des informations déjà embarquées.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.52` vérifiée.
+- Trait intérieur généralisé à toutes les zones non composites.
+- Popup finale ancrée sur `latlng` du clic.
+- Informations horaires / indicatifs / activité / remarques intégrées.
+- Historique v15.54 et antérieur conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.54 — RÈGLES CTR APPLIQUÉES À TOUS LES ESPACES / ZONES SIA
 Date : 17/08/2026
 Base : TEST v15.53
