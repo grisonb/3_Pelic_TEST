@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-47_sia_filters_own_aircraft_top';
-const APP_VERSION = 'v15.47';
+const SW_VERSION = 'sw-v15-48_touch_vrp_ctr_info';
+const APP_VERSION = 'v15.48';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
