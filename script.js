@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.50';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.51';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -18496,6 +18496,9 @@ let npfGlobalLinkLastPositions = [];
 let npfGlobalLinkRenderedCount = 0;
 let npfGlobalLinkSafeSkyMatches = [];
 let npfGlobalLinkRelayoutTimer = null;
+/* v15.51 — authentification GLR : mot de passe masqué et chargement captcha sérialisé. */
+let npfGlobalLinkCaptchaLoadPromise = null;
+let npfGlobalLinkPasswordAuthPromise = null;
 
 function getStoredGlobalLinkSession() {
     try {
@@ -18573,41 +18576,181 @@ function closeGlobalLinkAuthModal() {
     if (input) input.value = '';
 }
 
+function isGlobalLinkAbortError(error) {
+    const name = String(error?.name || '');
+    const message = String(error?.message || error || '');
+    return name === 'AbortError' || /fetch\s+is\s+aborted|aborted|aborterror/i.test(message);
+}
+
+function setGlobalLinkPasswordStatus(message = '', type = '') {
+    const el = document.getElementById('global-link-password-status');
+    if (!el) return;
+    el.textContent = String(message || '');
+    el.classList.toggle('error', type === 'error');
+    el.classList.toggle('success', type === 'success');
+}
+
+function closeGlobalLinkPasswordModal() {
+    const modal = document.getElementById('global-link-password-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    const input = document.getElementById('global-link-password-input');
+    if (input) input.value = '';
+}
+
+async function requestGlobalLinkNpfAuthorization() {
+    if (npfGlobalLinkPasswordAuthPromise) return npfGlobalLinkPasswordAuthPromise;
+
+    npfGlobalLinkPasswordAuthPromise = new Promise((resolve, reject) => {
+        const modal = document.getElementById('global-link-password-modal');
+        const input = document.getElementById('global-link-password-input');
+        const submitButton = document.getElementById('global-link-password-submit');
+        const closeButton = document.getElementById('global-link-password-close');
+
+        if (!modal || !input || !submitButton) {
+            reject(new Error('Fenêtre de mot de passe Global Link indisponible.'));
+            return;
+        }
+
+        let settled = false;
+        const cleanup = () => {
+            submitButton.removeEventListener('click', onSubmit);
+            closeButton?.removeEventListener('click', onCancel);
+            input.removeEventListener('keydown', onKeyDown);
+            modal.removeEventListener('click', onBackdrop);
+            document.removeEventListener('keydown', onEscape);
+        };
+        const finishResolve = value => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            closeGlobalLinkPasswordModal();
+            resolve(value);
+        };
+        const finishReject = error => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            closeGlobalLinkPasswordModal();
+            reject(error);
+        };
+        const onCancel = () => finishReject(new Error('Autorisation annulée.'));
+        const onBackdrop = event => {
+            if (event.target === modal) onCancel();
+        };
+        const onEscape = event => {
+            if (event.key === 'Escape' && modal.style.display === 'flex') onCancel();
+        };
+        const onKeyDown = event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                onSubmit();
+            }
+        };
+        const onSubmit = async () => {
+            const password = String(input.value || '');
+            if (!password) {
+                setGlobalLinkPasswordStatus('Saisis le mot de passe.', 'error');
+                try { input.focus(); } catch (_) {}
+                return;
+            }
+
+            submitButton.disabled = true;
+            setGlobalLinkPasswordStatus('Vérification du mot de passe…');
+            try {
+                const docsSession = await authorizeBriefingDocs(password);
+                if (!docsSession) throw new Error('Autorisation NPF impossible.');
+                setGlobalLinkPasswordStatus('Autorisation acceptée.', 'success');
+                finishResolve(docsSession);
+            } catch (error) {
+                submitButton.disabled = false;
+                setGlobalLinkPasswordStatus(error?.message || String(error), 'error');
+                try {
+                    input.focus();
+                    input.select();
+                } catch (_) {}
+            }
+        };
+
+        input.value = '';
+        submitButton.disabled = false;
+        setGlobalLinkPasswordStatus('');
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+
+        submitButton.addEventListener('click', onSubmit);
+        closeButton?.addEventListener('click', onCancel);
+        input.addEventListener('keydown', onKeyDown);
+        modal.addEventListener('click', onBackdrop);
+        document.addEventListener('keydown', onEscape);
+
+        setTimeout(() => {
+            try { input.focus(); } catch (_) {}
+        }, 30);
+    }).finally(() => {
+        npfGlobalLinkPasswordAuthPromise = null;
+    });
+
+    return npfGlobalLinkPasswordAuthPromise;
+}
+
 async function ensureGlobalLinkNpfAuthorization() {
     let docsSession = getStoredBriefingDocsSession();
     if (docsSession) return docsSession;
     if (!navigator.onLine) throw new Error('Connexion Internet requise.');
-    const password = window.prompt('Mot de passe NPF requis pour accéder à Global Link :', '');
-    if (password === null) throw new Error('Autorisation annulée.');
-    docsSession = await authorizeBriefingDocs(password);
+    docsSession = await requestGlobalLinkNpfAuthorization();
     if (!docsSession) throw new Error('Autorisation NPF impossible.');
     return docsSession;
 }
 
 async function loadGlobalLinkCaptcha() {
-    const docsSession = await ensureGlobalLinkNpfAuthorization();
-    openGlobalLinkAuthModal();
-    setGlobalLinkAuthStatus('Chargement du code de sécurité…');
-    const image = document.getElementById('global-link-captcha-image');
-    if (image) image.removeAttribute('src');
-    const response = await fetchGlobalLinkNas('captcha', {
-        method: 'GET',
-        headers: globalLinkAuthHeaders(docsSession)
-    }, 20000);
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload || payload.ok !== true || !payload.attempt || !payload.imageDataUrl) {
-        if (response.status === 401) clearBriefingDocsSession();
-        throw new Error(payload?.message || payload?.error || `Captcha Global Link impossible (${response.status})`);
+    if (npfGlobalLinkCaptchaLoadPromise) return npfGlobalLinkCaptchaLoadPromise;
+
+    npfGlobalLinkCaptchaLoadPromise = (async () => {
+        const docsSession = await ensureGlobalLinkNpfAuthorization();
+        openGlobalLinkAuthModal();
+        setGlobalLinkAuthStatus('Chargement du code de sécurité…');
+        const image = document.getElementById('global-link-captcha-image');
+        if (image) {
+            image.removeAttribute('src');
+            image.style.visibility = 'hidden';
+        }
+
+        const response = await fetchGlobalLinkNas('captcha', {
+            method: 'GET',
+            headers: globalLinkAuthHeaders(docsSession)
+        }, 45000);
+        const payload = await response.json().catch(() => null);
+
+        if (!response.ok || !payload || payload.ok !== true || !payload.attempt || !payload.imageDataUrl) {
+            if (response.status === 401) clearBriefingDocsSession();
+            throw new Error(payload?.message || payload?.error || `Captcha Global Link impossible (${response.status})`);
+        }
+
+        npfGlobalLinkAttempt = String(payload.attempt);
+        if (image) {
+            image.src = String(payload.imageDataUrl);
+            image.style.visibility = 'visible';
+        }
+
+        setGlobalLinkAuthStatus('Saisis le code affiché puis appuie sur Connexion.');
+        const input = document.getElementById('global-link-captcha-input');
+        if (input) {
+            input.value = '';
+            try { input.focus(); } catch (_) {}
+        }
+
+        // Laisser WebKit peindre le captcha avant toute autre requête/alerte.
+        await new Promise(resolve => requestAnimationFrame(() => resolve()));
+        return true;
+    })();
+
+    try {
+        return await npfGlobalLinkCaptchaLoadPromise;
+    } finally {
+        npfGlobalLinkCaptchaLoadPromise = null;
     }
-    npfGlobalLinkAttempt = String(payload.attempt);
-    if (image) image.src = String(payload.imageDataUrl);
-    setGlobalLinkAuthStatus('Saisis le code affiché puis appuie sur Connexion.');
-    const input = document.getElementById('global-link-captcha-input');
-    if (input) {
-        input.value = '';
-        try { input.focus(); } catch (_) {}
-    }
-    return true;
 }
 
 async function submitGlobalLinkCaptcha() {
@@ -19259,7 +19402,9 @@ async function refreshGlobalLinkPositions(options = {}) {
     } catch (error) {
         console.warn('[Global Link]', error);
         updateGlobalLinkButton();
-        if (!options.silent) alert(`Global Link : ${error.message || error}`);
+        if (!options.silent && !isGlobalLinkAbortError(error)) {
+            alert(`Global Link : ${error.message || error}`);
+        }
         return false;
     } finally {
         npfGlobalLinkFetchInProgress = false;
@@ -19333,7 +19478,13 @@ function initializeGlobalLinkUi() {
         button.addEventListener('click', () => {
             handleGlobalLinkButtonClick().catch(error => {
                 console.warn('[Global Link]', error);
-                if (error?.message && error.message !== 'Autorisation annulée.') alert(`Global Link : ${error.message}`);
+                if (
+                    error?.message
+                    && error.message !== 'Autorisation annulée.'
+                    && !isGlobalLinkAbortError(error)
+                ) {
+                    alert(`Global Link : ${error.message}`);
+                }
                 updateGlobalLinkButton();
             });
         });
@@ -19345,7 +19496,13 @@ function initializeGlobalLinkUi() {
     if (refreshButton && refreshButton.dataset.bound !== '1') {
         refreshButton.dataset.bound = '1';
         refreshButton.addEventListener('click', () => {
-            loadGlobalLinkCaptcha().catch(error => setGlobalLinkAuthStatus(error.message || String(error), 'error'));
+            loadGlobalLinkCaptcha().catch(error => {
+                if (isGlobalLinkAbortError(error)) {
+                    setGlobalLinkAuthStatus('Chargement interrompu. Appuie sur Nouveau code pour réessayer.', 'error');
+                    return;
+                }
+                setGlobalLinkAuthStatus(error.message || String(error), 'error');
+            });
         });
     }
     const submit = async () => {
@@ -19888,7 +20045,7 @@ function addAirportTouchHitbox(airport, popupHtml) {
                 L.DomEvent.stopPropagation(event.originalEvent);
             }
         } catch (_) {}
-        try { hitbox.openPopup(event?.latlng); } catch (_) {}
+        try { hitbox.openPopup(); } catch (_) {}
     });
     hitbox.addTo(permanentAirportLayer);
     try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
@@ -22302,8 +22459,8 @@ function buildOwnGpsIcon(altitudeLabel = '', options = {}) {
     return L.divIcon({
         className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}${isSimulation ? ' own-gps-simulation-icon' : ''}`,
         html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">${q400IconHtml}</span></div>`,
-        iconSize: [86, 68],
-        iconAnchor: [43, 43]
+        iconSize: [96, 78],
+        iconAnchor: [48, 48]
     });
 }
 
@@ -25838,6 +25995,7 @@ async function applyOfflineMapGroupSelectionInPlace(groupName, checked, packName
         }
     }).catch(() => {});
 
+    scheduleSiaLayerRefresh('basemap-switch-v15.51');
     return true;
 }
 
@@ -40824,7 +40982,7 @@ function buildSiaTerrainPopup(item) {
 
 function getSiaPointMarkerStyle(item) {
     if (item.k === 'dpn:VRP') {
-        return { radius: 4.5, color: '#111111', weight: 1.5, fillColor: '#ffea00', fillOpacity: 1 };
+        return { radius: 4.5, color: '#111111', weight: 1.5, fillColor: '#ff00ff', fillOpacity: 1 };
     }
     if (item.k === 'dpn:ADHP') {
         return { radius: 3.5, color: '#263238', weight: 1.5, fillColor: '#90a4ae', fillOpacity: 0.9 };
@@ -41236,7 +41394,7 @@ function addSiaTouchHitbox(latlng, popupHtml) {
                 L.DomEvent.stopPropagation(event.originalEvent);
             }
         } catch (_) {}
-        try { hitbox.openPopup(event?.latlng); } catch (_) {}
+        try { hitbox.openPopup(); } catch (_) {}
     });
     hitbox.addTo(siaLayerGroup);
     try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
@@ -41288,28 +41446,86 @@ function formatSiaCtrServices(item) {
     return `<div class="sia-ctr-services"><div class="sia-ctr-services-title">Fréquences associées SIA</div>${rows}</div>`;
 }
 
+function formatSiaCtrFrequencyValue(value, unit = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const numeric = Number(raw.replace(',', '.'));
+    if (Number.isFinite(numeric) && String(unit || '').toUpperCase() === 'MHZ') {
+        return numeric.toFixed(3);
+    }
+    return raw;
+}
+
+function formatSiaCtrFrequencySummary(item) {
+    const services = Array.isArray(item?.sv) ? item.sv : [];
+    if (!services.length) return '';
+
+    const grouped = new Map();
+    services.forEach(service => {
+        const type = String(service?.[0] || '').trim().toUpperCase() || 'FREQ';
+        const frequencies = Array.isArray(service?.[2]) ? service[2] : [];
+        frequencies.forEach(freq => {
+            const formatted = formatSiaCtrFrequencyValue(freq?.[0], freq?.[1]);
+            if (!formatted) return;
+            if (!grouped.has(type)) grouped.set(type, []);
+            const values = grouped.get(type);
+            if (!values.includes(formatted)) values.push(formatted);
+        });
+    });
+
+    return [...grouped.entries()]
+        .filter(([, values]) => values.length)
+        .map(([type, values]) => `${type}: ${values.join(' / ')}`)
+        .join(' · ');
+}
+
 function buildSiaAirspacePopup(item) {
+    const isCtr = item?.t === 'CTR';
+
+    if (isCtr) {
+        const title = ['CTR', item.c, item.n].filter(Boolean).join(' / ');
+        const typeClass = ['CTR', item.cl].filter(Boolean).join(' / ');
+        const vertical = `${formatSiaVertical(item.lo)} / ${formatSiaVertical(item.up)}`;
+        const frequency = formatSiaCtrFrequencySummary(item);
+
+        return `
+            <div class="sia-popup sia-ctr-popup sia-ctr-popup-compact">
+                <div class="sia-popup-title">${escapeHtml(title || 'CTR')}</div>
+                <div><strong>Type / Classe :</strong> ${escapeHtml(typeClass || 'CTR')}</div>
+                <div><strong>Plancher / Plafond :</strong> ${escapeHtml(vertical)}</div>
+                ${frequency ? `<div><strong>Fréquence :</strong> ${escapeHtml(frequency)}</div>` : ''}
+            </div>
+        `;
+    }
+
     const typeLabel = item.t === 'D-OTHER' && item.l
         ? `${item.t} / ${item.l}`
         : item.t;
     const name = [item.c, item.n].filter(Boolean).join(' — ');
     const remark = String(item.r || '').trim();
-    const isCtr = item.t === 'CTR';
-    const isCompositeCtr = isCtr && Number(item.co || 0) === 1;
 
     return `
-        <div class="sia-popup ${isCtr ? 'sia-ctr-popup' : ''}">
+        <div class="sia-popup">
             <div class="sia-popup-title">${escapeHtml(name || typeLabel || 'Espace SIA')}</div>
             <div><strong>Type :</strong> ${escapeHtml(typeLabel || '—')}</div>
             ${item.cl ? `<div><strong>Classe :</strong> ${escapeHtml(item.cl)}</div>` : ''}
             <div><strong>Plancher :</strong> ${escapeHtml(formatSiaVertical(item.lo))}</div>
             <div><strong>Plafond :</strong> ${escapeHtml(formatSiaVertical(item.up))}</div>
             ${item.a ? `<div><strong>Activité :</strong> ${escapeHtml(item.a)}</div>` : ''}
-            ${isCompositeCtr ? `<div class="sia-ctr-composite-note">CTR composite : les limites verticales détaillées sont portées par ses secteurs constitutifs.</div>` : ''}
-            ${isCtr ? formatSiaCtrServices(item) : ''}
             ${remark ? `<div class="sia-popup-remark">${escapeHtml(remark).replace(/#|\n/g, '<br>')}</div>` : ''}
         </div>
     `;
+}
+
+function isCurrentOfflineOaciMap() {
+    if (mapSourceMode !== 'offline') return false;
+    const activeGroup = String(getQuickOfflineActiveGroupName() || '').trim();
+    if (/\bOACI\b/i.test(activeGroup)) return true;
+
+    return (Array.isArray(activeOfflinePacks) ? activeOfflinePacks : []).some(pack => {
+        const group = String(getOfflinePackGroupName(pack) || '');
+        return /\bOACI\b/i.test(group) || /\bOACI\b/i.test(String(pack || ''));
+    });
 }
 
 function getSiaAirspaceStyle(item) {
@@ -41331,6 +41547,16 @@ function getSiaAirspaceStyle(item) {
         weight = Number(item?.co || 0) === 1 ? 1.7 : 2.4;
         opacity = Number(item?.co || 0) === 1 ? 0.65 : 1;
         fillOpacity = Number(item?.co || 0) === 1 ? 0.008 : 0.022;
+
+        /*
+         * v15.51 — sur le fond OACI, la CTR SIA reste active et tactile mais
+         * son dessin normal est masqué, puisque la zone est déjà imprimée sur
+         * la carte OACI. La sélection reste visible via la surface tactile.
+         */
+        if (isCurrentOfflineOaciMap()) {
+            opacity = 0;
+            fillOpacity = 0;
+        }
     }
     else if (type === 'TMA') color = '#673ab7';
     else if (type === 'CTA') color = '#3f51b5';
@@ -41422,7 +41648,7 @@ function buildSiaCtrInsetRingLatLngs(ring, insetPixels = 6) {
 }
 
 function addSiaCtrInnerBand(geometry, color = '#0066ff') {
-    if (!siaLayerGroup || !geometry) return;
+    if (!siaLayerGroup || !geometry || isCurrentOfflineOaciMap()) return;
     const rings = getSiaCtrOuterRings(geometry);
     rings.forEach(ring => {
         const latlngs = buildSiaCtrInsetRingLatLngs(ring, 6);
@@ -41510,10 +41736,13 @@ function selectSiaCtrTouchLayer(layer, item, latlng) {
         layer.bringToFront?.();
     } catch (_) {}
 
-    let popupLatLng = latlng;
-    if (!popupLatLng) {
-        try { popupLatLng = layer.getBounds().getCenter(); } catch (_) {}
-    }
+    /*
+     * v15.51 — la fiche est ancrée au centre de la zone sélectionnée,
+     * indépendamment de l'endroit précis où le doigt a touché la hitbox.
+     */
+    let popupLatLng = null;
+    try { popupLatLng = layer.getBounds().getCenter(); } catch (_) {}
+    if (!popupLatLng) popupLatLng = latlng;
     if (!popupLatLng) return;
 
     const popup = L.popup({ maxWidth: 360 })
