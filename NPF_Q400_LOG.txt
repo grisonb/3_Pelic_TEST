@@ -1,3 +1,99 @@
+VERSION TEST v15.48 — CORRECTIONS TACTILES / VRP / CTR ENRICHIES
+Date : 17/08/2026
+Base : TEST v15.47
+Source SIA : AIRAC 08/26 v04 fourni par l'utilisateur
+
+OBJECTIFS
+- Corriger les zones tactiles trop petites des pélicandromes, aérodromes et points SIA.
+- Remplacer le symbole VRP par un code directement inscrit dans un cercle jaune cerclé noir.
+- Neutraliser la sélection/callout iPad lors de l'appui long sur l'icône France.
+- Corriger le faux doublon LFBS/LFLB de Chambéry dans la base historique NPF.
+- Enrichir le clic sur les CTR avec classe, limites verticales, activité et fréquences réellement associées par les relations AIXM.
+- Rendre immédiatement lisible le côté intérieur d'une CTR par une bande interne large et semi-transparente.
+
+MODIFICATIONS
+
+1. Zones tactiles NPF
+- La zone tactile invisible des pélicandromes et aérodromes NPF passe à 56 px de diamètre (rayon 28 px).
+- Les symboles visibles ne sont pas agrandis : seule la surface de toucher est augmentée.
+- Les aérodromes complémentaires et les aérodromes noirs/cerclés bénéficient du même agrandissement.
+
+2. Zones tactiles SIA
+- Les aérodromes/hélistations/landing sites SIA disposent désormais d'une hitbox invisible de 56 px de diamètre.
+- Les VRP disposent d'une hitbox invisible de 56 px de diamètre.
+- Les points ADHP / OTHER disposent d'une hitbox invisible d'environ 52 px de diamètre.
+- La hitbox est distincte du dessin visible afin de préserver la lisibilité de la carte.
+
+3. Nouveau rendu VRP
+- Suppression du petit point jaune séparé et de l'étiquette latérale.
+- Le code court du VRP est directement centré dans un cercle :
+  - fond jaune vif #FFFF00 ;
+  - contour noir ;
+  - texte noir gras.
+- Lorsque le code SIA permet une forme courte fiable, le préfixe terrain est retiré pour l'affichage : MTNE -> NE, LBAL -> AL, TBMAT -> MAT.
+- Les informations complètes restent disponibles au clic.
+
+4. Appui long sur l'icône France
+- Ajout de -webkit-user-select:none, user-select:none et -webkit-touch-callout:none sur le bouton et tous ses éléments internes.
+- L'appui long continue d'ouvrir les filtres SIA vers 650 ms.
+- Le clic court conserve l'ouverture du sélecteur des cartes Offline.
+- Un déplacement du doigt supérieur à environ 12 px annule l'appui long afin de ne pas déclencher le panneau pendant un geste.
+- La sélection/callout Safari/iPad est explicitement neutralisée.
+
+5. Chambéry — correction de la base historique NPF
+- Suppression de l'entrée erronée « LFBS — Chambéry-Savoie » aux coordonnées de Chambéry.
+- Suppression de la piste 18/36 erronément rattachée à LFBS aux coordonnées de LFLB.
+- LFLB Chambéry-Savoie / Chambéry Aix-les-Bains reste présent.
+- LFBS Biscarrosse-Parentis reste présent sous son bon code et à ses bonnes coordonnées.
+- Cette correction supprime les deux symboles NPF presque superposés observés à Chambéry.
+
+6. CTR — informations au clic
+- Le jeu SIA embarqué est enrichi à partir des relations AIXM Sae -> Ser -> Fqy.
+- Pour les CTR, la fiche affiche désormais lorsque l'information existe :
+  - identification / nom ;
+  - classe ;
+  - plancher ;
+  - plafond ;
+  - activité / régime horaire ;
+  - services réellement associés à l'espace ;
+  - fréquences de ces services ;
+  - indicatif radio ;
+  - horaires de la fréquence ;
+  - remarques SIA.
+- Aucune fréquence n'est déduite par proximité géographique.
+- Exemple vérifié dans la source fournie pour CHAMBERY 1 :
+  - classe D ;
+  - SFC -> 3500 ft AMSL ;
+  - activité HO ;
+  - TWR 118.305 MHz ;
+  - APP 121.205 / 123.705 MHz.
+- 118 des 133 CTR de l'export disposent d'au moins une relation fréquence/service exploitable dans cette base.
+- Le contenu IndexedDB de v15.47 est automatiquement remplacé grâce à une révision interne NPF 15.48, même si l'AIRAC et la révision officielle SIA restent 08/26 v04.
+
+7. CTR — représentation du côté intérieur
+- La limite CTR reste dessinée par un trait bleu fin, plein et opaque.
+- Une seconde bande bleue plus large et semi-transparente est calculée environ 6 px à l'intérieur du contour.
+- Cette bande est une géométrie réellement décalée vers l'intérieur et non un simple trait large centré sur la limite.
+- Le côté de la zone devient ainsi immédiatement identifiable comme sur les représentations aéronautiques usuelles.
+- Les CTR composites issues d'Adg ne reçoivent pas une seconde bande afin d'éviter de foncer artificiellement les secteurs qui les constituent.
+
+8. Périmètre inchangé
+- Tous les filtres SIA de v15.47 restent indépendants.
+- Les points IFR Dpn/ICAO restent exclus.
+- Aucun changement du fonctionnement VAC.
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Jeu SIA compressé : décompression et métadonnées vérifiées.
+- Relations CTR Chambéry vérifiées dans l'export AIXM fourni.
+- Faux LFBS Chambéry et fausse piste LFBS supprimés ; LFBS Biscarrosse et LFLB Chambéry conservés.
+- Historique des modifications précédentes conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.47 — DONNÉES AÉRONAUTIQUES SIA / FILTRES INDÉPENDANTS / AVION PRIORITAIRE
 Date : 16/08/2026
 Base : TEST v15.46
