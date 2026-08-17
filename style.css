@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.56 */
+/* NPF_STYLE_BUILD_VERSION: v15.57 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15210,4 +15210,42 @@ body.gaar-point-search-open .gaar-editing-banner {
     line-height: 1.18;
     font-weight: 800;
     opacity: .78;
+}
+
+
+/* ==========================================================================
+   v15.57 — APPUI LONG CARTE : CRÉER FEU / SÉLECTION ZONE
+   ========================================================================== */
+
+.npf-map-longpress-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 190px;
+    padding: 2px;
+}
+
+.npf-map-longpress-action {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 11px 14px;
+    border: 1px solid #667085;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #111827;
+    font: 900 16px/1.15 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-align: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.npf-map-longpress-action:active {
+    transform: scale(.99);
+}
+
+.sia-airspace-touch-surface {
+    pointer-events: auto !important;
+    touch-action: manipulation;
 }
