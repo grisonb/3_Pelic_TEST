@@ -1,5 +1,4 @@
-
-/* NPF_STYLE_BUILD_VERSION: v15.53 */
+/* NPF_STYLE_BUILD_VERSION: v15.54 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15080,4 +15079,58 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 .sia-ctr-frequency-row {
     white-space: normal;
+}
+
+
+/* ==========================================================================
+   v15.54 — MÊMES RÈGLES CTR POUR TOUS LES ESPACES / ZONES SIA
+   ========================================================================== */
+
+.sia-airspace-popup-compact {
+    min-width: 240px;
+    font-size: 16px !important;
+    line-height: 1.30 !important;
+    font-weight: 800 !important;
+}
+
+.sia-airspace-choice {
+    min-width: 260px;
+    max-width: 350px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.sia-airspace-choice-title {
+    font-size: 15px;
+    font-weight: 900;
+    margin-bottom: 7px;
+}
+
+.sia-airspace-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 270px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.sia-airspace-choice-button {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 10px;
+    border: 1px solid #7a8796;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #111827;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 800;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.sia-airspace-choice-button:active {
+    transform: scale(0.99);
 }
