@@ -1,3 +1,119 @@
+VERSION TEST v15.57 — APPUI LONG FEU / SÉLECTION ZONE + NETTOYAGE TMA
+Date : 17/08/2026
+Base : TEST v15.56
+
+OBJECTIFS
+- La sélection d'un espace/zone doit désormais se faire par appui long.
+- Éviter tout conflit entre la création d'un feu et la sélection d'une zone.
+- Si aucune zone n'est présente au point d'appui, conserver la création directe du feu.
+- Masquer les parents techniques TMA AIXM de type UNION sans tranche opérationnelle propre.
+- Simplifier l'affichage du nom des TMA en supprimant le code technique de secteur.
+
+1. APPUI COURT SUR UNE ZONE
+- Un appui court sur une CTR, TMA ou autre espace SIA ne sélectionne plus la zone.
+- Les grandes surfaces tactiles de zone restent présentes uniquement pour permettre la détection fiable de l'appui long sur iPad.
+- Les aéroports, pélicandromes, VRP et autres points conservent leur comportement d'appui court existant.
+
+2. APPUI LONG — AUCUNE ZONE
+- Durée inchangée : 1,2 seconde.
+- Tolérance de déplacement inchangée : 14 px.
+- Si aucune zone SIA active ne contient le point touché :
+  -> création du feu immédiatement.
+- Aucune fenêtre intermédiaire n'est affichée dans ce cas.
+- La procédure de création du feu est exactement la même que précédemment.
+
+3. APPUI LONG — UNE OU PLUSIEURS ZONES
+- Si au moins une zone SIA active contient le point touché, une petite fenêtre apparaît au point d'appui.
+- Elle contient exactement deux boutons :
+  CRÉER FEU
+  SÉLECTION ZONE
+- « Créer Feu » crée le feu aux coordonnées exactes de l'appui long.
+- « Sélection Zone » :
+  - une seule zone concernée -> ouverture directe de sa fiche ;
+  - plusieurs zones concernées -> ouverture de « ESPACES À CET ENDROIT ».
+- La fiche finale de la zone reste ancrée au point de l'appui long.
+
+4. APPUI LONG SUR LA SURFACE D'UNE ZONE
+- La surface SVG des zones reçoit la classe dédiée `sia-airspace-touch-surface`.
+- Elle n'est plus considérée comme un objet bloquant par le détecteur général d'appui long.
+- Les autres objets interactifs restent exclus :
+  marqueurs, points, contrôles Leaflet, popup, boutons, formulaires, liens, etc.
+- Le fonctionnement tactile validé pour les aéroports/pélicandromes/VRP n'est pas modifié.
+
+5. PARENTS TECHNIQUES TMA AIXM
+- L'AIXM officiel est analysé sur les objets `Adg`.
+- Un parent TMA est marqué technique uniquement si :
+  - il possède un `AseUidBase` ;
+  - il possède un ou plusieurs `AseUidComponent` ;
+  - toutes les opérations `codeOpr` sont explicitement `UNION`.
+- 48 parents techniques TMA ont été identifiés.
+- Ces objets restent présents dans le payload pour traçabilité mais reçoivent le marqueur interne `tp:1`.
+- Ils ne sont plus :
+  - dessinés ;
+  - rendus tactiles ;
+  - proposés dans « ESPACES À CET ENDROIT ».
+- Les vrais secteurs TMA composant l'UNION restent affichés et sélectionnables.
+
+6. PROVENCE / NICE
+- `TMA / LFML / PROVENCE` est identifié comme parent technique Adg/UNION et n'est plus proposé.
+- `TMA / LFMN / NICE` est identifié de la même manière.
+- Les secteurs réels restent disponibles :
+  PROVENCE 1, PROVENCE 2, PROVENCE 3, etc.
+  NICE 1, NICE 2, etc.
+- Leur tranche verticale reste affichée dans la première fenêtre de superposition.
+
+7. NOM DES TMA
+- Le code technique du secteur n'est plus affiché pour une TMA.
+- Ancien affichage :
+  TMA / LFML2 / PROVENCE 2
+- Nouvel affichage :
+  TMA / PROVENCE 2
+- Même règle dans :
+  - « ESPACES À CET ENDROIT » ;
+  - la fiche détaillée de la TMA.
+- Le code LFML2/LFMN2 reste conservé en interne pour l'identification des données et les relations AIXM.
+- Cette suppression du code visuel concerne les TMA uniquement.
+- Les CTR conservent leur présentation existante avec code, par exemple :
+  CTR / LFTW / GARONS.
+
+8. FRÉQUENCES / ALTITUDES
+- Les fréquences TMA intégrées en v15.56 sont conservées.
+- Les fréquences supplétives `(s)` restent conservées.
+- Les tranches verticales de la fenêtre de superposition sont conservées.
+- Les informations détaillées de la fiche v15.55 restent conservées.
+
+9. DONNÉES SIA
+- `npfDatasetRevision` passe de 15.56 à 15.57.
+- Le changement sert à embarquer le marquage officiel des parents techniques TMA.
+- `technicalTmaUnionParents = 48`.
+- AIRAC et version SIA restent 08/26 v04.
+
+10. ÉLÉMENTS INCHANGÉS
+- Contour fin + bande estompée intérieure de toutes les zones conservés.
+- Mode OACI invisible mais tactile conservé.
+- VRP fuchsia / texte blanc / contour noir conservés.
+- GLR v15.51 conservé.
+- Q400 jaune agrandi conservé.
+- VAC inchangé.
+- Aucun changement NAS.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.57` vérifiée.
+- 48 parents TMA Adg/UNION marqués.
+- `LFML / PROVENCE` parent technique marqué et masqué.
+- `LFMN / NICE` parent technique marqué et masqué.
+- Appui court zone : sélection supprimée.
+- Appui long sans zone : feu direct.
+- Appui long avec zone : fenêtre « Créer Feu / Sélection Zone ».
+- TMA : titre sans code technique.
+- Historique v15.56 et antérieur conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.56 — SUPERPOSITION TMA AVEC ALTITUDES / FRÉQUENCES TMA
 Date : 17/08/2026
 Base : TEST v15.55
