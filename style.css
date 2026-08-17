@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.50 */
+/* NPF_STYLE_BUILD_VERSION: v15.51 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14985,4 +14985,60 @@ body.gaar-point-search-open .gaar-editing-banner {
     pointer-events: auto !important;
     touch-action: manipulation;
     background: rgba(0, 0, 0, 0.002) !important;
+}
+
+
+/* ==========================================================================
+   v15.51 — CTR / GLR / POSITION PROPRE / VRP
+   ========================================================================== */
+
+/* Mot de passe GLR : saisie masquée dans une vraie fenêtre, plus de window.prompt. */
+.global-link-password-input {
+    width: min(100%, 300px);
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 2px solid #9aa9ba;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #111827;
+    font: 800 18px/1.1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    text-align: center;
+}
+.global-link-password-input:focus {
+    outline: 3px solid rgba(11, 94, 215, .18);
+    border-color: #0b5ed7;
+}
+
+/* Position propre : même silhouette, jaune numérique maximal #FFFF00, + ~20 %. */
+.own-gps-plane-body {
+    width: 58px !important;
+    height: 58px !important;
+    margin-left: -29px !important;
+    margin-top: -23px !important;
+}
+.own-gps-plane-shape {
+    width: 58px !important;
+    height: 58px !important;
+}
+.own-gps-plane-shape .own-gps-q400-img {
+    width: 58px !important;
+    height: 58px !important;
+    filter:
+        drop-shadow(0 0 1px #000000)
+        drop-shadow(0 1px 2px rgba(0,0,0,.72)) !important;
+}
+
+/* VRP / points VFR : fond fuchsia demandé, contour et texte noirs conservés. */
+.sia-vrp-symbol {
+    background: #ff00ff !important;
+    color: #000000 !important;
+    border-color: #000000 !important;
+}
+
+/* Fiche CTR volontairement compacte. */
+.sia-ctr-popup-compact {
+    min-width: 230px;
+}
+.sia-ctr-popup-compact > div:not(.sia-popup-title) {
+    margin-top: 5px;
 }
