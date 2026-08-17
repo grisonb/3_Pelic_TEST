@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.47 */
+/* NPF_STYLE_BUILD_VERSION: v15.48 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -14596,7 +14596,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /* ==========================================================================
-   v15.47 — Données aéronautiques SIA + position propre prioritaire
+   v15.48 — Données aéronautiques SIA + position propre prioritaire
    ========================================================================== */
 
 .own-gps-plane-altitude {
@@ -14873,4 +14873,77 @@ body.gaar-point-search-open .gaar-editing-banner {
     .sia-management-meta {
         grid-template-columns: 1fr;
     }
+}
+
+
+/* ==========================================================================
+   v15.48 — APPUI LONG FRANCE / VRP / CTR
+   ========================================================================== */
+
+#quick-offline-map-button,
+#quick-offline-map-button *,
+.quick-offline-map-button,
+.quick-offline-map-button * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    touch-action: manipulation;
+}
+
+.sia-vrp-div-icon {
+    background: transparent !important;
+    border: 0 !important;
+    pointer-events: none !important;
+}
+
+.sia-vrp-symbol {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border: 2px solid #000000;
+    border-radius: 50%;
+    background: #ffff00;
+    color: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    font-weight: 950;
+    line-height: 1;
+    letter-spacing: -0.3px;
+    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(255,255,255,.7);
+}
+
+.sia-ctr-services {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid #cddcf0;
+}
+
+.sia-ctr-services-title {
+    margin-bottom: 4px;
+    color: #004fbf;
+    font-weight: 900;
+}
+
+.sia-ctr-service-row {
+    margin: 4px 0;
+}
+
+.sia-ctr-service-unit,
+.sia-ctr-service-call,
+.sia-ctr-service-hours {
+    display: block;
+    margin-left: 10px;
+    font-size: 11px;
+    opacity: .78;
+}
+
+.sia-ctr-composite-note {
+    margin-top: 6px;
+    padding: 5px 7px;
+    border-radius: 6px;
+    background: #eef5ff;
+    color: #34506f;
+    font-size: 11px;
 }
