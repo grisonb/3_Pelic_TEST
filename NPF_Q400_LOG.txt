@@ -1,3 +1,99 @@
+VERSION TEST v15.51 — CTR COMPACTES / OACI / GLR / POSITION PROPRE / VRP
+Date : 17/08/2026
+Base : TEST v15.50
+
+OBJECTIFS
+- Conserver sans modification la correction tactile v15.50 validée sur iPad.
+- Simplifier fortement la fiche d'information des CTR.
+- Sur la carte OACI, garder les CTR SIA tactiles tout en masquant leur dessin normal.
+- Ancrer les fenêtres des points/terrains au centre exact de leur symbole.
+- Corriger le déroulement de connexion Global Link.
+- Rendre la position propre Q400 plus visible.
+- Passer les points VFR / VRP sur fond fuchsia.
+
+MODIFICATIONS
+
+1. Correction tactile v15.50 conservée
+- Les hitboxes Leaflet SVG validées en v15.50 ne sont pas remplacées.
+- Pélicandromes / aérodromes NPF : diamètre tactile 64 px.
+- Points SIA : diamètre tactile 56 px.
+- Les panes, renderer SVG et priorités tactiles v15.50 restent inchangés.
+
+2. Fiche CTR simplifiée
+- Le titre utilise désormais la forme :
+  CTR / OACI / NOM
+- Exemple :
+  CTR / LFTW / GARONS
+- Le contenu est limité à :
+  - Type / Classe : CTR / D
+  - Plancher / Plafond : SFC / 2500 ft AMSL
+  - Fréquence : TWR: 123.200
+- Les anciennes lignes Activité, remarques, intitulés techniques et détails de service sont supprimés de la fiche CTR.
+- Les fréquences MHz sont normalisées sur trois décimales pour l'affichage.
+- Si plusieurs services/fréquences sont réellement reliés à la CTR dans le jeu SIA, ils restent regroupés sur la ligne Fréquence.
+
+3. Carte OACI — CTR SIA invisibles mais tactiles
+- Lorsque le fond offline actif appartient au groupe OACI, le contour/remplissage normal de la CTR SIA devient visuellement transparent.
+- La surface tactile CTR reste active.
+- Le trait intérieur large semi-transparent n'est pas redessiné au-dessus de la carte OACI.
+- Au toucher d'une CTR, la même règle que sur les autres fonds s'applique :
+  - la CTR sélectionnée se colore en bleu semi-transparent ;
+  - sa fiche s'ouvre.
+- Lors d'un changement de fond de carte, le rendu SIA est rafraîchi pour appliquer immédiatement le mode OACI/non-OACI.
+
+4. Position des fenêtres
+- Les hitboxes des pélicandromes/aérodromes NPF ouvrent désormais leur popup sur les coordonnées exactes du terrain, et non à la position du doigt dans la grande zone tactile.
+- Même correction pour VRP / ADHP / OTHER et terrains SIA.
+- La fiche d'une CTR est ancrée au centre de la géométrie sélectionnée, indépendamment de l'endroit où la zone a été touchée.
+
+5. Global Link — mot de passe masqué
+- Suppression du window.prompt utilisé pour le mot de passe NPF de Global Link.
+- Ajout d'une fenêtre dédiée avec input type=password.
+- Les caractères saisis ne sont donc plus affichés en clair.
+- La validation par la touche Entrée est prise en charge.
+- La fenêtre peut être fermée explicitement ou par Échap.
+
+6. Global Link — code à 4 chiffres / Fetch is aborted
+- Le chargement du captcha GLR est sérialisé afin d'éviter plusieurs requêtes concurrentes.
+- Le délai de chargement du captcha est porté à 45 secondes.
+- Le captcha est injecté puis une frame de rendu WebKit est laissée avant la poursuite.
+- Les AbortError / « Fetch is aborted » parasites ne déclenchent plus une alerte navigateur Global Link.
+- Une interruption lors d'un rafraîchissement manuel du captcha reste signalée dans la fenêtre GLR, sans bloquer l'affichage.
+- Aucun fichier NAS n'est modifié.
+
+7. Position propre Q400
+- La silhouette Q400 validée est conservée.
+- Le jaune de l'image est déjà le jaune numérique maximal #FFFF00 : il est conservé.
+- La taille visible passe de 48 px à 58 px, soit environ +21 %.
+- Le contour/ombre sombre reste léger afin de détacher l'avion des fonds clairs sans ajouter de disque coloré.
+- Le pane prioritaire de la position propre reste inchangé.
+
+8. Points VFR / VRP
+- Le fond des symboles VRP passe de jaune à fuchsia pur #FF00FF.
+- Le contour noir et le texte noir sont conservés.
+- Le seuil d'apparition à l'échelle 5 NM reste inchangé.
+- Les descriptions françaises et la fiche VRP simplifiée restent inchangées.
+
+9. Superposition future CTR / TMA
+- Aucune logique TMA supplémentaire n'est activée dans cette version : les informations au clic restent limitées aux CTR comme demandé.
+- L'ajout ultérieur des TMA pourra utiliser une sélection de toutes les zones contenant le point touché, sans dépendre du z-index visuel.
+
+10. Périmètre inchangé
+- Aucun changement AIRAC/IndexedDB : le jeu SIA 15.49 reste valide.
+- Aucun changement VAC.
+- Aucun changement NAS.
+- Aucun changement au mécanisme de création de feu par appui long (1,2 s).
+- Aucun changement des données aéronautiques embarquées.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Versions/cache-busters : contrôlés.
+- Historique : v15.50 et antérieur conservés intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.50 — CORRECTION TACTILE CIBLÉE iPad
 Date : 17/08/2026
 Base : TEST v15.49
