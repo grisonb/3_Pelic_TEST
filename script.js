@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.53';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.54';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -39895,8 +39895,11 @@ let siaLayerGroup = null;
 let siaAirspaceRenderer = null;
 let siaCtrTouchRenderer = null;
 let siaPointRenderer = null;
+/* v15.54 — la surface tactile "CTR" est généralisée à tous les espaces SIA. */
 let siaSelectedCtrTouchLayer = null;
 let siaSelectedCtrKey = null;
+let siaSelectedAirspaceItem = null;
+let siaAirspaceTouchEntries = [];
 let siaRefreshTimer = null;
 let siaFilterPrefs = null;
 
@@ -40113,6 +40116,8 @@ function ensureSiaMapPanes() {
 function clearSiaRenderedLayers() {
     siaSelectedCtrTouchLayer = null;
     siaSelectedCtrKey = null;
+    siaSelectedAirspaceItem = null;
+    siaAirspaceTouchEntries = [];
     if (siaLayerGroup) {
         try { siaLayerGroup.clearLayers(); } catch (_) {}
     }
@@ -41042,40 +41047,33 @@ function formatSiaCtrFrequencyRows(item) {
         .join('');
 }
 
+function getSiaAirspaceDisplayType(item) {
+    const type = String(item?.t || '').trim().toUpperCase();
+    const local = String(item?.l || '').trim().toUpperCase();
+
+    // Pour les D-OTHER, le type local est plus utile opérationnellement.
+    if (type === 'D-OTHER' && local) return local;
+    return type || 'ESPACE';
+}
+
 function buildSiaAirspacePopup(item) {
-    const isCtr = item?.t === 'CTR';
+    const displayType = getSiaAirspaceDisplayType(item);
+    const title = [displayType, item?.c, item?.n].filter(Boolean).join(' / ');
+    const typeClass = [displayType, item?.cl].filter(Boolean).join(' / ');
+    const vertical = `${formatSiaVertical(item?.lo)} / ${formatSiaVertical(item?.up)}`;
+    const frequencyRows = formatSiaCtrFrequencyRows(item);
 
-    if (isCtr) {
-        const title = ['CTR', item.c, item.n].filter(Boolean).join(' / ');
-        const typeClass = ['CTR', item.cl].filter(Boolean).join(' / ');
-        const vertical = `${formatSiaVertical(item.lo)} / ${formatSiaVertical(item.up)}`;
-        const frequencyRows = formatSiaCtrFrequencyRows(item);
-
-        return `
-            <div class="sia-popup sia-ctr-popup sia-ctr-popup-compact">
-                <div class="sia-popup-title">${escapeHtml(title || 'CTR')}</div>
-                <div class="sia-ctr-info-row">${escapeHtml(typeClass || 'CTR')}</div>
-                <div class="sia-ctr-info-row">${escapeHtml(vertical)}</div>
-                ${frequencyRows}
-            </div>
-        `;
-    }
-
-    const typeLabel = item.t === 'D-OTHER' && item.l
-        ? `${item.t} / ${item.l}`
-        : item.t;
-    const name = [item.c, item.n].filter(Boolean).join(' — ');
-    const remark = String(item.r || '').trim();
-
+    /*
+     * v15.54 — toutes les zones suivent la présentation CTR :
+     * titre TYPE / CODE / NOM, puis TYPE / CLASSE, limites verticales,
+     * puis une ligne distincte par service radio.
+     */
     return `
-        <div class="sia-popup">
-            <div class="sia-popup-title">${escapeHtml(name || typeLabel || 'Espace SIA')}</div>
-            <div><strong>Type :</strong> ${escapeHtml(typeLabel || '—')}</div>
-            ${item.cl ? `<div><strong>Classe :</strong> ${escapeHtml(item.cl)}</div>` : ''}
-            <div><strong>Plancher :</strong> ${escapeHtml(formatSiaVertical(item.lo))}</div>
-            <div><strong>Plafond :</strong> ${escapeHtml(formatSiaVertical(item.up))}</div>
-            ${item.a ? `<div><strong>Activité :</strong> ${escapeHtml(item.a)}</div>` : ''}
-            ${remark ? `<div class="sia-popup-remark">${escapeHtml(remark).replace(/#|\n/g, '<br>')}</div>` : ''}
+        <div class="sia-popup sia-ctr-popup sia-ctr-popup-compact sia-airspace-popup-compact">
+            <div class="sia-popup-title">${escapeHtml(title || displayType)}</div>
+            <div class="sia-ctr-info-row">${escapeHtml(typeClass || displayType)}</div>
+            <div class="sia-ctr-info-row">${escapeHtml(vertical)}</div>
+            ${frequencyRows}
         </div>
     `;
 }
@@ -41100,15 +41098,6 @@ function getSiaAirspaceStyle(item) {
         opacity = Number(item?.co || 0) === 1 ? 0.65 : 1;
         fillOpacity = Number(item?.co || 0) === 1 ? 0.008 : 0.022;
 
-        /*
-         * v15.51 — sur le fond OACI, la CTR SIA reste active et tactile mais
-         * son dessin normal est masqué, puisque la zone est déjà imprimée sur
-         * la carte OACI. La sélection reste visible via la surface tactile.
-         */
-        if (isCurrentOfflineOaciMap()) {
-            opacity = 0;
-            fillOpacity = 0;
-        }
     }
     else if (type === 'TMA') color = '#673ab7';
     else if (type === 'CTA') color = '#3f51b5';
@@ -41129,6 +41118,15 @@ function getSiaAirspaceStyle(item) {
         else if (local === 'SUR') color = '#6d4c41';
         else if (local === 'PRN') color = '#f4511e';
         else if (local === 'BAL') color = '#7b1fa2';
+    }
+
+    /*
+     * v15.54 — sur le fond OACI, TOUS les espaces SIA restent actifs/tactiles
+     * mais leur dessin normal est masqué. Seule la zone sélectionnée se colore.
+     */
+    if (isCurrentOfflineOaciMap()) {
+        opacity = 0;
+        fillOpacity = 0;
     }
 
     return {
@@ -41244,11 +41242,20 @@ function shouldDisplaySiaDesignatedPoints() {
 function getSiaCtrSelectionKey(item) {
     return [
         String(item?.t || ''),
+        String(item?.l || ''),
         String(item?.c || ''),
         String(item?.n || ''),
         JSON.stringify(item?.lo || null),
         JSON.stringify(item?.up || null)
     ].join('|');
+}
+
+function getSiaAirspaceSelectionColor(item) {
+    try {
+        return String(getSiaAirspaceStyle(item)?.color || '#0066ff');
+    } catch (_) {
+        return '#0066ff';
+    }
 }
 
 function resetSelectedSiaCtrTouchLayer(clearKey = true) {
@@ -41258,12 +41265,13 @@ function resetSelectedSiaCtrTouchLayer(clearKey = true) {
                 color: 'transparent',
                 weight: 0,
                 opacity: 0,
-                fillColor: '#0066ff',
+                fillColor: getSiaAirspaceSelectionColor(siaSelectedAirspaceItem),
                 fillOpacity: 0.001
             });
         } catch (_) {}
     }
     siaSelectedCtrTouchLayer = null;
+    siaSelectedAirspaceItem = null;
     if (clearKey) siaSelectedCtrKey = null;
 }
 
@@ -41276,28 +41284,31 @@ function selectSiaCtrTouchLayer(layer, item, latlng) {
 
     siaSelectedCtrTouchLayer = layer;
     siaSelectedCtrKey = getSiaCtrSelectionKey(item);
+    siaSelectedAirspaceItem = item;
+
+    const selectionColor = getSiaAirspaceSelectionColor(item);
 
     try {
         layer.setStyle({
-            color: '#0066ff',
-            weight: 1.4,
-            opacity: 0.60,
-            fillColor: '#0066ff',
+            color: selectionColor,
+            weight: 1.6,
+            opacity: 0.78,
+            fillColor: selectionColor,
             fillOpacity: 0.18
         });
         layer.bringToFront?.();
     } catch (_) {}
 
     /*
-     * v15.51 — la fiche est ancrée au centre de la zone sélectionnée,
-     * indépendamment de l'endroit précis où le doigt a touché la hitbox.
+     * La fiche finale est toujours ancrée au centre de la géométrie,
+     * pas à la position exacte du doigt.
      */
     let popupLatLng = null;
     try { popupLatLng = layer.getBounds().getCenter(); } catch (_) {}
     if (!popupLatLng) popupLatLng = latlng;
     if (!popupLatLng) return;
 
-    const popup = L.popup({ maxWidth: 360 })
+    const popup = L.popup({ maxWidth: 380 })
         .setLatLng(popupLatLng)
         .setContent(buildSiaAirspacePopup(item))
         .openOn(map);
@@ -41312,9 +41323,154 @@ function selectSiaCtrTouchLayer(layer, item, latlng) {
     map.on('popupclose', onPopupClose);
 }
 
+function siaPointInRing(lng, lat, ring) {
+    if (!Array.isArray(ring) || ring.length < 3) return false;
+    let inside = false;
+
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const a = ring[i];
+        const b = ring[j];
+        if (!Array.isArray(a) || !Array.isArray(b) || a.length < 2 || b.length < 2) continue;
+
+        const xi = Number(a[0]);
+        const yi = Number(a[1]);
+        const xj = Number(b[0]);
+        const yj = Number(b[1]);
+        if (![xi, yi, xj, yj].every(Number.isFinite)) continue;
+
+        const intersects = ((yi > lat) !== (yj > lat))
+            && (lng < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi);
+        if (intersects) inside = !inside;
+    }
+
+    return inside;
+}
+
+function siaPointInPolygonCoordinates(lng, lat, polygonCoordinates) {
+    if (!Array.isArray(polygonCoordinates) || !polygonCoordinates.length) return false;
+    if (!siaPointInRing(lng, lat, polygonCoordinates[0])) return false;
+
+    // Trous éventuels du polygone.
+    for (let i = 1; i < polygonCoordinates.length; i += 1) {
+        if (siaPointInRing(lng, lat, polygonCoordinates[i])) return false;
+    }
+    return true;
+}
+
+function siaGeometryContainsLatLng(geometry, latlng) {
+    if (!geometry || !latlng) return false;
+    const lng = Number(latlng.lng);
+    const lat = Number(latlng.lat);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return false;
+
+    if (geometry.type === 'Polygon') {
+        return siaPointInPolygonCoordinates(lng, lat, geometry.coordinates);
+    }
+    if (geometry.type === 'MultiPolygon') {
+        return (geometry.coordinates || []).some(poly =>
+            siaPointInPolygonCoordinates(lng, lat, poly)
+        );
+    }
+    return false;
+}
+
+function getSiaAirspaceChoicePriority(item) {
+    const type = String(item?.t || '').toUpperCase();
+    if (type === 'CTR') return 10;
+    if (type === 'P' || type === 'R' || type === 'D' || type === 'TRA') return 20;
+    if (type === 'TMA') return 30;
+    if (type === 'CTA') return 40;
+    if (type === 'D-OTHER') return 50;
+    if (type === 'RAS' || type === 'SECTOR' || type === 'SECTOR-C') return 60;
+    if (type === 'OCA' || type === 'UTA') return 70;
+    if (type === 'FIR' || type === 'UIR' || type === 'UIR-P') return 80;
+    return 90;
+}
+
+function getSiaAirspaceTouchCandidates(latlng) {
+    return siaAirspaceTouchEntries
+        .filter(entry => siaGeometryContainsLatLng(entry.geometry, latlng))
+        .sort((a, b) => {
+            const pa = getSiaAirspaceChoicePriority(a.item);
+            const pb = getSiaAirspaceChoicePriority(b.item);
+            if (pa !== pb) return pa - pb;
+
+            const aa = Array.isArray(a.item?.b) && a.item.b.length >= 4
+                ? Math.abs((Number(a.item.b[2]) - Number(a.item.b[0])) * (Number(a.item.b[3]) - Number(a.item.b[1])))
+                : Infinity;
+            const ab = Array.isArray(b.item?.b) && b.item.b.length >= 4
+                ? Math.abs((Number(b.item.b[2]) - Number(b.item.b[0])) * (Number(b.item.b[3]) - Number(b.item.b[1])))
+                : Infinity;
+            return aa - ab;
+        });
+}
+
+function getSiaAirspaceChoiceLabel(item) {
+    return [
+        getSiaAirspaceDisplayType(item),
+        item?.c,
+        item?.n
+    ].filter(Boolean).join(' / ');
+}
+
+function openSiaAirspaceChoicePopup(latlng, candidates) {
+    if (!map || !latlng || !Array.isArray(candidates) || !candidates.length) return;
+
+    const container = document.createElement('div');
+    container.className = 'sia-airspace-choice';
+
+    const title = document.createElement('div');
+    title.className = 'sia-airspace-choice-title';
+    title.textContent = 'ESPACES À CET ENDROIT';
+    container.appendChild(title);
+
+    const list = document.createElement('div');
+    list.className = 'sia-airspace-choice-list';
+
+    candidates.forEach(entry => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'sia-airspace-choice-button';
+        button.textContent = getSiaAirspaceChoiceLabel(entry.item);
+
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            try { map.closePopup(); } catch (_) {}
+            selectSiaCtrTouchLayer(entry.layer, entry.item, latlng);
+        });
+
+        list.appendChild(button);
+    });
+
+    container.appendChild(list);
+
+    L.popup({ maxWidth: 390, closeButton: true })
+        .setLatLng(latlng)
+        .setContent(container)
+        .openOn(map);
+}
+
+function handleSiaAirspaceTouch(latlng) {
+    const candidates = getSiaAirspaceTouchCandidates(latlng);
+
+    if (!candidates.length) return;
+    if (candidates.length === 1) {
+        selectSiaCtrTouchLayer(candidates[0].layer, candidates[0].item, latlng);
+        return;
+    }
+
+    /*
+     * Plusieurs zones se superposent : le z-index ne choisit jamais à la place
+     * de l'utilisateur. On propose toutes les zones actives contenant le point.
+     */
+    openSiaAirspaceChoicePopup(latlng, candidates);
+}
+
 function addSiaCtrTouchSurface(feature) {
-    if (!siaLayerGroup || !feature?.geometry || feature?.properties?.siaItem?.t !== 'CTR') return null;
+    if (!siaLayerGroup || !feature?.geometry || !feature?.properties?.siaItem) return null;
     const item = feature.properties.siaItem;
+    const selectionColor = getSiaAirspaceSelectionColor(item);
 
     const touchGeoJson = L.geoJSON(feature, {
         pane: 'siaCtrTouchPane',
@@ -41323,7 +41479,7 @@ function addSiaCtrTouchSurface(feature) {
             color: 'transparent',
             weight: 0,
             opacity: 0,
-            fillColor: '#0066ff',
+            fillColor: selectionColor,
             fillOpacity: 0.001,
             interactive: true
         },
@@ -41335,12 +41491,18 @@ function addSiaCtrTouchSurface(feature) {
                         L.DomEvent.preventDefault(event.originalEvent);
                     }
                 } catch (_) {}
-                selectSiaCtrTouchLayer(layer, item, event?.latlng);
+                handleSiaAirspaceTouch(event?.latlng);
             });
         }
     });
 
     touchGeoJson.addTo(siaLayerGroup);
+    siaAirspaceTouchEntries.push({
+        item,
+        geometry: feature.geometry,
+        layer: touchGeoJson
+    });
+
     return touchGeoJson;
 }
 
@@ -41359,6 +41521,8 @@ async function refreshSiaLayers(reason = 'manual') {
     }
     siaSelectedCtrTouchLayer = null;
     siaSelectedCtrKey = null;
+    siaSelectedAirspaceItem = null;
+    siaAirspaceTouchEntries = [];
     siaLayerGroup.clearLayers();
 
     const bounds = map.getBounds();
@@ -41400,11 +41564,10 @@ async function refreshSiaLayers(reason = 'manual') {
                         fillOpacity: 0.85
                     });
                 },
-                onEachFeature: (feature, layer) => {
-                    layer.bindPopup(
-                        buildSiaAirspacePopup(feature.properties.siaItem),
-                        { maxWidth: 360 }
-                    );
+                onEachFeature: (_feature, layer) => {
+                    // v15.54 : l'interaction passe par la surface tactile exacte
+                    // afin d'être identique pour tous les espaces et sur iPad.
+                    try { layer.options.interactive = false; } catch (_) {}
                 }
             }
         );
@@ -41418,9 +41581,12 @@ async function refreshSiaLayers(reason = 'manual') {
          */
         visibleAirspaceFeatures.forEach(feature => {
             const item = feature.properties.siaItem;
-            if (item?.t === 'CTR') {
-                addSiaCtrTouchSurface(feature);
-            }
+
+            // v15.54 : toute zone SIA visible reçoit une surface tactile exacte.
+            addSiaCtrTouchSurface(feature);
+
+            // La bande interne reste un choix graphique propre aux CTR sur les
+            // fonds non-OACI ; les autres types conservent leur dessin normal.
             if (item?.t !== 'CTR' || Number(item?.co || 0) === 1) return;
             addSiaCtrInnerBand(feature.geometry, '#0066ff');
         });
