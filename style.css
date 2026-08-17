@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.57 */
+/* NPF_STYLE_BUILD_VERSION: v15.59 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15248,4 +15248,25 @@ body.gaar-point-search-open .gaar-editing-banner {
 .sia-airspace-touch-surface {
     pointer-events: auto !important;
     touch-action: manipulation;
+}
+
+
+/* ==========================================================================
+   v15.59 — SIA : sélection persistante + BASE dans les pélics proches
+   ========================================================================== */
+
+.leaflet-siaSelectionPane-pane,
+.leaflet-siaSelectionPane-pane svg,
+.leaflet-siaSelectionPane-pane path {
+    pointer-events: none !important;
+}
+
+.route-tooltip .route-label-base-flag {
+    display: block;
+    margin-bottom: 1px;
+    text-align: center;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: .08em;
 }
