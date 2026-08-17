@@ -1,3 +1,110 @@
+VERSION TEST v15.54 — RÈGLES CTR APPLIQUÉES À TOUS LES ESPACES / ZONES SIA
+Date : 17/08/2026
+Base : TEST v15.53
+
+OBJECTIF
+- Appliquer à tous les espaces/zones SIA le comportement actuellement validé pour les CTR.
+- Conserver sans modification le système tactile des aéroports, pélicandromes et points VFR.
+
+1. FICHE D'INFORMATION — TOUS LES ESPACES
+- Même présentation compacte que la CTR pour :
+  CTR, TMA, CTA, FIR, UIR, UIR-P, UTA, OCA, SECTOR, SECTOR-C, RAS, TRA, P, R, D et D-OTHER.
+- Titre :
+  TYPE / CODE / NOM
+- Exemple :
+  TMA / LFML / PROVENCE
+- Ligne suivante :
+  TYPE / CLASSE
+- Puis :
+  PLANCHER / PLAFOND
+- Aucun intitulé « Type », « Classe », « Plancher », « Plafond » ou « Fréquence ».
+- Toutes les informations restent en gras avec la police agrandie de v15.52.
+- Pour D-OTHER, le type local utile (AER, PJE, VOL, SUR, etc.) est utilisé comme type d'affichage.
+
+2. FRÉQUENCES — TOUS LES ESPACES
+- Les fréquences associées sont affichées pour n'importe quel type d'espace lorsque les relations SIA en fournissent.
+- Une ligne séparée par service :
+  TWR
+  APP
+  SOL
+  ATIS
+  INFO
+  AFIS
+  FIS
+  etc.
+- La règle des fréquences supplétives v15.52 reste intégralement appliquée :
+  suffixe « (s) » uniquement lorsque XML_SIA indique explicitement Suppletive = oui.
+- Aucun rapprochement géographique approximatif n'est utilisé.
+
+3. CARTE OACI — TOUS LES ESPACES
+- La règle jusque-là appliquée uniquement aux CTR est généralisée à toutes les zones SIA.
+- Si le fond actif est OACI :
+  - le dessin normal de toutes les zones SIA est transparent ;
+  - les surfaces tactiles exactes restent actives ;
+  - la zone sélectionnée se colore temporairement ;
+  - sa fiche reste consultable.
+- À la fermeture de la fiche, la coloration disparaît.
+- Sur les fonds non-OACI, les zones conservent leur dessin normal selon leur type/couleur.
+
+4. SURFACE TACTILE — TOUS LES ESPACES
+- Chaque espace visible et activé reçoit désormais une surface tactile correspondant à toute sa géométrie.
+- Le clic n'est plus limité au contour.
+- La surface tactile est portée par le même renderer SVG fiable que celui validé pour les CTR.
+- Le dessin visible de la zone n'ouvre plus directement une popup concurrente : toute l'interaction passe par la surface tactile commune.
+
+5. SÉLECTION D'UNE ZONE
+- La zone choisie reçoit un remplissage semi-transparent de 18 %.
+- La couleur de sélection reprend la couleur normale du type d'espace :
+  CTR bleu, TMA violet, R/D/P selon leur code couleur, etc.
+- La fiche finale est positionnée au centre de la géométrie sélectionnée, et non à l'endroit précis où le doigt a touché.
+
+6. SUPERPOSITION DE PLUSIEURS ZONES
+- Le z-index ne décide plus quelle zone est sélectionnée lorsque plusieurs espaces se superposent.
+- Au toucher, NPF recherche toutes les zones activées contenant réellement le point.
+- S'il n'y en a qu'une : ouverture directe.
+- S'il y en a plusieurs : affichage d'une petite liste « ESPACES À CET ENDROIT ».
+- Après choix :
+  - seule la zone choisie se colore ;
+  - sa fiche s'ouvre au centre de cette zone.
+- Ordre de priorité de présentation :
+  CTR
+  P/R/D/TRA
+  TMA
+  CTA
+  D-OTHER
+  RAS/SECTOR
+  OCA/UTA
+  FIR/UIR
+- À priorité égale, les géométries les plus petites sont proposées d'abord.
+
+7. ÉLÉMENTS INCHANGÉS
+- Correction tactile v15.50 conservée pour pélicandromes/aéroports/points.
+- VRP fuchsia, texte blanc et cercle noir conservés.
+- Seuil VRP 5 NM conservé.
+- Fréquences supplétives v15.52 conservées.
+- GLR v15.51 conservé.
+- Q400 agrandi/jaune conservé.
+- VAC inchangé.
+- Création de feu par appui long inchangée.
+- Aucun changement NAS.
+
+8. DONNÉES SIA
+- Aucun changement du payload AIRAC.
+- `npfDatasetRevision` reste 15.52.
+- Cette version modifie uniquement le moteur d'affichage et d'interaction.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression vérifiée.
+- `npfDatasetRevision = 15.52` vérifiée.
+- Une seule fonction de popup finale pour tous les espaces.
+- Surface tactile appelée pour toutes les zones visibles.
+- Historique v15.53 et antérieur conservé intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.53 — CORRECTION RÉGRESSION AFFICHAGE SIA
 Date : 17/08/2026
 Base : TEST v15.52
