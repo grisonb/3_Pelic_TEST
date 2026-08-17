@@ -1,3 +1,86 @@
+VERSION TEST v15.49 — TACTILE / CTR / VRP FR / ÉCHELLE 5 NM / APPUI FEU
+Date : 17/08/2026
+Base : TEST v15.48
+Source SIA : AIRAC 08/26 v04 fourni par l'utilisateur
+
+OBJECTIFS
+- Rendre réellement cliquables sur iPad les pélicandromes et aérodromes NPF malgré les couches SIA.
+- Rendre les points SIA fiables au toucher.
+- N'afficher les points SIA qu'à partir de l'échelle 5 NM de NPF.
+- Simplifier la fiche des points VFR et utiliser les descriptions françaises officielles XML-SIA.
+- Rendre toute la surface d'une CTR tactile et colorer temporairement la CTR sélectionnée.
+- Allonger l'appui long sur la carte nécessaire à la création d'un feu afin de limiter les déclenchements involontaires.
+
+MODIFICATIONS
+
+1. Pélicandromes / aérodromes NPF — priorité tactile
+- Création d'un pane tactile NPF dédié à z-index 640, au-dessus des couches et points SIA.
+- Les zones tactiles sont désormais des hitboxes DOM de 64 × 64 px.
+- Le symbole visible des terrains et pélicandromes n'est pas agrandi.
+- Les pélicandromes, aérodromes noirs cerclés blanc/noir et simples points noirs utilisent la même logique tactile.
+- SafeSky / GLR restent au-dessus de cette couche ; le Q400 propre reste au-dessus de tous les marqueurs et n'intercepte pas les clics.
+
+2. Points SIA — zones tactiles
+- Création d'un pane tactile SIA dédié à z-index 620.
+- Les points SIA utilisent une hitbox DOM invisible de 56 × 56 px au lieu d'une zone transparente Canvas.
+- La représentation visible reste inchangée.
+
+3. Points SIA — affichage à partir de 5 NM
+- Les points Dpn affichables (VRP, ADHP et OTHER) sont masqués aux échelles supérieures à 5 NM.
+- Ils apparaissent dès que la barre d'échelle NPF indique 5 NM, puis restent visibles à 2 NM, 1 NM, etc.
+- Le déclenchement réutilise le même calcul que la barre d'échelle NPF et non un seuil de zoom Leaflet approximatif.
+- Les aérodromes/hélistations/landing sites SIA ne sont pas concernés par cette limitation.
+
+4. Points VFR / VRP — fiche simplifiée et française
+- Le titre est compact, par exemple AS-LFMA.
+- Suppression dans la fiche VRP de :
+  - « Nom SIA » ;
+  - « Aérodrome associé » ;
+  - coordonnées.
+- La fiche conserve uniquement le titre et la description utile du point.
+- Les 1 094 descriptions VRP ont été rapprochées avec le fichier officiel XML-SIA du même export afin d'utiliser le texte français lorsqu'il est fourni.
+- Vérification : 1 094 / 1 094 VRP AIXM ont trouvé leur correspondance XML-SIA française.
+- La révision interne du jeu IndexedDB passe à 15.49 afin de remplacer automatiquement le jeu 15.48 déjà stocké.
+
+5. CTR — surface tactile complète
+- Création d'un pane tactile CTR dédié à z-index 445, juste au-dessus du dessin des espaces et sous les points.
+- Les CTR utilisent une surface polygonale SVG tactile couvrant tout leur intérieur.
+- Il n'est plus nécessaire de viser précisément le trait de limite.
+- Les points SIA et les aérodromes NPF restent prioritaires lorsqu'ils se trouvent au-dessus de la CTR.
+
+6. CTR — identification visuelle de la zone sélectionnée
+- Au toucher d'une CTR, sa surface tactile normalement invisible devient bleue à environ 18 % d'opacité.
+- Le contour de sélection est légèrement renforcé.
+- La coloration permet de voir immédiatement quelle géométrie/CTR a été sélectionnée.
+- La fiche conserve les informations introduites en v15.48 : classe, plancher, plafond, activité, fréquences/services AIXM et remarques.
+- La coloration disparaît à la fermeture de la fiche.
+
+7. Création manuelle d'un feu — appui long
+- Sur iPad/tactile, la création d'un feu nécessite désormais un appui immobile d'environ 1,2 seconde.
+- Le contextmenu tactile plus précoce généré par Leaflet est neutralisé pendant cet appui.
+- Un déplacement du doigt de plus de 14 px annule la création.
+- Un deuxième doigt annule également l'appui.
+- Les contrôles, marqueurs et objets interactifs sont exclus afin qu'un appui sur eux ne crée pas un feu.
+- Le clic droit souris conserve son comportement antérieur.
+- Le mode simulation conserve son action d'appui long.
+
+8. Périmètre inchangé
+- Les points IFR Dpn/ICAO restent exclus.
+- Les filtres SIA restent indépendants.
+- Aucun changement VAC.
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Jeu SIA compressé : décompression contrôlée.
+- Descriptions VRP françaises : 1 094 / 1 094 correspondances contrôlées.
+- Versions/cache-busters : contrôlés.
+- Historique : v15.48 et antérieur conservés intégralement.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.48 — CORRECTIONS TACTILES / VRP / CTR ENRICHIES
 Date : 17/08/2026
 Base : TEST v15.47
