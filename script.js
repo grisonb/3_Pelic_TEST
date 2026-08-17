@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.52';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.53';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -40411,6 +40411,17 @@ function formatSiaVertical(raw) {
     if (unit === 'FT') return `${value} ft${ref === 'ALT' ? ' AMSL' : ref === 'HEI' ? ' AGL' : ''}`;
     if (unit) return `${value} ${unit}`;
     return value;
+}
+
+function isCurrentOfflineOaciMap() {
+    if (mapSourceMode !== 'offline') return false;
+    const activeGroup = String(getQuickOfflineActiveGroupName() || '').trim();
+    if (/\bOACI\b/i.test(activeGroup)) return true;
+
+    return (Array.isArray(activeOfflinePacks) ? activeOfflinePacks : []).some(pack => {
+        const group = String(getOfflinePackGroupName(pack) || '');
+        return /\bOACI\b/i.test(group) || /\bOACI\b/i.test(String(pack || ''));
+    });
 }
 
 function getSiaAirspaceStyle(item) {
