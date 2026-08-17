@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.49';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.50';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -557,6 +557,9 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // v14.44 — filtre trafics au sol et zone centrée sur la carte.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null, selectedAirportDestination = null;
+// v15.50 — renderers SVG dédiés aux grandes zones tactiles iPad.
+let npfTouchRenderer = null;
+let siaPointTouchRenderer = null;
 let npfRunwayMapLayer = null;
 let npfRunwayRenderer = null;
 let communeAliases = [];
@@ -5210,13 +5213,27 @@ function initMap() {
     if (map.createPane && !map.getPane('siaPointTouchPane')) {
         map.createPane('siaPointTouchPane');
         const siaPointTouchPane = map.getPane('siaPointTouchPane');
-        if (siaPointTouchPane) siaPointTouchPane.style.zIndex = '620';
+        if (siaPointTouchPane) {
+            siaPointTouchPane.style.zIndex = '660';
+            siaPointTouchPane.style.pointerEvents = 'auto';
+        }
     }
     if (map.createPane && !map.getPane('npfTouchPane')) {
         map.createPane('npfTouchPane');
         const npfTouchPane = map.getPane('npfTouchPane');
-        if (npfTouchPane) npfTouchPane.style.zIndex = '640';
+        if (npfTouchPane) {
+            npfTouchPane.style.zIndex = '665';
+            npfTouchPane.style.pointerEvents = 'auto';
+        }
     }
+    // v15.50 — renderer tactile NPF disponible avant le premier dessin des terrains.
+    if (!npfTouchRenderer && L.svg) {
+        npfTouchRenderer = L.svg({ padding: 0.35, pane: 'npfTouchPane' });
+    }
+    if (!siaPointTouchRenderer && L.svg) {
+        siaPointTouchRenderer = L.svg({ padding: 0.35, pane: 'siaPointTouchPane' });
+    }
+
     if (map.createPane && !map.getPane('ownAircraftPane')) {
         map.createPane('ownAircraftPane');
         const ownAircraftPane = map.getPane('ownAircraftPane');
@@ -19835,22 +19852,46 @@ function drawNpfRunwayMapLayer() {
 
 function addAirportTouchHitbox(airport, popupHtml) {
     /*
-     * v15.49 — vraie zone tactile DOM 64 × 64 px dans un pane dédié z640.
-     * Elle reste au-dessus des couches SIA mais sous SafeSky/GLR.
+     * v15.50 — correction tactile ciblée.
+     *
+     * Les DIV transparents 64 × 64 px introduits en v15.49 ne sont pas
+     * suffisamment fiables sur Safari/iPad. Retour au mécanisme Leaflet Path
+     * qui fonctionnait avant l'arrivée des couches SIA, mais :
+     * - rayon porté à 32 px (64 px de diamètre) ;
+     * - renderer SVG dédié dans npfTouchPane z665 ;
+     * - remplissage quasi invisible (0.002) et non totalement transparent afin
+     *   que WebKit conserve toujours la surface dans son hit-testing ;
+     * - bubblingMouseEvents=false pour empêcher le clic carte de prendre le pas.
      */
     if (!airport || !Number.isFinite(Number(airport.lat)) || !Number.isFinite(Number(airport.lon)) || !popupHtml) return null;
-    const hitbox = L.marker([airport.lat, airport.lon], {
+
+    ensureSiaMapPanes();
+    const hitbox = L.circleMarker([airport.lat, airport.lon], {
         pane: 'npfTouchPane',
+        renderer: npfTouchRenderer || undefined,
+        radius: 32,
+        stroke: false,
+        color: '#000000',
+        opacity: 0,
+        fill: true,
+        fillColor: '#000000',
+        fillOpacity: 0.002,
         interactive: true,
-        keyboard: false,
-        icon: L.divIcon({
-            className: 'npf-airport-touch-hitbox',
-            html: '',
-            iconSize: [64, 64],
-            iconAnchor: [32, 32]
-        })
-    }).bindPopup(popupHtml, { maxWidth: 300 });
+        bubblingMouseEvents: false,
+        keyboard: false
+    });
+
+    hitbox.bindPopup(popupHtml, { maxWidth: 300 });
+    hitbox.on('click', event => {
+        try {
+            if (event?.originalEvent) {
+                L.DomEvent.stopPropagation(event.originalEvent);
+            }
+        } catch (_) {}
+        try { hitbox.openPopup(event?.latlng); } catch (_) {}
+    });
     hitbox.addTo(permanentAirportLayer);
+    try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
     return hitbox;
 }
 
@@ -40352,13 +40393,28 @@ function ensureSiaMapPanes() {
     if (!map.getPane('siaPointTouchPane')) {
         map.createPane('siaPointTouchPane');
         const pane = map.getPane('siaPointTouchPane');
-        if (pane) pane.style.zIndex = '620';
+        if (pane) {
+            pane.style.zIndex = '660';
+            pane.style.pointerEvents = 'auto';
+        }
     }
 
     if (!map.getPane('npfTouchPane')) {
         map.createPane('npfTouchPane');
         const pane = map.getPane('npfTouchPane');
-        if (pane) pane.style.zIndex = '640';
+        if (pane) {
+            pane.style.zIndex = '665';
+            pane.style.pointerEvents = 'auto';
+        }
+    }
+
+    // v15.50 — les hitboxes utilisent SVG plutôt qu'un DIV vide :
+    // c'est beaucoup plus fiable pour le hit-testing tactile Safari/iPad.
+    if (!siaPointTouchRenderer && L.svg) {
+        siaPointTouchRenderer = L.svg({ padding: 0.35, pane: 'siaPointTouchPane' });
+    }
+    if (!npfTouchRenderer && L.svg) {
+        npfTouchRenderer = L.svg({ padding: 0.35, pane: 'npfTouchPane' });
     }
 
     if (!siaAirspaceRenderer && L.canvas) {
@@ -41155,21 +41211,35 @@ function addSiaTouchHitbox(latlng, popupHtml) {
     if (!siaLayerGroup || !latlng || !popupHtml) return null;
 
     /*
-     * v15.49 — zone tactile DOM 56 × 56 px, indépendante du Canvas SIA.
+     * v15.50 — même correction que pour les terrains NPF : surface SVG
+     * quasi invisible plutôt qu'un DIV vide. Diamètre tactile 56 px.
      */
-    const hitbox = L.marker(latlng, {
+    ensureSiaMapPanes();
+    const hitbox = L.circleMarker(latlng, {
         pane: 'siaPointTouchPane',
+        renderer: siaPointTouchRenderer || undefined,
+        radius: 28,
+        stroke: false,
+        color: '#000000',
+        opacity: 0,
+        fill: true,
+        fillColor: '#000000',
+        fillOpacity: 0.002,
         interactive: true,
-        keyboard: false,
-        icon: L.divIcon({
-            className: 'sia-point-touch-hitbox',
-            html: '',
-            iconSize: [56, 56],
-            iconAnchor: [28, 28]
-        })
+        bubblingMouseEvents: false,
+        keyboard: false
     });
     hitbox.bindPopup(popupHtml, { maxWidth: 340 });
+    hitbox.on('click', event => {
+        try {
+            if (event?.originalEvent) {
+                L.DomEvent.stopPropagation(event.originalEvent);
+            }
+        } catch (_) {}
+        try { hitbox.openPopup(event?.latlng); } catch (_) {}
+    });
     hitbox.addTo(siaLayerGroup);
+    try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
     return hitbox;
 }
 
@@ -41585,12 +41655,15 @@ async function refreshSiaLayers(reason = 'manual') {
         const latlng = L.latLng(Number(item.x), Number(item.y));
         if (!pointBounds.contains(latlng)) continue;
 
+        const terrainPopupHtml = buildSiaTerrainPopup(item);
         const marker = L.circleMarker(latlng, {
             ...getSiaTerrainMarkerStyle(item),
             pane: 'siaPointPane',
             renderer: siaPointRenderer,
-            interactive: false
+            interactive: true,
+            bubblingMouseEvents: false
         });
+        marker.bindPopup(terrainPopupHtml, { maxWidth: 320 });
         if (zoom >= 8 && item.c) {
             marker.bindTooltip(escapeHtml(item.c), {
                 permanent: true,
@@ -41600,7 +41673,7 @@ async function refreshSiaLayers(reason = 'manual') {
             });
         }
         marker.addTo(siaLayerGroup);
-        addSiaTouchHitbox(latlng, buildSiaTerrainPopup(item));
+        addSiaTouchHitbox(latlng, terrainPopupHtml);
         rendered += 1;
     }
 
@@ -41617,7 +41690,8 @@ async function refreshSiaLayers(reason = 'manual') {
             const size = getSiaVrpVisualSize(symbolText);
             const marker = L.marker(latlng, {
                 pane: 'siaPointPane',
-                interactive: false,
+                interactive: true,
+                bubblingMouseEvents: false,
                 keyboard: false,
                 icon: L.divIcon({
                     className: 'sia-vrp-div-icon',
@@ -41626,6 +41700,7 @@ async function refreshSiaLayers(reason = 'manual') {
                     iconAnchor: [size / 2, size / 2]
                 })
             });
+            marker.bindPopup(popupHtml, { maxWidth: 340 });
             marker.addTo(siaLayerGroup);
             addSiaTouchHitbox(latlng, popupHtml);
             rendered += 1;
@@ -41636,8 +41711,10 @@ async function refreshSiaLayers(reason = 'manual') {
             ...getSiaPointMarkerStyle(item),
             pane: 'siaPointPane',
             renderer: siaPointRenderer,
-            interactive: false
+            interactive: true,
+            bubblingMouseEvents: false
         });
+        marker.bindPopup(popupHtml, { maxWidth: 340 });
 
         const label = String(item.d || item.c || '').trim();
         if (zoom >= 8 && label && item.k !== 'dpn:ADHP') {
