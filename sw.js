@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-57_longpress_fire_zone_tma_parent';
-const APP_VERSION = 'v15.57';
+const SW_VERSION = 'sw-v15-59_sia_touch_highlight_labels_aubenas_base';
+const APP_VERSION = 'v15.59';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
