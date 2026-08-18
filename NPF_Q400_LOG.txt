@@ -1,3 +1,78 @@
+VERSION TEST v15.63 — NOMS R PAR RÉFÉRENCES CROISÉES + FILTRE ALTITUDE FL115
+Date : 18/08/2026
+Base : TEST v15.62
+
+OBJECTIFS
+- Retrouver le nom géographique publié d'une zone R lorsque sa propre fiche SIA ne contient que son numéro, en exploitant les références explicites « LF-R xxx NOM » présentes dans les autres espaces du même jeu SIA.
+- Afficher notamment « R 107 / PILON DU ROY » et « R 283 / CARPIAGNE » sans table manuelle spécifique à ces zones.
+- Conserver la priorité absolue à une instruction opérationnelle explicite d'entrée/clairance/contact, afin que R108B reste « CAMARGUE / 127.925 ».
+- Ajouter dans « CALQUES AÉRONAUTIQUES SIA » le filtre mémorisé « Masquer zones > FL115 », désactivé par défaut.
+- Appliquer ce filtre d'altitude de façon cohérente à la carte, aux surfaces tactiles, aux libellés et au profil vertical.
+
+1. ZONES R — RÉSOLUTION DES NOMS PAR RÉFÉRENCES CROISÉES SIA
+- Construction à la demande d'un index des références « LF-R xxx NOM » trouvées dans les remarques de tous les espaces SIA embarqués.
+- Aucune table manuelle de noms n'est ajoutée : le nom doit être réellement présent dans le jeu SIA AIRAC embarqué.
+- Les mentions sans nom du type « LF-R 95A active », « LF-R xxx when active » ou simples références numériques sont rejetées.
+- En cas de plusieurs occurrences, le nom normalisé le plus fréquemment publié est retenu.
+- Exemples vérifiés dans le payload :
+  - CTR PROVENCE et TMA PROVENCE 1.30 citent « LF-R 107 PILON DU ROY » ;
+  - TMA PROVENCE 15 cite « LF-R 283 CARPIAGNE ».
+- Résultats attendus :
+  - « R 107 / PILON DU ROY » ;
+  - « R 283 / CARPIAGNE ».
+
+2. PRIORITÉ ENTRE NOM GÉOGRAPHIQUE ET SERVICE OPÉRATIONNEL
+- Une instruction explicite d'entrée/clairance/contact reste prioritaire sur tout nom trouvé par référence croisée.
+- R108B conserve donc : « R 108 B / CAMARGUE / 127.925 ».
+- En l'absence d'une telle instruction, un nom géographique publié par référence croisée est préféré comme nom principal de la zone.
+- Le service opérationnel reste conservé séparément pour rechercher une fréquence associée fiable.
+- Exemple : une zone nommée par référence croisée peut garder une fréquence publiée par son service sans remplacer son nom géographique par le nom du service.
+
+3. FILTRE « MASQUER ZONES > FL115 »
+- Nouvelle case à cocher dans le menu « CALQUES AÉRONAUTIQUES SIA ».
+- Libellé : « Masquer zones > FL115 ».
+- Désactivée par défaut afin de conserver le comportement complet actuel lors d'une première utilisation.
+- Préférence mémorisée dans le même stockage local que les autres choix SIA.
+- « Tout afficher » / « Tout masquer » continuent d'agir uniquement sur les familles de calques et ne modifient pas ce filtre d'altitude.
+
+4. RÈGLE VERTICALE DU FILTRE
+- La décision se fait sur le PLANCHER de la zone.
+- Une zone dont le plancher est >= FL115 / 11 500 ft est masquée.
+- Exemples :
+  - FL125 / FL195 : masquée ;
+  - FL115 / FL195 : masquée ;
+  - 4500 ft / FL195 : conservée ;
+  - SFC / FL145 : conservée.
+- Les limites verticales non interprétables restent affichées par sécurité.
+
+5. APPLICATION COHÉRENTE DU FILTRE
+- Carte : la zone filtrée n'est pas ajoutée aux entités visibles.
+- Interaction : aucune surface tactile n'est créée pour une zone filtrée.
+- Libellés : aucun nom/fréquence n'est créé pour une zone filtrée.
+- PROFIL : les volumes dont le plancher est >= FL115 sont exclus de la coupe lorsque le filtre est actif.
+- Terrains et points SIA ne sont pas concernés par ce filtre.
+
+6. DONNÉES SIA / NAS
+- Payload SIA inchangé.
+- `npfDatasetRevision` reste 15.57.
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Cohérence v15.63 index/script/style/manifest/SW vérifiée.
+- Payload SIA gzip/base64 inchangé et décompressable.
+- Référence croisée R107 : PILON DU ROY retrouvée.
+- Référence croisée R283 : CARPIAGNE retrouvée.
+- R108B : CAMARGUE + 127.925 conservés malgré la nouvelle logique de nommage.
+- R95 : LE LUC + 122.200 conservés.
+- Filtre FL115 : désactivé par défaut, préférence mémorisée, appliqué au rendu et au profil.
+- Historique v15.62 et antérieur conservé intégralement.
+- Validation réelle Safari/iPadOS à effectuer sur l'appareil.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.62 — ZONES R OPÉRATIONNELLES + LIBELLÉS INTÉRIEURS + PROFIL AU-DESSUS DES ICÔNES
 Date : 18/08/2026
 Base : TEST v15.61
