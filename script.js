@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.65';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.66';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -11595,14 +11595,41 @@ function openTrafficSettingsDialog() {
     }, 50);
 }
 
+/*
+ * v15.66 — protection iPadOS des commandes prévues pour l'appui long.
+ * Empêche Safari de transformer l'appui long en sélection de texte / callout
+ * sans modifier le comportement des champs de saisie ni les gestes de carte.
+ */
+function protectNpfLongPressControlFromIosSelection(element) {
+    if (!element || element.dataset?.npfLongPressSelectionProtected === '1') return;
+    try { element.dataset.npfLongPressSelectionProtected = '1'; } catch (_) {}
+
+    const protect = node => {
+        if (!node) return;
+        try {
+            node.setAttribute?.('draggable', 'false');
+            node.style.webkitUserSelect = 'none';
+            node.style.userSelect = 'none';
+            node.style.webkitTouchCallout = 'none';
+            node.style.webkitUserDrag = 'none';
+        } catch (_) {}
+    };
+
+    protect(element);
+    try { element.querySelectorAll('*').forEach(protect); } catch (_) {}
+
+    element.addEventListener('selectstart', event => {
+        event.preventDefault();
+        try { window.getSelection?.()?.removeAllRanges?.(); } catch (_) {}
+    });
+    element.addEventListener('dragstart', event => event.preventDefault());
+}
+
 function installTrafficButtonInteractions(button) {
     if (!button || button.dataset.trafficBound === '1') return;
     button.dataset.trafficBound = '1';
 
-    try {
-        button.setAttribute('draggable', 'false');
-        button.querySelectorAll('*').forEach(child => child.setAttribute('draggable', 'false'));
-    } catch (_) {}
+    protectNpfLongPressControlFromIosSelection(button);
 
     let longPressTimer = null;
     let longPressTriggered = false;
@@ -11626,7 +11653,7 @@ function installTrafficButtonInteractions(button) {
 
     button.addEventListener('selectstart', (event) => event.preventDefault());
     button.addEventListener('dragstart', (event) => event.preventDefault());
-    button.addEventListener('pointerdown', startLongPress);
+    button.addEventListener('pointerdown', startLongPress, { passive: false });
     button.addEventListener('pointerup', clearLongPress);
     button.addEventListener('pointerleave', clearLongPress);
     button.addEventListener('pointercancel', clearLongPress);
@@ -21597,6 +21624,8 @@ function installCenterGpsButtonPressHandlers(button) {
         return;
     }
     button.dataset.centerGpsPressHandlersInstalled = 'true';
+
+    protectNpfLongPressControlFromIosSelection(button);
 
     const cancelPress = () => {
         resetCenterGpsButtonPressState(button);
@@ -40169,7 +40198,7 @@ let siaSelectionRenderer = null;
 let siaSelectionLayer = null;
 
 let siaProfileOpen = false;
-let siaProfileDistanceNm = 50;
+let siaProfileDistanceNm = 25;
 let siaProfileRefreshTimer = null;
 let siaProfileSegments = [];
 
@@ -41329,26 +41358,161 @@ function getSiaProfileCandidateItems(dataset) {
     });
 }
 
-function buildSiaProfileSvg(volumes, position) {
-    const width = 1000;
-    const height = 330;
-    const margin = { left: 68, right: 18, top: 18, bottom: 38 };
-    const plotW = width - margin.left - margin.right;
-    const plotH = height - margin.top - margin.bottom;
+function getSiaProfileLabelParts(item) {
+    const displayType = getSiaAirspaceDisplayType(item);
+    const type = String(item?.t || '').trim().toUpperCase();
+    const name = String(item?.n || '').trim();
+    const code = String(item?.c || '').trim();
+    const primaryName = name || code;
+    const base = [displayType, primaryName].filter(Boolean).join(' ');
+
+    if (type === 'R') {
+        const restrictedInfo = getSiaRestrictedRemarkInfo(item);
+        return {
+            name: [
+                base,
+                String(restrictedInfo?.operationalName || '').trim()
+            ].filter(Boolean).join(' / '),
+            frequency: String(restrictedInfo?.frequency || '').trim()
+        };
+    }
+
+    if (type === 'P') {
+        return {
+            name: [base, getSiaProhibitedCrossReferenceName(item)].filter(Boolean).join(' / '),
+            frequency: ''
+        };
+    }
+
+    const firstFrequency = getSiaFirstAssignedFrequency(item);
+    if (!firstFrequency) return { name: base, frequency: '' };
+
+    const frequencyPrefix = firstFrequency.inferredFromRemark
+        ? ''
+        : String(firstFrequency.serviceType || '').trim();
+
+    return {
+        name: base,
+        frequency: [frequencyPrefix, firstFrequency.value]
+            .filter(Boolean)
+            .join(' ') + (firstFrequency.supplementary ? ' (s)' : '')
+    };
+}
+
+function getSiaProfileDisplayCeilingFeet(position) {
+    const ownAlt = Number(position?.altitudeFt);
+    let ceiling = Number.isFinite(ownAlt)
+        ? Math.max(5000, ownAlt + 5000)
+        : null;
+
+    if (isSiaHideAboveFl115Enabled()) {
+        ceiling = Number.isFinite(ceiling)
+            ? Math.min(ceiling, SIA_HIDE_ABOVE_FL115_FEET)
+            : SIA_HIDE_ABOVE_FL115_FEET;
+    }
+
+    return Number.isFinite(ceiling) ? ceiling : null;
+}
+
+function estimateSiaProfileLabelWidth(text, fontSize = 11) {
+    const value = String(text || '');
+    if (!value) return 0;
+    // Estimation volontairement conservatrice pour éviter tout chevauchement.
+    return value.length * fontSize * 0.59 + 8;
+}
+
+function siaProfileLabelRectsOverlap(a, b, padding = 4) {
+    return !(
+        a.x + a.width + padding <= b.x
+        || b.x + b.width + padding <= a.x
+        || a.y + a.height + padding <= b.y
+        || b.y + b.height + padding <= a.y
+    );
+}
+
+function findSiaProfileLabelPlacement({ x1, x2, yTop, yBottom, name, frequency }, occupied) {
+    const rectWidth = Math.max(0, x2 - x1);
+    const rectHeight = Math.max(0, yBottom - yTop);
+    const labelWidth = Math.max(
+        estimateSiaProfileLabelWidth(name, 11),
+        estimateSiaProfileLabelWidth(frequency, 10)
+    );
+    const labelHeight = frequency ? 28 : 16;
+    const inset = 5;
+
+    if (!name || labelWidth > rectWidth - inset * 2 || labelHeight > rectHeight - 4) {
+        return null;
+    }
+
+    const minCenterX = x1 + inset + labelWidth / 2;
+    const maxCenterX = x2 - inset - labelWidth / 2;
+    const minCenterY = yTop + 2 + labelHeight / 2;
+    const maxCenterY = yBottom - 2 - labelHeight / 2;
+    if (minCenterX > maxCenterX || minCenterY > maxCenterY) return null;
+
+    const centersX = [
+        (x1 + x2) / 2,
+        minCenterX,
+        maxCenterX,
+        x1 + rectWidth * 0.35,
+        x1 + rectWidth * 0.65
+    ].map(x => Math.max(minCenterX, Math.min(maxCenterX, x)));
+
+    const centersY = [
+        (yTop + yBottom) / 2,
+        minCenterY,
+        maxCenterY
+    ].map(y => Math.max(minCenterY, Math.min(maxCenterY, y)));
+
+    const seen = new Set();
+    for (const centerY of centersY) {
+        for (const centerX of centersX) {
+            const key = `${Math.round(centerX)}:${Math.round(centerY)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const candidate = {
+                x: centerX - labelWidth / 2,
+                y: centerY - labelHeight / 2,
+                width: labelWidth,
+                height: labelHeight,
+                centerX,
+                centerY
+            };
+
+            if (!occupied.some(other => siaProfileLabelRectsOverlap(candidate, other))) {
+                occupied.push(candidate);
+                return candidate;
+            }
+        }
+    }
+    return null;
+}
+
+function buildSiaProfileSvg(volumes, position, viewport = {}) {
+    /*
+     * v15.66 — coordonnées SVG calées sur les dimensions CSS réelles du graphe.
+     * On n’utilise plus le redimensionnement SVG anisotrope : les textes
+     * gardent donc leurs proportions normales sur iPad, même en pleine largeur.
+     */
+    const width = Math.max(640, Math.round(Number(viewport.width) || 1000));
+    const height = Math.max(220, Math.round(Number(viewport.height) || 330));
+    const margin = { left: 64, right: 16, top: 18, bottom: 38 };
+    const plotW = Math.max(1, width - margin.left - margin.right);
+    const plotH = Math.max(1, height - margin.top - margin.bottom);
 
     const ownAlt = Number(position.altitudeFt);
+    const profileCeilingFt = getSiaProfileDisplayCeilingFeet(position);
     const upperValues = volumes
         .map(v => Number(v.upperFt))
         .filter(Number.isFinite);
 
     let maxAlt;
-    if (isSiaHideAboveFl115Enabled()) {
-        // v15.65 — le filtre FL115 limite aussi l'échelle graphique du profil.
-        maxAlt = SIA_HIDE_ABOVE_FL115_FEET;
+    if (Number.isFinite(profileCeilingFt)) {
+        maxAlt = Math.max(1000, profileCeilingFt);
     } else {
         maxAlt = Math.max(
             10000,
-            Number.isFinite(ownAlt) ? ownAlt + 5000 : 0,
             upperValues.length ? Math.max(...upperValues) : 0
         );
         maxAlt = Math.min(40000, Math.ceil(maxAlt / 5000) * 5000);
@@ -41362,17 +41526,22 @@ function buildSiaProfileSvg(volumes, position) {
         margin.top + plotH - (Math.max(0, Math.min(maxAlt, feet)) / maxAlt) * plotH;
 
     const grid = [];
-    for (let alt = 0; alt <= maxAlt; alt += 5000) {
-        const y = yForAltitude(alt);
-        grid.push(`<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${(width-margin.right).toFixed(1)}" y2="${y.toFixed(1)}" class="sia-profile-grid-line"/>`);
-        grid.push(`<text x="${margin.left-8}" y="${(y+4).toFixed(1)}" text-anchor="end" class="sia-profile-axis-label">${alt === 0 ? 'SFC' : `${Math.round(alt/1000)}k`}</text>`);
-    }
+    const gridAltitudes = [];
+    for (let alt = 0; alt <= maxAlt; alt += 5000) gridAltitudes.push(alt);
+    if (!gridAltitudes.includes(maxAlt)) gridAltitudes.push(maxAlt);
 
-    if (isSiaHideAboveFl115Enabled() && maxAlt === SIA_HIDE_ABOVE_FL115_FEET) {
-        const y = yForAltitude(SIA_HIDE_ABOVE_FL115_FEET);
-        grid.push(`<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${(width-margin.right).toFixed(1)}" y2="${y.toFixed(1)}" class="sia-profile-grid-line sia-profile-fl115-line"/>`);
-        grid.push(`<text x="${margin.left-8}" y="${(y+12).toFixed(1)}" text-anchor="end" class="sia-profile-axis-label sia-profile-fl115-label">FL115</text>`);
-    }
+    [...new Set(gridAltitudes.map(v => Math.round(v)))].sort((a, b) => a - b).forEach(alt => {
+        const y = yForAltitude(alt);
+        const isTop = Math.abs(alt - maxAlt) < 1;
+        let label = alt === 0 ? 'SFC' : `${Math.round(alt / 1000)}k`;
+        if (isTop && isSiaHideAboveFl115Enabled() && Math.abs(maxAlt - SIA_HIDE_ABOVE_FL115_FEET) < 1) {
+            label = 'FL115';
+        } else if (isTop && alt % 1000 !== 0) {
+            label = `${Math.round(alt)} ft`;
+        }
+        grid.push(`<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${(width-margin.right).toFixed(1)}" y2="${y.toFixed(1)}" class="sia-profile-grid-line${isTop ? ' sia-profile-ceiling-line' : ''}"/>`);
+        grid.push(`<text x="${margin.left-8}" y="${(y+4).toFixed(1)}" text-anchor="end" class="sia-profile-axis-label${isTop ? ' sia-profile-ceiling-label' : ''}">${escapeHtml(label)}</text>`);
+    });
 
     const distanceStep = siaProfileDistanceNm <= 25 ? 5 : siaProfileDistanceNm <= 50 ? 10 : 20;
     for (let nm = 0; nm <= siaProfileDistanceNm; nm += distanceStep) {
@@ -41382,22 +41551,45 @@ function buildSiaProfileSvg(volumes, position) {
     }
 
     const shapes = [];
+    const occupiedLabels = [];
+
     volumes.forEach((volume, index) => {
         const x1 = xForDistance(volume.startNm);
         const x2 = xForDistance(volume.endNm);
         const lower = Number.isFinite(volume.lowerFt) ? volume.lowerFt : 0;
         const upper = Number.isFinite(volume.upperFt) ? volume.upperFt : maxAlt;
-        const yTop = yForAltitude(Math.max(lower, upper));
-        const yBottom = yForAltitude(Math.min(lower, upper));
-        const rectHeight = Math.max(5, yBottom - yTop);
+        const visibleLower = Math.max(0, Math.min(maxAlt, lower));
+        const visibleUpper = Math.max(0, Math.min(maxAlt, upper));
+        if (visibleUpper <= visibleLower + 1) return;
+
+        const yTop = yForAltitude(visibleUpper);
+        const yBottom = yForAltitude(visibleLower);
+        const rectHeight = Math.max(2, yBottom - yTop);
         const rectWidth = Math.max(2, x2 - x1);
         const style = getSiaAirspaceStyle(volume.item);
         const color = String(style?.color || '#3559e0');
+        const labelParts = getSiaProfileLabelParts(volume.item);
+        const placement = findSiaProfileLabelPlacement({
+            x1,
+            x2,
+            yTop,
+            yBottom,
+            name: labelParts.name,
+            frequency: labelParts.frequency
+        }, occupiedLabels);
 
-        const label = getSiaAirspaceBoundaryLabelText(volume.item);
-        const canLabel = rectWidth >= 90 && rectHeight >= 18;
-        const labelX = x1 + rectWidth / 2;
-        const labelY = yTop + Math.min(rectHeight / 2 + 4, 16);
+        let labelSvg = '';
+        if (placement) {
+            const nameY = labelParts.frequency
+                ? placement.centerY - 3
+                : placement.centerY + 4;
+            const frequencyY = placement.centerY + 10;
+            labelSvg = `
+                <text x="${placement.centerX.toFixed(1)}" y="${nameY.toFixed(1)}"
+                      text-anchor="middle" class="sia-profile-volume-label sia-profile-volume-label-name">${escapeHtml(labelParts.name)}</text>
+                ${labelParts.frequency ? `<text x="${placement.centerX.toFixed(1)}" y="${frequencyY.toFixed(1)}"
+                      text-anchor="middle" class="sia-profile-volume-label sia-profile-volume-label-frequency">${escapeHtml(labelParts.frequency)}</text>` : ''}`;
+        }
 
         shapes.push(`
             <g class="sia-profile-volume-group" data-profile-index="${index}">
@@ -41406,8 +41598,7 @@ function buildSiaProfileSvg(volumes, position) {
                       fill="${escapeHtml(color)}" fill-opacity="0.20"
                       stroke="${escapeHtml(color)}" stroke-width="2"
                       class="sia-profile-volume"/>
-                ${canLabel ? `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}"
-                    text-anchor="middle" class="sia-profile-volume-label">${escapeHtml(label)}</text>` : ''}
+                ${labelSvg}
             </g>
         `);
     });
@@ -41420,7 +41611,7 @@ function buildSiaProfileSvg(volumes, position) {
     }
 
     return `
-        <svg class="sia-profile-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Coupe verticale des espaces aéronautiques devant l'avion">
+        <svg class="sia-profile-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Coupe verticale des espaces aéronautiques devant l'avion">
             <rect x="${margin.left}" y="${margin.top}" width="${plotW}" height="${plotH}" class="sia-profile-plot-bg"/>
             ${grid.join('')}
             ${shapes.join('')}
@@ -41453,6 +41644,7 @@ async function renderSiaAirspaceProfile(reason = 'manual') {
     const items = getSiaProfileCandidateItems(dataset);
 
     const volumes = [];
+    const profileCeilingFt = getSiaProfileDisplayCeilingFeet(position);
 
     items.forEach(item => {
         if (!siaProfileItemCouldMeetRoute(item, routeBounds)) return;
@@ -41466,12 +41658,29 @@ async function renderSiaAirspaceProfile(reason = 'manual') {
         const lowerFt = siaProfileVerticalToFeet(item.lo);
         const upperFt = siaProfileVerticalToFeet(item.up);
 
+        /*
+         * v15.66 — le profil est une vue opérationnelle autour de l'avion :
+         * on ne conserve pas une zone dont le plancher commence au-dessus du
+         * plafond affiché (altitude avion + 5000 ft, limité au FL115 si demandé).
+         * Les plafonds plus hauts sont tronqués graphiquement, jamais dans la
+         * donnée SIA ni dans la fiche de la zone.
+         */
+        if (
+            Number.isFinite(profileCeilingFt)
+            && Number.isFinite(lowerFt)
+            && lowerFt >= profileCeilingFt
+        ) return;
+
+        const profileUpperFt = Number.isFinite(profileCeilingFt)
+            ? (Number.isFinite(upperFt) ? Math.min(upperFt, profileCeilingFt) : profileCeilingFt)
+            : upperFt;
+
         intervals.forEach(interval => {
             volumes.push({
                 item,
                 geometry,
                 lowerFt,
-                upperFt,
+                upperFt: profileUpperFt,
                 startNm: interval.startNm,
                 endNm: interval.endNm
             });
@@ -41488,7 +41697,11 @@ async function renderSiaAirspaceProfile(reason = 'manual') {
     siaProfileSegments = volumes.slice(0, 80);
 
     if (subtitle) {
-        subtitle.textContent = `Route ${String(Math.round(position.heading)).padStart(3, '0')}° · 0–${siaProfileDistanceNm} NM · ${siaProfileSegments.length} volume${siaProfileSegments.length > 1 ? 's' : ''}`;
+        const profileCeilingFt = getSiaProfileDisplayCeilingFeet(position);
+        const ceilingText = Number.isFinite(profileCeilingFt)
+            ? ` · plafond ${Math.round(profileCeilingFt)} ft`
+            : '';
+        subtitle.textContent = `Route ${String(Math.round(position.heading)).padStart(3, '0')}° · 0–${siaProfileDistanceNm} NM${ceilingText} · ${siaProfileSegments.length} volume${siaProfileSegments.length > 1 ? 's' : ''}`;
     }
 
     if (!siaProfileSegments.length) {
@@ -41496,7 +41709,10 @@ async function renderSiaAirspaceProfile(reason = 'manual') {
         return;
     }
 
-    chart.innerHTML = buildSiaProfileSvg(siaProfileSegments, position);
+    chart.innerHTML = buildSiaProfileSvg(siaProfileSegments, position, {
+        width: chart.clientWidth || chart.getBoundingClientRect?.().width || 1000,
+        height: chart.clientHeight || chart.getBoundingClientRect?.().height || 330
+    });
 
     chart.querySelectorAll('[data-profile-index]').forEach(group => {
         group.addEventListener('click', event => {
@@ -41793,19 +42009,7 @@ function installQuickOfflineMapButtonInteractions(button) {
     if (!button || button.dataset.siaLongPressBound === '1') return;
     button.dataset.siaLongPressBound = '1';
 
-    const disableSelection = element => {
-        if (!element) return;
-        try {
-            element.setAttribute('draggable', 'false');
-            element.style.webkitUserSelect = 'none';
-            element.style.userSelect = 'none';
-            element.style.webkitTouchCallout = 'none';
-            element.style.touchAction = 'manipulation';
-        } catch (_) {}
-    };
-
-    disableSelection(button);
-    try { button.querySelectorAll('*').forEach(disableSelection); } catch (_) {}
+    protectNpfLongPressControlFromIosSelection(button);
 
     let longPressTimer = null;
     let longPressTriggered = false;
