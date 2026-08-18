@@ -1,3 +1,113 @@
+VERSION TEST v15.62 — ZONES R OPÉRATIONNELLES + LIBELLÉS INTÉRIEURS + PROFIL AU-DESSUS DES ICÔNES
+Date : 18/08/2026
+Base : TEST v15.61
+
+OBJECTIFS
+- Corriger l'association erronée de certaines zones R, notamment R108B qui prenait GARONS depuis une liste « Activity known on ».
+- Donner la priorité aux instructions opérationnelles explicites d'entrée/clairance/contact pour nommer une zone R et choisir sa fréquence.
+- Ne jamais utiliser une liste « Activity known on » pour déterminer le nom principal d'une zone R.
+- Déplacer les noms/fréquences des zones à l'intérieur de leur contour, sans recouvrir le trait plein.
+- Donner la priorité d'affichage aux CTR puis aux zones R/P/D afin qu'une zone moins prioritaire ne masque plus une CTR telle que SALON.
+- Faire apparaître la fenêtre PROFIL au-dessus de toutes les icônes et commandes de la carte.
+- Conserver la représentation du profil selon la route sol GPS instantanée de l'avion.
+
+1. ZONES R — PRIORITÉ À LA CLAIRANCE / AU CONTACT OPÉRATIONNEL
+- Nouvelle priorité de lecture des remarques :
+  1) instruction explicite d'entrée, clairance, contact ou autorisation ;
+  2) gestionnaire « Administrator / Adminitrator / Managing authority » ;
+  3) service ATS directement publié dans les premières lignes, hors listes d'information d'activité.
+- Exemple validé :
+  « GAT VFR: entry with clearance from CAMARGUE Control 127.925 MHz »
+  donne désormais :
+  « R 108 B / CAMARGUE / 127.925 ».
+- Les services « CONTROL » sont désormais reconnus en plus de APP / TWR / INFO / SIV / FIS / ACC / FIC / AFIS / ATIS / A/A.
+- Les gestionnaires militaires CCER / CMC / CDC / CLA / ESCA / CDPGE restent utilisables en repli lorsque le lieu est explicite.
+- Aucun nom n'est déduit par proximité géographique.
+
+2. « ACTIVITY KNOWN ON » NE NOMME PLUS UNE ZONE R
+- Les listes « Activity known on » / « Actual activity known on » ne peuvent plus fournir le nom principal d'une zone.
+- Elles peuvent uniquement fournir une fréquence de repli lorsqu'elles citent clairement le service déjà retenu.
+- Cela supprime le faux rattachement « R108B / GARONS » observé en v15.61.
+
+3. FRÉQUENCES DES ZONES R
+- Une fréquence présente sur la même ligne qu'une instruction de clairance/contact gagne immédiatement.
+- À défaut, priorité aux lignes citant le service opérationnel retenu.
+- Les fréquences restent limitées aux valeurs aéronautiques décimales 118–399 MHz.
+- Le terme « RAI » reste volontairement masqué.
+- R95 conserve donc :
+  « R 95 A / LE LUC / 122.200 ».
+- Aucune fréquence n'est inventée si les remarques ne permettent pas une association fiable.
+
+4. LIBELLÉS À L'INTÉRIEUR DES ZONES
+- Le texte n'est plus centré directement sur le trait plein de la limite.
+- Pour chaque segment candidat, NPF calcule les deux normales au segment et teste plusieurs retraits vers l'intérieur.
+- Un emplacement n'est retenu que s'il se trouve réellement dans le Polygon/MultiPolygon de la zone.
+- Retraits testés : 22 / 30 / 38 px.
+- Le texte reste orienté parallèlement à la limite proche mais se trouve dans la zone, au-delà du trait plein et de la bande intérieure.
+- En cas de collision avec un autre libellé, NPF essaie les autres segments de la même zone au lieu de supprimer immédiatement son nom.
+
+5. PRIORITÉ DES NOMS DE ZONES
+- Ordre de placement :
+  1) CTR ;
+  2) R / P / D ;
+  3) TRA ;
+  4) TMA ;
+  5) CTA ;
+  6) autres espaces.
+- Seuil minimal de segment abaissé pour les zones prioritaires :
+  CTR 34 px ; R/P/D 38 px ; TMA 44 px ; autres 50 px.
+- Distance anticollision : 92 px pour CTR/R/P/D, 105 px pour les autres.
+- Cette priorité empêche notamment une TMA/CTA de prendre l'emplacement utile de la CTR SALON.
+
+6. CTR SALON
+- Les données structurées restent inchangées et donnent :
+  nom : SALON ;
+  service : TWR ;
+  première fréquence : 130.300 MHz.
+- Le libellé attendu à l'intérieur de la CTR est :
+  « CTR SALON · TWR 130.300 ».
+- Aucun traitement spécial codé uniquement pour LFMY : la correction de placement s'applique à toutes les CTR.
+
+7. PROFIL ESPACES AU-DESSUS DES ICÔNES
+- Le panneau PROFIL reste `position: fixed` et synchronisé avec `visualViewport`.
+- Son z-index passe de 720 à 1500.
+- Les commandes carte sont à 1000/1001 : le profil les recouvre donc correctement.
+- Les vraies fenêtres modales de l'application restent au-dessus (z-index >= 2000).
+
+8. AXE DU PROFIL
+- Aucun changement de logique : le profil utilise la position GPS courante et `lastPosition.heading`.
+- Il projette l'axe devant l'avion sur 25 / 50 / 100 NM.
+- En simulation seulement, `simulationRouteDeg` reste le repli lorsque le heading GPS est absent.
+- Le profil suit donc la route sol GPS instantanée de l'avion, pas un plan de vol préprogrammé.
+
+9. PRN / PARCS ET RÉSERVES NATURELLES
+- Aucun contour n'est inventé.
+- Le payload SIA actuel contient 143 objets PRN mais la majorité est fournie sous forme ponctuelle.
+- v15.62 ne transforme pas artificiellement ces points en polygones.
+- Une future intégration de contours réels nécessitera une source polygonale dédiée.
+
+10. DONNÉES SIA / NAS
+- Payload SIA inchangé.
+- `npfDatasetRevision` reste 15.57.
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Cohérence des versions index/script/style/manifest/SW vérifiée.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- Test R108B : CAMARGUE + 127.925, GARONS non retenu.
+- Test R95 : LE LUC + 122.200, sans affichage « RAI ».
+- CTR SALON : SALON + TWR 130.300 présents dans les données structurées.
+- Placement de libellé : logique d'inset intérieur + multi-candidats intégrée.
+- Ordre de priorité des libellés : CTR avant R/P/D avant TMA/CTA.
+- PROFIL : z-index 1500.
+- Historique v15.61 et antérieur conservé intégralement.
+- Validation réelle Safari/iPadOS à effectuer sur l'appareil.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.61 — PROFIL DANS FILTRES + ZONES R ENRICHIES + PROFIL VIEWPORT + BANDES ÉLARGIES
 Date : 18/08/2026
 Base : TEST v15.60
