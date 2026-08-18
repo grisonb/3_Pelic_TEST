@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-65_siv_profile_tma_pnames';
-const APP_VERSION = 'v15.65';
+const SW_VERSION = 'sw-v15-66_profile_labels_longpress';
+const APP_VERSION = 'v15.66';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
