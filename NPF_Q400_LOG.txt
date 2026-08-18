@@ -1,3 +1,60 @@
+VERSION TEST v15.67 — GÉOMÉTRIES AIXM CORRIGÉES + FRÉQUENCES SIV + SIV HORS PROFIL
+Date : 18/08/2026
+Base : TEST v15.66
+
+OBJECTIFS
+- Corriger globalement les formes erronées de zones comportant des arcs AIXM, notamment P62 et R234, sans traitement au cas par cas.
+- Exploiter la géométrie développée officielle déjà fournie dans XML_SIA pour reconstruire les limites CWA / CCA avec le bon segment.
+- Ajouter aux SIV les services / fréquences FIS disponibles dans XML_SIA, sans inventer une fréquence lorsqu'une attribution de secteur est ambiguë.
+- Ne plus faire apparaître les SIV dans « PROFIL ESPACES » tout en les conservant sur la carte et dans le filtre SIV.
+
+1. GÉOMÉTRIES DES ZONES — CORRECTION SYSTÉMIQUE DES ARCS
+- La source AIRAC 08/26 v04 du 06/08/2026 reste inchangée.
+- Le défaut provenait de l'interprétation du sommet AIXM CWA / CCA : l'arc était appliqué au segment précédent alors qu'il décrit le segment sortant du sommet courant.
+- Les limites contenant des arcs sont désormais reconstruites à partir de `<Geometrie>` dans `XML_SIA_2026-08-06.xml`, géométrie développée issue du même export SIA.
+- 419 limites Abd contenant CWA / CCA ont été détectées.
+- 427 composants de limites ont été reconstruits dans 415 espaces concernés.
+- Les espaces multi-polygones sont reconstruits avec tous leurs composants ; aucun composant non courbe d'un même espace n'est perdu.
+- Les correspondances Contour AIXM / XML_SIA sont validées à 6 décimales ; un repli à 5 décimales n'est accepté que si toutes les correspondances donnent une géométrie développée identique.
+- P62 reprend ainsi les deux arcs aux bons endroits et la fermeture correcte de la zone.
+- R234 A et R234 B reprennent la même emprise latérale correcte : segment droit puis arc de retour autour du centre publié.
+- Les bornes compactes `b` sont recalculées après remplacement de chaque géométrie.
+- Cette correction modifie réellement le payload SIA embarqué : révision interne NPF SIA portée de 15.57 à 15.67.
+
+2. SIV — SERVICES ET FRÉQUENCES FIS
+- Les 129 objets SIV restent identifiés à partir de `RAS / FLIGHT INFORMATION SECTOR`.
+- Les familles SIV, services FIS et fréquences sont relus dans `XML_SIA_2026-08-06.xml`, issu du même export SIA.
+- 110 SIV reçoivent désormais au moins un bloc `sv` FIS exploitable dans leur fiche détaillée.
+- 54 SIV disposent d'une ou plusieurs fréquences explicitement utilisables dans le libellé carte sans choix arbitraire.
+- Lorsqu'une remarque de fréquence désigne explicitement un secteur (`SIV 1`, `SIV 4`, secteur COTENTIN, NORD, SUD, etc.), cette attribution est utilisée comme fréquence de carte.
+- Lorsqu'une famille ne possède qu'une seule fréquence, celle-ci peut être affichée directement.
+- Lorsqu'il existe plusieurs fréquences sans attribution de secteur suffisamment claire, NPF n'en choisit aucune arbitrairement pour le libellé ; elles restent toutes disponibles dans la fiche détaillée.
+- Exemple source pris en charge automatiquement : PROVENCE 1 / 4 → 132.950 ; PROVENCE 2 → 124.350 ; PROVENCE 3 / 6 → 132.300 ; PROVENCE 5 → 126.260.
+
+3. PROFIL ESPACES — SIV EXCLUS
+- Les SIV sont désormais exclus explicitement de `getSiaProfileCandidateItems()`.
+- Le filtre SIV continue de commander leur affichage sur la carte, leurs limites, leurs libellés et leur sélection tactile.
+- Aucun SIV n'est dessiné dans la coupe verticale, même lorsque le filtre SIV est coché.
+- Les corrections v15.66 du profil sont conservées : 25 NM par défaut, pleine largeur, texte non déformé, fréquence sous le nom, anti-chevauchement et plafond altitude avion + 5000 ft / FL115.
+
+4. COMPATIBILITÉ / CONSERVATION
+- AIRAC : 08/26 ; date d'effet : 06/08/2026 ; dataset SIA v04 inchangés.
+- Nombre d'espaces : 5 066 ; terrains : 877 ; points non-IFR : 1 899 inchangés.
+- Noms R/P, héritage conservateur des fréquences TMA, filtre FL115, retour sélection multiple et fermeture rouge conservés.
+- Protection des appuis longs iPad introduite en v15.66 conservée.
+- Aucun changement NAS.
+
+CONTROLES
+- Validation de la reconstruction globale des limites CWA / CCA avec P62 et R234 A/B comme cas de référence.
+- Vérification que les 5 066 espaces sont toujours présents après reconstruction.
+- Vérification des fréquences SIV source et de l'absence de choix arbitraire lorsque plusieurs fréquences sont ambiguës.
+- Vérification qu'aucun SIV n'entre dans la liste des candidats du profil.
+- Vérification syntaxique JavaScript de `script.js` et `sw.js`.
+- Validation JSON du manifest.
+- Vérification des références de version v15.67 dans index / script / style / manifest / service worker.
+- Historique des modifications conservé intégralement ci-dessous.
+
+
 VERSION TEST v15.66 — PROFIL LISIBLE + 25 NM + +5000 FT + APPUIS LONGS IPAD
 Date : 18/08/2026
 Base : TEST v15.65
