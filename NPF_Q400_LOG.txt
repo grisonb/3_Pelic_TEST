@@ -1,3 +1,69 @@
+VERSION TEST v15.66 — PROFIL LISIBLE + 25 NM + +5000 FT + APPUIS LONGS IPAD
+Date : 18/08/2026
+Base : TEST v15.65
+
+OBJECTIFS
+- Corriger la déformation de toutes les écritures du PROFIL ESPACES en pleine largeur.
+- Afficher la fréquence sous le nom de la zone et empêcher les chevauchements de libellés.
+- Passer l'échelle horizontale par défaut du profil de 50 NM à 25 NM.
+- Limiter le profil aux espaces utiles jusqu'à 5000 ft au-dessus de l'altitude avion, avec FL115 comme plafond supplémentaire lorsque « Masquer zones > FL115 » est actif.
+- Rétablir les appuis longs sur les icônes/commandes carte sur iPad en neutralisant la sélection de texte et le callout Safari.
+
+1. PROFIL ESPACES — POLICES NON DÉFORMÉES
+- Suppression du rendu SVG avec `preserveAspectRatio="none"`, qui étirait les caractères différemment en largeur et en hauteur.
+- Le viewBox du SVG est désormais construit à partir des dimensions CSS réelles du graphique.
+- Conservation du profil sur toute la largeur de l'écran.
+- Les axes, valeurs, noms de zones et fréquences conservent leurs proportions typographiques normales.
+
+2. LIBELLÉS DU PROFIL — NOM PUIS FRÉQUENCE
+- Première ligne : nom opérationnel de la zone.
+- Deuxième ligne : fréquence associée lorsqu'elle existe.
+- Exemples : `TMA PROVENCE 1.30` puis `APP 132.300`, ou `R 108 B / CAMARGUE` puis `127.925`.
+- Les zones sans fréquence conservent une seule ligne de nom.
+- Les fréquences héritées de famille TMA introduites en v15.65 restent prises en compte.
+
+3. ANTI-CHEVAUCHEMENT DES NOMS
+- Calcul d'une boîte estimée pour chaque libellé avant insertion dans le SVG.
+- Plusieurs positions sont testées à l'intérieur du volume : centre, gauche, droite, haut et bas.
+- Les emplacements déjà occupés sont mémorisés.
+- Si aucun emplacement sans collision n'est disponible, le libellé est masqué mais le volume reste dessiné et sélectionnable.
+- Aucun étirement artificiel du texte n'est utilisé pour faire tenir un nom.
+
+4. DISTANCE PAR DÉFAUT : 25 NM
+- `siaProfileDistanceNm` passe de 50 à 25 NM au démarrage.
+- Le bouton 25 NM est actif par défaut dans l'interface.
+- Les boutons 50 NM et 100 NM restent disponibles et inchangés.
+
+5. PROFIL LIMITÉ À ALTITUDE AVION + 5000 FT
+- Lorsque l'altitude GPS est disponible, le plafond graphique du profil vaut altitude avion + 5000 ft.
+- Une zone dont le plancher est à ce plafond ou au-dessus n'est pas représentée dans le profil.
+- Une zone commençant sous le plafond mais montant plus haut reste visible et est tronquée graphiquement au plafond.
+- Cette limitation concerne uniquement PROFIL ESPACES : elle ne modifie ni la carte, ni le payload SIA, ni les fiches de zones.
+- Si « Masquer zones > FL115 » est coché, le plafond retenu est le minimum entre altitude avion + 5000 ft et FL115.
+- Si l'altitude avion est indisponible, le profil conserve un fonctionnement de repli ; FL115 reste appliqué lorsqu'il est demandé.
+
+6. APPUIS LONGS IPAD — SÉLECTION DE TEXTE NEUTRALISÉE
+- Protection commune appliquée aux commandes prévues pour l'appui long, notamment SafeSky, centrage/suivi GPS et sélection rapide des cartes.
+- `user-select`, `-webkit-user-select`, `-webkit-touch-callout` et drag d'image neutralisés sur les boutons/icônes carte.
+- Les événements `selectstart` et `dragstart` sont annulés sur les contrôles concernés.
+- Le fonctionnement des appuis courts reste inchangé.
+- Les champs de saisie, textes des fenêtres et gestes de déplacement/zoom de la carte ne sont pas neutralisés.
+
+7. DONNÉES / COMPATIBILITÉ
+- Aucune modification du payload SIA embarqué : révision NPF SIA 15.57 conservée.
+- SIV, noms R/P, fréquences TMA, filtre FL115 et corrections de sélection v15.65 conservés.
+- Aucun changement NAS.
+
+CONTROLES
+- Vérification syntaxique JavaScript de `script.js` et `sw.js`.
+- Validation JSON du manifest.
+- Vérification des références de version v15.66 dans index / script / style / manifest / service worker.
+- Vérification du défaut 25 NM dans le JS et dans le bouton actif HTML.
+- Vérification de l'absence de `preserveAspectRatio="none"` dans le profil.
+- Vérification de la protection anti-sélection sur les contrôles d'appui long.
+- Historique des modifications conservé intégralement ci-dessous.
+
+
 VERSION TEST v15.65 — SIV + PROFIL IPAD FL115 + FRÉQUENCES TMA + NOMS ZONES P
 Date : 18/08/2026
 Base : TEST v15.64
