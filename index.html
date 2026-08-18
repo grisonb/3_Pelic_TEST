@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.59" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.59">
-    <link rel="manifest" href="manifest.json?appv=v15.59">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.60" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.60">
+    <link rel="manifest" href="manifest.json?appv=v15.60">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.59';
+        const APP_VERSION = 'v15.60';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -422,6 +422,13 @@
                 </svg>
             </span>
         </button>
+        <button id="sia-profile-button"
+                class="left-map-action-button sia-profile-map-button"
+                type="button"
+                title="Afficher/Masquer la coupe verticale des espaces devant l'avion"
+                aria-label="Afficher ou masquer le profil vertical des espaces devant l'avion">
+            <span class="sia-profile-map-label">PROFIL</span>
+        </button>
         <button id="briefing-docs-map-button"
                 class="left-map-action-button briefing-docs-group-map-button briefing-docs-none-loaded"
                 type="button"
@@ -451,6 +458,23 @@
         </button>
     </div>
     <div id="traffic-status-display" class="traffic-status-display" style="display: none;"></div>
+
+    <div id="sia-profile-panel" class="sia-profile-panel" hidden aria-hidden="true">
+        <div class="sia-profile-header">
+            <div>
+                <div class="sia-profile-title">PROFIL ESPACES</div>
+                <div id="sia-profile-subtitle" class="sia-profile-subtitle">Coupe verticale devant l'avion</div>
+            </div>
+            <div class="sia-profile-controls">
+                <button type="button" class="sia-profile-range-button" data-profile-range="25">25 NM</button>
+                <button type="button" class="sia-profile-range-button active" data-profile-range="50">50 NM</button>
+                <button type="button" class="sia-profile-range-button" data-profile-range="100">100 NM</button>
+                <button id="sia-profile-close" type="button" class="sia-profile-close" aria-label="Fermer le profil">&times;</button>
+            </div>
+        </div>
+        <div id="sia-profile-chart" class="sia-profile-chart"></div>
+        <div class="sia-profile-note">FL représentés à 100 ft/FL ; SFC/AGL sans profil de relief.</div>
+    </div>
 
     <div id="briefing-doc-selector-modal"
          class="briefing-doc-selector-modal"
@@ -806,7 +830,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.59"></script>
+    <script src="script.js?appv=v15.60"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
