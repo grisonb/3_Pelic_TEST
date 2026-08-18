@@ -1,3 +1,193 @@
+VERSION TEST v15.60 — APPUI LONG IMMÉDIAT + ZONES TRANSPARENTES + LIBELLÉS BORDURE + PROFIL VERTICAL
+Date : 18/08/2026
+Base : TEST v15.59
+
+OBJECTIFS
+- Revenir au comportement demandé pour l'appui long : afficher la fenêtre dès que 1,2 s sont atteintes, sans attendre le relâchement.
+- Faire rester la fenêtre ouverte lorsque le doigt est relâché.
+- Rendre toutes les zones non sélectionnées transparentes à l'intérieur.
+- Porter l'opacité de la zone sélectionnée à 30 %.
+- Colorer « Créer Feu » en rouge et « Sélection Zone » en vert.
+- Afficher le nom des zones sur leur bordure et y associer leur première fréquence SIA.
+- Ajouter une vue « PROFIL ESPACES » donnant une coupe verticale des espaces situés devant l'avion.
+
+1. APPUI LONG — FENÊTRE DÈS 1,2 SECONDE
+- Le délai reste 1,2 seconde.
+- La tolérance de déplacement reste 14 px.
+- Contrairement à v15.59, NPF n'attend plus le `pointerup`.
+- Dès que les 1,2 s sont atteintes :
+  - aucune zone -> création directe du feu ;
+  - zone(s) -> ouverture immédiate de « Créer Feu / Sélection Zone ».
+- Le doigt peut encore être posé lorsque la fenêtre apparaît.
+
+2. RELÂCHEMENT DU DOIGT
+- Le relâchement ne ferme plus la fenêtre.
+- Le clic synthétique généré par Safari/iPadOS après l'appui long est neutralisé près du point d'appui.
+- Les vrais clics effectués ensuite dans la popup restent autorisés.
+- La protection contextmenu tactile est conservée.
+
+3. COULEUR DES DEUX ACTIONS
+- « Créer Feu » :
+  bouton rouge, texte blanc.
+- « Sélection Zone » :
+  bouton vert, texte blanc.
+- Les deux boutons conservent une taille tactile importante.
+
+4. TRANSPARENCE DES ZONES NON SÉLECTIONNÉES
+- Toutes les zones surfaciques SIA non sélectionnées ont désormais :
+  remplissage intérieur = 0 %.
+- Le fond cartographique reste donc totalement visible à travers les espaces.
+- Restent visibles :
+  - le contour principal ;
+  - la bande estompée intérieure demandée précédemment.
+- Le comportement OACI reste cohérent : les zones SIA normales peuvent y rester invisibles mais sélectionnables.
+
+5. ZONE SÉLECTIONNÉE
+- Le remplissage de la couche de sélection passe de 18 % à 30 %.
+- Le contour renforcé de sélection est conservé.
+- Les objets ponctuels sélectionnés utilisent également 30 % de remplissage.
+- La couche indépendante `siaSelectionPane` de v15.59 est conservée afin de résister aux `moveend` provoqués par l'autoPan.
+
+6. NOM DES ZONES SUR LEUR BORDURE
+- Les zones Polygon / MultiPolygon peuvent maintenant recevoir un libellé directement sur une portion visible de leur bordure.
+- Le texte suit l'orientation du segment de bordure retenu.
+- Le moteur choisit en priorité le segment visible le plus long.
+- Le texte est non interactif et ne gêne donc pas les appuis sur la carte.
+- Les parents/composites `co:1` ne reçoivent pas de libellé afin de limiter les doublons.
+- Sur fond OACI, les libellés SIA de bordure ne sont pas ajoutés.
+- Les libellés apparaissent à partir d'une échelle suffisamment rapprochée : 50 NM ou moins.
+- Un anti-collision simple limite l'accumulation de textes.
+- Garde-fou : maximum 70 libellés de bordure par rendu.
+
+7. NOM + PREMIÈRE FRÉQUENCE
+- Format général :
+  TYPE NOM · SERVICE FRÉQUENCE
+- Exemples :
+  TMA PROVENCE 2 · APP 132.300
+  CTR GARONS · TWR 123.200
+- Pour les TMA, le code technique LFML2/LFMN2 reste masqué conformément aux versions précédentes.
+- Le nom opérationnel est prioritaire.
+- Le code de zone n'est utilisé qu'en repli lorsque le nom est absent.
+
+8. CHOIX DE LA PREMIÈRE FRÉQUENCE
+- Les fréquences sont lues uniquement dans les relations SIA déjà intégrées au payload.
+- Aucune fréquence n'est déduite par proximité.
+- Une fréquence normale est prioritaire sur une fréquence supplétive `(s)`.
+- L'ordre des services/fréquences du SIA est conservé.
+- S'il n'existe que des fréquences supplétives, la première est affichée avec `(s)`.
+- Si aucune fréquence n'est directement associée à la zone, le libellé affiche uniquement son nom.
+
+9. NOUVEAU BOUTON « PROFIL »
+- Ajout d'un bouton `PROFIL` dans la colonne des actions carte.
+- Un appui ouvre/ferme le panneau « PROFIL ESPACES ».
+- Le panneau occupe environ le tiers inférieur de la carte.
+- Il est superposé à la carte et peut être fermé avec `×`.
+
+10. COUPE VERTICALE DES ESPACES DEVANT L'AVION
+- Le profil utilise :
+  - la dernière position GPS connue ;
+  - la route sol GPS ;
+  - l'altitude GPS lorsqu'elle est disponible.
+- En simulation, la route de simulation est utilisée en repli.
+- Axe horizontal :
+  distance devant l'avion.
+- Trois portées :
+  25 NM
+  50 NM
+  100 NM.
+- Axe vertical :
+  altitude en pieds.
+
+11. DÉTECTION DES ESPACES SUR L'AXE
+- Le moteur construit un axe géographique devant l'avion.
+- Les volumes sont échantillonnés :
+  0,25 NM pour 25 NM ;
+  0,40 NM pour 50 NM ;
+  0,50 NM pour 100 NM.
+- Chaque zone active intersectant cet axe est représentée entre sa distance d'entrée et sa distance de sortie approximatives.
+- Seules les zones surfaciques Polygon / MultiPolygon sont représentées dans le profil.
+- Les objets ponctuels AER/VOL/PJE/etc. restent consultables sur la carte mais ne sont pas représentés comme volumes dans cette coupe.
+
+12. FILTRES DU PROFIL
+- Le profil respecte les cases cochées dans « CALQUES AÉRONAUTIQUES SIA ».
+- Une catégorie masquée sur la carte n'est pas ajoutée au profil.
+- Les parents techniques TMA `tp:1` restent exclus.
+- Les TMA génériques sans altitude filtrées depuis v15.58 restent exclues.
+
+13. REPRÉSENTATION VERTICALE
+- ALT en ft -> valeur en pieds.
+- FL -> valeur graphique FL × 100 ft.
+- SFC -> niveau 0 du profil.
+- HEI/AGL -> valeur numérique représentée sans relief.
+- Mention permanente dans le panneau :
+  « FL représentés à 100 ft/FL ; SFC/AGL sans profil de relief. »
+- Il ne s'agit donc pas d'une conversion QNH exacte ni d'un profil terrain.
+
+14. ALTITUDE DU Q400
+- Lorsque l'altitude GPS est disponible, une ligne horizontale jaune affiche l'altitude actuelle dans la coupe.
+- Elle permet de voir rapidement quels volumes se trouvent autour de l'altitude actuelle.
+
+15. CONTENU DES VOLUMES DU PROFIL
+- Les volumes utilisent les couleurs des catégories SIA.
+- Lorsque le rectangle est assez grand, il affiche :
+  TYPE NOM · PREMIÈRE FRÉQUENCE.
+- Jusqu'à 80 volumes sont affichés afin de préserver les performances sur iPad.
+
+16. INTERACTION AVEC LE PROFIL
+- Un appui sur un volume du profil :
+  - sélectionne la même zone ;
+  - applique la coloration 30 % sur la carte ;
+  - ouvre sa fiche d'information à un point correspondant approximativement au milieu de la traversée.
+- La logique de fiche et fréquences existante est réutilisée.
+
+17. RAFRAÎCHISSEMENT DU PROFIL
+- Le profil est recalculé lorsqu'il est ouvert et que :
+  - la position/route GPS évolue ;
+  - la portée 25/50/100 NM change ;
+  - les calques SIA sont rafraîchis ou leurs filtres changent.
+- Le calcul est temporisé pour éviter les rafraîchissements excessifs.
+
+18. CORRECTIONS v15.59 CONSERVÉES
+- D-OTHER Point/MultiPoint/LineString/MultiLineString sélectionnables.
+- Suppression des « ? » issus du Marker Leaflet par défaut.
+- Codes + significations AER/VOL/SUR/PJE/PRN/TRVL/TRPLA/AP/LTA/BAL/UAC/ACC/TRPVL.
+- RAS / TRA explicités dans le menu.
+- Coordonnées LFHO Aubenas corrigées :
+  44.53824722 / 4.37033056.
+- `BASE` au-dessus du code OACI lorsque la base fait partie des pélicandromes retenus.
+- Double sécurité TMA sans altitude conservée.
+
+19. DONNÉES SIA
+- Le payload embarqué n'est pas modifié.
+- `npfDatasetRevision` reste 15.57.
+- Aucun nouveau téléchargement de données SIA n'est imposé par v15.60.
+
+20. NAS
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.57`.
+- Appui long : `executeMapLongPressAction()` est de nouveau appelé dans le timer 1,2 s et non au relâchement.
+- Protection du clic synthétique au relâchement présente.
+- Bouton Créer Feu rouge / Sélection Zone vert vérifiés.
+- Remplissage normal des zones surfaciques = 0 %.
+- Remplissage de sélection = 30 %.
+- Fonction première fréquence SIA vérifiée.
+- Libellés bordure avec rotation / anti-collision / limite 70 vérifiés.
+- Bouton et panneau PROFIL présents.
+- Portées 25 / 50 / 100 NM présentes.
+- Profil filtré par calques SIA actifs.
+- Ligne altitude avion présente.
+- Interaction volume profil -> sélection zone présente.
+- Historique v15.59 et antérieur conservé intégralement.
+- Validation réelle Safari/iPadOS à effectuer sur l'appareil.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.59 — CORRECTIONS GÉNÉRALES SIA + AUBENAS + BASE/PÉLIC
 Date : 17/08/2026
 Base : TEST v15.58
