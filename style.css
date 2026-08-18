@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.61 */
+/* NPF_STYLE_BUILD_VERSION: v15.62 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15520,7 +15520,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v15.61 — PROFIL DANS FILTRES / VIEWPORT iPad / LISIBILITÉ DES ZONES
+   v15.62 — LIBELLÉS INTÉRIEURS / PROFIL AU-DESSUS DES COMMANDES
    ========================================================================== */
 
 /* Le bouton PROFIL n'est plus dans la colonne carte : il fait partie des
@@ -15541,7 +15541,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 
 /*
- * Le profil est attaché au viewport. Le JS v15.61 positionne également son
+ * Le profil est attaché au viewport. Le JS v15.62 positionne également son
  * `top` d'après visualViewport afin de neutraliser les particularités
  * Safari/iPadOS qui pouvaient placer le panneau sous l'écran visible.
  */
@@ -15552,7 +15552,11 @@ body.gaar-point-search-open .gaar-editing-banner {
     bottom: max(8px, env(safe-area-inset-bottom));
     height: min(35dvh, 360px);
     max-height: calc(100dvh - 16px);
-    z-index: 720;
+    /*
+     * v15.62 — au-dessus de toutes les icônes/commandes carte (1000/1001),
+     * mais sous les vraies fenêtres modales applicatives (>= 2000).
+     */
+    z-index: 1500;
 }
 
 @supports not (height: 1dvh) {
