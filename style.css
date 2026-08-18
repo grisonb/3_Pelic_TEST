@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.66 */
+/* NPF_STYLE_BUILD_VERSION: v15.67 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15733,7 +15733,7 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 
 /* ==========================================================================
-   v15.66 — PROFIL LISIBLE / LIBELLÉS 2 LIGNES / APPUIS LONGS IPAD
+   v15.67 — PROFIL LISIBLE / LIBELLÉS 2 LIGNES / APPUIS LONGS IPAD
    ========================================================================== */
 
 /*
@@ -15781,3 +15781,6 @@ body.gaar-point-search-open .gaar-editing-banner {
     -webkit-user-drag: none !important;
     touch-action: manipulation;
 }
+
+
+/* v15.67 — aucune règle graphique supplémentaire : géométries/SIV gérés dans le dataset et le JS. */
