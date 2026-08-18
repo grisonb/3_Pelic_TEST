@@ -1,3 +1,70 @@
+VERSION TEST v15.68 — ZONES P : NOMS OFFICIELS + LIBELLÉS FIABLES + PETITES ZONES
+Date : 18/08/2026
+Base : TEST v15.67
+
+OBJECTIFS
+- Reprendre l'ensemble des zones P après les anomalies constatées sur P1, P5, P10, P12, P35, P200 L, P202 L et d'autres zones.
+- Utiliser le nom propre publié dans la source SIA de la zone elle-même plutôt qu'un texte récupéré dans les remarques d'un autre espace.
+- Garantir un libellé visible sur les petites zones et les cercles lorsque les segments discrétisés sont trop courts pour le placement historique.
+- Conserver uniquement le nom et la tranche verticale sur la carte ; les textes réglementaires détaillés restent dans la fiche tactile.
+
+1. NOMS DES ZONES P — SOURCE OFFICIELLE XML_SIA
+- Les 115 objets de type P du payload ont été confrontés aux `Partie` du même export SIA AIRAC 08/26 v04.
+- Le champ `NomUsuel` de `XML_SIA_2026-08-06.xml` est désormais embarqué directement dans chaque objet P sous la clé compacte `pn`.
+- 114 zones P sur 115 possèdent un `NomUsuel` explicite dans cette source.
+- La seule zone sans `NomUsuel` dans XML_SIA est SOP3 ; elle reste affichée proprement sous la forme `P 3`, sans phrase réglementaire utilisée comme faux nom.
+- Deux anomalies historiques de code source sont prises en charge sans heuristique de texte : `LFP047` reprend BALARD depuis la Partie LF P47 et `LF237L` reprend PRADERE depuis la Partie LF P237 L.
+- Le système de références croisées `LF-P xx ...` n'est plus utilisé pour le nom visible des zones P.
+- Les phrases telles que `ENTRY PROHIBITED`, `EXCEPTION SEE AIP ENR 5.1`, conditions de dérogation, contacts ou autres remarques ne peuvent donc plus devenir un nom de carte.
+
+Exemples vérifiés :
+- P 1 / BLAYAIS-BRAUD ET SAINT LOUIS ;
+- P 5 / LE BARP ;
+- P 10 / CADARACHE ;
+- P 12 / CRUAS-MEYSSE ;
+- P 35 / MONT DE MARSAN ;
+- P 47 / BALARD ;
+- P 48 / FORT DE BRÉGANÇON ;
+- P 62 / TOULON ;
+- P 63 / ILE DU LEVANT ;
+- P 200 L / CAZAUX ;
+- P 202 L / SAUVAGNAC ;
+- P 237 L / PRADERE.
+
+2. LIBELLÉS CARTE DES ZONES P
+- Le titre de la fiche, le libellé de carte et le libellé du PROFIL ESPACES utilisent tous le même `NomUsuel` embarqué.
+- Format carte conservé : première ligne `P numéro / NOM`, seconde ligne tranche verticale.
+- Aucun texte réglementaire n'est ajouté à la première ligne.
+- Les remarques complètes du SIA restent consultables dans la fiche ouverte par appui sur la zone.
+
+3. P5 / P35 ET PETITES ZONES — PLACEMENT INTÉRIEUR
+- Le placement historique reposait d'abord sur un segment de contour individuel suffisamment long ; un cercle discrétisé en nombreux petits segments pouvait donc n'obtenir aucun libellé.
+- Pour toutes les zones P, plusieurs points intérieurs sont désormais calculés à partir du centroïde écran, du centre de boîte et du barycentre des sommets.
+- Plusieurs décalages autour de ces centres sont testés et validés uniquement s'ils restent réellement dans la géométrie de la zone et dans le viewport.
+- Ces positions intérieures horizontales sont essayées avant les positions basées sur les segments.
+- Le placement historique le long d'un segment reste disponible en repli.
+- P5 et P35 ne dépendent donc plus de la longueur de chaque petit segment du cercle pour obtenir leur texte.
+- Le gestionnaire global de collisions reste actif afin de ne pas superposer volontairement deux libellés proches.
+
+4. DONNÉES / COMPATIBILITÉ
+- Les géométries corrigées en v15.67 sont conservées sans nouvelle modification de forme.
+- Les services et fréquences SIV de v15.67 sont conservés ; les SIV restent absents du profil.
+- Les corrections du profil v15.66, le filtre FL115, les noms R, l'héritage TMA, les appuis longs iPad et la navigation Retour restent inchangés.
+- Le payload SIA est modifié uniquement pour ajouter les noms P `pn` et sa révision interne passe de 15.67 à 15.68.
+- Nombre d'espaces : 5 066 ; terrains : 877 ; points non-IFR : 1 899 inchangés.
+- Aucun changement NAS.
+
+CONTROLES
+- 115 zones P détectées dans le payload ; 114 `NomUsuel` SIA embarqués ; SOP3 reste volontairement sans nom inventé.
+- Vérifications ciblées P1, P5, P10, P12, P35, P47, P48, P62, P63, P200L, P202L et P237L.
+- Vérification qu'aucun appel au résolveur de références croisées P n'est utilisé dans les fonctions de titre/libellé/profil.
+- Vérification de la présence du placement intérieur prioritaire pour les P.
+- Vérification syntaxique JavaScript de `script.js` et `sw.js`.
+- Validation JSON du manifest.
+- Vérification des références de version v15.68 dans index / script / style / manifest / service worker.
+- Historique des modifications conservé intégralement ci-dessous.
+
+
 VERSION TEST v15.67 — GÉOMÉTRIES AIXM CORRIGÉES + FRÉQUENCES SIV + SIV HORS PROFIL
 Date : 18/08/2026
 Base : TEST v15.66
