@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.62';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.63';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -32814,6 +32814,8 @@ const SIA_DB_STORE = 'kv';
 const SIA_DATASET_KEY = 'activeDataset';
 const SIA_META_KEY = 'activeMeta';
 const SIA_FILTER_PREFS_KEY = 'npfSiaLayerPrefs_v1';
+const SIA_HIDE_ABOVE_FL115_PREF_KEY = '__npfHideAirspacesAboveFL115';
+const SIA_HIDE_ABOVE_FL115_FEET = 11500;
 const SIA_EMBEDDED_META = Object.freeze({
     source: 'SIA',
     airac: '08/26',
@@ -40319,7 +40321,9 @@ function saveSiaFilterPrefs() {
 }
 
 function hasAnyEnabledSiaFilter() {
-    return Object.values(loadSiaFilterPrefs()).some(Boolean);
+    return Object.entries(loadSiaFilterPrefs()).some(([key, enabled]) =>
+        key !== SIA_HIDE_ABOVE_FL115_PREF_KEY && enabled === true
+    );
 }
 
 function isSiaFilterEnabled(key) {
@@ -40329,6 +40333,36 @@ function isSiaFilterEnabled(key) {
 function setSiaFilterEnabled(key, enabled) {
     loadSiaFilterPrefs()[key] = !!enabled;
     saveSiaFilterPrefs();
+}
+
+function isSiaHideAboveFl115Enabled() {
+    return loadSiaFilterPrefs()[SIA_HIDE_ABOVE_FL115_PREF_KEY] === true;
+}
+
+function setSiaHideAboveFl115Enabled(enabled) {
+    loadSiaFilterPrefs()[SIA_HIDE_ABOVE_FL115_PREF_KEY] = !!enabled;
+    saveSiaFilterPrefs();
+}
+
+function getSiaAirspaceLowerLimitFeetForFilter(item) {
+    const raw = item?.lo;
+    if (!Array.isArray(raw)) return null;
+
+    const ref = String(raw?.[0] || '').trim().toUpperCase();
+    const value = Number(raw?.[1]);
+    const unit = String(raw?.[2] || '').trim().toUpperCase();
+    if (!Number.isFinite(value)) return null;
+
+    if (ref === 'STD' && unit === 'FL') return value * 100;
+    if ((ref === 'ALT' || ref === 'HEI') && unit === 'FT') return value;
+    return null;
+}
+
+function shouldHideSiaAirspaceAboveFl115(item) {
+    if (!isSiaHideAboveFl115Enabled()) return false;
+    const lowerFeet = getSiaAirspaceLowerLimitFeetForFilter(item);
+    // Une limite non interprétable reste visible par sécurité.
+    return Number.isFinite(lowerFeet) && lowerFeet >= SIA_HIDE_ABOVE_FL115_FEET;
 }
 
 function ensureSiaMapPanes() {
@@ -40536,6 +40570,11 @@ function ensureSiaFilterModal() {
                         title="Afficher ou masquer la coupe verticale des espaces devant l'avion">
                     PROFIL ESPACES
                 </button>
+                <label class="sia-filter-altitude-option"
+                       title="Masquer les zones dont le plancher est au FL115 / 11 500 ft ou au-dessus">
+                    <input type="checkbox" id="sia-filter-hide-above-fl115">
+                    <span>Masquer zones &gt; FL115</span>
+                </label>
             </div>
             <div id="sia-filter-sections" class="sia-filter-sections">
                 <div class="sia-filter-loading">Chargement des données SIA…</div>
@@ -40578,6 +40617,16 @@ function ensureSiaFilterModal() {
         scheduleSiaLayerRefresh('filters-none');
     });
 
+    const altitudeFilterInput = modal.querySelector('#sia-filter-hide-above-fl115');
+    if (altitudeFilterInput) {
+        altitudeFilterInput.checked = isSiaHideAboveFl115Enabled();
+        altitudeFilterInput.addEventListener('change', () => {
+            setSiaHideAboveFl115Enabled(altitudeFilterInput.checked);
+            scheduleSiaLayerRefresh('altitude-filter-change');
+            scheduleSiaProfileRefresh('altitude-filter-change');
+        });
+    }
+
     modal.querySelector('#sia-filter-sections')?.addEventListener('change', event => {
         const input = event.target?.closest?.('input[data-sia-filter-key]');
         if (!input) return;
@@ -40595,6 +40644,8 @@ function renderSiaFilterModal(dataset) {
 
     const sections = getSiaFilterSections(dataset);
     const prefs = loadSiaFilterPrefs();
+    const altitudeFilterInput = modal.querySelector('#sia-filter-hide-above-fl115');
+    if (altitudeFilterInput) altitudeFilterInput.checked = isSiaHideAboveFl115Enabled();
 
     container.innerHTML = sections.map(section => `
         <section class="sia-filter-section">
@@ -40908,6 +40959,7 @@ async function refreshSiaLayers(reason = 'manual') {
     const visibleAirspaceFeatures = [];
     for (const item of dataset.airspaces || []) {
         if (!isSiaFilterEnabled(item.k)) continue;
+        if (shouldHideSiaAirspaceAboveFl115(item)) continue;
 
         // v15.57 — les parents techniques TMA issus d'un Adg/UNION ne sont ni
         // dessinés ni proposés à la sélection. Les vrais secteurs restent.
@@ -41233,6 +41285,7 @@ function getSiaProfileCandidateItems(dataset) {
     const operationalFamilies = buildSiaTmaOperationalFamilySet(dataset);
     return (dataset?.airspaces || []).filter(item => {
         if (!isSiaFilterEnabled(item.k)) return false;
+        if (shouldHideSiaAirspaceAboveFl115(item)) return false;
         if (isSiaTechnicalTmaUnionParent(item)) return false;
         if (isSiaGenericTmaWithoutAltitude(item, operationalFamilies)) return false;
         if (!item.g) return false;
@@ -41877,6 +41930,74 @@ function extractSiaAeronauticalFrequencyFromText(value) {
     return numeric.toFixed(3);
 }
 
+let siaRestrictedCrossReferenceNameIndex = null;
+
+function normalizeSiaRestrictedReferenceCode(value) {
+    return String(value || '')
+        .trim()
+        .toUpperCase()
+        .replace(/^LF\s*-?\s*R\s*/i, '')
+        .replace(/\s+/g, '');
+}
+
+function cleanSiaRestrictedCrossReferenceName(value) {
+    let name = String(value || '')
+        .trim()
+        .replace(/^[\s\-–—:;,.()]+|[\s\-–—:;,.()]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+
+    // Ces mots décrivent l'état ou la relation, pas un nom géographique.
+    if (!name || /^(?:IS|ARE|ACTIVE|ACTIVATED|WHEN|IF|PART|AREA|AREAS|ZONE|ZONES)\b/i.test(name)) return '';
+    if (/^(?:ACTIVITY|ACTIVATION)\b/i.test(name)) return '';
+    if (/\bLF\s*-\s*R\b/i.test(name)) return '';
+    if (/^\d+(?:[./]\d+)*$/.test(name)) return '';
+    return name;
+}
+
+function buildSiaRestrictedCrossReferenceNameIndex(dataset = siaDataset) {
+    if (siaRestrictedCrossReferenceNameIndex) return siaRestrictedCrossReferenceNameIndex;
+
+    const counts = new Map();
+    const referenceRegex = /\bLF\s*-\s*R\s*([0-9A-Z./]+)\s+(.+?)(?=\s+(?:OR|AND)\s+LF\s*-\s*R\s*[0-9]|\s+(?:WHEN|INTERFERING|EXCEPT|EXCLUDING|WHICH|ACTIVITY|ACTIVATION|IS\s+ACTIVE|ARE\s+ACTIVE)\b|[#;,\n.]|$)/gi;
+
+    (dataset?.airspaces || []).forEach(sourceItem => {
+        const remark = String(sourceItem?.r || '');
+        if (!remark) return;
+
+        referenceRegex.lastIndex = 0;
+        for (const match of remark.matchAll(referenceRegex)) {
+            const code = normalizeSiaRestrictedReferenceCode(match?.[1]);
+            const name = cleanSiaRestrictedCrossReferenceName(match?.[2]);
+            if (!code || !name) continue;
+
+            if (!counts.has(code)) counts.set(code, new Map());
+            const nameCounts = counts.get(code);
+            nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+        }
+    });
+
+    const index = new Map();
+    counts.forEach((nameCounts, code) => {
+        const ordered = [...nameCounts.entries()].sort((a, b) => {
+            if (a[1] !== b[1]) return b[1] - a[1];
+            if (a[0].length !== b[0].length) return b[0].length - a[0].length;
+            return a[0].localeCompare(b[0], 'fr');
+        });
+        if (ordered[0]?.[0]) index.set(code, ordered[0][0]);
+    });
+
+    siaRestrictedCrossReferenceNameIndex = index;
+    return index;
+}
+
+function getSiaRestrictedCrossReferenceName(item) {
+    if (String(item?.t || '').trim().toUpperCase() !== 'R') return '';
+    const code = normalizeSiaRestrictedReferenceCode(item?.c);
+    if (!code) return '';
+    return buildSiaRestrictedCrossReferenceNameIndex().get(code) || '';
+}
+
 function getSiaRestrictedAdministratorFallback(administratorChunk) {
     const chunk = String(administratorChunk || '').trim();
     if (!chunk) return null;
@@ -41991,17 +42112,27 @@ function getSiaRestrictedRemarkInfo(item) {
         }
     }
 
-    const operationalName = String(service?.operationalName || '').trim();
+    const serviceOperationalName = String(service?.operationalName || '').trim();
+    const crossReferenceName = getSiaRestrictedCrossReferenceName(item);
+
+    /*
+     * v15.63 — un vrai nom géographique publié ailleurs dans le même jeu SIA
+     * devient le nom principal, sauf si une instruction explicite de clairance/
+     * contact a fourni un service directement opérationnel (ex. R108B/CAMARGUE).
+     */
+    const operationalName = sourceKind === 'explicit'
+        ? serviceOperationalName
+        : (crossReferenceName || serviceOperationalName);
 
     /*
      * Fréquence de repli :
      * - si l'instruction opérationnelle retenue donne une fréquence, elle gagne ;
-     * - sinon priorité à une ligne citant le service retenu ;
+     * - sinon priorité à une ligne citant le SERVICE retenu ;
      * - les lignes "activity known" peuvent fournir la fréquence, mais jamais
      *   le NOM de la zone ;
      * - RAI n'est jamais affiché.
      */
-    if (!frequency && operationalName) {
+    if (!frequency && serviceOperationalName) {
         const candidates = [];
         lines.forEach((line, lineIndex) => {
             const value = extractSiaAeronauticalFrequencyFromText(line);
@@ -42010,7 +42141,7 @@ function getSiaRestrictedRemarkInfo(item) {
             const upperLine = line.toUpperCase();
             let score = 0;
 
-            if (upperLine.includes(operationalName.toUpperCase())) score += 12;
+            if (upperLine.includes(serviceOperationalName.toUpperCase())) score += 12;
             if (explicitOperationalRegex.test(line)) score += 10;
             if (/(?:Admin(?:istrator|itrator)s?|Managing\s+authority)/i.test(line)) score += 7;
             if (/(?:actual\s+)?activity\s+known|activation\s+(?:known|provided|announced)/i.test(line)) score += 3;
@@ -42030,9 +42161,11 @@ function getSiaRestrictedRemarkInfo(item) {
 
     const result = {
         operationalName,
+        serviceName: serviceOperationalName,
+        crossReferenceName,
         serviceType: service?.serviceType || '',
         frequency,
-        sourceKind,
+        sourceKind: crossReferenceName && sourceKind !== 'explicit' ? 'cross-reference' : sourceKind,
         administrator: administratorChunk
     };
 
@@ -42049,8 +42182,9 @@ function formatSiaCtrFrequencyRows(item) {
         const restrictedInfo = getSiaRestrictedRemarkInfo(item);
         if (!restrictedInfo?.frequency) return '';
 
-        const detail = restrictedInfo.operationalName
-            ? `<div class="sia-airspace-frequency-detail">${escapeHtml(restrictedInfo.operationalName)}</div>`
+        const frequencyDetailName = restrictedInfo.serviceName || restrictedInfo.operationalName || '';
+        const detail = frequencyDetailName
+            ? `<div class="sia-airspace-frequency-detail">${escapeHtml(frequencyDetailName)}</div>`
             : '';
 
         return `
@@ -43237,6 +43371,7 @@ async function refreshSiaLayers(reason = 'manual') {
     const siaBoundaryLabelState = { points: [], count: 0 };
     for (const item of dataset.airspaces || []) {
         if (!isSiaFilterEnabled(item.k)) continue;
+        if (shouldHideSiaAirspaceAboveFl115(item)) continue;
 
         // Parents techniques AIXM déjà identifiés en v15.57.
         if (isSiaTechnicalTmaUnionParent(item)) continue;
