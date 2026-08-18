@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.59 */
+/* NPF_STYLE_BUILD_VERSION: v15.60 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15269,4 +15269,251 @@ body.gaar-point-search-open .gaar-editing-banner {
     line-height: 1;
     font-weight: 950;
     letter-spacing: .08em;
+}
+
+
+/* ==========================================================================
+   v15.60 — APPUI LONG : ACTIONS COLORÉES
+   ========================================================================== */
+
+.npf-map-longpress-action.npf-map-longpress-fire {
+    background: #c62828;
+    border-color: #8e0000;
+    color: #ffffff;
+}
+
+.npf-map-longpress-action.npf-map-longpress-zone {
+    background: #2e7d32;
+    border-color: #145a18;
+    color: #ffffff;
+}
+
+.npf-map-longpress-action.npf-map-longpress-fire:active,
+.npf-map-longpress-action.npf-map-longpress-zone:active {
+    filter: brightness(.94);
+}
+
+/* ==========================================================================
+   v15.60 — NOM + PREMIÈRE FRÉQUENCE SUR LES BORDURES SIA
+   ========================================================================== */
+
+.sia-boundary-label-icon {
+    background: transparent !important;
+    border: 0 !important;
+    pointer-events: none !important;
+}
+
+.sia-boundary-label-text {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: center center;
+    white-space: nowrap;
+    pointer-events: none;
+    font: 900 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #111827;
+    text-shadow:
+        -2px -2px 0 rgba(255,255,255,.96),
+         2px -2px 0 rgba(255,255,255,.96),
+        -2px  2px 0 rgba(255,255,255,.96),
+         2px  2px 0 rgba(255,255,255,.96),
+         0 0 4px rgba(255,255,255,.96);
+}
+
+/* ==========================================================================
+   v15.60 — PROFIL VERTICAL DES ESPACES
+   ========================================================================== */
+
+.sia-profile-map-button {
+    font: 900 9px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: .03em;
+}
+
+.sia-profile-map-label {
+    display: block;
+    transform: rotate(-90deg);
+    white-space: nowrap;
+}
+
+.sia-profile-map-button.active {
+    box-shadow: inset 0 0 0 3px rgba(46,125,50,.88);
+}
+
+.sia-profile-panel {
+    position: absolute;
+    left: 58px;
+    right: 8px;
+    bottom: 8px;
+    height: min(35vh, 360px);
+    min-height: 225px;
+    z-index: 720;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 2px solid rgba(17,24,39,.88);
+    border-radius: 12px;
+    background: rgba(255,255,255,.97);
+    box-shadow: 0 5px 20px rgba(0,0,0,.28);
+    pointer-events: auto;
+}
+
+.sia-profile-panel[hidden] {
+    display: none !important;
+}
+
+.sia-profile-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 9px;
+    border-bottom: 1px solid rgba(17,24,39,.20);
+}
+
+.sia-profile-title {
+    font-size: 14px;
+    line-height: 1.05;
+    font-weight: 950;
+}
+
+.sia-profile-subtitle {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.1;
+    font-weight: 700;
+    opacity: .74;
+}
+
+.sia-profile-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.sia-profile-range-button,
+.sia-profile-close {
+    min-height: 32px;
+    border: 1px solid #6b7280;
+    border-radius: 7px;
+    background: #ffffff;
+    color: #111827;
+    font-weight: 850;
+    touch-action: manipulation;
+}
+
+.sia-profile-range-button {
+    padding: 5px 8px;
+    font-size: 11px;
+}
+
+.sia-profile-range-button.active {
+    background: #1f2937;
+    color: #ffffff;
+}
+
+.sia-profile-close {
+    width: 34px;
+    padding: 0;
+    font-size: 24px;
+    line-height: 1;
+}
+
+.sia-profile-chart {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.sia-profile-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.sia-profile-plot-bg {
+    fill: rgba(248,250,252,.92);
+}
+
+.sia-profile-grid-line {
+    stroke: rgba(100,116,139,.25);
+    stroke-width: 1;
+}
+
+.sia-profile-grid-vertical {
+    stroke-dasharray: 3 4;
+}
+
+.sia-profile-axis {
+    stroke: #111827;
+    stroke-width: 1.6;
+}
+
+.sia-profile-axis-label,
+.sia-profile-axis-title {
+    fill: #374151;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.sia-profile-volume {
+    cursor: pointer;
+}
+
+.sia-profile-volume-group {
+    cursor: pointer;
+}
+
+.sia-profile-volume-group:active .sia-profile-volume {
+    fill-opacity: .34;
+}
+
+.sia-profile-volume-label {
+    fill: #111827;
+    font-size: 10px;
+    font-weight: 900;
+    pointer-events: none;
+    paint-order: stroke;
+    stroke: rgba(255,255,255,.94);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+
+.sia-profile-own-alt-line {
+    stroke: #f9a825;
+    stroke-width: 3;
+    stroke-dasharray: 10 5;
+}
+
+.sia-profile-own-alt-label {
+    fill: #111827;
+    font-size: 12px;
+    font-weight: 950;
+    paint-order: stroke;
+    stroke: #fff59d;
+    stroke-width: 4px;
+}
+
+.sia-profile-empty {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #475569;
+}
+
+.sia-profile-note {
+    flex: 0 0 auto;
+    padding: 3px 8px 5px;
+    font-size: 9px;
+    line-height: 1.1;
+    font-weight: 700;
+    color: #64748b;
+    text-align: right;
 }
