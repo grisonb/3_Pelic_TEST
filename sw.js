@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-62_rzones_innerlabels_profiletop';
-const APP_VERSION = 'v15.62';
+const SW_VERSION = 'sw-v15-63_rnames_fl115filter';
+const APP_VERSION = 'v15.63';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
