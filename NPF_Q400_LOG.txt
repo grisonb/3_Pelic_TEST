@@ -1,3 +1,88 @@
+VERSION TEST v15.65 — SIV + PROFIL IPAD FL115 + FRÉQUENCES TMA + NOMS ZONES P
+Date : 18/08/2026
+Base : TEST v15.64
+
+OBJECTIFS
+- Faire apparaître les SIV comme une catégorie distincte dans « Espaces aériens / zones » alors qu'ils sont publiés comme RAS / FLIGHT INFORMATION SECTOR dans le payload AIXM.
+- Faire occuper au « PROFIL ESPACES » toute la largeur de l'écran de l'iPad.
+- Ajouter une poignée basse interne à NPF permettant d'ouvrir le profil par glissement vers le haut sans tenter d'intercepter le geste système réservé à iPadOS.
+- Lorsque « Masquer zones > FL115 » est actif, limiter aussi l'échelle verticale du profil au FL115.
+- Compléter les secteurs TMA dépourvus de bloc `sv` uniquement lorsqu'un unique bloc de services/fréquences est commun aux autres secteurs de la même famille.
+- Généraliser aux zones P la récupération d'un nom géographique explicite publié par référence croisée SIA.
+
+1. SIV DANS « ESPACES AÉRIENS / ZONES »
+- Les objets `RAS` dont le type local vaut exactement `FLIGHT INFORMATION SECTOR` sont reconnus comme SIV par NPF.
+- Nouveau filtre virtuel `ase:SIV` affiché dans « Espaces aériens / zones ».
+- Le compteur est calculé sans modifier le payload : 129 secteurs SIV dans le jeu SIA embarqué.
+- Ces secteurs ne sont plus comptés dans le bouton générique RAS.
+- Migration : à la première ouverture en v15.65, si le réglage SIV n'existe pas encore, il reprend l'ancien état du filtre RAS afin de préserver l'affichage précédent.
+- Sur la carte et dans les fiches, le type affiché devient `SIV` au lieu de `RAS`.
+- Le même filtre est utilisé pour le rendu, les surfaces tactiles, les libellés et le profil vertical.
+
+2. PROFIL ESPACES — PLEINE LARGEUR / GESTE IPAD
+- Le panneau occupe désormais toute la largeur du viewport : bord gauche à bord droit.
+- Suppression des anciennes marges latérales de 58 px / 8 px pour le profil.
+- Le bas du panneau est aligné sur le bas du viewport, avec prise en compte de la safe-area iPad.
+- Ajout d'une petite poignée centrée en bas de NPF, juste au-dessus de la zone système iPadOS.
+- Glissement vers le haut d'au moins 35 px depuis cette poignée : ouverture de « PROFIL ESPACES ».
+- Un appui sur la poignée ouvre également le profil.
+- Glissement vers le bas d'au moins 45 px depuis l'en-tête du profil, hors boutons : fermeture du profil.
+- Le bouton « PROFIL ESPACES » du menu SIA reste disponible.
+
+3. PROFIL — PLAFOND GRAPHIQUE FL115
+- Le filtre « Masquer zones > FL115 » continue d'exclure les zones dont le plancher est >= 11 500 ft.
+- Lorsque ce filtre est actif, l'échelle verticale du profil est maintenant strictement limitée à 11 500 ft / FL115.
+- Une zone SFC–FL195 reste représentée mais est graphiquement coupée au FL115.
+- Une zone FL125–FL195 reste entièrement absente.
+- Une ligne/étiquette FL115 est ajoutée au sommet du profil dans ce mode.
+
+4. TMA — HÉRITAGE CONSERVATEUR DES FRÉQUENCES DE FAMILLE
+- Une TMA avec un bloc `sv` propre continue d'utiliser exclusivement ses fréquences propres.
+- Si `sv` est absent, NPF recherche les autres secteurs de la même famille TMA.
+- L'héritage n'est autorisé que si tous les secteurs renseignés de la famille convergent vers un seul bloc `sv` strictement identique.
+- En présence de plusieurs blocs différents, aucune fréquence n'est inventée ni héritée.
+- Exemple vérifié :
+  - TMA PROVENCE 1.30 : aucun `sv` propre ;
+  - les secteurs PROVENCE renseignés partagent un unique bloc PROVENCE APP ;
+  - affichage attendu : `TMA PROVENCE 1.30 · APP 132.300` ;
+  - tranche : `2500 ft AMSL – 4500 ft AMSL`.
+- Même correction automatique pour PROVENCE 8.20.
+- La fiche détaillée utilise le même bloc de services effectif que le libellé carte.
+
+5. ZONES P — NOMS PAR RÉFÉRENCES CROISÉES SIA
+- Construction à la demande d'un index `LF-P xx NOM` à partir des remarques déjà présentes dans le payload.
+- Aucun nom n'est ajouté manuellement ni déduit par proximité.
+- Les références s'arrêtent proprement avant une autre zone P/R/D, une condition d'activation ou une ponctuation structurante.
+- Résultats attendus vérifiés dans les données :
+  - `P 62 / TOULON` ;
+  - `P 48 / FORT DE BRÉGANÇON` ;
+  - `P 63 / ILE DU LEVANT`.
+- La tranche verticale ajoutée en v15.64 reste affichée sous ce nom.
+
+6. DONNÉES SIA / NAS
+- Payload SIA inchangé.
+- `npfDatasetRevision` reste 15.57.
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Cohérence des versions v15.65 vérifiée dans index / manifest / script / style / SW.
+- Payload SIA gzip/base64 strictement identique à la v15.64 ; `npfDatasetRevision` reste 15.57.
+- 129 objets RAS / FLIGHT INFORMATION SECTOR détectés et classés sous le filtre virtuel SIV.
+- Profil : code vérifié avec plafond graphique strict à 11 500 ft lorsque le filtre FL115 est actif.
+- PROVENCE 1.30 : `sv` propre absent, famille PROVENCE non ambiguë, première fréquence non supplétive héritée = APP 132.300 ; tranche 2500–4500 ft AMSL.
+- PROVENCE 8.20 : même héritage sûr APP 132.300 ; tranche 2500–4500 ft AMSL.
+- Références croisées P vérifiées dans le payload :
+  - P62 = TOULON (9 occurrences utiles) ;
+  - P48 = FORT DE BRÉGANÇON (forme accentuée majoritaire) ;
+  - P63 = ILE DU LEVANT (9 occurrences utiles).
+- La logique R de v15.64 est conservée ; seul le garde-fou de référence a été élargi à P/R/D.
+- Validation réelle du geste et du rendu pleine largeur à effectuer sur Safari/iPadOS.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.64 — R190 GARRIGUES + ALTITUDES CARTE + RETOUR SÉLECTION
 Date : 18/08/2026
 Base : TEST v15.63
