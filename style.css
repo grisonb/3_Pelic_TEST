@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.64 */
+/* NPF_STYLE_BUILD_VERSION: v15.65 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15668,4 +15668,65 @@ body.gaar-point-search-open .gaar-editing-banner {
 
 .sia-airspace-dialog-popup .leaflet-popup-content {
     margin-top: 54px !important;
+}
+
+
+/* ==========================================================================
+   v15.65 — SIV / PROFIL PLEINE LARGEUR / POIGNÉE IPAD / PLAFOND FL115
+   ========================================================================== */
+
+/* Le profil occupe toute la largeur du viewport, y compris en paysage iPad. */
+.sia-profile-panel {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    bottom: 0 !important;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Poignée située dans la page, juste au-dessus de la zone réservée à iPadOS. */
+.sia-profile-swipe-handle {
+    position: fixed;
+    left: 50%;
+    bottom: max(5px, calc(env(safe-area-inset-bottom) + 4px));
+    transform: translateX(-50%);
+    z-index: 1495;
+    width: 118px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 15px;
+    background: rgba(255,255,255,.78);
+    box-shadow: 0 1px 7px rgba(0,0,0,.28);
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.sia-profile-swipe-handle[hidden] {
+    display: none !important;
+}
+
+.sia-profile-swipe-handle span {
+    display: block;
+    width: 72px;
+    height: 5px;
+    margin: 0 auto;
+    border-radius: 999px;
+    background: rgba(17,24,39,.72);
+}
+
+.sia-profile-header {
+    touch-action: pan-x;
+}
+
+.sia-profile-fl115-line {
+    stroke-width: 2;
+}
+
+.sia-profile-fl115-label {
+    font-weight: 950;
 }
