@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.61';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.62';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -41811,10 +41811,16 @@ function normalizeSiaFrequencyServiceLabel(value) {
 
 
 /*
- * v15.61 — les zones R du payload SIA ne possèdent pas de relations `sv`.
- * Leur gestionnaire et, lorsqu'elle est explicitement publiée, leur fréquence
- * sont donc extraits des remarques SIA. Aucun rapprochement géographique ni
- * aucune fréquence inventée n'est utilisé.
+ * v15.62 — enrichissement opérationnel des zones R.
+ *
+ * Ordre de priorité demandé :
+ * 1) instruction explicite d'entrée/clairance/contact/autorisation ;
+ * 2) gestionnaire publié (Administrator / Managing authority) ;
+ * 3) service ATS explicite dans les premières lignes, hors listes "activity known".
+ *
+ * Une liste "Activity known on" ne sert JAMAIS à nommer la zone. Elle peut
+ * uniquement fournir une fréquence de repli si le service retenu est clairement
+ * cité sur la même ligne. Aucun rapprochement géographique n'est utilisé.
  */
 const siaRestrictedRemarkInfoCache = new WeakMap();
 
@@ -41838,7 +41844,7 @@ function extractSiaOperationalServiceFromChunk(value) {
         .replace(/^RADIO\s+CONTACT(?:\s+MANDATORY)?\s+WITH\s*:?\s*/i, '');
 
     const match = text.match(
-        /^(.{1,55}?)\s+(APP|TWR|INFO|SIV|FIS|ACC|FIC|AFIS|ATIS|A\/A)\b/i
+        /^(.{1,70}?)\s+(APP|TWR|INFO|SIV|FIS|ACC|FIC|AFIS|ATIS|A\/A|CONTROL)\b/i
     );
     if (!match) return null;
 
@@ -41846,8 +41852,8 @@ function extractSiaOperationalServiceFromChunk(value) {
         .trim()
         .replace(/^[\s\-–—:;,.]+|[\s\-–—:;,.]+$/g, '')
         .replace(/^.*:\s*/i, '')
-        .replace(/^.*\b(?:THROUGH|FOLLOW|BY|ON|UPON|WITH|OF|AFTER|AND|OR)\s+/i, '')
-        .replace(/^(?:MANDATORY|CONTACT|WITH)\s+/i, '')
+        .replace(/^.*\b(?:THROUGH|FOLLOW|BY|ON|UPON|WITH|OF|AFTER|AND|OR|FROM)\s+/i, '')
+        .replace(/^(?:MANDATORY|CONTACT|WITH|CLEARANCE)\s+/i, '')
         .trim()
         .toUpperCase();
 
@@ -41860,6 +41866,51 @@ function extractSiaOperationalServiceFromChunk(value) {
     };
 }
 
+function extractSiaAeronauticalFrequencyFromText(value) {
+    const text = String(value || '');
+    const regex = /\b((?:1[1-3]\d|2\d{2}|3\d{2})(?:[.,]\d{1,3}))\s*(?:MHZ)?\b/i;
+    const match = text.match(regex);
+    if (!match) return '';
+
+    const numeric = Number(String(match[1] || '').replace(',', '.'));
+    if (!Number.isFinite(numeric) || numeric < 118 || numeric >= 400) return '';
+    return numeric.toFixed(3);
+}
+
+function getSiaRestrictedAdministratorFallback(administratorChunk) {
+    const chunk = String(administratorChunk || '').trim();
+    if (!chunk) return null;
+
+    const atsService = extractSiaOperationalServiceFromChunk(chunk);
+    if (atsService) return atsService;
+
+    /*
+     * Gestionnaires militaires : le lieu est conservé, l'acronyme organique
+     * n'est pas utilisé comme nom de zone. Ex. "CCER Istres or CMC Istres"
+     * -> ISTRES.
+     */
+    const organizationMatch = chunk.match(
+        /\b(?:CCER|CMC|CDC|CLA|ESCA|CDPGE)\s+([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,30}?)(?=\s+(?:OR|AND)\b|[.;,]|$)/i
+    );
+    const airForceBaseMatch = chunk.match(
+        /^(.{2,30}?)\s+AIR\s+FORCE\s+BASE\b/i
+    );
+    const fallbackMatch = organizationMatch || airForceBaseMatch;
+    if (!fallbackMatch) return null;
+
+    const operationalName = String(fallbackMatch[1] || '')
+        .split(/[.;,]/)[0]
+        .trim()
+        .toUpperCase();
+
+    if (!operationalName) return null;
+    return {
+        operationalName,
+        serviceType: '',
+        rawService: String(fallbackMatch[0] || '').trim()
+    };
+}
+
 function getSiaRestrictedRemarkInfo(item) {
     if (String(item?.t || '').trim().toUpperCase() !== 'R') return null;
 
@@ -41869,125 +41920,120 @@ function getSiaRestrictedRemarkInfo(item) {
 
     const lines = normalizeSiaAirspaceRemarkLines(item);
     let service = null;
+    let frequency = '';
+    let sourceKind = '';
     let administratorChunk = '';
 
-    // 1) Gestionnaire publié explicitement dans la remarque.
+    /*
+     * 1) Priorité absolue aux instructions opérationnelles explicites.
+     * Ex. R108B :
+     * "entry with clearance from CAMARGUE Control 127.925 MHz"
+     * -> CAMARGUE / 127.925.
+     */
+    const explicitOperationalRegex =
+        /(?:entry(?:\s+\w+){0,4}\s+with\s+clearance\s+from|clearance\s+(?:from|by)|radio\s+contact(?:\s+mandatory)?\s+with|contact\s+with|with\s+authori[sz]ation\s+of|upon\s+.*authori[sz]ation|authori[sz]ation\s+(?:of|from|by)|authori[sz]ed\s+by)\s+(.+)/i;
+
     for (const line of lines) {
-        const administratorMatch = line.match(
-            /(?:Admin(?:istrator|itrator)s?|Managing\s+authority)\s*:?\s*(.+)/i
-        );
-        if (!administratorMatch) continue;
-        administratorChunk = String(administratorMatch[1] || '').trim();
-        service = extractSiaOperationalServiceFromChunk(administratorChunk);
-        if (service) break;
+        const explicitMatch = line.match(explicitOperationalRegex);
+        if (!explicitMatch) continue;
+
+        const explicitService = extractSiaOperationalServiceFromChunk(explicitMatch[1]);
+        if (!explicitService) continue;
+
+        service = explicitService;
+        frequency = extractSiaAeronauticalFrequencyFromText(line);
+        sourceKind = 'explicit';
+        break;
     }
 
-    // 2) À défaut : service sur lequel l'activité/activation est publiée.
-    if (!service) {
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
-            const line = lines[lineIndex];
-            const knownMatch = line.match(
-                /(?:Actual\s+)?(?:activity|activation)\s+(?:known|provided|announced)(?:\s+(?:on|by|of))?\s*:?\s*(.*)/i
-            );
-            if (!knownMatch) continue;
-
-            service = extractSiaOperationalServiceFromChunk(knownMatch[1]);
-            if (service) break;
-
-            // Beaucoup de zones utilisent "Activity known on :" puis une liste.
-            for (let offset = 1; offset <= 5 && lineIndex + offset < lines.length; offset += 1) {
-                service = extractSiaOperationalServiceFromChunk(lines[lineIndex + offset]);
-                if (service) break;
-            }
-            if (service) break;
-        }
-    }
-
-    // 3) Certaines zones donnent directement "ORLY APP", "MARSAN APP", etc.
-    if (!service) {
-        for (const line of lines.slice(0, 3)) {
-            service = extractSiaOperationalServiceFromChunk(line);
-            if (service) break;
-        }
-    }
-
-    // 4) Replis explicites : contact/autorisation auprès d'un service nommé.
+    // 2) À défaut seulement : gestionnaire/autorité explicitement publié.
     if (!service) {
         for (const line of lines) {
-            const contextMatch = line.match(
-                /(?:contact\s+with|authori[sz]ation\s+of|authori[sz]ed\s+by|after|upon|follow)\s+(.+)/i
+            const administratorMatch = line.match(
+                /(?:Admin(?:istrator|itrator)s?|Managing\s+authority)\s*:?\s*(.+)/i
             );
-            if (!contextMatch) continue;
-            service = extractSiaOperationalServiceFromChunk(contextMatch[1]);
-            if (service) break;
+            if (!administratorMatch) continue;
+
+            administratorChunk = String(administratorMatch[1] || '').trim();
+            service = getSiaRestrictedAdministratorFallback(administratorChunk);
+            if (service) {
+                frequency = extractSiaAeronauticalFrequencyFromText(line);
+                sourceKind = 'administrator';
+                break;
+            }
         }
-    }
-
-    let operationalName = service?.operationalName || '';
-
-    // Replis de gestionnaires militaires/organismes lorsque le lieu est explicite.
-    if (!operationalName && administratorChunk) {
-        const organizationMatch = administratorChunk.match(
-            /\b(?:CMC|ESCA|CDPGE)\s+([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,30})/i
-        );
-        const airForceBaseMatch = administratorChunk.match(
-            /^(.{2,30}?)\s+AIR\s+FORCE\s+BASE\b/i
-        );
-        const fallbackMatch = organizationMatch || airForceBaseMatch;
-
-        if (fallbackMatch) {
-            operationalName = String(fallbackMatch[1] || '')
-                .split(/[.;,]/)[0]
-                .trim()
-                .toUpperCase();
+    } else {
+        // On mémorise quand même le gestionnaire pour la fiche, sans lui donner priorité.
+        for (const line of lines) {
+            const administratorMatch = line.match(
+                /(?:Admin(?:istrator|itrator)s?|Managing\s+authority)\s*:?\s*(.+)/i
+            );
+            if (administratorMatch) {
+                administratorChunk = String(administratorMatch[1] || '').trim();
+                break;
+            }
         }
     }
 
     /*
-     * Fréquence : uniquement une valeur aéronautique décimale 118–399 MHz,
-     * rencontrée dans les remarques. Les numéros de téléphone et altitudes ne
-     * peuvent donc pas être pris pour des fréquences.
-     *
-     * Une ligne mentionnant le gestionnaire est prioritaire, puis une ligne
-     * "activity known", puis toute ligne portant un service ATS. Le mot RAI
-     * n'est jamais restitué : pour R95, 122.2 devient simplement 122.200
-     * associé à LE LUC.
+     * 3) Repli très conservateur : service ATS présent directement dans les
+     * premières lignes, mais jamais une ligne "activity known".
      */
-    const frequencyCandidates = [];
-    const frequencyRegex = /\b((?:1[1-3]\d|2\d{2}|3\d{2})(?:[.,]\d{1,3}))\s*(?:MHZ)?\b/ig;
-    const serviceRegex = /\b(?:APP|TWR|INFO|SIV|FIS|ACC|FIC|AFIS|ATIS|A\/A)\b/i;
+    if (!service) {
+        for (const line of lines.slice(0, 4)) {
+            if (/(?:actual\s+)?activity\s+known|activation\s+(?:known|provided|announced)/i.test(line)) continue;
+            const directService = extractSiaOperationalServiceFromChunk(line);
+            if (!directService) continue;
+            service = directService;
+            frequency = extractSiaAeronauticalFrequencyFromText(line);
+            sourceKind = 'direct';
+            break;
+        }
+    }
 
-    lines.forEach((line, lineIndex) => {
-        frequencyRegex.lastIndex = 0;
-        const matches = [...line.matchAll(frequencyRegex)];
-        if (!matches.length) return;
+    const operationalName = String(service?.operationalName || '').trim();
 
-        let score = 0;
-        if (operationalName && line.toUpperCase().includes(operationalName)) score += 6;
-        if (/(?:actual\s+activity\s+known|activity\s+known|radio\s+contact|listening\s+watch)/i.test(line)) score += 4;
-        if (serviceRegex.test(line)) score += 2;
-        if (/\bRAI\b/i.test(line)) score += 1;
-        if (score <= 0 && !/\bMHZ\b/i.test(line)) return;
+    /*
+     * Fréquence de repli :
+     * - si l'instruction opérationnelle retenue donne une fréquence, elle gagne ;
+     * - sinon priorité à une ligne citant le service retenu ;
+     * - les lignes "activity known" peuvent fournir la fréquence, mais jamais
+     *   le NOM de la zone ;
+     * - RAI n'est jamais affiché.
+     */
+    if (!frequency && operationalName) {
+        const candidates = [];
+        lines.forEach((line, lineIndex) => {
+            const value = extractSiaAeronauticalFrequencyFromText(line);
+            if (!value) return;
 
-        const numeric = Number(String(matches[0][1] || '').replace(',', '.'));
-        if (!Number.isFinite(numeric)) return;
+            const upperLine = line.toUpperCase();
+            let score = 0;
 
-        frequencyCandidates.push({
-            score,
-            lineIndex,
-            value: numeric.toFixed(3)
+            if (upperLine.includes(operationalName.toUpperCase())) score += 12;
+            if (explicitOperationalRegex.test(line)) score += 10;
+            if (/(?:Admin(?:istrator|itrator)s?|Managing\s+authority)/i.test(line)) score += 7;
+            if (/(?:actual\s+)?activity\s+known|activation\s+(?:known|provided|announced)/i.test(line)) score += 3;
+            if (/\bRAI\b/i.test(line)) score += 1;
+
+            if (score <= 0) return;
+            candidates.push({ score, lineIndex, value });
         });
-    });
 
-    frequencyCandidates.sort((a, b) => {
-        if (a.score !== b.score) return b.score - a.score;
-        return a.lineIndex - b.lineIndex;
-    });
+        candidates.sort((a, b) => {
+            if (a.score !== b.score) return b.score - a.score;
+            return a.lineIndex - b.lineIndex;
+        });
+
+        frequency = candidates[0]?.value || '';
+    }
 
     const result = {
         operationalName,
         serviceType: service?.serviceType || '',
-        frequency: frequencyCandidates[0]?.value || ''
+        frequency,
+        sourceKind,
+        administrator: administratorChunk
     };
 
     if (item && typeof item === 'object') {
@@ -42172,23 +42218,21 @@ function getSiaAirspaceBoundaryLabelText(item) {
     const type = String(item?.t || '').trim().toUpperCase();
     const name = String(item?.n || '').trim();
     const code = String(item?.c || '').trim();
-
-    // Le type et le nom forment le premier bloc, comme en v15.60 :
-    // "CTR SALON", "R 95 A", etc.
     const primaryName = name || code;
-    let base = [displayType, primaryName].filter(Boolean).join(' ');
+    const base = [displayType, primaryName].filter(Boolean).join(' ');
 
-    // v15.61 — pour les zones R, le gestionnaire/service explicite complète
-    // le numéro de zone : "R 95 A · LE LUC".
+    /*
+     * v15.62 — les zones R utilisent le format opérationnel demandé :
+     * "R 108 B / CAMARGUE / 127.925".
+     * Le suffixe APP/TWR/CONTROL n'est pas répété dans ce libellé.
+     */
     if (type === 'R') {
         const restrictedInfo = getSiaRestrictedRemarkInfo(item);
-        const operationalName = String(restrictedInfo?.operationalName || '').trim();
-        if (operationalName) {
-            const normalizedExisting = base.toUpperCase();
-            if (!normalizedExisting.includes(operationalName.toUpperCase())) {
-                base += ` · ${operationalName}`;
-            }
-        }
+        return [
+            base,
+            String(restrictedInfo?.operationalName || '').trim(),
+            String(restrictedInfo?.frequency || '').trim()
+        ].filter(Boolean).join(' / ');
     }
 
     const firstFrequency = getSiaFirstAssignedFrequency(item);
@@ -42507,14 +42551,34 @@ function normalizeSiaBoundaryLabelAngle(angleDeg) {
     return angle;
 }
 
-function findSiaBoundaryLabelPlacement(geometry) {
-    if (!map || !geometry) return null;
+function getSiaBoundaryLabelPriority(item) {
+    const type = String(item?.t || '').trim().toUpperCase();
+    if (type === 'CTR') return 10;
+    if (type === 'R' || type === 'P' || type === 'D') return 20;
+    if (type === 'TRA') return 25;
+    if (type === 'TMA') return 30;
+    if (type === 'CTA') return 40;
+    if (type === 'D-OTHER') return 50;
+    return 60;
+}
+
+function getSiaBoundaryLabelMinimumSegmentPx(item) {
+    const priority = getSiaBoundaryLabelPriority(item);
+    if (priority <= 10) return 34; // CTR : priorité maximale, notamment SALON.
+    if (priority <= 20) return 38; // R / P / D.
+    if (priority <= 30) return 44;
+    return 50;
+}
+
+function findSiaBoundaryLabelPlacements(item, geometry) {
+    if (!map || !geometry) return [];
 
     const rings = getSiaCtrOuterRings(geometry);
-    if (!rings.length) return null;
+    if (!rings.length) return [];
 
-    const bounds = map.getBounds().pad(-0.02);
-    let best = null;
+    const bounds = map.getBounds().pad(-0.01);
+    const minimumLengthPx = getSiaBoundaryLabelMinimumSegmentPx(item);
+    const placements = [];
 
     rings.forEach(ring => {
         if (!Array.isArray(ring) || ring.length < 2) return;
@@ -42526,33 +42590,69 @@ function findSiaBoundaryLabelPlacement(geometry) {
 
             const aLatLng = L.latLng(Number(a[1]), Number(a[0]));
             const bLatLng = L.latLng(Number(b[1]), Number(b[0]));
-            const mid = L.latLng(
-                (aLatLng.lat + bLatLng.lat) / 2,
-                (aLatLng.lng + bLatLng.lng) / 2
-            );
-            if (!bounds.contains(mid)) continue;
-
             const pa = map.latLngToContainerPoint(aLatLng);
             const pb = map.latLngToContainerPoint(bLatLng);
             const lengthPx = pa.distanceTo(pb);
-            if (!Number.isFinite(lengthPx) || lengthPx < 58) continue;
+            if (!Number.isFinite(lengthPx) || lengthPx < minimumLengthPx) continue;
+
+            const midpoint = L.point((pa.x + pb.x) / 2, (pa.y + pb.y) / 2);
+            const dx = pb.x - pa.x;
+            const dy = pb.y - pa.y;
+            const segmentLength = Math.hypot(dx, dy);
+            if (!Number.isFinite(segmentLength) || segmentLength < 1) continue;
 
             const angle = normalizeSiaBoundaryLabelAngle(
-                Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI
+                Math.atan2(dy, dx) * 180 / Math.PI
             );
 
-            if (!best || lengthPx > best.lengthPx) {
-                best = {
-                    latlng: mid,
-                    point: map.latLngToContainerPoint(mid),
-                    angle,
-                    lengthPx
-                };
+            /*
+             * Le texte ne doit plus être posé sur le trait plein.
+             * On teste les deux normales au segment et plusieurs retraits.
+             * Seul un point réellement contenu dans le polygone est retenu.
+             */
+            const normals = [
+                { x: -dy / segmentLength, y: dx / segmentLength },
+                { x: dy / segmentLength, y: -dx / segmentLength }
+            ];
+            const insetDistances = [22, 30, 38];
+            let insidePlacement = null;
+
+            for (const insetPx of insetDistances) {
+                for (const normal of normals) {
+                    const point = L.point(
+                        midpoint.x + normal.x * insetPx,
+                        midpoint.y + normal.y * insetPx
+                    );
+                    const latlng = map.containerPointToLatLng(point);
+                    if (!bounds.contains(latlng)) continue;
+                    if (!siaGeometryContainsLatLng(geometry, latlng)) continue;
+
+                    insidePlacement = {
+                        latlng,
+                        point,
+                        angle,
+                        lengthPx,
+                        insetPx
+                    };
+                    break;
+                }
+                if (insidePlacement) break;
             }
+
+            if (insidePlacement) placements.push(insidePlacement);
         }
     });
 
-    return best;
+    /*
+     * Les segments les plus longs sont essayés d'abord. En cas de collision,
+     * addSiaAirspaceBoundaryLabel() essaie les suivants au lieu d'abandonner.
+     */
+    placements.sort((a, b) => {
+        if (a.lengthPx !== b.lengthPx) return b.lengthPx - a.lengthPx;
+        return b.insetPx - a.insetPx;
+    });
+
+    return placements;
 }
 
 function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
@@ -42566,17 +42666,21 @@ function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
     const type = String(geometry.type || '');
     if (type !== 'Polygon' && type !== 'MultiPolygon') return;
 
-    const placement = findSiaBoundaryLabelPlacement(geometry);
-    if (!placement) return;
-
     const state = labelState || { points: [], count: 0 };
     if (state.count >= 70) return;
 
-    // Évite une accumulation illisible de libellés au même endroit.
-    if (state.points.some(point => point.distanceTo(placement.point) < 105)) return;
-
     const text = getSiaAirspaceBoundaryLabelText(item);
     if (!text) return;
+
+    const placements = findSiaBoundaryLabelPlacements(item, geometry);
+    if (!placements.length) return;
+
+    const priority = getSiaBoundaryLabelPriority(item);
+    const collisionDistance = priority <= 20 ? 92 : 105;
+    const placement = placements.find(candidate =>
+        !state.points.some(point => point.distanceTo(candidate.point) < collisionDistance)
+    );
+    if (!placement) return;
 
     const marker = L.marker(placement.latlng, {
         pane: 'siaAirspacePane',
@@ -43202,8 +43306,26 @@ async function refreshSiaLayers(reason = 'manual') {
 
             const airspaceStyle = getSiaAirspaceStyle(item);
             addSiaCtrInnerBand(feature.geometry, airspaceStyle.color);
-            addSiaAirspaceBoundaryLabel(item, feature.geometry, siaBoundaryLabelState);
         });
+
+        /*
+         * v15.62 — les libellés sont posés après les bandes, dans un ordre
+         * opérationnel : CTR puis R/P/D, TMA, CTA et enfin les autres zones.
+         * Une zone moins prioritaire ne peut donc plus masquer une CTR comme SALON.
+         */
+        visibleAirspaceFeatures
+            .filter(feature => Number(feature.properties?.siaItem?.co || 0) !== 1)
+            .sort((a, b) =>
+                getSiaBoundaryLabelPriority(a.properties.siaItem)
+                - getSiaBoundaryLabelPriority(b.properties.siaItem)
+            )
+            .forEach(feature => {
+                addSiaAirspaceBoundaryLabel(
+                    feature.properties.siaItem,
+                    feature.geometry,
+                    siaBoundaryLabelState
+                );
+            });
 
         rendered += visibleAirspaceFeatures.length;
     }
