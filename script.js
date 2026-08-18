@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.63';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.64';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -41892,6 +41892,9 @@ function extractSiaOperationalServiceFromChunk(value) {
         .trim()
         .replace(/^[\s\-–—:;,.]+/, '');
 
+    // v15.64 — une condition météo/visibilité n'est pas un indicatif de service.
+    if (/^(?:VISI|VISIBILITY|METEO|WEATHER)\b/i.test(text)) return null;
+
     text = text
         .replace(/^(?:ACTUAL\s+)?ACTIVITY\s+KNOWN\s+ON\s*:?\s*/i, '')
         .replace(/^RADIO\s+CONTACT(?:\s+MANDATORY)?\s+WITH\s*:?\s*/i, '');
@@ -41952,6 +41955,15 @@ function cleanSiaRestrictedCrossReferenceName(value) {
     if (/^(?:ACTIVITY|ACTIVATION)\b/i.test(name)) return '';
     if (/\bLF\s*-\s*R\b/i.test(name)) return '';
     if (/^\d+(?:[./]\d+)*$/.test(name)) return '';
+
+    /*
+     * v15.64 — garde-fou contre les faux noms issus de conditions opérationnelles.
+     * Exemple R8 : « VISI > or = 5 km : ATIS GARONS » ne doit jamais produire
+     * « = 5 KM » comme nom de zone.
+     */
+    if (/(?:^|\b)(?:VISI|VISIBILITY|METEO|WEATHER)\b/i.test(name)) return '';
+    if (/(?:>=|<=|>|<|=)\s*\d/i.test(name)) return '';
+    if (/^=?\s*\d+(?:[.,]\d+)?\s*(?:KM|NM|FT|M|FL\d*)\b/i.test(name)) return '';
     return name;
 }
 
@@ -42006,12 +42018,39 @@ function getSiaRestrictedAdministratorFallback(administratorChunk) {
     if (atsService) return atsService;
 
     /*
+     * v15.64 — lorsqu'un gestionnaire publie lui-même un lieu géographique
+     * explicite, celui-ci est plus fiable que le nom rencontré seulement dans
+     * une référence croisée. Ex. « 2ème REI, camp des Garrigues » -> GARRIGUES.
+     */
+    const placePatterns = [
+        /\bCAMP\s+(?:DES|DU|DE|D['’])\s*([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,45}?)(?=[.;,]|$)/i,
+        /\bBASE(?:\s+A[ÉE]RIENNE)?\s+(?:DES|DU|DE|D['’])\s*([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,45}?)(?=[.;,]|$)/i,
+        /\bCENTRE\s+(?:DES|DU|DE|D['’])\s*([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,45}?)(?=[.;,]|$)/i
+    ];
+
+    for (const pattern of placePatterns) {
+        const match = chunk.match(pattern);
+        if (!match) continue;
+        const operationalName = String(match[1] || '')
+            .trim()
+            .replace(/\s+/g, ' ')
+            .toUpperCase();
+        if (!operationalName) continue;
+        return {
+            operationalName,
+            serviceType: '',
+            rawService: String(match[0] || '').trim(),
+            administratorGeographic: true
+        };
+    }
+
+    /*
      * Gestionnaires militaires : le lieu est conservé, l'acronyme organique
      * n'est pas utilisé comme nom de zone. Ex. "CCER Istres or CMC Istres"
      * -> ISTRES.
      */
     const organizationMatch = chunk.match(
-        /\b(?:CCER|CMC|CDC|CLA|ESCA|CDPGE)\s+([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,30}?)(?=\s+(?:OR|AND)\b|[.;,]|$)/i
+        /\b(?:CCER|CMC|CMCI|CDC|CLA|ESCA|CDPGE)\s+([A-ZÀ-ÖØ-öø-ÿ][A-ZÀ-ÖØ-öø-ÿ'’.\- ]{1,30}?)(?=\s+(?:OR|AND)\b|[.;,]|$)/i
     );
     const airForceBaseMatch = chunk.match(
         /^(.{2,30}?)\s+AIR\s+FORCE\s+BASE\b/i
@@ -42028,7 +42067,8 @@ function getSiaRestrictedAdministratorFallback(administratorChunk) {
     return {
         operationalName,
         serviceType: '',
-        rawService: String(fallbackMatch[0] || '').trim()
+        rawService: String(fallbackMatch[0] || '').trim(),
+        administratorGeographic: true
     };
 }
 
@@ -42122,7 +42162,11 @@ function getSiaRestrictedRemarkInfo(item) {
      */
     const operationalName = sourceKind === 'explicit'
         ? serviceOperationalName
-        : (crossReferenceName || serviceOperationalName);
+        : (
+            sourceKind === 'administrator' && service?.administratorGeographic
+                ? serviceOperationalName
+                : (crossReferenceName || serviceOperationalName)
+        );
 
     /*
      * Fréquence de repli :
@@ -42382,6 +42426,16 @@ function getSiaAirspaceBoundaryLabelText(item) {
     ].filter(Boolean).join(' ');
 
     return `${base} · ${frequencyText}${firstFrequency.supplementary ? ' (s)' : ''}`;
+}
+
+function getSiaAirspaceBoundaryVerticalText(item) {
+    const hasLower = hasSiaVerticalValue(item?.lo);
+    const hasUpper = hasSiaVerticalValue(item?.up);
+    if (!hasLower && !hasUpper) return '';
+
+    const lower = hasLower ? formatSiaVertical(item.lo) : '—';
+    const upper = hasUpper ? formatSiaVertical(item.up) : '—';
+    return `${lower} – ${upper}`;
 }
 
 function getSiaAirspaceDisplayType(item) {
@@ -42805,6 +42859,7 @@ function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
 
     const text = getSiaAirspaceBoundaryLabelText(item);
     if (!text) return;
+    const verticalText = getSiaAirspaceBoundaryVerticalText(item);
 
     const placements = findSiaBoundaryLabelPlacements(item, geometry);
     if (!placements.length) return;
@@ -42822,7 +42877,7 @@ function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
         keyboard: false,
         icon: L.divIcon({
             className: 'sia-boundary-label-icon',
-            html: `<div class="sia-boundary-label-text" style="transform:translate(-50%,-50%) rotate(${placement.angle.toFixed(1)}deg)">${escapeHtml(text)}</div>`,
+            html: `<div class="sia-boundary-label-text" style="transform:translate(-50%,-50%) rotate(${placement.angle.toFixed(1)}deg)"><div class="sia-boundary-label-main">${escapeHtml(text)}</div>${verticalText ? `<div class="sia-boundary-label-altitude">${escapeHtml(verticalText)}</div>` : ''}</div>`,
             iconSize: [1, 1],
             iconAnchor: [0, 0]
         })
@@ -42944,7 +42999,7 @@ function resetSelectedSiaCtrTouchLayer(clearKey = true) {
     if (clearKey) siaSelectedCtrKey = null;
 }
 
-function selectSiaCtrTouchLayer(layer, item, latlng, geometry = null) {
+function selectSiaCtrTouchLayer(layer, item, latlng, geometry = null, options = {}) {
     if (!map || !item) return;
 
     const selectionKey = getSiaCtrSelectionKey(item);
@@ -42981,13 +43036,52 @@ function selectSiaCtrTouchLayer(layer, item, latlng, geometry = null) {
     const popupLatLng = latlng;
     if (!popupLatLng) return;
 
+    const choiceOrigin = options?.choiceOrigin
+        ? L.latLng(Number(options.choiceOrigin.lat), Number(options.choiceOrigin.lng))
+        : null;
+
+    let popupContent = buildSiaAirspacePopup(item);
+    if (choiceOrigin && Number.isFinite(choiceOrigin.lat) && Number.isFinite(choiceOrigin.lng)) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'sia-airspace-detail-with-return';
+
+        const backButton = document.createElement('button');
+        backButton.type = 'button';
+        backButton.className = 'sia-airspace-choice-return';
+        backButton.textContent = '← RETOUR';
+        backButton.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            resetSelectedSiaCtrTouchLayer(true);
+            try { map.closePopup(popup); } catch (_) {}
+
+            setTimeout(() => {
+                const freshCandidates = getSiaAirspaceTouchCandidates(choiceOrigin);
+                const returnCandidates = freshCandidates.length
+                    ? freshCandidates
+                    : (Array.isArray(options?.choiceCandidates) ? options.choiceCandidates : []);
+                if (returnCandidates.length) {
+                    openSiaAirspaceChoicePopup(choiceOrigin, returnCandidates);
+                }
+            }, 0);
+        });
+
+        const details = document.createElement('div');
+        details.innerHTML = popupContent;
+        wrapper.appendChild(backButton);
+        wrapper.appendChild(details);
+        popupContent = wrapper;
+    }
+
     const popup = L.popup({
         maxWidth: 400,
         autoPan: true,
-        keepInView: true
+        keepInView: true,
+        className: choiceOrigin ? 'sia-airspace-dialog-popup sia-airspace-detail-popup' : ''
     })
         .setLatLng(popupLatLng)
-        .setContent(buildSiaAirspacePopup(item))
+        .setContent(popupContent)
         .openOn(map);
 
     const onPopupClose = event => {
@@ -43216,7 +43310,13 @@ function openSiaAirspaceChoicePopup(latlng, candidates) {
             event.preventDefault();
             event.stopPropagation();
             try { map.closePopup(); } catch (_) {}
-            selectSiaCtrTouchLayer(entry.layer, entry.item, latlng, entry.geometry);
+            selectSiaCtrTouchLayer(
+                entry.layer,
+                entry.item,
+                latlng,
+                entry.geometry,
+                { choiceOrigin: latlng, choiceCandidates: candidates }
+            );
         });
 
         list.appendChild(button);
@@ -43228,7 +43328,8 @@ function openSiaAirspaceChoicePopup(latlng, candidates) {
         maxWidth: 390,
         closeButton: true,
         autoPan: true,
-        keepInView: true
+        keepInView: true,
+        className: 'sia-airspace-dialog-popup sia-airspace-choice-popup'
     })
         .setLatLng(latlng)
         .setContent(container)
