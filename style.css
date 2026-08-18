@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.62 */
+/* NPF_STYLE_BUILD_VERSION: v15.63 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15565,3 +15565,34 @@ body.gaar-point-search-open .gaar-editing-banner {
         max-height: calc(100vh - 16px);
     }
 }
+
+/* ==========================================================================
+   v15.63 — FILTRE VERTICAL SIA FL115
+   ========================================================================== */
+
+.sia-filter-altitude-option {
+    flex: 1 0 100%;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 7px 11px;
+    border: 1px solid #b8c9dc;
+    border-radius: 10px;
+    background: #eef5fc;
+    color: #0b2f6b;
+    font-size: 14px;
+    font-weight: 850;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.sia-filter-altitude-option input {
+    width: 21px;
+    height: 21px;
+    margin: 0;
+    flex: 0 0 auto;
+    accent-color: #0b63d1;
+}
+
