@@ -1,3 +1,99 @@
+VERSION TEST v15.61 — PROFIL DANS FILTRES + ZONES R ENRICHIES + PROFIL VIEWPORT + BANDES ÉLARGIES
+Date : 18/08/2026
+Base : TEST v15.60
+
+OBJECTIFS
+- Déplacer le bouton PROFIL de la colonne carte vers le menu « CALQUES AÉRONAUTIQUES SIA » ouvert par appui long sur l'icône France.
+- Corriger le panneau « PROFIL ESPACES » qui pouvait apparaître sous la partie visible de l'écran sur iPad/Safari.
+- Enrichir de façon générale les zones R avec le gestionnaire/service et la fréquence explicitement publiés dans leurs remarques SIA.
+- Ne jamais afficher le terme « RAI » dans les libellés : la fréquence publiée reste affichée seule avec le gestionnaire opérationnel.
+- Conserver le nom opérationnel et la première fréquence structurée des CTR, y compris les CTR militaires comme SALON.
+- Augmenter légèrement la largeur de la bande intérieure semi-transparente des zones pour améliorer leur lisibilité.
+
+1. BOUTON PROFIL DANS LE MENU FILTRES
+- Le bouton PROFIL est supprimé de la colonne des actions à gauche de la carte.
+- Il est ajouté aux actions générales de « CALQUES AÉRONAUTIQUES SIA », à côté de « Tout afficher » et « Tout masquer ».
+- Libellé : « PROFIL ESPACES ».
+- Lorsque le profil est ouvert, le bouton prend un état actif vert.
+- Un appui sur « PROFIL ESPACES » ouvre/ferme le profil puis ferme le menu des filtres afin de laisser la coupe visible.
+
+2. PROFIL TOUJOURS DANS LE VIEWPORT VISIBLE
+- Le panneau passe en `position: fixed`.
+- Sa position verticale est recalée sur `visualViewport` lorsqu'il est disponible.
+- La hauteur reste voisine de 35 % de la hauteur visible, avec garde-fous mini/maxi.
+- Recalcul lors de l'ouverture, d'un resize, d'une rotation et d'un changement de visualViewport.
+- La safe-area latérale/basse iPad est conservée.
+- Aucun changement du correctif général de hauteur de carte NPF.
+
+3. LOGIQUE GÉNÉRALE POUR LES ZONES R
+- Les 629 zones R du payload embarqué ne possèdent pas de relations de fréquence `sv`.
+- v15.61 analyse donc les remarques SIA des zones R uniquement en repli.
+- Priorité pour le nom opérationnel :
+  1) gestionnaire explicite « Administrator / Adminitrator / Managing authority » ;
+  2) service indiqué par les mentions d'activité/activation « known / provided / announced » ;
+  3) service ATS donné directement dans les premières lignes ;
+  4) contact ou autorisation explicitement rattaché à un service nommé.
+- Les listes placées sous « Activity known on : » sont également parcourues.
+- Services reconnus : APP / TWR / INFO / SIV / FIS / ACC / FIC / AFIS / ATIS / A/A.
+- Replis militaires/organismes explicites pris en compte pour CMC / ESCA / CDPGE et « Air Force base ».
+- Aucun nom n'est déduit par proximité géographique.
+
+4. FRÉQUENCE DES ZONES R
+- Une fréquence de remarque n'est retenue que si elle est écrite sous forme décimale dans la plage aéronautique 118–399 MHz.
+- Cette règle évite de confondre numéros de téléphone ou altitudes avec une fréquence.
+- Priorité aux lignes contenant le gestionnaire, puis « activity known », puis un service ATS explicite.
+- La fréquence est normalisée à trois décimales.
+- Exemple R95 :
+  « R 95 A · LE LUC · 122.200 ».
+- Le mot « RAI » est volontairement masqué.
+- Si aucune fréquence fiable n'est publiée, aucune fréquence n'est inventée.
+- La fréquence inférée apparaît également dans la fiche de la zone R.
+
+5. CTR CIVILES ET MILITAIRES
+- Les CTR continuent d'utiliser en priorité leur nom structuré SIA `n` et leurs relations de fréquence `sv`.
+- Exemple vérifié dans le payload :
+  « CTR SALON · TWR 130.300 ».
+- Le code technique/OACI n'est pas utilisé à la place du nom opérationnel dans le libellé de bordure lorsque ce nom est disponible.
+- La même fonction de libellé est utilisée dans le profil vertical.
+
+6. TITRES DE SÉLECTION DES ZONES R
+- Dans la liste de zones superposées et dans le titre de fiche, une zone R présente désormais :
+  type / numéro de zone / nom opérationnel lorsqu'il est disponible.
+- Exemple :
+  « R / 95 A / LE LUC ».
+
+7. BANDE INTÉRIEURE DES ZONES
+- Largeur de la bande intérieure semi-transparente portée de 10 px à 12 px.
+- Décalage vers l'intérieur porté de 6 px à 7 px.
+- Opacité maintenue à 22 %.
+- Le trait principal et le remplissage intérieur transparent restent inchangés.
+- Le comportement sur fond OACI reste inchangé.
+
+8. DONNÉES SIA
+- Le payload embarqué n'est pas modifié.
+- `npfDatasetRevision` reste 15.57.
+- Aucun nouveau téléchargement de données SIA n'est imposé par v15.61.
+
+9. NAS
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Cohérence des versions index/script/style/manifest/SW vérifiée.
+- Payload SIA gzip/base64 : décompression et JSON vérifiés.
+- `npfDatasetRevision = 15.57`.
+- R95 : extraction attendue LE LUC + 122.200 sans affichage « RAI ».
+- CTR SALON : nom SALON + première fréquence structurée TWR 130.300 conservés.
+- Bouton PROFIL absent de la colonne carte et présent dans le menu filtres.
+- Panneau profil lié à visualViewport.
+- Bande intérieure = 12 px / opacité 22 %.
+- Historique v15.60 et antérieur conservé intégralement.
+- Validation réelle Safari/iPadOS à effectuer sur l'appareil.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.60 — APPUI LONG IMMÉDIAT + ZONES TRANSPARENTES + LIBELLÉS BORDURE + PROFIL VERTICAL
 Date : 18/08/2026
 Base : TEST v15.59
