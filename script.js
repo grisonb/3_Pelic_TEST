@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.64';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.65';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -40335,6 +40335,36 @@ function setSiaFilterEnabled(key, enabled) {
     saveSiaFilterPrefs();
 }
 
+/*
+ * v15.65 — les SIV sont publiés dans l'AIXM embarqué comme RAS avec le
+ * sous-type local "FLIGHT INFORMATION SECTOR". NPF leur donne un filtre
+ * virtuel propre sans modifier le payload SIA.
+ */
+function isSiaFlightInformationSector(item) {
+    return String(item?.t || '').trim().toUpperCase() === 'RAS'
+        && String(item?.l || '').trim().toUpperCase() === 'FLIGHT INFORMATION SECTOR';
+}
+
+function getSiaEffectiveFilterKey(item) {
+    if (isSiaFlightInformationSector(item)) return 'ase:SIV';
+    return String(item?.k || '').trim();
+}
+
+function migrateSiaSivFilterPreference() {
+    const prefs = loadSiaFilterPrefs();
+    if (prefs['ase:SIV'] !== undefined) return;
+
+    /*
+     * Avant v15.65, les SIV dépendaient du bouton RAS. On reprend son état
+     * lors de la première ouverture afin de ne pas faire disparaître un calque
+     * qui était déjà affiché.
+     */
+    if (prefs['ase:RAS'] !== undefined) {
+        prefs['ase:SIV'] = prefs['ase:RAS'] === true;
+        saveSiaFilterPrefs();
+    }
+}
+
 function isSiaHideAboveFl115Enabled() {
     return loadSiaFilterPrefs()[SIA_HIDE_ABOVE_FL115_PREF_KEY] === true;
 }
@@ -40453,22 +40483,24 @@ function normalizeSiaFilterCounts(dataset) {
     const add = (key) => counts.set(key, (counts.get(key) || 0) + 1);
     (dataset?.terrain || []).forEach(item => add(item.k));
     (dataset?.points || []).forEach(item => add(item.k));
-    (dataset?.airspaces || []).forEach(item => add(item.k));
+    (dataset?.airspaces || []).forEach(item => add(getSiaEffectiveFilterKey(item)));
     return counts;
 }
 
 function getSiaFilterSections(dataset) {
+    migrateSiaSivFilterPreference();
     const counts = normalizeSiaFilterCounts(dataset);
     const count = (key) => counts.get(key) || 0;
 
     const orderedAseTypes = [
-        'CTR', 'TMA', 'CTA', 'FIR', 'UIR', 'UIR-P', 'UTA', 'OCA',
+        'CTR', 'TMA', 'CTA', 'SIV', 'FIR', 'UIR', 'UIR-P', 'UTA', 'OCA',
         'SECTOR', 'SECTOR-C', 'RAS', 'TRA', 'P', 'R', 'D'
     ];
     const aseLabels = {
         CTR: 'CTR',
         TMA: 'TMA',
         CTA: 'CTA',
+        SIV: 'SIV — Secteurs d’information de vol',
         FIR: 'FIR',
         UIR: 'UIR',
         'UIR-P': 'UIR-P',
@@ -40958,7 +40990,7 @@ async function refreshSiaLayers(reason = 'manual') {
 
     const visibleAirspaceFeatures = [];
     for (const item of dataset.airspaces || []) {
-        if (!isSiaFilterEnabled(item.k)) continue;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
         if (shouldHideSiaAirspaceAboveFl115(item)) continue;
 
         // v15.57 — les parents techniques TMA issus d'un Adg/UNION ne sont ni
@@ -41012,7 +41044,7 @@ async function refreshSiaLayers(reason = 'manual') {
     const pointBounds = bounds.pad(0.04);
 
     for (const item of dataset.terrain || []) {
-        if (!isSiaFilterEnabled(item.k)) continue;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
         const latlng = L.latLng(Number(item.x), Number(item.y));
         if (!pointBounds.contains(latlng)) continue;
 
@@ -41035,7 +41067,7 @@ async function refreshSiaLayers(reason = 'manual') {
     }
 
     for (const item of dataset.points || []) {
-        if (!isSiaFilterEnabled(item.k)) continue;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
         const latlng = L.latLng(Number(item.x), Number(item.y));
         if (!pointBounds.contains(latlng)) continue;
 
@@ -41284,7 +41316,7 @@ function buildSiaProfileIntervals(item, geometry, samples, stepNm) {
 function getSiaProfileCandidateItems(dataset) {
     const operationalFamilies = buildSiaTmaOperationalFamilySet(dataset);
     return (dataset?.airspaces || []).filter(item => {
-        if (!isSiaFilterEnabled(item.k)) return false;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) return false;
         if (shouldHideSiaAirspaceAboveFl115(item)) return false;
         if (isSiaTechnicalTmaUnionParent(item)) return false;
         if (isSiaGenericTmaWithoutAltitude(item, operationalFamilies)) return false;
@@ -41309,13 +41341,19 @@ function buildSiaProfileSvg(volumes, position) {
         .map(v => Number(v.upperFt))
         .filter(Number.isFinite);
 
-    let maxAlt = Math.max(
-        10000,
-        Number.isFinite(ownAlt) ? ownAlt + 5000 : 0,
-        upperValues.length ? Math.max(...upperValues) : 0
-    );
-    maxAlt = Math.min(40000, Math.ceil(maxAlt / 5000) * 5000);
-    if (maxAlt < 10000) maxAlt = 10000;
+    let maxAlt;
+    if (isSiaHideAboveFl115Enabled()) {
+        // v15.65 — le filtre FL115 limite aussi l'échelle graphique du profil.
+        maxAlt = SIA_HIDE_ABOVE_FL115_FEET;
+    } else {
+        maxAlt = Math.max(
+            10000,
+            Number.isFinite(ownAlt) ? ownAlt + 5000 : 0,
+            upperValues.length ? Math.max(...upperValues) : 0
+        );
+        maxAlt = Math.min(40000, Math.ceil(maxAlt / 5000) * 5000);
+        if (maxAlt < 10000) maxAlt = 10000;
+    }
 
     const xForDistance = nm =>
         margin.left + (Math.max(0, Math.min(siaProfileDistanceNm, nm)) / siaProfileDistanceNm) * plotW;
@@ -41328,6 +41366,12 @@ function buildSiaProfileSvg(volumes, position) {
         const y = yForAltitude(alt);
         grid.push(`<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${(width-margin.right).toFixed(1)}" y2="${y.toFixed(1)}" class="sia-profile-grid-line"/>`);
         grid.push(`<text x="${margin.left-8}" y="${(y+4).toFixed(1)}" text-anchor="end" class="sia-profile-axis-label">${alt === 0 ? 'SFC' : `${Math.round(alt/1000)}k`}</text>`);
+    }
+
+    if (isSiaHideAboveFl115Enabled() && maxAlt === SIA_HIDE_ABOVE_FL115_FEET) {
+        const y = yForAltitude(SIA_HIDE_ABOVE_FL115_FEET);
+        grid.push(`<line x1="${margin.left}" y1="${y.toFixed(1)}" x2="${(width-margin.right).toFixed(1)}" y2="${y.toFixed(1)}" class="sia-profile-grid-line sia-profile-fl115-line"/>`);
+        grid.push(`<text x="${margin.left-8}" y="${(y+12).toFixed(1)}" text-anchor="end" class="sia-profile-axis-label sia-profile-fl115-label">FL115</text>`);
     }
 
     const distanceStep = siaProfileDistanceNm <= 25 ? 5 : siaProfileDistanceNm <= 50 ? 10 : 20;
@@ -41499,16 +41543,16 @@ function syncSiaProfilePanelToViewport() {
             : fallbackViewportHeight
     );
 
-    const gap = 8;
-    const maxAvailableHeight = Math.max(160, viewportHeight - (gap * 2));
+    const topGap = 8;
+    const maxAvailableHeight = Math.max(160, viewportHeight - topGap);
     const desiredHeight = Math.min(
         360,
         maxAvailableHeight,
         Math.max(200, viewportHeight * 0.35)
     );
     const top = Math.max(
-        viewportTop + gap,
-        viewportTop + viewportHeight - desiredHeight - gap
+        viewportTop + topGap,
+        viewportTop + viewportHeight - desiredHeight
     );
 
     panel.style.top = `${Math.round(top)}px`;
@@ -41528,6 +41572,7 @@ function setSiaProfileOpen(open) {
 
     const panel = document.getElementById('sia-profile-panel');
     const button = document.getElementById('sia-profile-button');
+    const swipeHandle = document.getElementById('sia-profile-swipe-handle');
 
     if (panel) {
         panel.hidden = !siaProfileOpen;
@@ -41536,6 +41581,10 @@ function setSiaProfileOpen(open) {
     if (button) {
         button.classList.toggle('active', siaProfileOpen);
         button.setAttribute('aria-pressed', siaProfileOpen ? 'true' : 'false');
+    }
+    if (swipeHandle) {
+        swipeHandle.hidden = siaProfileOpen;
+        swipeHandle.setAttribute('aria-hidden', siaProfileOpen ? 'true' : 'false');
     }
 
     if (siaProfileOpen) {
@@ -41551,6 +41600,7 @@ function initializeSiaAirspaceProfileUi() {
     const button = document.getElementById('sia-profile-button');
     const panel = document.getElementById('sia-profile-panel');
     const closeButton = document.getElementById('sia-profile-close');
+    const swipeHandle = document.getElementById('sia-profile-swipe-handle');
 
     /*
      * v15.61 — le panneau existe dès index.html, tandis que le bouton PROFIL
@@ -41581,6 +41631,86 @@ function initializeSiaAirspaceProfileUi() {
                 scheduleSiaProfileRefresh('range');
             });
         });
+    }
+
+    /*
+     * v15.65 — geste iPad depuis une poignée située à l'intérieur du viewport.
+     * Le vrai bord système iPadOS reste réservé au système ; cette poignée est
+     * volontairement placée juste au-dessus de la safe-area.
+     */
+    if (swipeHandle && swipeHandle.dataset.profileSwipeBound !== '1') {
+        swipeHandle.dataset.profileSwipeBound = '1';
+        swipeHandle.hidden = siaProfileOpen;
+
+        let startY = null;
+        let lastY = null;
+
+        const resetSwipe = () => {
+            startY = null;
+            lastY = null;
+        };
+
+        swipeHandle.addEventListener('touchstart', event => {
+            if (event.touches?.length !== 1) return;
+            startY = Number(event.touches[0].clientY);
+            lastY = startY;
+            event.preventDefault();
+        }, { passive: false });
+
+        swipeHandle.addEventListener('touchmove', event => {
+            if (startY === null || event.touches?.length !== 1) return;
+            lastY = Number(event.touches[0].clientY);
+            event.preventDefault();
+        }, { passive: false });
+
+        swipeHandle.addEventListener('touchend', event => {
+            const endY = lastY;
+            if (startY !== null && Number.isFinite(endY) && endY - startY <= -35) {
+                setSiaProfileOpen(true);
+            }
+            resetSwipe();
+            event.preventDefault();
+        }, { passive: false });
+
+        swipeHandle.addEventListener('touchcancel', resetSwipe, { passive: true });
+        swipeHandle.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setSiaProfileOpen(true);
+        });
+    }
+
+    if (panel && panel.dataset.profileSwipeCloseBound !== '1') {
+        panel.dataset.profileSwipeCloseBound = '1';
+        const header = panel.querySelector('.sia-profile-header');
+        if (header) {
+            let headerStartY = null;
+            let headerLastY = null;
+
+            header.addEventListener('touchstart', event => {
+                if (event.target?.closest?.('button')) return;
+                if (event.touches?.length !== 1) return;
+                headerStartY = Number(event.touches[0].clientY);
+                headerLastY = headerStartY;
+            }, { passive: true });
+
+            header.addEventListener('touchmove', event => {
+                if (headerStartY === null || event.touches?.length !== 1) return;
+                headerLastY = Number(event.touches[0].clientY);
+            }, { passive: true });
+
+            header.addEventListener('touchend', () => {
+                if (
+                    headerStartY !== null
+                    && Number.isFinite(headerLastY)
+                    && headerLastY - headerStartY >= 45
+                ) {
+                    setSiaProfileOpen(false);
+                }
+                headerStartY = null;
+                headerLastY = null;
+            }, { passive: true });
+        }
     }
 
     if (button && button.dataset.profileBound !== '1') {
@@ -41634,6 +41764,7 @@ function initializeSiaSystem() {
 
     ensureSiaMapPanes();
     loadSiaFilterPrefs();
+    migrateSiaSivFilterPreference();
     bindSiaManagementButtons();
     initializeSiaAirspaceProfileUi();
     refreshSiaManagementStatus();
@@ -41953,7 +42084,7 @@ function cleanSiaRestrictedCrossReferenceName(value) {
     // Ces mots décrivent l'état ou la relation, pas un nom géographique.
     if (!name || /^(?:IS|ARE|ACTIVE|ACTIVATED|WHEN|IF|PART|AREA|AREAS|ZONE|ZONES)\b/i.test(name)) return '';
     if (/^(?:ACTIVITY|ACTIVATION)\b/i.test(name)) return '';
-    if (/\bLF\s*-\s*R\b/i.test(name)) return '';
+    if (/\bLF\s*-\s*[PRD]\b/i.test(name)) return '';
     if (/^\d+(?:[./]\d+)*$/.test(name)) return '';
 
     /*
@@ -42008,6 +42139,65 @@ function getSiaRestrictedCrossReferenceName(item) {
     const code = normalizeSiaRestrictedReferenceCode(item?.c);
     if (!code) return '';
     return buildSiaRestrictedCrossReferenceNameIndex().get(code) || '';
+}
+
+
+/*
+ * v15.65 — même principe pour les zones P : leur propre fiche contient
+ * souvent seulement le numéro alors que d'autres espaces publient explicitement
+ * "LF-P xx NOM" (P62 TOULON, P48 FORT DE BRÉGANÇON, P63 ILE DU LEVANT...).
+ */
+let siaProhibitedCrossReferenceNameIndex = null;
+
+function normalizeSiaProhibitedReferenceCode(value) {
+    return String(value || '')
+        .trim()
+        .toUpperCase()
+        .replace(/^LF\s*-?\s*P\s*/i, '')
+        .replace(/\s+/g, '');
+}
+
+function buildSiaProhibitedCrossReferenceNameIndex(dataset = siaDataset) {
+    if (siaProhibitedCrossReferenceNameIndex) return siaProhibitedCrossReferenceNameIndex;
+
+    const counts = new Map();
+    const referenceRegex = /\bLF\s*-\s*P\s*([0-9A-Z./]+)\s+(.+?)(?=\s+(?:OR|AND)\s+LF\s*-\s*[PRD]\s*[0-9]|,\s*LF\s*-\s*[PRD]\s*[0-9]|\s+(?:WHEN|INTERFERING|EXCEPT|EXCLUDING|WHICH|ACTIVITY|ACTIVATION|IS\s+ACTIVE|ARE\s+ACTIVE)\b|[#;\n.]|$)/gi;
+
+    (dataset?.airspaces || []).forEach(sourceItem => {
+        const remark = String(sourceItem?.r || '');
+        if (!remark) return;
+
+        referenceRegex.lastIndex = 0;
+        for (const match of remark.matchAll(referenceRegex)) {
+            const code = normalizeSiaProhibitedReferenceCode(match?.[1]);
+            const name = cleanSiaRestrictedCrossReferenceName(match?.[2]);
+            if (!code || !name) continue;
+
+            if (!counts.has(code)) counts.set(code, new Map());
+            const nameCounts = counts.get(code);
+            nameCounts.set(name, (nameCounts.get(name) || 0) + 1);
+        }
+    });
+
+    const index = new Map();
+    counts.forEach((nameCounts, code) => {
+        const ordered = [...nameCounts.entries()].sort((a, b) => {
+            if (a[1] !== b[1]) return b[1] - a[1];
+            if (a[0].length !== b[0].length) return b[0].length - a[0].length;
+            return a[0].localeCompare(b[0], 'fr');
+        });
+        if (ordered[0]?.[0]) index.set(code, ordered[0][0]);
+    });
+
+    siaProhibitedCrossReferenceNameIndex = index;
+    return index;
+}
+
+function getSiaProhibitedCrossReferenceName(item) {
+    if (String(item?.t || '').trim().toUpperCase() !== 'P') return '';
+    const code = normalizeSiaProhibitedReferenceCode(item?.c);
+    if (!code) return '';
+    return buildSiaProhibitedCrossReferenceNameIndex().get(code) || '';
 }
 
 function getSiaRestrictedAdministratorFallback(administratorChunk) {
@@ -42220,7 +42410,8 @@ function getSiaRestrictedRemarkInfo(item) {
 }
 
 function formatSiaCtrFrequencyRows(item) {
-    const services = Array.isArray(item?.sv) ? item.sv : [];
+    const effectiveServices = getSiaEffectiveServices(item);
+    const services = effectiveServices.services;
 
     if (!services.length) {
         const restrictedInfo = getSiaRestrictedRemarkInfo(item);
@@ -42347,8 +42538,83 @@ function formatSiaCtrFrequencyRows(item) {
         .join('');
 }
 
+let siaTmaFamilyServicesIndex = null;
+
+function getSiaTmaServiceSignature(services) {
+    if (!Array.isArray(services) || !services.length) return '';
+    try {
+        return JSON.stringify(services);
+    } catch (_) {
+        return '';
+    }
+}
+
+function buildSiaTmaFamilyServicesIndex(dataset = siaDataset) {
+    if (siaTmaFamilyServicesIndex) return siaTmaFamilyServicesIndex;
+
+    const families = new Map();
+
+    (dataset?.airspaces || []).forEach(item => {
+        if (String(item?.t || '').trim().toUpperCase() !== 'TMA') return;
+
+        const services = Array.isArray(item?.sv) ? item.sv : [];
+        if (!services.length) return;
+
+        const family = getSiaTmaFamilyBaseFromSectorName(item?.n);
+        if (!family) return;
+
+        const signature = getSiaTmaServiceSignature(services);
+        if (!signature) return;
+
+        if (!families.has(family)) families.set(family, new Map());
+        const signatures = families.get(family);
+        if (!signatures.has(signature)) signatures.set(signature, services);
+    });
+
+    const index = new Map();
+    families.forEach((signatures, family) => {
+        /*
+         * Héritage uniquement si tous les secteurs renseignés de la famille
+         * convergent vers un unique bloc de services. Aucune fréquence n'est
+         * déduite en cas d'ambiguïté.
+         */
+        if (signatures.size === 1) {
+            index.set(family, [...signatures.values()][0]);
+        }
+    });
+
+    siaTmaFamilyServicesIndex = index;
+    return index;
+}
+
+function getSiaEffectiveServices(item) {
+    const direct = Array.isArray(item?.sv) ? item.sv : [];
+    if (direct.length) {
+        return { services: direct, inheritedFromFamily: false };
+    }
+
+    if (String(item?.t || '').trim().toUpperCase() !== 'TMA') {
+        return { services: [], inheritedFromFamily: false };
+    }
+
+    const family = getSiaTmaFamilyBaseFromSectorName(item?.n);
+    if (!family) return { services: [], inheritedFromFamily: false };
+
+    const inherited = buildSiaTmaFamilyServicesIndex().get(family);
+    if (!Array.isArray(inherited) || !inherited.length) {
+        return { services: [], inheritedFromFamily: false };
+    }
+
+    return {
+        services: inherited,
+        inheritedFromFamily: true,
+        inheritedFamily: family
+    };
+}
+
 function getSiaFirstAssignedFrequency(item) {
-    const services = Array.isArray(item?.sv) ? item.sv : [];
+    const effectiveServices = getSiaEffectiveServices(item);
+    const services = effectiveServices.services;
     const candidates = [];
 
     services.forEach((service, serviceIndex) => {
@@ -42364,7 +42630,9 @@ function getSiaFirstAssignedFrequency(item) {
                 value,
                 supplementary: Number(freq?.[4] || 0) === 1,
                 serviceIndex,
-                freqIndex
+                freqIndex,
+                inheritedFromFamily: effectiveServices.inheritedFromFamily === true,
+                inheritedFamily: effectiveServices.inheritedFamily || ''
             });
         });
     });
@@ -42413,6 +42681,13 @@ function getSiaAirspaceBoundaryLabelText(item) {
         ].filter(Boolean).join(' / ');
     }
 
+    if (type === 'P') {
+        return [
+            base,
+            getSiaProhibitedCrossReferenceName(item)
+        ].filter(Boolean).join(' / ');
+    }
+
     const firstFrequency = getSiaFirstAssignedFrequency(item);
     if (!firstFrequency) return base;
 
@@ -42442,6 +42717,9 @@ function getSiaAirspaceDisplayType(item) {
     const type = String(item?.t || '').trim().toUpperCase();
     const local = String(item?.l || '').trim().toUpperCase();
 
+    // v15.65 — les RAS "FLIGHT INFORMATION SECTOR" sont présentés comme SIV.
+    if (isSiaFlightInformationSector(item)) return 'SIV';
+
     // Pour les D-OTHER, le type local est plus utile opérationnellement.
     if (type === 'D-OTHER' && local) return local;
     return type || 'ESPACE';
@@ -42467,6 +42745,14 @@ function getSiaAirspaceDisplayTitle(item) {
             displayType,
             name || code,
             restrictedInfo?.operationalName || ''
+        ].filter(Boolean).join(' / ');
+    }
+
+    if (type === 'P') {
+        return [
+            displayType,
+            name || code,
+            getSiaProhibitedCrossReferenceName(item)
         ].filter(Boolean).join(' / ');
     }
 
@@ -42746,6 +43032,7 @@ function getSiaBoundaryLabelPriority(item) {
     if (type === 'TRA') return 25;
     if (type === 'TMA') return 30;
     if (type === 'CTA') return 40;
+    if (isSiaFlightInformationSector(item)) return 45;
     if (type === 'D-OTHER') return 50;
     return 60;
 }
@@ -43231,6 +43518,7 @@ function getSiaAirspaceChoicePriority(item) {
     if (type === 'P' || type === 'R' || type === 'D' || type === 'TRA') return 20;
     if (type === 'TMA') return 30;
     if (type === 'CTA') return 40;
+    if (isSiaFlightInformationSector(item)) return 45;
     if (type === 'D-OTHER') return 50;
     if (type === 'RAS' || type === 'SECTOR' || type === 'SECTOR-C') return 60;
     if (type === 'OCA' || type === 'UTA') return 70;
@@ -43471,7 +43759,7 @@ async function refreshSiaLayers(reason = 'manual') {
     const visibleAirspaceFeatures = [];
     const siaBoundaryLabelState = { points: [], count: 0 };
     for (const item of dataset.airspaces || []) {
-        if (!isSiaFilterEnabled(item.k)) continue;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
         if (shouldHideSiaAirspaceAboveFl115(item)) continue;
 
         // Parents techniques AIXM déjà identifiés en v15.57.
@@ -43570,7 +43858,7 @@ async function refreshSiaLayers(reason = 'manual') {
     const showSiaDesignatedPoints = shouldDisplaySiaDesignatedPoints();
 
     for (const item of dataset.terrain || []) {
-        if (!isSiaFilterEnabled(item.k)) continue;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
         const latlng = L.latLng(Number(item.x), Number(item.y));
         if (!pointBounds.contains(latlng)) continue;
 
@@ -43598,7 +43886,7 @@ async function refreshSiaLayers(reason = 'manual') {
 
     for (const item of dataset.points || []) {
         if (!showSiaDesignatedPoints) break;
-        if (!isSiaFilterEnabled(item.k)) continue;
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
         const latlng = L.latLng(Number(item.x), Number(item.y));
         if (!pointBounds.contains(latlng)) continue;
 
