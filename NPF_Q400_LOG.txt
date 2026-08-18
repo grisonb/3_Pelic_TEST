@@ -1,3 +1,77 @@
+VERSION TEST v15.64 — R190 GARRIGUES + ALTITUDES CARTE + RETOUR SÉLECTION
+Date : 18/08/2026
+Base : TEST v15.63
+
+OBJECTIFS
+- Corriger l'identification opérationnelle des R190 A/B/C en exploitant le lieu explicitement publié dans leur propre champ Administrator : « 2ème REI, camp des Garrigues ».
+- Empêcher toute condition météo/visibilité de devenir un faux nom de zone (cas R8 : « VISI > or = 5 km : ATIS GARONS »).
+- Ajouter sous le nom/fréquence de chaque zone affichée sur la carte sa tranche verticale plancher–plafond.
+- Ajouter un bouton « ← RETOUR » lorsqu'une fiche de zone a été ouverte depuis la fenêtre « ESPACES À CET ENDROIT ».
+- Agrandir le bouton X de fermeture de cette navigation et l'afficher en blanc sur fond rouge.
+
+1. R190 A/B/C — GARRIGUES PRIORITAIRE
+- Le parseur Administrator reconnaît désormais les lieux explicites introduits notamment par « camp de/du/des », « base de/du/des » et « centre de/du/des ».
+- « Administrator : 2ème REI, camp des Garrigues » fournit donc le nom géographique GARRIGUES.
+- Lorsqu'un tel lieu provient de la fiche propre de la zone, il est prioritaire sur un nom trouvé uniquement par référence croisée.
+- Résultats attendus :
+  - R 190 A / GARRIGUES ;
+  - R 190 B / GARRIGUES ;
+  - R 190 C / GARRIGUES.
+- Les fréquences des listes « Activity known on » ne sont pas transformées en fréquence principale de ces zones.
+
+2. R8 — REJET DU FAUX NOM « = 5 KM »
+- Les lignes commençant par VISI / VISIBILITY / METEO / WEATHER sont exclues de l'extraction d'un nom de service.
+- Les candidats ressemblant à une comparaison ou une condition chiffrée (>=, <=, >, <, =, km, NM, ft, FL...) sont rejetés comme noms géographiques.
+- La phrase « VISI > or = 5 km : ATIS GARONS » ne peut donc plus produire « = 5 KM ».
+
+3. TRANCHES D'ALTITUDE SUR LA CARTE
+- Le libellé principal nom / service / fréquence reste sur la première ligne.
+- Une deuxième ligne plus petite affiche la tranche verticale réelle de la zone : « plancher – plafond ».
+- Le formatage existant est réutilisé : SFC, FLxxx, ft AMSL, ft AGL.
+- Exemples attendus :
+  - R 190 A / GARRIGUES
+    SFC – 3300 ft AMSL
+  - R 190 B / GARRIGUES
+    SFC – 8300 ft AMSL
+  - R 190 C / GARRIGUES
+    SFC – FL195
+- Le texte reste placé à l'intérieur de la zone, en retrait du trait plein.
+
+4. FENÊTRE « ESPACES À CET ENDROIT » — BOUTON RETOUR
+- Lorsqu'une zone est ouverte depuis la liste des zones superposées, sa fiche affiche un bouton « ← RETOUR ».
+- Ce bouton ferme la fiche, retire la surbrillance de la zone et reconstruit la liste des zones présentes au point d'origine.
+- Les candidats sont recalculés au retour afin de réutiliser les couches tactiles actuellement actives après un éventuel autoPan/rendu.
+- Les fiches ouvertes directement lorsqu'une seule zone est présente ne reçoivent pas ce bouton Retour.
+
+5. BOUTON X DE FERMETURE
+- La popup de sélection multiple et les fiches ouvertes depuis cette popup utilisent une classe dédiée.
+- Bouton X agrandi à 42 × 42 px.
+- Fond rouge, X blanc, contraste et zone tactile renforcés.
+- Le contenu est décalé sous le bouton afin d'éviter tout recouvrement.
+
+6. DONNÉES SIA / NAS
+- Payload SIA inchangé.
+- `npfDatasetRevision` reste 15.57.
+- Aucun fichier NAS modifié.
+
+VALIDATION STATIQUE EFFECTUÉE
+- JavaScript principal : syntaxe Node vérifiée.
+- Service Worker : syntaxe Node vérifiée.
+- Manifest : JSON valide.
+- Cohérence des versions v15.64 vérifiée.
+- Vérification ciblée :
+  - R190A = GARRIGUES / SFC–3300 ft AMSL ;
+  - R190B = GARRIGUES / SFC–8300 ft AMSL ;
+  - R190C = GARRIGUES / SFC–FL195 ;
+  - R8 = aucun faux nom « = 5 KM » ;
+  - R107 = PILON DU ROY ; R283 = CARPIAGNE ;
+  - R108B = CAMARGUE / 127.925 ; R95A = LE LUC / 122.200 ;
+  - CTR SALON = TWR 130.300 / SFC–2500 ft AMSL.
+- Historique v15.63 et antérieur conservé intégralement.
+- Validation Safari/iPadOS à effectuer sur l'appareil.
+
+HISTORIQUE PRÉCÉDENT CONSERVÉ INTÉGRALEMENT
+
 VERSION TEST v15.63 — NOMS R PAR RÉFÉRENCES CROISÉES + FILTRE ALTITUDE FL115
 Date : 18/08/2026
 Base : TEST v15.62
