@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.60 */
+/* NPF_STYLE_BUILD_VERSION: v15.61 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15516,4 +15516,48 @@ body.gaar-point-search-open .gaar-editing-banner {
     font-weight: 700;
     color: #64748b;
     text-align: right;
+}
+
+
+/* ==========================================================================
+   v15.61 — PROFIL DANS FILTRES / VIEWPORT iPad / LISIBILITÉ DES ZONES
+   ========================================================================== */
+
+/* Le bouton PROFIL n'est plus dans la colonne carte : il fait partie des
+   actions générales du menu ouvert par appui long sur l'icône France. */
+.sia-filter-global-actions {
+    flex-wrap: wrap;
+}
+
+#sia-profile-button {
+    background: #ffffff;
+    color: #0b2f6b;
+}
+
+#sia-profile-button.active {
+    background: #2e7d32;
+    border-color: #145a18;
+    color: #ffffff;
+}
+
+/*
+ * Le profil est attaché au viewport. Le JS v15.61 positionne également son
+ * `top` d'après visualViewport afin de neutraliser les particularités
+ * Safari/iPadOS qui pouvaient placer le panneau sous l'écran visible.
+ */
+.sia-profile-panel {
+    position: fixed;
+    left: max(58px, calc(env(safe-area-inset-left) + 58px));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    height: min(35dvh, 360px);
+    max-height: calc(100dvh - 16px);
+    z-index: 720;
+}
+
+@supports not (height: 1dvh) {
+    .sia-profile-panel {
+        height: min(35vh, 360px);
+        max-height: calc(100vh - 16px);
+    }
 }
