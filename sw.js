@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-69_siv_profile_dother_band';
-const APP_VERSION = 'v15.69';
+const SW_VERSION = 'sw-v15-74_rebase69_siv_sim';
+const APP_VERSION = 'v15.74';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
