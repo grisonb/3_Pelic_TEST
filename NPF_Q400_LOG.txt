@@ -1,3 +1,50 @@
+VERSION TEST v15.73 — RÉCUPÉRATION APP-SHELL / GPS-BOUTONS + SIV TOUJOURS SÉLECTIONNABLES
+Date : 19/08/2026
+Base fonctionnelle : TEST v15.70
+
+OBJECTIFS
+- Restaurer en priorité le fonctionnement général après le blocage observé en v15.71/v15.72 : aucun pélicandrome, aucun terrain et boutons inactifs.
+- Repartir intégralement du code applicatif v15.70 connu fonctionnel.
+- Conserver la demande SIV : un SIV doit être proposé par « Sélection Zone » même si son filtre graphique est désactivé.
+- Rendre le mécanisme de mise à jour PWA capable de sortir d'un cache app-shell incomplet sur iPad/Safari.
+
+1. RETOUR À LA BASE FONCTIONNELLE v15.70
+- Index, Script et Style reconstruits depuis v15.70, puis versionnés v15.73.
+- Le payload SIA reste strictement celui de v15.70 ; révision interne 15.70.
+- Les fréquences SIV par secteur, le mouvement simulation, les zones P, D-OTHER, le profil et les autres corrections de v15.70 sont conservés.
+- Aucune logique v15.71/v15.72 n'est reprise en bloc.
+
+2. SERVICE WORKER — MODE RECOVERY
+- Nouveau SW_VERSION : `sw-v15-73_recovery_network_first`.
+- L'installation v15.73 ne supprime aucun cache app-shell utilisé par un ancien worker.
+- L'installation n'est plus bloquée si GitHub Pages n'a pas encore propagé simultanément toutes les ressources ; le worker peut prendre la main puis compléter son cache.
+- À l'activation, les anciens app-shells sont volontairement conservés pendant cette version de récupération.
+- Pour `index.html`, `script.js`, `style.css` et `manifest.json`, stratégie réseau d'abord avec validation stricte de v15.73.
+- Si le réseau n'est pas disponible, repli sur le cache v15.73 puis sur un ancien app-shell valide.
+- Les cartes offline, IndexedDB, VAC et données utilisateur ne sont ni supprimées ni réinitialisées.
+
+3. CAUSE DU BLOCAGE TRAITÉE
+- v15.70 et v15.71 partageaient le même `SW_VERSION`/nom de cache app-shell.
+- Un worker en cours d'installation pouvait donc supprimer/remplir le même cache que celui utilisé par le worker actif.
+- La v15.73 supprime cette dépendance et interdit toute suppression destructive des caches pendant la récupération.
+
+4. SIV TOUJOURS PROPOSÉ À LA SÉLECTION
+- Le filtre `ase:SIV` reste uniquement graphique.
+- Lors d'un appui long, et uniquement à ce moment, le dataset SIA peut être chargé si nécessaire.
+- Les SIV opérationnels contenant le point sont ajoutés aux candidats même s'ils sont masqués graphiquement.
+- Les parents techniques SIV restent exclus.
+- Pas de doublon lorsqu'un SIV est déjà visible/sélectionnable.
+- Le filtre « Masquer zones > FL115 » reste respecté.
+
+CONTROLES
+- `script.js` et `sw.js` validés par `node --check` après copie temporaire en `.js`.
+- Manifest JSON valide.
+- Cohérence v15.73 vérifiée dans Index / Manifest / Script / Style / SW.
+- Script v15.73 dérivé de v15.70 avec seulement la sélection SIV ciblée ajoutée.
+- Aucun changement NAS.
+- Historique cumulatif conservé ci-dessous.
+
+
 VERSION TEST v15.72 — CORRECTION CHARGEMENT / CACHE SW + SIV TOUJOURS SÉLECTIONNABLES
 Date : 19/08/2026
 Base fonctionnelle : TEST v15.70
