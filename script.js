@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.71';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.72';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -32668,9 +32668,9 @@ async function executeMapLongPressAction(latlng) {
     let zoneCandidates = [];
     try {
         /*
-         * v15.71 — même si tous les calques SIA (dont SIV) sont masqués,
-         * charger le dataset à la demande afin que les SIV sous le doigt restent
-         * proposés par « Sélection Zone ». Aucun calque masqué n'est redessiné.
+         * v15.72 — la sélection SIV est indépendante du filtre graphique.
+         * Si aucun calque SIA n'a encore nécessité le dataset, on le charge
+         * seulement à cet instant. Aucun calque masqué n'est redessiné.
          */
         if (!siaDataset && typeof ensureSiaDatasetLoaded === 'function') {
             await ensureSiaDatasetLoaded();
@@ -46565,10 +46565,10 @@ function getSiaAirspaceChoicePriority(item) {
 }
 
 /*
- * v15.71 — les SIV restent interrogeables même lorsque leur filtre graphique
- * est désactivé. Le filtre `ase:SIV` commande uniquement le dessin de la zone ;
- * « Sélection Zone » doit toujours proposer le ou les secteurs SIV opérationnels
- * contenant le point touché. Les parents techniques restent exclus.
+ * v15.72 — les SIV restent interrogeables même lorsque leur filtre graphique
+ * est désactivé. `ase:SIV` commande uniquement le dessin ; « Sélection Zone »
+ * complète les surfaces tactiles visibles par les secteurs SIV opérationnels
+ * réellement présents sous le point touché.
  */
 function getSiaAlwaysSelectableSivCandidates(latlng, existingEntries = []) {
     const dataset = siaDataset;
