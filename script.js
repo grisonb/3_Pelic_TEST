@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.69';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.74';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -1065,6 +1065,10 @@ let simulationAltitudeFt = Number.isFinite(storedSimulationAltitudeFt)
 let simulationMotionTimer = null;
 let simulationMotionLastTickMs = 0;
 let simulationAircraftPositionReady = false;
+// v15.74 — état cinématique dédié : la simulation ne dépend plus de lastPosition.
+let simulationMotionLatitude = null;
+let simulationMotionLongitude = null;
+const SIMULATION_MOTION_INTERVAL_MS = 500;
 
 // v12.22 — sécurité : un import interrompu ne doit pas bloquer les suppressions suivantes.
 try {
@@ -22883,6 +22887,7 @@ function applySimulationMotionSettings(speedKt, routeDeg, altitudeFt) {
     localStorage.setItem(SIMULATION_ALTITUDE_STORAGE_KEY, String(simulationAltitudeFt));
 
     simulationMotionLastTickMs = performance.now();
+    ensureSimulationMotionTimer();
     refreshSimulationMotionButtonState();
 
     if (
@@ -22931,6 +22936,12 @@ function stopSimulationMotionTimer() {
     simulationMotionLastTickMs = 0;
 }
 
+function ensureSimulationMotionTimer() {
+    if (!isSimulationMode || simulationMotionTimer) return;
+    simulationMotionLastTickMs = performance.now();
+    simulationMotionTimer = setInterval(runSimulationMotionStep, SIMULATION_MOTION_INTERVAL_MS);
+}
+
 function runSimulationMotionStep() {
     const nowMs = performance.now();
 
@@ -22939,13 +22950,8 @@ function runSimulationMotionStep() {
         return;
     }
 
-    if (!lastPosition || lastPosition.simulation !== true) {
-        simulationMotionLastTickMs = nowMs;
-        return;
-    }
-
-    const latitude = Number(lastPosition.latitude ?? lastPosition.lat);
-    const longitude = Number(lastPosition.longitude ?? lastPosition.lng);
+    const latitude = Number(simulationMotionLatitude);
+    const longitude = Number(simulationMotionLongitude);
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
         simulationMotionLastTickMs = nowMs;
         return;
@@ -22953,18 +22959,15 @@ function runSimulationMotionStep() {
 
     let elapsedSeconds = simulationMotionLastTickMs > 0
         ? (nowMs - simulationMotionLastTickMs) / 1000
-        : 1;
+        : SIMULATION_MOTION_INTERVAL_MS / 1000;
     simulationMotionLastTickMs = nowMs;
 
     /*
-     * Éviter un bond important lorsque Safari reprend après suspension.
-     * La simulation reprend depuis la dernière position affichée.
+     * iPad/Safari : après suspension, ne jamais rattraper tout le temps écoulé.
+     * Le mouvement reprend depuis le dernier point simulé effectivement affiché.
      */
-    elapsedSeconds = Math.min(2.5, Math.max(0, elapsedSeconds));
-
-    if (simulationSpeedKt <= 0 || elapsedSeconds <= 0) {
-        return;
-    }
+    elapsedSeconds = Math.min(1.0, Math.max(0, elapsedSeconds));
+    if (simulationSpeedKt <= 0 || elapsedSeconds <= 0) return;
 
     const distanceMeters = simulationSpeedKt * 1852 * elapsedSeconds / 3600;
     const destination = calculateDestinationLatLng(
@@ -22981,8 +22984,7 @@ function runSimulationMotionStep() {
 
 function startSimulationMotionTimer() {
     stopSimulationMotionTimer();
-    simulationMotionLastTickMs = performance.now();
-    simulationMotionTimer = setInterval(runSimulationMotionStep, 1000);
+    ensureSimulationMotionTimer();
 }
 
 function closeSimulationActionPopup() {
@@ -23095,8 +23097,11 @@ function applySimulatedUserPosition(lat, lng, { fromMotionTimer = false } = {}) 
     if (!Number.isFinite(numericLat) || !Number.isFinite(numericLng)) return;
 
     simulationAircraftPositionReady = true;
+    simulationMotionLatitude = numericLat;
+    simulationMotionLongitude = numericLng;
     if (!fromMotionTimer) {
         simulationMotionLastTickMs = performance.now();
+        ensureSimulationMotionTimer();
     }
 
     updateUserPosition({
@@ -23128,6 +23133,8 @@ function enableSimulationMode() {
 
     simulationMapClickHandler = null;
     simulationAircraftPositionReady = false;
+    simulationMotionLatitude = null;
+    simulationMotionLongitude = null;
     startSimulationMotionTimer();
     refreshSimulationModeButtonState();
 
@@ -23147,6 +23154,8 @@ function disableSimulationMode({ restoreGps = true } = {}) {
     simulationSuppressNextClickUntil = 0;
     stopSimulationMotionTimer();
     simulationAircraftPositionReady = false;
+    simulationMotionLatitude = null;
+    simulationMotionLongitude = null;
     closeSimulationActionPopup();
     closeSimulationMotionModal();
     isSimulationMode = false;
@@ -23171,6 +23180,7 @@ function toggleSimulationMode() {
 document.addEventListener('visibilitychange', () => {
     if (isSimulationMode && !document.hidden) {
         simulationMotionLastTickMs = performance.now();
+        ensureSimulationMotionTimer();
     }
 });
 
@@ -32659,6 +32669,15 @@ async function executeMapLongPressAction(latlng) {
      */
     let zoneCandidates = [];
     try {
+        /*
+         * v15.74 — le filtre SIV ne commande que son dessin. Lors d'un appui long,
+         * le jeu SIA est chargé à la demande si nécessaire afin de rechercher aussi
+         * le SIV situé sous le doigt, même lorsque le calque SIV est masqué.
+         * Aucun chargement supplémentaire n'est ajouté au démarrage de l'application.
+         */
+        if (!siaDataset && typeof ensureSiaDatasetLoaded === 'function') {
+            await ensureSiaDatasetLoaded();
+        }
         if (typeof getSiaAirspaceTouchCandidates === 'function') {
             zoneCandidates = getSiaAirspaceTouchCandidates(latlng);
         }
@@ -40402,6 +40421,181 @@ function isSiaFlightInformationSector(item) {
         && String(item?.l || '').trim().toUpperCase() === 'FLIGHT INFORMATION SECTOR';
 }
 
+/*
+ * v15.74 — SIV : 19 objets génériques sans limites verticales sont des parents
+ * techniques. Ils sont ignorés lorsqu'un enfant opérationnel utilisant leur code
+ * comme préfixe existe. Cela laisse 110 secteurs SIV réellement opérationnels.
+ */
+let siaTechnicalSivParentCacheDataset = null;
+let siaTechnicalSivParentCodeSet = null;
+
+function hasSiaOperationalVerticalLimit(raw) {
+    return Array.isArray(raw)
+        && raw.length >= 3
+        && String(raw?.[1] || '').trim() !== '';
+}
+
+function buildSiaTechnicalSivParentCodeSet(dataset = siaDataset) {
+    if (siaTechnicalSivParentCodeSet && siaTechnicalSivParentCacheDataset === dataset) {
+        return siaTechnicalSivParentCodeSet;
+    }
+
+    const sivs = (dataset?.airspaces || []).filter(isSiaFlightInformationSector);
+    const result = new Set();
+
+    sivs.forEach(item => {
+        const code = String(item?.c || '').trim().toUpperCase();
+        if (!code) return;
+        if (hasSiaOperationalVerticalLimit(item?.lo) || hasSiaOperationalVerticalLimit(item?.up)) return;
+
+        const hasOperationalChild = sivs.some(child => {
+            const childCode = String(child?.c || '').trim().toUpperCase();
+            return childCode
+                && childCode !== code
+                && childCode.startsWith(code)
+                && (hasSiaOperationalVerticalLimit(child?.lo) || hasSiaOperationalVerticalLimit(child?.up));
+        });
+
+        if (hasOperationalChild) result.add(code);
+    });
+
+    siaTechnicalSivParentCacheDataset = dataset;
+    siaTechnicalSivParentCodeSet = result;
+    return result;
+}
+
+function isSiaTechnicalSivParent(item, dataset = siaDataset) {
+    if (!isSiaFlightInformationSector(item)) return false;
+    const code = String(item?.c || '').trim().toUpperCase();
+    return !!code && buildSiaTechnicalSivParentCodeSet(dataset).has(code);
+}
+
+/*
+ * v15.74 — fréquences FIS sectorielles lues dans XML_SIA
+ * Espace -> Partie -> Volume -> Activite. Le payload v15.69 n'est pas réécrit :
+ * l'association est appliquée uniquement au moment de construire le libellé carte.
+ * 109 secteurs sur 110 disposent d'une fréquence explicite dans cette source.
+ * SOCAFS / CAYENNE renvoie « Fréquences : voir ENR 6.4 » et n'est donc pas inventé.
+ */
+const SIA_SIV_VOLUME_FREQUENCIES = Object.freeze({
+    "LFBDFS1": ["120.575"],
+    "LFBDFS2": ["120.575"],
+    "LFBHFS1": ["124.205"],
+    "LFBHFS2": ["124.205"],
+    "LFBIFS": ["124.000"],
+    "LFBLFS": ["124.050"],
+    "LFBOFS1": ["121.250"],
+    "LFBPFS": ["126.525"],
+    "LFBZFS": ["119.175", "126.525"],
+    "LFFFFSN": ["125.700"],
+    "LFFFFSO": ["129.625"],
+    "LFFFFSS": ["126.100"],
+    "LFKBFSNORD": ["124.725"],
+    "LFKBFSSUD": ["135.135"],
+    "LFKJFS": ["119.825"],
+    "LFLBFS1": ["123.705"],
+    "LFLBFS2": ["123.705"],
+    "LFLCFS1": ["122.225"],
+    "LFLCFS2": ["120.675"],
+    "LFLCFS3": ["120.675"],
+    "LFLCFS4": ["120.500"],
+    "LFLCFS5": ["119.375"],
+    "LFLCFS6": ["119.375"],
+    "LFLCFS7": ["133.725"],
+    "LFLLFS1": ["135.200"],
+    "LFLLFS2": ["135.200"],
+    "LFLLFS3": ["135.530"],
+    "LFLLFS4": ["135.530"],
+    "LFLLFS5": ["135.530"],
+    "LFMLFS1": ["132.950"],
+    "LFMLFS2": ["124.350"],
+    "LFMLFS3": ["132.300"],
+    "LFMLFS4": ["132.950"],
+    "LFMLFS5": ["126.260"],
+    "LFMLFS6": ["132.300"],
+    "LFMMFSN1": ["124.500"],
+    "LFMMFSN2": ["124.500"],
+    "LFMMFSS": ["120.550"],
+    "LFMNFS1": ["120.850"],
+    "LFMNFS2": ["122.925"],
+    "LFMNFS3": ["124.425"],
+    "LFMTFS1": ["134.375"],
+    "LFMTFS1P1": ["134.375"],
+    "LFMTFS1P2": ["134.375"],
+    "LFMTFS2": ["125.900"],
+    "LFMTFS2P1": ["125.900"],
+    "LFMTFS3": ["136.625"],
+    "LFOBFS1": ["119.800"],
+    "LFOBFS2": ["119.800"],
+    "LFPBFS": ["123.835"],
+    "LFPMFS1": ["134.300"],
+    "LFPMFS2": ["134.300"],
+    "LFPMFS3": ["134.300"],
+    "LFPMFS4": ["120.330"],
+    "LFPMFS5": ["120.330"],
+    "LFPMFS6": ["127.815"],
+    "LFPMFS7": ["127.815"],
+    "LFPMFS8": ["127.815"],
+    "LFPNFS1": ["119.305"],
+    "LFPNFS2": ["119.305"],
+    "LFPNFS3": ["119.305"],
+    "LFQQFS1": ["126.480"],
+    "LFQQFS2": ["132.540"],
+    "LFQQFS3": ["129.360"],
+    "LFQQFS4P1": ["132.610"],
+    "LFQQFS4P2": ["132.610"],
+    "LFQQFS5": ["129.360"],
+    "LFQQFS6P1": ["134.825"],
+    "LFQQFS6P2": ["134.825"],
+    "LFQQFS6P3": ["134.825"],
+    "LFQQFS6P4": ["134.825"],
+    "LFRBFS1": ["135.830"],
+    "LFRBFS2": ["119.575"],
+    "LFRBFS3": ["122.400", "119.575"],
+    "LFRBFS4P1": ["119.575"],
+    "LFRBFS4P2": ["119.575"],
+    "LFRNFSCTNA": ["134.200", "120.350"],
+    "LFRNFSCTNB": ["134.200", "120.350"],
+    "LFRNFSCTNC": ["134.200", "120.350"],
+    "LFRNFSNORD": ["126.950"],
+    "LFRNFSSUDA": ["134.000"],
+    "LFRNFSSUDB": ["134.000"],
+    "LFRSFS1": ["122.800"],
+    "LFRSFS2P1": ["130.275"],
+    "LFRSFS4": ["130.275"],
+    "LFSBFS11": ["130.905"],
+    "LFSBFS12": ["130.905"],
+    "LFSBFS13": ["130.905"],
+    "LFSBFS21": ["135.855"],
+    "LFSBFS22": ["135.855"],
+    "LFSBFS23": ["135.855"],
+    "LFSBFS24": ["135.855"],
+    "LFSBFS25": ["135.855"],
+    "LFSTFS1": ["136.135", "119.580"],
+    "LFSTFS2": ["136.135", "119.580"],
+    "LFSTFS3": ["119.450"],
+    "LFSTFS4": ["132.215", "119.450"],
+    "LFSTFS4.20": ["119.450"],
+    "LSAGFS01": ["126.350"],
+    "LSAGFS02": ["126.350"],
+    "LSAGFS03": ["126.350"],
+    "LSAGFS04": ["126.350"],
+    "LSAGFS05": ["126.350"],
+    "LSAGFS06": ["126.350"],
+    "LSAGFS07": ["126.350"],
+    "LSAGFS08": ["126.350"],
+    "LSAGFS09": ["126.350"],
+    "NWWWFS": ["128.200", "128.300"],
+    "TFFRFS": ["129.800"],
+});
+
+function getSiaVolumeAssignedFrequencies(item) {
+    if (!isSiaFlightInformationSector(item)) return [];
+    const code = String(item?.c || '').trim().toUpperCase();
+    const values = SIA_SIV_VOLUME_FREQUENCIES[code];
+    return Array.isArray(values) ? values : [];
+}
+
 function getSiaEffectiveFilterKey(item) {
     if (isSiaFlightInformationSector(item)) return 'ase:SIV';
     return String(item?.k || '').trim();
@@ -40540,7 +40734,10 @@ function normalizeSiaFilterCounts(dataset) {
     const add = (key) => counts.set(key, (counts.get(key) || 0) + 1);
     (dataset?.terrain || []).forEach(item => add(item.k));
     (dataset?.points || []).forEach(item => add(item.k));
-    (dataset?.airspaces || []).forEach(item => add(getSiaEffectiveFilterKey(item)));
+    (dataset?.airspaces || []).forEach(item => {
+        if (isSiaTechnicalSivParent(item, dataset)) return;
+        add(getSiaEffectiveFilterKey(item));
+    });
     return counts;
 }
 
@@ -41053,6 +41250,7 @@ async function refreshSiaLayers(reason = 'manual') {
         // v15.57 — les parents techniques TMA issus d'un Adg/UNION ne sont ni
         // dessinés ni proposés à la sélection. Les vrais secteurs restent.
         if (isSiaTechnicalTmaUnionParent(item)) continue;
+        if (isSiaTechnicalSivParent(item, dataset)) continue;
 
         if (!item.g) continue;
         if (!siaBoundsIntersects(item.b, bounds)) continue;
@@ -42988,6 +43186,17 @@ function getSiaFirstAssignedFrequency(item) {
      * Les autres fréquences FIS restent visibles dans la fiche détaillée via sv.
      */
     if (isSiaFlightInformationSector(item)) {
+        const volumeAssigned = getSiaVolumeAssignedFrequencies(item);
+        if (volumeAssigned.length) {
+            return {
+                serviceType: 'FIS',
+                value: volumeAssigned.join(' / '),
+                supplementary: false,
+                sourceDesignatedSiv: true,
+                sourceSivVolumeActivity: true
+            };
+        }
+
         const preferred = Array.isArray(item?.sfp)
             ? item.sfp.map(value => String(value || '').trim()).filter(Boolean)
             : [];
@@ -44047,26 +44256,81 @@ function getSiaAirspaceChoicePriority(item) {
     return 90;
 }
 
+function getSiaAlwaysSelectableSivCandidates(latlng, existingEntries = []) {
+    const dataset = siaDataset;
+    if (!dataset || !Array.isArray(dataset.airspaces) || !latlng) return [];
+
+    const lat = Number(latlng.lat);
+    const lng = Number(latlng.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+
+    const existingKeys = new Set(
+        (Array.isArray(existingEntries) ? existingEntries : [])
+            .map(entry => getSiaCtrSelectionKey(entry?.item))
+            .filter(Boolean)
+    );
+
+    const matches = [];
+    for (const item of dataset.airspaces) {
+        if (!isSiaFlightInformationSector(item)) continue;
+        if (isSiaTechnicalSivParent(item, dataset)) continue;
+        if (!item?.g) continue;
+
+        const bounds = Array.isArray(item?.b) ? item.b : null;
+        if (bounds && bounds.length >= 4) {
+            const minLng = Number(bounds[0]);
+            const minLat = Number(bounds[1]);
+            const maxLng = Number(bounds[2]);
+            const maxLat = Number(bounds[3]);
+            if ([minLng, minLat, maxLng, maxLat].every(Number.isFinite)) {
+                if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+            }
+        }
+
+        const key = getSiaCtrSelectionKey(item);
+        if (key && existingKeys.has(key)) continue;
+
+        const geometry = siaCompactGeometryToGeoJson(item.g);
+        if (!geometry || !siaGeometryContainsLatLng(geometry, latlng)) continue;
+
+        matches.push({
+            item,
+            geometry,
+            layer: null,
+            hiddenSivCandidate: !isSiaFilterEnabled('ase:SIV')
+        });
+        if (key) existingKeys.add(key);
+    }
+
+    return matches;
+}
+
 function getSiaAirspaceTouchCandidates(latlng) {
     const operationalFamilies = buildSiaTmaOperationalFamilySet(siaDataset);
 
-    return siaAirspaceTouchEntries
+    const visibleCandidates = siaAirspaceTouchEntries
         .filter(entry => !isSiaTechnicalTmaUnionParent(entry.item))
+        .filter(entry => !isSiaTechnicalSivParent(entry.item, siaDataset))
         .filter(entry => !isSiaGenericTmaWithoutAltitude(entry.item, operationalFamilies))
-        .filter(entry => siaGeometryContainsLatLng(entry.geometry, latlng))
-        .sort((a, b) => {
-            const pa = getSiaAirspaceChoicePriority(a.item);
-            const pb = getSiaAirspaceChoicePriority(b.item);
-            if (pa !== pb) return pa - pb;
+        .filter(entry => siaGeometryContainsLatLng(entry.geometry, latlng));
 
-            const aa = Array.isArray(a.item?.b) && a.item.b.length >= 4
-                ? Math.abs((Number(a.item.b[2]) - Number(a.item.b[0])) * (Number(a.item.b[3]) - Number(a.item.b[1])))
-                : Infinity;
-            const ab = Array.isArray(b.item?.b) && b.item.b.length >= 4
-                ? Math.abs((Number(b.item.b[2]) - Number(b.item.b[0])) * (Number(b.item.b[3]) - Number(b.item.b[1])))
-                : Infinity;
-            return aa - ab;
-        });
+    const candidates = visibleCandidates.concat(
+        getSiaAlwaysSelectableSivCandidates(latlng, visibleCandidates)
+    );
+
+    return candidates.sort((a, b) => {
+        const pa = getSiaAirspaceChoicePriority(a.item);
+        const pb = getSiaAirspaceChoicePriority(b.item);
+        if (pa !== pb) return pa - pb;
+
+        const aa = Array.isArray(a.item?.b) && a.item.b.length >= 4
+            ? Math.abs((Number(a.item.b[2]) - Number(a.item.b[0])) * (Number(a.item.b[3]) - Number(a.item.b[1])))
+            : Infinity;
+        const ab = Array.isArray(b.item?.b) && b.item.b.length >= 4
+            ? Math.abs((Number(b.item.b[2]) - Number(b.item.b[0])) * (Number(b.item.b[3]) - Number(b.item.b[1])))
+            : Infinity;
+        return aa - ab;
+    });
 }
 
 function getSiaAirspaceChoiceLabel(item) {
@@ -44318,6 +44582,7 @@ async function refreshSiaLayers(reason = 'manual') {
 
         // Parents techniques AIXM déjà identifiés en v15.57.
         if (isSiaTechnicalTmaUnionParent(item)) continue;
+        if (isSiaTechnicalSivParent(item, dataset)) continue;
 
         // v15.58 : règle générale pour TOUTES les familles TMA.
         // Si une TMA sans altitude porte le nom générique d'une famille
