@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-72_siv_select_cache_reset';
-const APP_VERSION = 'v15.72';
+const SW_VERSION = 'sw-v15-73_recovery_network_first';
+const APP_VERSION = 'v15.73';
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -199,30 +199,25 @@ async function copyExistingCachedAsset(url, targetCache) {
 
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
-        await caches.delete(APP_SHELL_CACHE).catch(() => false);
+        /*
+         * v15.73 RECOVERY — ne jamais détruire un shell actuellement utilisé.
+         * Le nouveau worker doit pouvoir s'activer même si GitHub Pages n'a pas
+         * encore propagé simultanément tous les fichiers de la nouvelle version.
+         */
         const cache = await caches.open(APP_SHELL_CACHE);
-        const failedCoreUrls = [];
 
         for (const url of CORE_APP_SHELL_URLS) {
-            let stored = false;
             try {
                 const response = await fetchValidatedCoreForInstall(url);
                 if (response) {
                     await cache.put(url, response.clone());
-                    stored = true;
+                    continue;
                 }
-            } catch (_) {}
-
-            if (!stored) stored = await copyExistingCachedAsset(url, cache);
-            if (!stored) failedCoreUrls.push(url);
-        }
-
-        if (failedCoreUrls.length) {
-            await caches.delete(APP_SHELL_CACHE).catch(() => false);
-            throw new Error(
-                `[SW ${APP_VERSION}] Installation atomique refusée, app-shell `
-                + `incomplet ou incohérent: ${failedCoreUrls.join(', ')}`
-            );
+                // Les bibliothèques stables peuvent être reprises d'un ancien cache.
+                await copyExistingCachedAsset(url, cache);
+            } catch (_) {
+                // Installation volontairement non bloquante en version recovery.
+            }
         }
 
         try {
@@ -239,36 +234,16 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
     event.waitUntil((async () => {
-        const cacheNames = await caches.keys();
-        const previousShells = cacheNames.filter(
-            name => name.startsWith(APP_SHELL_CACHE_PREFIX)
-                && name !== APP_SHELL_CACHE
-        );
-
         /*
-         * Conserver le shell précédent comme secours. Les shells plus anciens
-         * sont supprimés ; le cache stable des données n'est jamais touché.
-         */
-        const shellsToDelete = previousShells.slice(0, Math.max(0, previousShells.length - 1));
-        await Promise.all(shellsToDelete.map(name => caches.delete(name)));
-
-        /*
-         * L'ouverture de la grande base IndexedDB ne doit jamais retenir le
-         * service worker dans l'état « activating ». Safari peut conserver une
-         * transaction de cartes ouverte plusieurs secondes après fermeture.
+         * v15.73 RECOVERY — conserver tous les anciens app-shells pendant cette
+         * version. Ils servent de filet de sécurité si une ressource courante
+         * n'est pas encore propagée ou si le cache précédent est partiel.
          */
         await Promise.race([
             refreshOfflineSettingsFromDB({ force: true }).catch(() => null),
             swDelay(1500, null)
         ]);
         await self.clients.claim();
-
-        /*
-         * v14.65 — aucune navigation forcée depuis le service worker.
-         * clients.claim() provoque controllerchange dans la page, qui effectue
-         * au maximum un rechargement protégé par session. La double navigation
-         * npfupdate de la v14.64 pouvait réarmer indéfiniment l'alerte de MAJ.
-         */
     })());
 });
 
@@ -628,62 +603,92 @@ function isCriticalAppShellRequest(request) {
     }
 }
 
+async function findPreviousAppShellFallback(request, isNavigation) {
+    try {
+        const names = (await caches.keys())
+            .filter(name => name.startsWith(APP_SHELL_CACHE_PREFIX) && name !== APP_SHELL_CACHE)
+            .reverse();
+        const lookup = isNavigation ? './index.html' : request;
+
+        for (const name of names) {
+            try {
+                const cache = await caches.open(name);
+                const response = await cache.match(lookup, { ignoreSearch: true })
+                    || await cache.match(request, { ignoreSearch: true });
+                if (!response || !response.ok) continue;
+
+                const filename = isNavigation ? 'index.html' : getRequestFilename(request);
+                if (filename === 'script.js') {
+                    const text = await response.clone().text();
+                    if (!text.includes('NPF_SCRIPT_BUILD_VERSION')) continue;
+                } else if (filename === 'index.html') {
+                    const text = await response.clone().text();
+                    if (!text.includes('const APP_VERSION') || !text.includes('script.js')) continue;
+                }
+                return response;
+            } catch (_) {}
+        }
+    } catch (_) {}
+    return null;
+}
+
 async function handleAppShellRequest(request) {
     const cache = await caches.open(APP_SHELL_CACHE);
     const isNavigation = request.mode === 'navigate';
     const cacheKey = isNavigation ? './index.html' : request;
-    /*
-     * v14.70 — ne jamais rechercher l'app-shell dans tous les caches.
-     * caches.match() pouvait renvoyer le cache v14.68 conservé en secours avant
-     * le cache courant v14.70. La version active lit exclusivement son cache.
-     */
+    const filename = isNavigation ? 'index.html' : getRequestFilename(request);
+    const versionSensitive = isNavigation || VERSION_SENSITIVE_CORE_FILES.has(filename);
+
     const cached = await cache.match(cacheKey, { ignoreSearch: true })
         || await cache.match(request, { ignoreSearch: true });
-    const requestUrl = new URL(request.url);
-    const forcedTransition = isNavigation
-        && (requestUrl.searchParams.has('swrefresh')
-            || requestUrl.searchParams.has('ts'));
 
-    const refreshFromNetwork = async (timeoutMs = 4500) => {
+    const refreshFromNetwork = async (timeoutMs = 6500) => {
         try {
             const freshRequest = new Request(request, { cache: 'reload' });
             const fresh = await swFetchWithTimeout(freshRequest, {}, timeoutMs);
-            if (fresh && fresh.ok) {
-                const valid = await validateVersionSensitiveCoreResponse(
-                    request.url,
-                    fresh
-                );
-                /*
-                 * Une réponse réseau ancienne ne doit jamais écraser le cache
-                 * atomique courant. Ceci protège aussi contre la propagation
-                 * différée de GitHub Pages après activation de la v14.70.
-                 */
+            if (!fresh || !fresh.ok) return null;
+
+            if (versionSensitive) {
+                const valid = await validateVersionSensitiveCoreResponse(request.url, fresh);
                 if (!valid) return null;
-                await cache.put(cacheKey, fresh.clone());
-                return fresh;
             }
-        } catch (_) {}
-        return null;
+
+            try { await cache.put(cacheKey, fresh.clone()); } catch (_) {}
+            return fresh;
+        } catch (_) {
+            return null;
+        }
     };
 
     /*
-     * Démarrage ordinaire : cache d'abord. Le réseau ne doit jamais retarder
-     * l'ouverture hors ligne. Une mise à jour explicite peut attendre le réseau,
-     * mais conserve toujours le shell mis en cache en secours.
+     * v15.73 RECOVERY : index/script/style/manifest passent réseau d'abord.
+     * Cela permet de sortir d'un cache ancien incomplet. Le fonctionnement
+     * hors ligne reste garanti par le cache courant puis par les shells précédents.
      */
-    if (cached && !forcedTransition) {
+    if (versionSensitive) {
+        const fresh = await refreshFromNetwork(7000);
+        if (fresh) return fresh;
+        if (cached) return cached;
+
+        const previous = await findPreviousAppShellFallback(request, isNavigation);
+        if (previous) return previous;
+
+        return new Response('', {
+            status: 504,
+            statusText: 'Recovery app shell unavailable'
+        });
+    }
+
+    if (cached) {
         refreshFromNetwork(4500).catch(() => {});
         return cached;
     }
 
-    const fresh = await refreshFromNetwork(forcedTransition ? 6000 : 4500);
+    const fresh = await refreshFromNetwork(4500);
     if (fresh) return fresh;
-    if (cached) return cached;
 
-    if (isNavigation) {
-        const fallbackIndex = await caches.match('./index.html', { ignoreSearch: true });
-        if (fallbackIndex) return fallbackIndex;
-    }
+    const previous = await findPreviousAppShellFallback(request, isNavigation);
+    if (previous) return previous;
 
     return new Response('', {
         status: 504,
