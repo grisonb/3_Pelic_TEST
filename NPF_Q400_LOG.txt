@@ -1,3 +1,53 @@
+VERSION TEST v15.72 — CORRECTION CHARGEMENT / CACHE SW + SIV TOUJOURS SÉLECTIONNABLES
+Date : 19/08/2026
+Base fonctionnelle : TEST v15.70
+
+OBJECTIFS
+- Restaurer un chargement fiable de l'application après la régression constatée en v15.71 (GPS et icônes inactifs).
+- Repartir du script v15.70 fonctionnel et réappliquer uniquement la sélection des SIV indépendamment du filtre d'affichage.
+- Forcer un nouveau cache d'application propre à v15.72 afin d'éviter tout mélange entre index/script/style de versions différentes sur iPad/PWA.
+
+1. SERVICE WORKER / CACHE APPLICATION
+- Nouveau `SW_VERSION` propre à v15.72 : `sw-v15-72_siv_select_cache_reset`.
+- Le nom du cache app-shell change donc réellement en v15.72.
+- `APP_VERSION` passe à v15.72 dans index, manifest, script, style et service worker.
+- Le service worker conserve les mécanismes existants de suppression des anciens caches app-shell.
+- Aucun changement des bases de tuiles offline, cartes, VAC ou données utilisateur.
+
+2. SIV — TOUJOURS PROPOSÉS À « SÉLECTION ZONE »
+- Le filtre `ase:SIV` commande uniquement l'affichage graphique des limites/étiquettes SIV.
+- Un appui long sur la carte recherche également les secteurs SIV opérationnels contenant le point, même si leur filtre graphique est désactivé.
+- Les SIV masqués sont ajoutés uniquement à la liste « ESPACES À CET ENDROIT » ; ils ne sont pas redessinés sur la carte.
+- Dédoublonnage par clé de sélection si un SIV est déjà visible et donc déjà présent dans les surfaces tactiles.
+- Les parents techniques SIV restent exclus.
+- Le filtre « Masquer zones > FL115 » reste respecté.
+- Si aucun calque SIA n'est actif et que le dataset n'est pas encore chargé, il est initialisé uniquement au moment de l'appui long.
+- La navigation « ← RETOUR » recalcule la liste et conserve donc les SIV masqués.
+
+3. RÉGRESSION v15.71
+- Le script livré en v15.72 est reconstruit depuis v15.70, et non utilisé comme simple copie de v15.71.
+- Seules les deux modifications fonctionnelles nécessaires à la sélection SIV sont réintroduites.
+- Le cache SW n'est plus réutilisé avec l'identifiant v15.69 comme dans v15.70/v15.71.
+
+4. DONNÉES / FONCTIONS CONSERVÉES
+- Payload SIA inchangé : révision interne 15.70.
+- Fréquences SIV par Volume de v15.70 conservées.
+- Simulation mouvement fiabilisé v15.70 conservée.
+- Profil : SIV toujours exclus.
+- Zones P, géométries à arcs, D-OTHER, styles SIV, bande intérieure et autres corrections antérieures inchangés.
+- Aucun changement NAS.
+
+CONTROLES
+- `script.js` validé par `node --check` après copie temporaire en `.js`.
+- `sw.js` validé par `node --check` après copie temporaire en `.js`.
+- Manifest JSON valide.
+- Versions v15.72 cohérentes dans index / script / style / manifest / service worker.
+- `SW_VERSION` v15.72 distinct de v15.69/v15.70/v15.71.
+- Le payload SIA est byte-for-byte identique à v15.70.
+- Vérification statique des fonctions GPS, simulation et commandes principales : aucun bloc de démarrage modifié par v15.72.
+- Historique des modifications conservé intégralement ci-dessous.
+
+
 VERSION TEST v15.71 — SIV TOUJOURS PROPOSÉS À LA SÉLECTION DE ZONE
 Date : 19/08/2026
 Base : TEST v15.70
