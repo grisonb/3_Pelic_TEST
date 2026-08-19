@@ -1,3 +1,97 @@
+VERSION TEST v15.74 — REBASE v15.69 / SIV SÉLECTION & FRÉQUENCES / SIMULATION
+Date : 19/08/2026
+Base : TEST v15.69
+Versions v15.70 à v15.73 écartées : aucune de leurs bases de fichier n'est reprise.
+
+OBJECTIFS
+- Repartir strictement de la v15.69 fonctionnelle afin de préserver GPS, boutons, terrains, pélicandromes, couches SIA et démarrage général.
+- Fiabiliser le déplacement de l'avion en mode simulation sans dépendre de `lastPosition`.
+- Compléter les fréquences affichées sur la carte pour les secteurs SIV à partir des attributions sectorielles du XML SIA.
+- Supprimer les parents techniques SIV sans limites verticales lorsqu'ils doublonnent des secteurs opérationnels.
+- Toujours proposer le SIV contenant le point dans « Sélection Zone », même lorsque le filtre graphique SIV est décoché.
+- Ne pas réécrire le payload SIA embarqué de la v15.69.
+
+1. REBASE STRICTE SUR v15.69
+- Les six fichiers v15.74 sont reconstruits depuis les fichiers v15.69.
+- Le bloc `SIA_EMBEDDED_GZIP_BASE64` reste strictement identique à celui de v15.69.
+- Les variables globales SIA de v15.69 (`siaDbPromise`, `siaDataset`, profil, renderers, etc.) restent présentes et inchangées.
+- Aucun changement n'est repris depuis les scripts v15.70/v15.71/v15.72/v15.73.
+- Le Service Worker conserve la logique fonctionnelle de v15.69 ; seuls `SW_VERSION` et `APP_VERSION` sont actualisés pour forcer le chargement de la nouvelle version.
+
+2. MODE SIMULATION — DÉPLACEMENT AVION
+- Ajout d'une position cinématique dédiée :
+  - `simulationMotionLatitude`
+  - `simulationMotionLongitude`
+- Le déplacement ne dépend plus de `lastPosition`, qui reste réservé à l'état GPS/calculateur général.
+- Le moteur de déplacement est actualisé toutes les 500 ms.
+- Le timer est garanti/repris :
+  - après validation vitesse/route/altitude,
+  - après positionnement manuel de l'avion,
+  - après retour au premier plan sur iPad.
+- Après suspension Safari/iPad, aucun rattrapage brutal du temps écoulé : reprise depuis le dernier point effectivement simulé.
+- Entrée/sortie du mode simulation réinitialise explicitement l'état cinématique.
+
+3. SIV — FRÉQUENCES SECTORIELLES SUR LA CARTE
+- Les fréquences sont associées au code exact du secteur SIV à partir des données `XML_SIA -> Espace -> Partie -> Volume -> Activite`.
+- L'association est réalisée dans le script au moment de construire le libellé : le payload v15.69 n'est pas modifié.
+- 110 secteurs SIV opérationnels sont identifiés.
+- 109 de ces 110 secteurs disposent d'une fréquence explicite dans la source.
+- CAYENNE / `SOCAFS` n'est pas inventé : le XML indique explicitement `Fréquences : voir ENR 6.4`.
+- Exemples contrôlés :
+  - PROVENCE 1 : 132.950
+  - PROVENCE 2 : 124.350
+  - PROVENCE 3 : 132.300
+  - PROVENCE 4 : 132.950
+  - PROVENCE 5 : 126.260
+  - PROVENCE 6 : 132.300
+  - MARSEILLE NORD 1/2 : 124.500
+  - MARSEILLE SUD : 120.550
+  - NICE 1 : 120.850
+  - NICE 2 : 122.925
+  - NICE 3 : 124.425
+  - RENNES NORD : 126.950
+  - RENNES SUD A/B : 134.000
+- Lorsqu'une source attribue plusieurs fréquences au même secteur, toutes les fréquences publiées sont conservées dans le libellé.
+
+4. SIV — PARENTS TECHNIQUES
+- Détection dynamique des objets SIV sans limite verticale dont le code est le préfixe d'un ou plusieurs secteurs opérationnels.
+- 19 parents techniques sont ainsi identifiés.
+- Ils ne sont plus :
+  - comptés dans le filtre SIV,
+  - dessinés sur la carte,
+  - proposés dans la sélection.
+- Les 110 secteurs opérationnels réels restent conservés.
+
+5. SIV TOUJOURS PROPOSÉ DANS « SÉLECTION ZONE »
+- Le filtre `ase:SIV` ne commande que l'affichage graphique du SIV.
+- Lors d'un appui long sur la carte, NPF recherche également le ou les SIV opérationnels contenant le point, même si leur filtre est décoché.
+- Si le dataset SIA n'est pas encore chargé, il est chargé uniquement à ce moment-là : aucun chargement supplémentaire n'est ajouté au démarrage de l'application.
+- Les SIV masqués restent invisibles tant que leur filtre n'est pas activé.
+- Aucun doublon n'est ajouté lorsqu'un SIV est déjà présent dans les surfaces tactiles visibles.
+- Une zone SIV masquée peut être sélectionnée avec `layer=null` grâce à sa géométrie réelle ; la fiche et le surlignage utilisent la géométrie comme pour une zone visible.
+- La navigation `← RETOUR` des sélections multiples continue de recalculer les candidats au point d'origine.
+
+6. INTÉGRITÉ DU PAYLOAD SIA
+- Payload SIA embarqué : strictement identique à v15.69.
+- Taille JSON décompressée : 4 084 696 octets.
+- SHA-256 JSON décompressé :
+  `a1f215de713e05805853c97467bb8d3ffae63ba982f18f9585565009e39f2a93`
+- SHA-256 de la chaîne Base64 :
+  `4285ffa5d17a587645538739ca2cf5b7fb046c5b000ebcff64d22ceb26cae15b`
+- Révision interne du payload conservée à `15.69`.
+- AIRAC et données P/R/D/TMA/CTR/VRP/terrains inchangés.
+
+7. CONTRÔLES
+- Syntaxe JavaScript : contrôle `node --check`.
+- Syntaxe Service Worker : contrôle `node --check`.
+- Manifest JSON : parsing JSON.
+- Vérification que `SIA_EMBEDDED_GZIP_BASE64` reste terminé par `].join('');`.
+- Vérification de présence des variables globales SIA critiques.
+- Vérification de cohérence `v15.74` dans index / manifest / script / style / service worker.
+- Aucune modification NAS.
+
+
+
 VERSION TEST v15.69 — PROFIL FLUIDE / SIV / D-OTHER / SIMULATION / BANDE INTÉRIEURE
 Date : 19/08/2026
 Base : TEST v15.68
