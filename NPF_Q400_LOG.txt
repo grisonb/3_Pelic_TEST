@@ -1,3 +1,106 @@
+VERSION TEST v15.69 — PROFIL FLUIDE / SIV / D-OTHER / SIMULATION / BANDE INTÉRIEURE
+Date : 19/08/2026
+Base : TEST v15.68
+
+OBJECTIFS
+- Corriger la pile d'icônes en mode simulation afin que le bouton des paramètres de vol soit entièrement visible.
+- Reporter les repères 2'/5'/10' du vecteur temps sur la ligne d'altitude avion dans PROFIL ESPACES.
+- Supprimer l'effet « accordéon » des zones du profil et faire glisser ensemble les volumes lorsque l'avion avance sur une route stable.
+- Uniformiser le gros bouton X rouge des fiches SIA, y compris lorsqu'une fiche est ouverte depuis le profil.
+- Harmoniser le vert des icônes pélicandromes avec le vert fluorescent de l'étiquette du pélicandrome sélectionné/proche.
+- Rendre les D-OTHER ponctuels directement cliquables.
+- Donner aux SIV des limites et libellés jaune fluorescent, plus grands.
+- Compléter MARSEILLE SUD / NORD avec leur fréquence FIS sectorielle publiée.
+- Agrandir les étiquettes de zones à partir de l'échelle 5 NM.
+- Corriger la bande intérieure des zones pour qu'elle reste réellement du côté intérieur, notamment sur les formes concaves/circulaires observées autour de GAP.
+
+1. MODE SIMULATION — COLONNE GAUCHE
+- Lorsque `simulation-mode-active` est présent sur le body, l'icône « Carte Fréquences OPS » est masquée.
+- La colonne flex se compacte automatiquement : les icônes suivantes remontent et le bouton « paramètres simulation » n'est plus coupé en bas.
+- Hors simulation, l'icône Fréquences OPS et la disposition habituelle sont strictement conservées.
+
+2. PROFIL ESPACES — REPÈRES DU VECTEUR TEMPS
+- La vitesse sol connue de l'avion est maintenant transmise au profil.
+- Les repères 2', 5' et 10' sont calculés en distance à partir de cette vitesse.
+- Chaque repère est dessiné sous forme de boule jaune à contour noir directement sur la ligne horizontale représentant l'altitude avion.
+- Un repère situé au-delà de la distance de profil choisie (25/50/100 NM) n'est pas dessiné.
+
+3. PROFIL ESPACES — GLISSEMENT SANS « ACCORDÉON »
+- Mémorisation des intervalles du rendu précédent avec une clé stable par zone/intervalle.
+- Entre deux positions GPS proches et sur route stable, le déplacement longitudinal réel de l'avion est appliqué identiquement à tous les volumes déjà présents.
+- Les deux bords d'une même zone ne sont plus laissés libres de varier séparément à cause du pas d'échantillonnage de 0,25 NM.
+- Une tolérance conserve le recalcul géométrique comme référence si la route change ou si le nouvel intervalle s'écarte réellement de la prédiction.
+- Une animation SVG courte de translation est appliquée au nouveau rendu pour que les volumes glissent visuellement ensemble.
+- À l'entrée dans une zone, le bord gauche reste naturellement bloqué à 0 NM ; la diminution de largeur correspondant à la traversée réelle est conservée.
+- Les caches de mouvement sont remis à zéro à la fermeture du profil et lors d'un changement d'échelle 25/50/100 NM.
+
+4. FICHES SIA OUVERTES DEPUIS LE PROFIL
+- Toutes les fiches détaillées SIA utilisent désormais la classe de popup renforcée.
+- Le X rouge 42 × 42 déjà validé pour la sélection cartographique s'applique donc également à une zone ouverte depuis PROFIL ESPACES.
+- La navigation « ← RETOUR » des sélections multiples reste inchangée.
+
+5. PÉLICANDROMES — VERT HARMONISÉ
+- Les icônes des pélicandromes actifs utilisent maintenant exactement le vert fluorescent `#39ff14`.
+- Cette teinte est identique à celle de l'étiquette et de la route du pélicandrome sélectionné/proche.
+- Les états eau/retardant et désactivé conservent leurs couleurs spécifiques.
+
+6. D-OTHER PONCTUELS — APPUI COURT
+- Les D-OTHER publiés en Point/MultiPoint deviennent directement sélectionnables au toucher.
+- Un appui court sur le symbole ouvre la fiche SIA correspondante.
+- La grande hitbox SVG déjà utilisée est conservée.
+- Les zones surfaciques/linéaires restent gérées par l'appui long « Sélection Zone » pour préserver le choix lorsqu'il y a superposition.
+
+7. SIV — STYLE ET FRÉQUENCES MARSEILLE
+- Les SIV restent dans le filtre « Espaces aériens / zones » et restent exclus de PROFIL ESPACES.
+- Limite SIV : jaune fluorescent `#ffea00`, trait renforcé et plein.
+- La bande intérieure SIV reprend la même couleur.
+- Le texte du libellé SIV est jaune fluorescent avec halo sombre et une police plus grande que les autres zones.
+- À l'échelle 5 NM ou plus proche, le libellé SIV est encore agrandi.
+- `SIV MARSEILLE SUD` reçoit la fréquence publiée dans XML_SIA, Volume `SIV MARSEILLE SUD` : `MARSEILLE INFO 120.550`, secteur SUD.
+- `SIV MARSEILLE NORD 1` et `SIV MARSEILLE NORD 2` reçoivent `MARSEILLE INFO 124.500`, secteur NORD.
+- Ces attributions viennent directement de `XML_SIA_2026-08-06.xml` (`Activite` des volumes) et ne sont pas déduites d'une TMA.
+- Le nombre de SIV avec service FIS embarqué passe à 113 et le nombre avec fréquence préférée explicite à 57.
+
+8. ÉTIQUETTES DES ZONES — ÉCHELLE 5 NM
+- Lorsque `getCurrentNpfScaleNm() <= 5`, toutes les étiquettes de zones passent à une police de 14 px et leur tranche verticale à 12 px.
+- Les SIV passent à 16 px / 13 px à cette échelle.
+- La distance anti-collision est augmentée en même temps pour limiter les chevauchements provoqués par cette police plus grande.
+- Aux échelles supérieures à 5 NM, les tailles précédentes sont conservées hors règle SIV spécifique.
+
+9. BANDE INTÉRIEURE DES LIMITES — CÔTÉ RÉEL DU POLYGONE
+- L'ancien retrait tirait chaque sommet vers la moyenne des sommets de la zone.
+- Cette méthode est incorrecte sur une géométrie concave : le « centre moyen » peut se trouver du mauvais côté local d'un segment, ce qui explique la bande passant de l'intérieur à l'extérieur autour de GAP.
+- La v15.69 teste désormais, segment par segment, les deux normales au contour.
+- Le côté n'est retenu que si un point décalé est réellement contenu dans la géométrie SIA.
+- Le retrait reste au minimum à 7 px, soit plus que la demi-épaisseur de la bande de 12 px : il n’est jamais réduit au point de refaire déborder le trait.
+- Les extrémités de chaque segment sont légèrement raccourcies et trois points du segment décalé sont contrôlés dans la géométrie réelle ; si aucun placement sûr n’existe, le segment de bande est omis plutôt que dessiné à l’extérieur.
+- Les segments décalés sont dessinés comme MultiPolyline dans une seule couche Leaflet par anneau afin d'éviter les diagonales artificielles tout en conservant les performances iPad.
+- La règle s'applique à toutes les zones, y compris cercles, formes concaves et limites reconstruites par arcs.
+
+10. DONNÉES / COMPATIBILITÉ
+- AIRAC 08/26, date d'effet 06/08/2026, dataset v04 conservés.
+- Les géométries officielles corrigées v15.67 et les noms P v15.68 restent inchangés.
+- Le payload est modifié uniquement pour les trois secteurs MARSEILLE SUD/NORD explicitement renseignés ci-dessus et sa révision interne passe à 15.69.
+- Nombre d'espaces : 5 066 ; terrains : 877 ; points non-IFR : 1 899 inchangés.
+- Aucun changement NAS.
+
+CONTROLES
+- Vérification de la fréquence `MARSEILLE INFO 120.550` dans la source XML_SIA pour SIV MARSEILLE SUD.
+- Vérification de `MARSEILLE INFO 124.500` pour les deux volumes SIV MARSEILLE NORD.
+- Vérification de l'exclusion SIV du profil conservée.
+- Vérification 25 NM par défaut et plafond +5000 ft / FL115 conservés.
+- Vérification du nouveau placement des repères 2'/5'/10' sur la ligne altitude.
+- Vérification du mécanisme de translation commune du profil.
+- Vérification du gros X sur toutes les fiches SIA détaillées.
+- Vérification du clic direct D-OTHER ponctuel.
+- Vérification du style SIV et de l'agrandissement des étiquettes à 5 NM.
+- Vérification de la bande intérieure par test de géométrie segmentaire.
+- Vérification syntaxique JavaScript de `script.js` et `sw.js`.
+- Validation JSON du manifest.
+- Vérification des références de version v15.69 dans index / script / style / manifest / service worker.
+- Historique des modifications conservé intégralement ci-dessous.
+
+
 VERSION TEST v15.68 — ZONES P : NOMS OFFICIELS + LIBELLÉS FIABLES + PETITES ZONES
 Date : 18/08/2026
 Base : TEST v15.67
