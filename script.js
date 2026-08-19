@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.72';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.73';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -32668,9 +32668,8 @@ async function executeMapLongPressAction(latlng) {
     let zoneCandidates = [];
     try {
         /*
-         * v15.72 — la sélection SIV est indépendante du filtre graphique.
-         * Si aucun calque SIA n'a encore nécessité le dataset, on le charge
-         * seulement à cet instant. Aucun calque masqué n'est redessiné.
+         * v15.73 — sélection SIV indépendante de l'affichage, exécutée uniquement
+         * lors de l'appui long. Aucun chargement SIA supplémentaire au démarrage.
          */
         if (!siaDataset && typeof ensureSiaDatasetLoaded === 'function') {
             await ensureSiaDatasetLoaded();
@@ -46565,12 +46564,10 @@ function getSiaAirspaceChoicePriority(item) {
 }
 
 /*
- * v15.72 — les SIV restent interrogeables même lorsque leur filtre graphique
- * est désactivé. `ase:SIV` commande uniquement le dessin ; « Sélection Zone »
- * complète les surfaces tactiles visibles par les secteurs SIV opérationnels
- * réellement présents sous le point touché.
+ * v15.73 — SIV toujours interrogeable au point touché, même filtre graphique OFF.
+ * Cette fonction n'est appelée qu'au moment de « Sélection Zone ».
  */
-function getSiaAlwaysSelectableSivCandidates(latlng, existingEntries = []) {
+function getSiaHiddenSivTouchCandidates(latlng, existingEntries = []) {
     const dataset = siaDataset;
     if (!dataset || !Array.isArray(dataset.airspaces) || !latlng) return [];
 
@@ -46583,7 +46580,7 @@ function getSiaAlwaysSelectableSivCandidates(latlng, existingEntries = []) {
             .map(entry => getSiaCtrSelectionKey(entry?.item))
             .filter(Boolean)
     );
-    const candidates = [];
+    const result = [];
 
     for (const item of dataset.airspaces) {
         if (!isSiaFlightInformationSector(item)) continue;
@@ -46591,38 +46588,29 @@ function getSiaAlwaysSelectableSivCandidates(latlng, existingEntries = []) {
         if (shouldHideSiaAirspaceAboveFl115(item)) continue;
         if (!item?.g) continue;
 
-        // Rejet rapide par emprise avant conversion de la géométrie compacte.
-        const bounds = Array.isArray(item?.b) ? item.b : null;
-        if (bounds && bounds.length >= 4) {
-            const minLng = Number(bounds[0]);
-            const minLat = Number(bounds[1]);
-            const maxLng = Number(bounds[2]);
-            const maxLat = Number(bounds[3]);
+        const b = Array.isArray(item?.b) ? item.b : null;
+        if (b && b.length >= 4) {
+            const minLng = Number(b[0]);
+            const minLat = Number(b[1]);
+            const maxLng = Number(b[2]);
+            const maxLat = Number(b[3]);
             if (
                 Number.isFinite(minLng) && Number.isFinite(minLat)
                 && Number.isFinite(maxLng) && Number.isFinite(maxLat)
                 && (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat)
-            ) {
-                continue;
-            }
+            ) continue;
         }
 
-        const selectionKey = getSiaCtrSelectionKey(item);
-        if (existingKeys.has(selectionKey)) continue;
+        const key = getSiaCtrSelectionKey(item);
+        if (existingKeys.has(key)) continue;
 
         const geometry = siaCompactGeometryToGeoJson(item.g);
         if (!geometry || !siaGeometryContainsLatLng(geometry, latlng)) continue;
 
-        candidates.push({
-            item,
-            geometry,
-            layer: null,
-            hiddenSivCandidate: true
-        });
-        existingKeys.add(selectionKey);
+        result.push({ item, geometry, layer: null, hiddenSivCandidate: true });
+        if (key) existingKeys.add(key);
     }
-
-    return candidates;
+    return result;
 }
 
 function getSiaAirspaceTouchCandidates(latlng) {
@@ -46634,13 +46622,10 @@ function getSiaAirspaceTouchCandidates(latlng) {
         .filter(entry => !isSiaGenericTmaWithoutAltitude(entry.item, operationalFamilies))
         .filter(entry => siaGeometryContainsLatLng(entry.geometry, latlng));
 
-    const alwaysSelectableSiv = getSiaAlwaysSelectableSivCandidates(
-        latlng,
-        visibleCandidates
-    );
+    const hiddenSivCandidates = getSiaHiddenSivTouchCandidates(latlng, visibleCandidates);
 
     return visibleCandidates
-        .concat(alwaysSelectableSiv)
+        .concat(hiddenSivCandidates)
         .sort((a, b) => {
             const pa = getSiaAirspaceChoicePriority(a.item);
             const pb = getSiaAirspaceChoicePriority(b.item);
