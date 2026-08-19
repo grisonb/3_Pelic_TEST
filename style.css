@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.68 */
+/* NPF_STYLE_BUILD_VERSION: v15.69 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15794,4 +15794,73 @@ body.gaar-point-search-open .gaar-editing-banner {
    intérieur horizontal ; la typographie existante reste volontairement identique. */
 .sia-boundary-label-icon .sia-boundary-label-text.sia-prohibited-label {
     text-align: center;
+}
+
+
+/* ==========================================================================
+   v15.69 — SIMULATION / PROFIL / SIV / PÉLIC / LIBELLÉS
+   ========================================================================== */
+
+/* En simulation, la carte Fréquences OPS est masquée : la pile gauche se
+   compacte automatiquement et le bouton de paramètres simulation remonte. */
+body.simulation-mode-active #ops-frequencies-pdf-button {
+    display: none !important;
+}
+
+/* Même vert fluorescent que l'étiquette du pélicandrome sélectionné/proche. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-active {
+    background-color: #39ff14 !important;
+    border-color: #148d00 !important;
+}
+
+/* Repères 2'/5'/10' du vecteur temps posés sur la ligne d'altitude du profil. */
+.sia-profile-time-dot {
+    fill: #ffea00;
+    stroke: #111827;
+    stroke-width: 3.5;
+    pointer-events: none;
+}
+
+.sia-profile-time-dot-label {
+    fill: #111827;
+    font-size: 11px;
+    font-weight: 950;
+    paint-order: stroke;
+    stroke: rgba(255,255,255,.96);
+    stroke-width: 3px;
+    pointer-events: none;
+}
+
+/* SIV : limite et libellé jaune fluorescent, nettement plus lisibles. */
+.sia-boundary-label-text.sia-siv-label {
+    color: #ffea00 !important;
+    font-size: 14px !important;
+    font-weight: 950 !important;
+    text-shadow:
+        -2px -2px 0 #111827,
+         2px -2px 0 #111827,
+        -2px  2px 0 #111827,
+         2px  2px 0 #111827,
+         0 0 5px #111827 !important;
+}
+
+.sia-boundary-label-text.sia-siv-label .sia-boundary-label-altitude {
+    font-size: 12px !important;
+}
+
+/* À partir de l'échelle 5 NM, toutes les étiquettes de zones sont agrandies. */
+.sia-boundary-label-text.sia-zone-label-near {
+    font-size: 14px !important;
+}
+
+.sia-boundary-label-text.sia-zone-label-near .sia-boundary-label-altitude {
+    font-size: 12px !important;
+}
+
+.sia-boundary-label-text.sia-siv-label.sia-zone-label-near {
+    font-size: 16px !important;
+}
+
+.sia-boundary-label-text.sia-siv-label.sia-zone-label-near .sia-boundary-label-altitude {
+    font-size: 13px !important;
 }
