@@ -1,5 +1,8 @@
-const SW_VERSION = 'sw-v15-75_profile_gaar_chat_sia_perf';
-const APP_VERSION = 'v15.75';
+const SW_VERSION = 'sw-v15-76_split_sia_data';
+const APP_VERSION = 'v15.76';
+const SIA_DATA_REVISION = '15.69';
+const SIA_DATA_URL = './sia.js';
+const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
 
 const DB_NAME = 'OfflineTilesDB_v13_70_clean';
 const LEGACY_TILE_DB_NAME = DB_NAME;
@@ -135,6 +138,7 @@ async function validateVersionSensitiveCoreResponse(url, response) {
         const text = await response.clone().text();
         if (filename === 'index.html') {
             return text.includes(`const APP_VERSION = '${APP_VERSION}'`)
+                && text.includes(`sia.js?siav=${SIA_DATA_REVISION}`)
                 && text.includes(`script.js?appv=${APP_VERSION}`)
                 && text.includes(`style.css?appv=${APP_VERSION}`);
         }
@@ -224,6 +228,39 @@ self.addEventListener('install', event => {
                 + `incomplet ou incohérent: ${failedCoreUrls.join(', ')}`
             );
         }
+
+        /*
+         * v15.76 — données SIA séparées du script principal.
+         * Le cache SIA est indépendant du numéro de version NPF. Son échec ne
+         * doit jamais empêcher l'installation du shell principal.
+         */
+        try {
+            const siaCache = await caches.open(SIA_DATA_CACHE);
+            let siaResponse = null;
+            try {
+                const siaUrl = new URL(SIA_DATA_URL, self.location.href);
+                siaUrl.searchParams.set('siav', SIA_DATA_REVISION);
+                siaUrl.searchParams.set('swinstall', SW_VERSION);
+                const request = new Request(siaUrl.toString(), {
+                    cache: 'reload',
+                    mode: 'same-origin'
+                });
+                const response = await swFetchWithTimeout(request, {}, 18000);
+                if (response && response.ok) {
+                    const text = await response.clone().text();
+                    if (text.includes(`const NPF_SIA_DATA_REVISION = '${SIA_DATA_REVISION}'`)) {
+                        siaResponse = response;
+                    }
+                }
+            } catch (_) {}
+
+            if (siaResponse) {
+                await siaCache.put(SIA_DATA_URL, siaResponse.clone());
+            } else {
+                const existing = await caches.match(SIA_DATA_URL, { ignoreSearch: true });
+                if (existing) await siaCache.put(SIA_DATA_URL, existing.clone());
+            }
+        } catch (_) {}
 
         try {
             const dataCache = await caches.open(APP_DATA_CACHE);
@@ -458,6 +495,11 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    if (isSiaDataRequest(request)) {
+        event.respondWith(handleSiaDataRequest(request));
+        return;
+    }
+
     if (isAppDataRequest(request)) {
         event.respondWith(handleAppDataRequest(request));
         return;
@@ -559,6 +601,16 @@ function isCommunesGeojsonRequest(url) {
 
         return parsed.hostname === 'etalab-datasets.geo.data.gouv.fr'
             && /^\/contours-administratifs\/latest\/geojson\/communes-(?:50|100|1000)m\.geojson(?:\.gz)?$/i.test(parsed.pathname);
+    } catch (_) {
+        return false;
+    }
+}
+
+function isSiaDataRequest(request) {
+    try {
+        const parsed = new URL(request.url);
+        return parsed.origin === self.location.origin
+            && (parsed.pathname.split('/').pop() || '') === 'sia.js';
     } catch (_) {
         return false;
     }
@@ -688,6 +740,43 @@ async function handleAppShellRequest(request) {
     return new Response('', {
         status: 504,
         statusText: 'Offline app shell unavailable'
+    });
+}
+
+async function handleSiaDataRequest(request) {
+    const siaCache = await caches.open(SIA_DATA_CACHE);
+    const cached = await siaCache.match(SIA_DATA_URL, { ignoreSearch: true })
+        || await siaCache.match(request, { ignoreSearch: true })
+        || await caches.match(request, { ignoreSearch: true });
+
+    /*
+     * La base SIA est immuable pour une révision donnée. Cache d'abord : une
+     * petite évolution de NPF ne doit ni retélécharger ni remplacer ce fichier.
+     */
+    if (cached) {
+        try {
+            if (!(await siaCache.match(SIA_DATA_URL, { ignoreSearch: true }))) {
+                await siaCache.put(SIA_DATA_URL, cached.clone());
+            }
+        } catch (_) {}
+        return cached;
+    }
+
+    try {
+        const freshRequest = new Request(request, { cache: 'reload' });
+        const fresh = await swFetchWithTimeout(freshRequest, {}, 18000);
+        if (fresh && fresh.ok) {
+            const text = await fresh.clone().text();
+            if (text.includes(`const NPF_SIA_DATA_REVISION = '${SIA_DATA_REVISION}'`)) {
+                await siaCache.put(SIA_DATA_URL, fresh.clone());
+                return fresh;
+            }
+        }
+    } catch (_) {}
+
+    return new Response('', {
+        status: 504,
+        statusText: 'Offline SIA data unavailable'
     });
 }
 
