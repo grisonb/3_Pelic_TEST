@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.74" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v15.74">
-    <link rel="manifest" href="manifest.json?appv=v15.74">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v15.75" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v15.75">
+    <link rel="manifest" href="manifest.json?appv=v15.75">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v15.74';
+        const APP_VERSION = 'v15.75';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -473,6 +473,17 @@
                 <button id="sia-profile-close" type="button" class="sia-profile-close" aria-label="Fermer le profil">&times;</button>
             </div>
         </div>
+        <div class="sia-profile-zone-toolbar">
+            <div class="sia-profile-zone-toolbar-main">
+                <span class="sia-profile-zone-toolbar-title">Zones du profil</span>
+                <div id="sia-profile-zone-filters" class="sia-profile-zone-filters" aria-label="Sélection des zones affichées dans le profil"></div>
+            </div>
+            <button id="sia-profile-map-zones-toggle"
+                    type="button"
+                    class="sia-profile-map-zones-toggle"
+                    aria-pressed="false"
+                    title="Masquer temporairement les zones de la carte sans modifier les filtres">Masquer zones</button>
+        </div>
         <div id="sia-profile-chart" class="sia-profile-chart"></div>
         <div class="sia-profile-note">FL représentés à 100 ft/FL ; SFC/AGL sans profil de relief.</div>
     </div>
@@ -715,6 +726,14 @@
             </div>
         </div>
         <div class="chat-config-row">
+            <label class="chat-config-cell" for="chat-room-input">
+                <span>Canal</span>
+                <input type="text" id="chat-room-input" maxlength="32" value="Milan" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+            </label>
+            <label class="chat-config-cell" for="chat-user-input">
+                <span>Pseudo</span>
+                <input type="text" id="chat-user-input" maxlength="24" value="" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true">
+            </label>
             <button id="chat-connect-button">Connexion</button>
         </div>
         <div id="chat-messages"></div>
@@ -740,31 +759,10 @@
                        id="chat-connect-gps-checkbox">
             </label>
 
-            <label class="chat-connect-field" for="chat-room-input">
-                <span>Confirmer nom du Canal</span>
-                <input type="text"
-                       id="chat-room-input"
-                       maxlength="32"
-                       value="Milan"
-                       autocomplete="off"
-                       autocorrect="off"
-                       spellcheck="false"
-                       data-lpignore="true"
-                       data-1p-ignore="true">
-            </label>
-
-            <label class="chat-connect-field" for="chat-user-input">
-                <span>Renseigner Pseudo</span>
-                <input type="text"
-                       id="chat-user-input"
-                       maxlength="24"
-                       value=""
-                       autocomplete="off"
-                       autocorrect="off"
-                       spellcheck="false"
-                       data-lpignore="true"
-                       data-1p-ignore="true">
-            </label>
+            <div class="chat-connect-summary" aria-live="polite">
+                <div><span>Canal</span><strong id="chat-connect-room-summary">Milan</strong></div>
+                <div><span>Pseudo</span><strong id="chat-connect-user-summary">—</strong></div>
+            </div>
 
             <div id="chat-connect-modal-status"
                  class="chat-connect-modal-status"
@@ -831,7 +829,7 @@
     <script src="leaflet.min.js"></script>
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
-    <script src="script.js?appv=v15.74"></script>
+    <script src="script.js?appv=v15.75"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
