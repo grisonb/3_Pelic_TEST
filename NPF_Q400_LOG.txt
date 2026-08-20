@@ -1,3 +1,71 @@
+VERSION TEST v15.75 — VECTEUR / GAAR / STABILITÉ SIA / CHAT / PROFIL
+Date : 19/08/2026
+Base : TEST v15.74 (elle-même rebasée sur v15.69 fonctionnelle)
+
+1. VECTEUR TEMPS
+- Recalage de l'ancrage de l'icône Q400 : centre géométrique 48/39 au lieu de 48/48.
+- Le point de départ du vecteur coïncide désormais avec le centre visuel de l'avion.
+- Traits, points 2/5/10 min et libellés utilisent le pane `ownAircraftPane` (z-index 698) : au premier plan des zones SIA et couches cartographiques, derrière la silhouette avion dans le même pane.
+
+2. CRÉATION DES POINTS GAAR
+- En mode CRÉER/MODIFIER GAAR, une surface tactile SIA ne bloque plus le clic carte.
+- Les surfaces SIA transfèrent explicitement le point touché à `handleGaarMapClick(..., {fromSiaSurface:true})`.
+- Même correction pour les D-OTHER ponctuels.
+- Les vrais marqueurs, popups, contrôles Leaflet et points GAAR existants restent prioritaires et ne créent pas de point parasite.
+
+3. STABILITÉ / MÉMOIRE LORSQUE LES ZONES SIA SONT ACTIVES
+- Suppression du recalcul complet à chaque petit `moveend` du suivi GPS.
+- Le rendu charge une couverture tampon de 25 % autour du viewport.
+- Tant que le viewport reste dans cette couverture, aucun GeoJSON, bande intérieure, label ou surface tactile n'est reconstruit.
+- Le zoom, les changements de filtre et la sortie de la couverture déclenchent toujours un rendu complet.
+- Débounce `moveend` porté à 320 ms.
+- Verrou anti-rendus concurrents : une seule reconstruction SIA à la fois, avec un seul rafraîchissement en attente.
+- Cache LRU borné à 900 géométries AIXM converties en GeoJSON : réutilisation locale sans conserver progressivement les 5 066 géométries en mémoire.
+- Les zones surfaciques ne créent plus un second GeoJSON tactile invisible par zone : leur géométrie est testée seulement au moment de « Sélection Zone ». Seuls les D-OTHER ponctuels conservent une hitbox d’appui court.
+- Objectif : réduire fortement les allocations/GC Safari et les rechargements iPad observés avec les zones actives.
+
+4. DIAGRAMME GAAR
+- Le lecteur PDF applique maintenant un grossissement spécifique au GAAR : ×1,45.
+- Ce zoom est indépendant du réglage FdS existant (×1,82).
+
+5. CHAT
+- Les cellules `Canal` et `Pseudo` sont restaurées dans la fenêtre principale du Chat.
+- Elles restent les champs de référence utilisés par la connexion et la mémorisation locale.
+- La fenêtre de confirmation affiche un résumé Canal/Pseudo au lieu de déplacer ces champs hors du Chat.
+- `#team-chat-panel` passe à z-index 1650, donc au-dessus de l'échelle de distance (1350) et au-dessus du profil (1500).
+
+6. PROFIL — SÉLECTION INDÉPENDANTE DES TYPES DE ZONES
+- Une barre `Zones du profil` est ajoutée dans PROFIL.
+- Elle ne propose que les catégories actuellement activées dans le filtre SIA principal et compatibles avec un volume de profil.
+- SIV reste exclu du profil conformément au comportement validé.
+- Chaque catégorie possède sa propre case PROFIL, persistée séparément dans `npfSiaProfileFilterPrefs_v1`.
+- Décocher une case PROFIL masque cette catégorie uniquement dans la coupe verticale ; la carte et le filtre principal ne changent pas.
+- Une catégorie nouvellement activée dans le filtre principal est cochée par défaut dans PROFIL, sauf choix PROFIL déjà mémorisé.
+
+7. BOUTON `MASQUER ZONES` / `AFFICHER ZONES`
+- Le bouton est situé dans PROFIL mais agit UNIQUEMENT sur les zones de la CARTE.
+- `Masquer zones` masque temporairement les volumes/limites/libellés des zones SIA de la carte sans modifier aucune case du filtre principal.
+- `Afficher zones` réaffiche exactement les zones toujours sélectionnées dans le filtre principal.
+- Ce bouton ne modifie jamais les cases du PROFIL et n'a aucun effet sur la coupe verticale.
+- Les terrains/points SIA restent affichés : seul le rendu des espaces/zones est masqué.
+- Lors du masquage graphique, les zones sélectionnées dans le filtre principal restent identifiables par `Sélection Zone`; le SIV reste également toujours proposé selon la règle v15.74.
+
+8. INTÉGRITÉ / PÉRIMÈTRE
+- Payload SIA embarqué inchangé par rapport à v15.74 / v15.69.
+- Fréquences SIV et parents techniques v15.74 conservés.
+- Simulation v15.74 conservée.
+- Aucun changement NAS.
+- Service Worker : nouveau cache `sw-v15-75_profile_gaar_chat_sia_perf`.
+
+9. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v15.75 index/script/style/SW/manifest.
+- Contrôle unicité des IDs `chat-room-input` et `chat-user-input`.
+- Contrôle du bloc payload SIA par hash avec v15.74.
+
+
 VERSION TEST v15.74 — REBASE v15.69 / SIV SÉLECTION & FRÉQUENCES / SIMULATION
 Date : 19/08/2026
 Base : TEST v15.69
