@@ -1,3 +1,61 @@
+VERSION TEST v15.78 — SUIVI ÉCRAN / CENTRAGE VECTEUR / COULEURS VRP
+Date : 20/08/2026
+Base : TEST v15.77 (architecture SIA / Script scindée)
+
+OBJECTIFS
+- Corriger le décentrage excessif du mode Suivi observé aux caps Nord et Nord-Est.
+- Conserver davantage de carte devant la trajectoire sans permettre à l'avion de sortir de l'écran.
+- Recentrer exactement le vecteur temps sur le centre de rotation de la silhouette Q400 à tous les caps.
+- Colorer les points VFR/VRP selon leur aérodrome de rattachement avec une petite palette de couleurs très vives réutilisable géographiquement.
+- Conserver strictement le dataset SIA séparé et inchangé.
+
+1. MODE SUIVI — ZONE D'ÉCRAN SÛRE
+- Remplacement du recul fixe de 26 % par un calcul géométrique dans un rectangle d'écran sûr.
+- Marges réservées pour les commandes latérales, le bandeau commune et la zone basse iPad.
+- L'avion est déplacé sur l'axe opposé au cap jusqu'à 72 % de la marge disponible, jamais jusqu'au bord.
+- Les caps diagonaux ne sont plus normalisés par l'axe dominant : le recul X/Y n'est plus artificiellement amplifié.
+- Cap Est : avion à gauche avec visibilité accrue devant.
+- Cap Nord : avion en partie basse mais toujours visible.
+- Cap Nord-Est : avion dans le secteur inférieur gauche sans sortir sous les commandes.
+- Cap Sud : avion remonte davantage pour libérer la trajectoire vers le bas.
+- Zoom inchangé ; aucun fitBounds automatique ajouté.
+
+2. VECTEUR TEMPS — CENTRE RÉEL DE L'AVION
+- Cause identifiée : le conteneur Q400 58 px a son centre de rotation à Y=45 dans l'icône Leaflet, alors que l'ancre géographique était à Y=39.
+- Cette différence de 6 px devenait particulièrement visible aux caps Est/Ouest, où le vecteur passait à côté de l'axe du fuselage.
+- `iconAnchor` passe de `[48,39]` à `[48,45]`.
+- Le point GPS, le départ du vecteur et le centre de rotation de la silhouette coïncident désormais.
+- Aucune translation dépendante du cap n'est appliquée au vecteur lui-même.
+
+3. POINTS VFR / VRP — COULEUR PAR AÉROPORT
+- Les VRP utilisent directement leur champ SIA d'aérodrome de rattachement (`item.a`).
+- Nîmes-Garons `LFTW` est imposé en magenta vif `#ff00ff`.
+- Montpellier-Méditerranée `LFMT` est imposé en jaune vif `#ffff00`.
+- Palette volontairement limitée et très saturée : magenta, jaune, cyan, vert fluorescent, orange et rouge vif.
+- Les couleurs sont réutilisées pour des aérodromes éloignés afin d'éviter une multitude de teintes.
+- Attribution automatique : les aérodromes situés à moins de 100 NM les uns des autres évitent autant que possible la même couleur.
+- En cas de forte densité, priorité à la réduction des conflits locaux puis à la réutilisation équilibrée de la palette.
+- Tous les VRP rattachés au même aérodrome conservent exactement la même couleur.
+- Couleur du texte automatiquement noire ou blanche selon la luminosité du fond ; contour noir conservé.
+- Les VRP sans aérodrome de rattachement exploitable conservent le magenta historique en repli.
+
+4. DONNÉES SIA / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.77/v15.76.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement des géométries, terrains, points ou fréquences SIA.
+- Aucun changement NAS.
+- Service Worker : logique inchangée ; seuls `SW_VERSION` et `APP_VERSION` passent en v15.78.
+
+5. CONTRÔLES
+- Contrôle syntaxique `node --check` du Script.
+- Contrôle syntaxique `node --check` de `sia.js`.
+- Contrôle syntaxique `node --check` du Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.78 dans Index / Script / Style / Manifest / SW.
+- Hash de `sia.js` comparé à v15.77 : fichier strictement identique.
+- Vérification que les couleurs explicites LFTW/LFMT sont présentes et que la palette VRP reste limitée à 6 couleurs.
+
+
 VERSION TEST v15.77 — SIMULATION / APPUI LONG / SUIVI / R108 AF1 / PÉLICANDROMES
 Date : 20/08/2026
 Base : TEST v15.76 (données SIA déjà séparées de Script)
