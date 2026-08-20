@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.76 */
+/* NPF_STYLE_BUILD_VERSION: v15.77 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -5861,11 +5861,13 @@ body {
     margin-bottom: 0;
 }
 
+/* v15.77 — en simulation, la silhouette reste identique au GPS réel.
+ * Aucun carré/fond autour du Q400 ; seul le badge SIM distingue le mode. */
 .own-gps-simulation-icon .own-gps-plane-body {
-    background: #7c2d12 !important;
-    border-color: #ffffff !important;
-    color: #ffffff !important;
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, .85), 0 2px 7px rgba(0,0,0,.45) !important;
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+    box-shadow: none !important;
 }
 
 .own-gps-sim-badge {
@@ -5875,7 +5877,7 @@ body {
     transform: translateX(-50%);
     padding: 1px 5px;
     border-radius: 999px;
-    background: #7c2d12;
+    background: #e3001b;
     color: #ffffff;
     border: 2px solid #ffffff;
     font-size: 10px;
@@ -16087,4 +16089,14 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     flex: none !important;
     transform: scale(1.45) !important;
     transform-origin: 0 0 !important;
+}
+
+
+/* ==========================================================================
+   v15.77 — menu appui long unifié / zone indisponible
+   ========================================================================== */
+.npf-map-longpress-action:disabled {
+    opacity: .45 !important;
+    filter: grayscale(.35);
+    cursor: default !important;
 }
