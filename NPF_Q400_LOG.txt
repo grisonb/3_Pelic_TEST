@@ -1,3 +1,82 @@
+VERSION TEST v15.79 — SUIVI CARDINAL / BANDES SIA / VRP / DÉDUPLICATION SS-GLR / NETTOYAGE TRAFICS
+Date : 20/08/2026
+Base : TEST v15.78 (architecture SIA / Script scindée)
+
+OBJECTIFS
+- Corriger définitivement le placement écran du propre avion en mode Suivi, notamment Est/Ouest et les diagonales.
+- Renforcer les marges pour que la silhouette Q400 et ses informations ne soient plus collées aux limites de la carte.
+- Garantir des couleurs différentes aux aérodromes VFR proches avec une palette limitée et très vive.
+- Rendre la bande intérieure SIA robuste sur les limites partiellement problématiques, sans modifier les géométries officielles.
+- Rétablir la priorité SafeSky sur GLR pour les indicatifs fortement ressemblants, notamment PELIC34 / PELICAN 34.
+- Supprimer les réminiscences d'étiquettes/traits lorsqu'un trafic disparaît.
+
+1. MODE SUIVI — GÉOMÉTRIE CARDINALE ET MARGES
+- Nouveau placement déterministe par sinus/cosinus, sans calcul radial vers le bord.
+- Cap 090° Est : avion à gauche et EXACTEMENT centré sur la hauteur de l'écran.
+- Cap 270° Ouest : avion à droite et EXACTEMENT centré sur la hauteur de l'écran.
+- Cap 000° Nord : avion en bas et EXACTEMENT centré sur la largeur.
+- Cap 180° Sud : avion en haut et EXACTEMENT centré sur la largeur.
+- Aux caps intermédiaires, interpolation continue entre ces positions.
+- Décentrage horizontal limité à 25 % de la largeur et vertical à 26 % de la hauteur.
+- Marges de sécurité renforcées pour conserver l'ensemble visuel Q400 + altitude + badge SIM loin des bords.
+- Le zoom courant et la pause de 10 s après geste manuel restent inchangés.
+- Le centrage du vecteur temps sur le point GPS corrigé en v15.78 est conservé.
+
+2. POINTS VFR / VRP — COULEURS LOCALES STRICTES
+- LFTW Nîmes-Garons reste imposé en magenta vif.
+- LFMT Montpellier-Méditerranée reste imposé en jaune vif.
+- Palette portée à 9 couleurs franches : magenta, jaune, cyan, vert fluorescent, orange, rouge, violet électrique, turquoise fluorescent et bleu électrique.
+- Rayon de voisinage fixé à 55 NM, suffisant pour distinguer les ensembles de VRP visibles dans une même zone opérationnelle.
+- Remplacement du simple score v15.78 par une coloration DSATUR : une couleur déjà utilisée par un aérodrome voisin est exclue tant qu'une couleur libre existe.
+- Sur le dataset AIRAC 08/26 actuel, aucun conflit local n'est nécessaire ; LFTW et LFMI reçoivent donc obligatoirement des couleurs différentes.
+- Les couleurs restent réutilisées entre aérodromes éloignés ; il n'y a pas une couleur unique par terrain.
+- Texte noir/blanc automatique et contour noir conservés.
+
+3. BANDES INTÉRIEURES DES ZONES SIA
+- Le dataset et les géométries SIA restent strictement inchangés.
+- Le problème observé sur des zones de Nîmes, Istres/Perpignan et Orange venait du rejet d'un segment complet dès qu'une partie de son décalage intérieur échouait.
+- Nouveau comportement : tentative sur le segment complet puis subdivision récursive uniquement si nécessaire.
+- Une limite problématique peut être découpée jusqu'à 5 niveaux ; les portions réellement intérieures sont conservées et seules les petites portions impossibles sont omises.
+- Le décalage minimal de 7 px et la bande de 12 px / opacité 22 % sont conservés.
+- Le choix du côté reste contrôlé par inclusion réelle dans la géométrie, sans supposer l'orientation du polygone.
+- Cette correction s'applique à toutes les zones polygonales utilisant la bande intérieure, pas à une liste de zones codée en dur.
+
+4. SAFESKY / GLR — PRIORITÉ SAFESKY ET FORTE RESSEMBLANCE
+- La règle de non-superposition est réaffirmée : lorsqu'un même aéronef est reconnu dans SafeSky et GLR, seul le plot SafeSky reste affiché.
+- La comparaison utilise désormais le callsign ET l'immatriculation SafeSky lorsqu'ils sont disponibles.
+- Normalisation espaces/tirets/ponctuation conservée.
+- Le numéro final doit être strictement identique : PELIC34 ne peut pas fusionner avec PELIC35.
+- Les abréviations fortes de préfixe sont reconnues, notamment PELIC34 ↔ PELICAN 34.
+- Les petites différences de type DRAGO13 ↔ DRAGON13 restent reconnues.
+- Pour une correspondance floue, la proximité géographique doit être <= 3 NM afin d'éviter de fusionner deux appareils différents travaillant dans la même zone.
+- Les correspondances exactes restent prioritaires.
+- La logique « mon avion » SafeSky masqué mais prioritaire sur son doublon GLR est conservée.
+
+5. TRAFICS — SUPPRESSION DES RÉMINISCENCES D'ÉTIQUETTES
+- SafeSky : avant retrait d'un trafic, suppression explicite de l'étiquette et du connecteur DOM, fermeture/déliaison du popup puis retrait Leaflet.
+- Les callbacks requestAnimationFrame retardés vérifient désormais que le marqueur existe encore, est connecté et n'a pas été marqué supprimé avant de recréer/mettre à jour un connecteur.
+- GLR : à chaque reconstruction, purge explicite des anciens symboles, étiquettes et connecteurs DOM après clearLayers.
+- Même purge lors de la désactivation de GLR.
+- Objectif : aucun texte ni trait orphelin après disparition d'un trafic, y compris sur Safari/WebKit iPad.
+
+6. DONNÉES SIA / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.78/v15.76.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement NAS.
+- Aucune mise à jour automatique SIA ajoutée.
+- Service Worker : logique inchangée ; seuls les identifiants de version/cache passent en v15.79.
+
+7. CONTRÔLES
+- Contrôle syntaxique `node --check` du Script.
+- Contrôle syntaxique `node --check` de `sia.js`.
+- Contrôle syntaxique `node --check` du Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.79 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.78.
+- Vérification ciblée de la logique de similarité : PELIC34 / PELICAN 34 reconnu ; PELIC34 / PELICAN 35 refusé.
+- Vérification de la coloration AIRAC 08/26 : LFTW et LFMI différents et absence de conflit de couleur à <= 55 NM avec la palette courante.
+
+
 VERSION TEST v15.78 — SUIVI ÉCRAN / CENTRAGE VECTEUR / COULEURS VRP
 Date : 20/08/2026
 Base : TEST v15.77 (architecture SIA / Script scindée)
