@@ -1,3 +1,96 @@
+VERSION TEST v15.77 — SIMULATION / APPUI LONG / SUIVI / R108 AF1 / PÉLICANDROMES
+Date : 20/08/2026
+Base : TEST v15.76 (données SIA déjà séparées de Script)
+
+OBJECTIFS
+- Conserver strictement la séparation `script.js` / `sia.js` validée en v15.76.
+- Démarrer la simulation directement à la position GPS courante connue.
+- Supprimer le fond/carré autour de l'avion simulé et conserver uniquement un badge SIM rouge.
+- Unifier l'appui long carte entre mode normal et simulation.
+- Donner davantage de visibilité devant l'avion en mode Suivi.
+- Empêcher les fenêtres SIA de lutter contre le déplacement automatique de la carte en mode Suivi.
+- Corriger les bandes intérieures manquantes sur certaines géométries, notamment R108 A F1.
+- Faire respecter strictement le nombre de pélicandromes demandé.
+
+1. MODE SIMULATION — DÉPART À LA POSITION GPS
+- À l'activation du mode Simulation, NPF capture la dernière position GPS connue AVANT de couper le suivi GPS réel.
+- L'avion simulé est immédiatement initialisé à cette position.
+- Si aucune position n'est encore disponible, une demande GPS ponctuelle est utilisée pour initialiser le point de départ.
+- Le déplacement commence ensuite automatiquement selon la vitesse et la route simulation déjà réglées.
+- L'appui long conserve la possibilité de repositionner volontairement l'avion ailleurs.
+- Le moteur cinématique dédié v15.74/v15.76 reste inchangé.
+
+2. AVION SIMULÉ — AFFICHAGE
+- Suppression du carré/fond marron autour de la silhouette Q400.
+- La silhouette avion reste identique à celle du GPS réel.
+- Le badge `SIM` reste sous l'avion.
+- Le badge `SIM` passe sur fond rouge `#e3001b`, texte blanc.
+
+3. APPUI LONG CARTE — MENU UNIQUE
+- Même logique d'appui long en mode normal et en mode Simulation.
+- Boutons communs :
+  - `Créer Feu`
+  - `Sélection Zone`
+- En mode Simulation uniquement, ajout de :
+  - `Positionner avion`
+- `Sélection Zone` reste présente mais désactivée lorsqu'aucune zone SIA n'est trouvée sous le point.
+- Le comportement SIV v15.74 est conservé : un SIV contenant le point peut être proposé même si son filtre graphique est masqué.
+- En simulation, `Créer Feu` conserve la création d'un `Feu SIM`.
+
+4. MODE SUIVI — VISIBILITÉ DEVANT LA TRAJECTOIRE
+- Le mode Suivi ne centre plus l'avion au milieu de l'écran.
+- Le centre cartographique est décalé dans le sens du cap, avec environ 26 % de recul sur chaque axe dominant.
+- Exemples :
+  - cap Est : avion à gauche de l'écran ;
+  - cap Nord : avion dans la partie basse ;
+  - cap Nord-Est : avion dans le quart inférieur gauche ;
+  - comportement symétrique pour les autres caps.
+- La logique travaille en pixels écran : le positionnement reste cohérent quel que soit le zoom.
+- Le clic ponctuel de recentrage hors mode Suivi conserve un centrage exact sur l'avion.
+
+5. FENÊTRES DE ZONE SIA + MODE SUIVI
+- Les popups de détail et de choix des zones SIA utilisent `autoPan=false` et `keepInView=false` lorsque le Suivi est actif.
+- La carte et la trajectoire de l'avion deviennent prioritaires : une fenêtre de zone peut sortir naturellement de l'écran.
+- Si une fiche SIA était déjà ouverte au moment où le Suivi est activé, son autoPan est neutralisé immédiatement.
+- Hors mode Suivi, le comportement habituel de maintien des fenêtres dans l'écran est conservé.
+
+6. R108 A F1 — BANDE / LIMITE INTÉRIEURE
+- La géométrie officielle SIA de `LFR108AF1` n'est pas modifiée.
+- Cause corrigée dans le rendu : auparavant, un segment entier de bande intérieure était rejeté si une seule de ses extrémités décalées tombait hors du polygone près d'un angle.
+- Nouveau retrait adaptatif :
+  - le milieu du segment détermine le côté intérieur ;
+  - si une extrémité est hors zone, recherche dichotomique du premier point intérieur ;
+  - marge supplémentaire de 4 px vers l'intérieur pour conserver le trait de 12 px dans la zone ;
+  - contrôle des points à 25 %, 50 % et 75 % avant dessin.
+- Vérification géométrique sur R108 A F1 : les deux grandes limites qui étaient rejetées par l'ancien algorithme sont désormais conservées aux zooms opérationnels.
+- Aucune modification du dataset SIA.
+
+7. NOMBRE DE PÉLICANDROMES
+- `Nbr Pélic.` devient une limite stricte.
+- Le bug observé venait du pélicandrome déjà sélectionné : s'il n'était pas dans les N plus proches, il était ajouté en supplément.
+- Désormais, si le pélic sélectionné doit être conservé, il REMPLACE le plus éloigné de la liste automatique.
+- Exemple : `Nbr Pélic. = 3` affiche toujours 3 routes pélicandromes, jamais 4.
+- La route BASE reste gérée séparément.
+- Le pélic sélectionné reste prioritaire pour BINGO et les calculs mission tant que `Nbr Pélic.` est supérieur à 0.
+
+8. DONNÉES SIA / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.76.
+- Révision SIA toujours `15.69`.
+- AIRAC 08/26, effet 06/08/2026.
+- Aucun changement NAS.
+- Aucune mise à jour automatique SIA ajoutée.
+- Service Worker : logique inchangée ; seuls `SW_VERSION` et `APP_VERSION` passent en v15.77.
+
+9. CONTRÔLES
+- Contrôle syntaxique `node --check` du Script.
+- Contrôle syntaxique `node --check` de `sia.js`.
+- Contrôle syntaxique `node --check` du Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.77 dans Index / Script / Style / Manifest / SW.
+- Hash de `sia.js` comparé à v15.76 : fichier strictement identique.
+- Vérification ciblée de la géométrie R108 A F1 avec l'algorithme de bande intérieure corrigé.
+
+
 VERSION TEST v15.76 — SÉPARATION DONNÉES SIA / SCRIPT
 Date : 20/08/2026
 Base : TEST v15.75
