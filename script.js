@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.77';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.78';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -21759,8 +21759,20 @@ function installCenterGpsButtonPressHandlers(button) {
     });
 }
 
-const CENTER_GPS_FOLLOW_LOOK_AHEAD_X_RATIO = 0.26;
-const CENTER_GPS_FOLLOW_LOOK_AHEAD_Y_RATIO = 0.26;
+/*
+ * v15.78 — Suivi : l'avion reste dans une zone utile de l'écran.
+ * Les marges tiennent compte des colonnes de boutons, du bandeau commune et
+ * de la poignée iPad. Le décentrage est calculé sur un rayon vers l'arrière de
+ * la trajectoire, sans sur-amplification des caps diagonaux.
+ */
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO = 0.13;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO = 0.13;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO = 0.10;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO = 0.16;
+const CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX = 150;
+const CENTER_GPS_FOLLOW_MIN_TOP_MARGIN_PX = 85;
+const CENTER_GPS_FOLLOW_MIN_BOTTOM_MARGIN_PX = 145;
+const CENTER_GPS_FOLLOW_SAFE_EDGE_USAGE = 0.72;
 
 function getCenterGpsFollowHeadingDegrees() {
     const heading = Number(lastPosition?.heading);
@@ -21790,20 +21802,40 @@ function getCenterGpsFollowMapCenter(pos, zoom) {
         }
 
         const headingRad = headingDeg * Math.PI / 180;
-        const rawX = Math.sin(headingRad);
-        const rawY = -Math.cos(headingRad);
-        const dominant = Math.max(Math.abs(rawX), Math.abs(rawY), 1e-9);
+        const forwardX = Math.sin(headingRad);
+        const forwardY = -Math.cos(headingRad);
+        const behindX = -forwardX;
+        const behindY = -forwardY;
+
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const safeLeft = Math.min(centerX - 20, Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, width * CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO));
+        const safeRight = Math.max(centerX + 20, width - Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, width * CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO));
+        const safeTop = Math.min(centerY - 20, Math.max(CENTER_GPS_FOLLOW_MIN_TOP_MARGIN_PX, height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO));
+        const safeBottom = Math.max(centerY + 20, height - Math.max(CENTER_GPS_FOLLOW_MIN_BOTTOM_MARGIN_PX, height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO));
 
         /*
-         * v15.77 — position "look-ahead" en mode Suivi :
-         * le centre de la carte est décalé dans le sens du vol.
-         * Le propre avion se retrouve donc à l'opposé de la trajectoire :
-         * Est -> gauche, Nord -> bas, Nord-Est -> quart inférieur gauche, etc.
-         * La normalisation par l'axe dominant conserve le même recul sur les
-         * diagonales au lieu de rapprocher l'avion du centre.
+         * On cherche jusqu'où l'avion peut reculer sur l'axe opposé au cap
+         * sans sortir du rectangle sûr. Pour un cap diagonal, la même distance
+         * vectorielle est appliquée sur X/Y : plus de normalisation par l'axe
+         * dominant, qui poussait auparavant l'avion jusque dans un coin.
          */
-        const aheadX = (rawX / dominant) * width * CENTER_GPS_FOLLOW_LOOK_AHEAD_X_RATIO;
-        const aheadY = (rawY / dominant) * height * CENTER_GPS_FOLLOW_LOOK_AHEAD_Y_RATIO;
+        const EPS = 1e-7;
+        let maxTravel = Infinity;
+        if (behindX < -EPS) maxTravel = Math.min(maxTravel, (centerX - safeLeft) / (-behindX));
+        if (behindX > EPS) maxTravel = Math.min(maxTravel, (safeRight - centerX) / behindX);
+        if (behindY < -EPS) maxTravel = Math.min(maxTravel, (centerY - safeTop) / (-behindY));
+        if (behindY > EPS) maxTravel = Math.min(maxTravel, (safeBottom - centerY) / behindY);
+
+        if (!Number.isFinite(maxTravel) || maxTravel <= 0) return pos;
+
+        const travel = maxTravel * CENTER_GPS_FOLLOW_SAFE_EDGE_USAGE;
+        const aircraftScreenX = centerX + behindX * travel;
+        const aircraftScreenY = centerY + behindY * travel;
+
+        // Décalage du centre cartographique nécessaire pour obtenir ce point écran.
+        const aheadX = centerX - aircraftScreenX;
+        const aheadY = centerY - aircraftScreenY;
 
         const aircraftPixel = map.project(L.latLng(pos.lat, pos.lng), zoom);
         const mapCenterPixel = L.point(
@@ -22603,9 +22635,10 @@ function buildOwnGpsIcon(altitudeLabel = '', options = {}) {
         className: `own-gps-altitude-marker own-gps-plane-icon${hasAltitudeLabel ? ' has-own-gps-altitude' : ' no-own-gps-altitude'}${isSimulation ? ' own-gps-simulation-icon' : ''}`,
         html: `${altitudeHtml}${simulationHtml}<div class="own-gps-plane-body"><span class="own-gps-plane-shape">${q400IconHtml}</span></div>`,
         iconSize: [96, 78],
-        // v15.75 — le point géographique passe par le centre visuel de la silhouette.
-        // L'ancien ancrage Y=48 décalait l'avion de 9 px par rapport au vecteur temps.
-        iconAnchor: [48, 39]
+        // v15.78 — ancrage sur le centre réel du conteneur Q400.
+        // Le body 58 px est centré à Y=45 (top 50 % + margin-top -23 px) :
+        // le vecteur temps part ainsi du centre de rotation de l'avion à tous les caps.
+        iconAnchor: [48, 45]
     });
 }
 
@@ -34183,9 +34216,147 @@ function buildSiaTerrainPopup(item) {
     `;
 }
 
+const SIA_VRP_AIRPORT_COLOR_PALETTE = Object.freeze([
+    '#ff00ff', // magenta
+    '#ffff00', // jaune
+    '#00e5ff', // cyan
+    '#39ff14', // vert fluorescent
+    '#ff7a00', // orange
+    '#ff1744'  // rouge vif
+]);
+const SIA_VRP_AIRPORT_COLOR_OVERRIDES = Object.freeze({
+    LFTW: '#ff00ff', // Nîmes-Garons
+    LFMT: '#ffff00'  // Montpellier-Méditerranée
+});
+const SIA_VRP_NEIGHBOUR_DISTANCE_NM = 100;
+let siaVrpAirportColorMap = null;
+let siaVrpAirportColorDataset = null;
+
+function getSiaVrpReadableTextColor(background) {
+    const hex = String(background || '').replace('#', '');
+    if (!/^[0-9a-f]{6}$/i.test(hex)) return '#ffffff';
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    // Contraste simple sRGB : texte noir sur les teintes très lumineuses.
+    const luminance = (0.299 * r) + (0.587 * g) + (0.114 * b);
+    return luminance >= 150 ? '#000000' : '#ffffff';
+}
+
+function buildSiaVrpAirportColorMap(dataset) {
+    const mapByAirport = new Map();
+    if (!dataset) return mapByAirport;
+
+    const airports = Array.from(new Set(
+        (dataset.points || [])
+            .filter(item => item?.k === 'dpn:VRP')
+            .map(item => String(item?.a || '').trim().toUpperCase())
+            .filter(Boolean)
+    ));
+
+    const coordsByAirport = new Map();
+    for (const terrain of dataset.terrain || []) {
+        const code = String(terrain?.c || '').trim().toUpperCase();
+        if (!airports.includes(code) || coordsByAirport.has(code)) continue;
+        const lat = Number(terrain?.x);
+        const lon = Number(terrain?.y);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            coordsByAirport.set(code, { lat, lon });
+        }
+    }
+
+    const neighbours = new Map(airports.map(code => [code, []]));
+    for (let i = 0; i < airports.length; i += 1) {
+        const aCode = airports[i];
+        const a = coordsByAirport.get(aCode);
+        if (!a) continue;
+        for (let j = i + 1; j < airports.length; j += 1) {
+            const bCode = airports[j];
+            const b = coordsByAirport.get(bCode);
+            if (!b) continue;
+            const distance = calculateDistanceInNm(a.lat, a.lon, b.lat, b.lon);
+            if (Number.isFinite(distance) && distance <= SIA_VRP_NEIGHBOUR_DISTANCE_NM) {
+                neighbours.get(aCode).push(bCode);
+                neighbours.get(bCode).push(aCode);
+            }
+        }
+    }
+
+    const paletteIndexByColor = new Map(SIA_VRP_AIRPORT_COLOR_PALETTE.map((color, index) => [color.toLowerCase(), index]));
+    const assignedIndex = new Map();
+    const usage = new Array(SIA_VRP_AIRPORT_COLOR_PALETTE.length).fill(0);
+
+    // Affectations imposées par l'utilisateur.
+    Object.entries(SIA_VRP_AIRPORT_COLOR_OVERRIDES).forEach(([code, color]) => {
+        const index = paletteIndexByColor.get(String(color).toLowerCase());
+        if (Number.isInteger(index) && airports.includes(code)) {
+            assignedIndex.set(code, index);
+            usage[index] += 1;
+        }
+    });
+
+    const orderedAirports = airports
+        .filter(code => !assignedIndex.has(code))
+        .sort((a, b) => ((neighbours.get(b)?.length || 0) - (neighbours.get(a)?.length || 0)) || a.localeCompare(b));
+
+    const stableSeed = code => Array.from(code).reduce((sum, char) => ((sum * 33) + char.charCodeAt(0)) >>> 0, 5381);
+
+    for (const code of orderedAirports) {
+        const nearCodes = neighbours.get(code) || [];
+        const seed = stableSeed(code) % SIA_VRP_AIRPORT_COLOR_PALETTE.length;
+        let bestIndex = 0;
+        let bestScore = Infinity;
+
+        for (let offset = 0; offset < SIA_VRP_AIRPORT_COLOR_PALETTE.length; offset += 1) {
+            const index = (seed + offset) % SIA_VRP_AIRPORT_COLOR_PALETTE.length;
+            const conflicts = nearCodes.reduce((count, neighbourCode) => (
+                count + (assignedIndex.get(neighbourCode) === index ? 1 : 0)
+            ), 0);
+            // Les conflits locaux coûtent très cher ; à égalité on réutilise la couleur la moins chargée.
+            const score = (conflicts * 1000) + usage[index] + (offset * 0.001);
+            if (score < bestScore) {
+                bestScore = score;
+                bestIndex = index;
+            }
+        }
+
+        assignedIndex.set(code, bestIndex);
+        usage[bestIndex] += 1;
+    }
+
+    airports.forEach(code => {
+        const forced = SIA_VRP_AIRPORT_COLOR_OVERRIDES[code];
+        const index = assignedIndex.get(code);
+        const background = forced || SIA_VRP_AIRPORT_COLOR_PALETTE[Number.isInteger(index) ? index : 0];
+        mapByAirport.set(code, {
+            background,
+            foreground: getSiaVrpReadableTextColor(background)
+        });
+    });
+
+    return mapByAirport;
+}
+
+function ensureSiaVrpAirportColorMap(dataset = siaDataset) {
+    if (siaVrpAirportColorMap && siaVrpAirportColorDataset === dataset) return siaVrpAirportColorMap;
+    siaVrpAirportColorDataset = dataset || null;
+    siaVrpAirportColorMap = buildSiaVrpAirportColorMap(dataset);
+    return siaVrpAirportColorMap;
+}
+
+function getSiaVrpAirportVisual(item) {
+    const airport = String(item?.a || '').trim().toUpperCase();
+    if (!airport) {
+        return { background: '#ff00ff', foreground: '#ffffff' };
+    }
+    const mapByAirport = ensureSiaVrpAirportColorMap();
+    return mapByAirport.get(airport) || { background: '#ff00ff', foreground: '#ffffff' };
+}
+
 function getSiaPointMarkerStyle(item) {
     if (item.k === 'dpn:VRP') {
-        return { radius: 4.5, color: '#111111', weight: 1.5, fillColor: '#ff00ff', fillOpacity: 1 };
+        const visual = getSiaVrpAirportVisual(item);
+        return { radius: 4.5, color: '#111111', weight: 1.5, fillColor: visual.background, fillOpacity: 1 };
     }
     if (item.k === 'dpn:ADHP') {
         return { radius: 3.5, color: '#263238', weight: 1.5, fillColor: '#90a4ae', fillOpacity: 0.9 };
@@ -37985,6 +38156,7 @@ async function refreshSiaLayers(reason = 'manual') {
             if (item.k === 'dpn:VRP') {
                 const symbolText = getSiaVrpSymbolText(item);
                 const size = getSiaVrpVisualSize(symbolText);
+                const vrpVisual = getSiaVrpAirportVisual(item);
                 const marker = L.marker(latlng, {
                     pane: 'siaPointPane',
                     interactive: true,
@@ -37992,7 +38164,7 @@ async function refreshSiaLayers(reason = 'manual') {
                     keyboard: false,
                     icon: L.divIcon({
                         className: 'sia-vrp-div-icon',
-                        html: `<span class="sia-vrp-symbol" style="width:${size}px;height:${size}px;font-size:${symbolText.length >= 5 ? 8 : symbolText.length === 4 ? 9 : 11}px">${escapeHtml(symbolText)}</span>`,
+                        html: `<span class="sia-vrp-symbol" style="--sia-vrp-bg:${vrpVisual.background};--sia-vrp-fg:${vrpVisual.foreground};width:${size}px;height:${size}px;font-size:${symbolText.length >= 5 ? 8 : symbolText.length === 4 ? 9 : 11}px">${escapeHtml(symbolText)}</span>`,
                         iconSize: [size, size],
                         iconAnchor: [size / 2, size / 2]
                     })
