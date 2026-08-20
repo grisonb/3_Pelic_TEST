@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.78';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.79';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -14788,11 +14788,33 @@ function prepareTrafficMarkerReconciliation(entry, aircraft, nowMs) {
 }
 
 function removeTrafficMarkerEntry(key, entry) {
-    try {
-        if (entry?.marker && trafficLayer) {
-            trafficLayer.removeLayer(entry.marker);
-        }
-    } catch (_) {}
+    const marker = entry?.marker;
+    if (marker) {
+        marker._npfTrafficRemoved = true;
+
+        /*
+         * v15.79 — nettoyage explicite avant retrait Leaflet. Safari/WebKit
+         * pouvait parfois conserver une réminiscence de l'étiquette ou de son
+         * connecteur après disparition du trafic.
+         */
+        try {
+            const icon = marker._icon;
+            if (icon) {
+                icon.querySelectorAll?.(
+                    '.traffic-aircraft-altitude-label, .traffic-label-connector'
+                )?.forEach?.(node => node.remove());
+            }
+        } catch (_) {}
+        try { marker.closePopup?.(); } catch (_) {}
+        try { marker.unbindPopup?.(); } catch (_) {}
+        try {
+            if (trafficLayer) trafficLayer.removeLayer(marker);
+        } catch (_) {}
+        try {
+            if (marker._icon?.isConnected) marker._icon.remove();
+        } catch (_) {}
+    }
+
     trafficMarkerRegistry.delete(key);
 }
 
@@ -15064,13 +15086,18 @@ function updateTrafficMarkerLabelConnector(marker) {
 }
 
 function scheduleTrafficMarkerLabelConnector(marker) {
-    if (!marker) return;
+    if (!marker || marker._npfTrafficRemoved) return;
+
+    const updateIfStillActive = () => {
+        if (marker._npfTrafficRemoved) return;
+        const icon = marker._icon;
+        if (!marker._map || !icon || !icon.isConnected) return;
+        updateTrafficMarkerLabelConnector(marker);
+    };
 
     requestAnimationFrame(() => {
-        updateTrafficMarkerLabelConnector(marker);
-        requestAnimationFrame(() => {
-            updateTrafficMarkerLabelConnector(marker);
-        });
+        updateIfStillActive();
+        requestAnimationFrame(updateIfStillActive);
     });
 }
 
@@ -15812,6 +15839,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
                 renderNow
             );
 
+            entry.marker._npfTrafficRemoved = false;
             entry.marker._trafficAircraftKey = aircraftKey;
             entry.marker._npfTrafficAircraft = ac;
 
@@ -15849,6 +15877,7 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             }
         );
 
+        marker._npfTrafficRemoved = false;
         marker._trafficAircraftKey = aircraftKey;
         marker._npfTrafficAircraft = ac;
         updateTrafficMarkerPopup(marker, popupHtml);
@@ -18933,87 +18962,157 @@ function splitTrafficComparableCallsign(value) {
     };
 }
 
-function trafficCallsignEditDistanceAtMostOne(left, right) {
+function trafficCallsignEditDistance(left, right, maxDistance = 4) {
     const a = String(left || '');
     const b = String(right || '');
-    if (a === b) return true;
-    if (Math.abs(a.length - b.length) > 1) return false;
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
 
-    /*
-     * Distance de Levenshtein limitée à 1 : substitution, insertion ou
-     * suppression d'un seul caractère. Suffisant pour DRAGO <-> DRAGON.
-     */
-    if (a.length === b.length) {
-        let differences = 0;
-        for (let i = 0; i < a.length; i += 1) {
-            if (a[i] !== b[i] && ++differences > 1) return false;
+    let previous = Array.from({ length: b.length + 1 }, (_value, index) => index);
+    for (let i = 1; i <= a.length; i += 1) {
+        const current = [i];
+        let rowMinimum = current[0];
+        for (let j = 1; j <= b.length; j += 1) {
+            const substitutionCost = a[i - 1] === b[j - 1] ? 0 : 1;
+            current[j] = Math.min(
+                previous[j] + 1,
+                current[j - 1] + 1,
+                previous[j - 1] + substitutionCost
+            );
+            rowMinimum = Math.min(rowMinimum, current[j]);
         }
-        return differences === 1;
+        if (rowMinimum > maxDistance) return maxDistance + 1;
+        previous = current;
     }
-
-    const shorter = a.length < b.length ? a : b;
-    const longer = a.length < b.length ? b : a;
-    let i = 0;
-    let j = 0;
-    let differences = 0;
-
-    while (i < shorter.length && j < longer.length) {
-        if (shorter[i] === longer[j]) {
-            i += 1;
-            j += 1;
-            continue;
-        }
-        differences += 1;
-        if (differences > 1) return false;
-        j += 1;
-    }
-
-    if (j < longer.length) differences += 1;
-    return differences <= 1;
+    return previous[b.length];
 }
 
-function compareTrafficSourceCallsigns(glrName, safeSkyCallsign) {
+function trafficCallsignCommonPrefixLength(left, right) {
+    const a = String(left || '');
+    const b = String(right || '');
+    const limit = Math.min(a.length, b.length);
+    let index = 0;
+    while (index < limit && a[index] === b[index]) index += 1;
+    return index;
+}
+
+function compareTrafficSourceCallsigns(glrName, safeSkyIdentifier) {
     const glr = splitTrafficComparableCallsign(glrName);
-    const ss = splitTrafficComparableCallsign(safeSkyCallsign);
+    const ss = splitTrafficComparableCallsign(safeSkyIdentifier);
 
     if (!glr.compact || !ss.compact) {
-        return { match: false, mode: '' };
+        return { match: false, mode: '', fuzzy: false, similarity: 0 };
     }
 
     if (glr.compact === ss.compact) {
-        return { match: true, mode: 'exact-normalized' };
+        return { match: true, mode: 'exact-normalized', fuzzy: false, similarity: 1 };
     }
 
     /*
-     * Tolérance volontairement stricte :
-     * - un numéro final doit exister des deux côtés et être identique ;
-     * - les deux préfixes doivent avoir au moins 4 caractères ;
-     * - une seule différence de caractère maximum est acceptée.
-     *
-     * Ainsi MILAN75 ne peut pas fusionner avec MILAN76, mais
-     * DRAGO13 peut fusionner avec DRAGON13.
+     * v15.79 — forte ressemblance GLR / SafeSky :
+     * - le numéro final doit être STRICTEMENT identique ;
+     * - les préfixes doivent avoir au moins 4 caractères ;
+     * - abréviation évidente admise (PELIC <-> PELICAN) ;
+     * - petite faute/insertion admise (DRAGO <-> DRAGON).
+     * La proximité géographique confirme ensuite les rapprochements flous.
      */
     if (
-        glr.suffix
-        && ss.suffix
-        && glr.suffix === ss.suffix
-        && glr.base.length >= 4
-        && ss.base.length >= 4
-        && trafficCallsignEditDistanceAtMostOne(glr.base, ss.base)
+        !glr.suffix
+        || !ss.suffix
+        || glr.suffix !== ss.suffix
+        || glr.base.length < 4
+        || ss.base.length < 4
     ) {
-        return { match: true, mode: 'same-number-fuzzy-prefix' };
+        return { match: false, mode: '', fuzzy: false, similarity: 0 };
     }
 
-    return { match: false, mode: '' };
+    const shorter = glr.base.length <= ss.base.length ? glr.base : ss.base;
+    const longer = glr.base.length > ss.base.length ? glr.base : ss.base;
+    const lengthDifference = longer.length - shorter.length;
+    const editDistance = trafficCallsignEditDistance(glr.base, ss.base, 3);
+    const maxLength = Math.max(glr.base.length, ss.base.length);
+    const similarity = maxLength > 0
+        ? Math.max(0, 1 - (editDistance / maxLength))
+        : 0;
+    const commonPrefixLength = trafficCallsignCommonPrefixLength(glr.base, ss.base);
+
+    const isStrongPrefixAbbreviation = (
+        longer.startsWith(shorter)
+        && shorter.length >= 4
+        && lengthDifference <= 3
+        && (shorter.length / longer.length) >= 0.60
+    );
+    if (isStrongPrefixAbbreviation) {
+        return {
+            match: true,
+            mode: 'same-number-prefix-abbreviation',
+            fuzzy: true,
+            similarity
+        };
+    }
+
+    const isStrongTypoMatch = (
+        editDistance <= 1
+        || (
+            editDistance <= 2
+            && similarity >= 0.70
+            && commonPrefixLength >= 3
+        )
+    );
+    if (isStrongTypoMatch) {
+        return {
+            match: true,
+            mode: 'same-number-strong-similarity',
+            fuzzy: true,
+            similarity
+        };
+    }
+
+    return { match: false, mode: '', fuzzy: false, similarity };
 }
+
+const TRAFFIC_GLR_FUZZY_MATCH_MAX_DISTANCE_NM = 3;
 
 function getSafeSkyTrafficForGlobalLinkDedup() {
     /*
-     * v15.43 — les trafics SafeSky réellement rendus restent prioritaires,
-     * mais « mon avion » est aussi conservé comme candidat de déduplication
-     * même lorsqu'il est volontairement masqué de la couche SafeSky.
+     * SafeSky reste la source prioritaire lorsqu'elle est affichée. Chaque
+     * candidat expose désormais TOUS ses identifiants utiles (callsign +
+     * immatriculation), et non plus seulement le callsign.
      */
     const result = [];
+    const seenCandidateKeys = new Set();
+
+    const pushCandidate = ({ aircraft, marker = null, ownAircraft = false, ownId = '' }) => {
+        const ac = aircraft || {};
+        const identifiers = [ac.callsign, ac.registration]
+            .map(value => String(value || '').trim())
+            .filter(value => value && value !== 'N/A' && value !== '--');
+        const normalizedIdentifiers = Array.from(new Set(
+            identifiers.map(normalizeTrafficSourceCallsign).filter(Boolean)
+        ));
+        if (!normalizedIdentifiers.length) return;
+
+        const aircraftKey = ownAircraft
+            ? `own:${ownId || ac.id || normalizedIdentifiers[0]}`
+            : (marker?._trafficAircraftKey || buildTrafficAircraftKey(ac));
+        const candidateKey = `${aircraftKey || ''}|${normalizedIdentifiers.join('|')}`;
+        if (seenCandidateKeys.has(candidateKey)) return;
+        seenCandidateKeys.add(candidateKey);
+
+        const latLng = marker?.getLatLng?.();
+        result.push({
+            callsign: String(ac.callsign || '').trim(),
+            registration: String(ac.registration || '').trim(),
+            identifiers,
+            normalizedIdentifiers,
+            lat: Number(latLng?.lat ?? ac.lat),
+            lon: Number(latLng?.lng ?? ac.lon),
+            aircraftKey,
+            ownAircraft
+        });
+    };
 
     if (
         showTrafficLayer
@@ -19022,50 +19121,17 @@ function getSafeSkyTrafficForGlobalLinkDedup() {
         && map.hasLayer?.(trafficLayer)
     ) {
         trafficMarkerRegistry.forEach(entry => {
-            const ac = entry?.aircraft;
-            const marker = entry?.marker;
-            if (!ac || !marker) return;
-
-            const callsign = String(ac.callsign || '').trim();
-            if (!callsign || callsign === 'N/A') return;
-
-            const latLng = marker.getLatLng?.();
-            result.push({
-                callsign,
-                lat: Number(latLng?.lat ?? ac.lat),
-                lon: Number(latLng?.lng ?? ac.lon),
-                aircraftKey: marker._trafficAircraftKey || buildTrafficAircraftKey(ac),
-                ownAircraft: false
-            });
+            if (!entry?.aircraft || !entry?.marker || entry.marker._npfTrafficRemoved) return;
+            pushCandidate({ aircraft: entry.aircraft, marker: entry.marker });
         });
     }
 
     const ownAircraft = getOwnTrafficAircraftSession();
     if (ownAircraft) {
-        const ownLabels = [
-            ownAircraft.callsign,
-            ownAircraft.registration
-        ]
-            .map(value => String(value || '').trim())
-            .filter(value => value && value !== 'N/A');
-
-        const knownNormalized = new Set(
-            result
-                .map(item => normalizeTrafficSourceCallsign(item.callsign))
-                .filter(Boolean)
-        );
-
-        ownLabels.forEach(callsign => {
-            const normalized = normalizeTrafficSourceCallsign(callsign);
-            if (!normalized || knownNormalized.has(normalized)) return;
-            knownNormalized.add(normalized);
-            result.push({
-                callsign,
-                lat: null,
-                lon: null,
-                aircraftKey: `own:${ownAircraft.id}`,
-                ownAircraft: true
-            });
+        pushCandidate({
+            aircraft: ownAircraft,
+            ownAircraft: true,
+            ownId: ownAircraft.id
         });
     }
 
@@ -19081,12 +19147,6 @@ function findSafeSkyMatchForGlobalLinkItem(item, safeSkyTraffic) {
     let best = null;
 
     safeSkyTraffic.forEach(candidate => {
-        const comparison = compareTrafficSourceCallsigns(
-            glrName,
-            candidate.callsign
-        );
-        if (!comparison.match) return;
-
         let distanceNm = Infinity;
         if (
             Number.isFinite(Number(item?.lat))
@@ -19102,24 +19162,51 @@ function findSafeSkyMatchForGlobalLinkItem(item, safeSkyTraffic) {
             );
         }
 
-        const score = comparison.mode === 'exact-normalized' ? 0 : 1;
-        if (
-            !best
-            || score < best.score
-            || (
-                score === best.score
-                && Number(distanceNm) < Number(best.distanceNm)
-            )
-        ) {
-            best = {
-                score,
-                mode: comparison.mode,
-                glrName,
-                safeSkyCallsign: candidate.callsign,
-                safeSkyAircraftKey: candidate.aircraftKey,
-                distanceNm: Number.isFinite(distanceNm) ? distanceNm : null
-            };
-        }
+        const identifiers = Array.isArray(candidate.identifiers) && candidate.identifiers.length
+            ? candidate.identifiers
+            : [candidate.callsign, candidate.registration].filter(Boolean);
+
+        identifiers.forEach(identifier => {
+            const comparison = compareTrafficSourceCallsigns(glrName, identifier);
+            if (!comparison.match) return;
+
+            /*
+             * Une ressemblance floue n'est validée que si les deux plots sont
+             * géographiquement compatibles. Exception : « mon avion », dont la
+             * position SafeSky est volontairement absente lorsque son plot est masqué.
+             */
+            if (
+                comparison.fuzzy
+                && !candidate.ownAircraft
+                && (
+                    !Number.isFinite(distanceNm)
+                    || distanceNm > TRAFFIC_GLR_FUZZY_MATCH_MAX_DISTANCE_NM
+                )
+            ) {
+                return;
+            }
+
+            const modeScore = comparison.mode === 'exact-normalized'
+                ? 0
+                : (comparison.mode === 'same-number-prefix-abbreviation' ? 1 : 2);
+            const score = modeScore * 100
+                + (1 - Number(comparison.similarity || 0)) * 10
+                + (Number.isFinite(distanceNm) ? Math.min(distanceNm, 9.9) : 9.9);
+
+            if (!best || score < best.score) {
+                best = {
+                    score,
+                    mode: comparison.mode,
+                    similarity: comparison.similarity,
+                    glrName,
+                    safeSkyCallsign: candidate.callsign,
+                    safeSkyRegistration: candidate.registration,
+                    safeSkyMatchedIdentifier: identifier,
+                    safeSkyAircraftKey: candidate.aircraftKey,
+                    distanceNm: Number.isFinite(distanceNm) ? distanceNm : null
+                };
+            }
+        });
     });
 
     return best;
@@ -19257,11 +19344,23 @@ function buildGlobalLinkLabelLayout(items) {
     return placements;
 }
 
+
+function purgeGlobalLinkDomArtifacts() {
+    try {
+        const container = map?.getContainer?.();
+        if (!container) return;
+        container.querySelectorAll(
+            '.global-link-aircraft-marker, .global-link-aircraft-label-marker, .global-link-connector-marker'
+        ).forEach(node => node.remove());
+    } catch (_) {}
+}
+
 function renderGlobalLinkPositions(positions) {
     npfGlobalLinkLastPositions = Array.isArray(positions) ? positions : [];
     const layer = ensureGlobalLinkLayer();
     if (!layer) return;
     layer.clearLayers();
+    purgeGlobalLinkDomArtifacts();
     if (!npfGlobalLinkEnabled) {
         npfGlobalLinkRenderedCount = 0;
         npfGlobalLinkSafeSkyMatches = [];
@@ -19491,6 +19590,7 @@ function setGlobalLinkEnabled(enabled, options = {}) {
     if (!npfGlobalLinkEnabled) {
         stopGlobalLinkRefreshTimer();
         if (npfGlobalLinkLayer) npfGlobalLinkLayer.clearLayers();
+        purgeGlobalLinkDomArtifacts();
         updateGlobalLinkButton();
         return;
     }
@@ -19521,6 +19621,7 @@ function initializeGlobalLinkUi() {
         npfGlobalLinkEnabled = false;
         stopGlobalLinkRefreshTimer();
         if (npfGlobalLinkLayer) npfGlobalLinkLayer.clearLayers();
+        purgeGlobalLinkDomArtifacts();
         try {
             localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, '0');
         } catch (_) {}
@@ -21760,19 +21861,20 @@ function installCenterGpsButtonPressHandlers(button) {
 }
 
 /*
- * v15.78 — Suivi : l'avion reste dans une zone utile de l'écran.
- * Les marges tiennent compte des colonnes de boutons, du bandeau commune et
- * de la poignée iPad. Le décentrage est calculé sur un rayon vers l'arrière de
- * la trajectoire, sans sur-amplification des caps diagonaux.
+ * v15.79 — Suivi : position écran déterministe selon le cap.
+ * Les caps cardinaux conservent strictement l'axe orthogonal centré :
+ * 090/270 -> Y = 50 %, 000/180 -> X = 50 %. Les diagonales utilisent les
+ * composantes sinus/cosinus sans pousser l'avion jusque sur les bords.
  */
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO = 0.13;
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO = 0.13;
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO = 0.10;
+const CENTER_GPS_FOLLOW_HORIZONTAL_OFFSET_RATIO = 0.25;
+const CENTER_GPS_FOLLOW_VERTICAL_OFFSET_RATIO = 0.26;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO = 0.18;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO = 0.18;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO = 0.16;
 const CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO = 0.16;
-const CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX = 150;
-const CENTER_GPS_FOLLOW_MIN_TOP_MARGIN_PX = 85;
-const CENTER_GPS_FOLLOW_MIN_BOTTOM_MARGIN_PX = 145;
-const CENTER_GPS_FOLLOW_SAFE_EDGE_USAGE = 0.72;
+const CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX = 165;
+const CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX = 120;
+const CENTER_GPS_FOLLOW_CARDINAL_EPSILON = 1e-8;
 
 function getCenterGpsFollowHeadingDegrees() {
     const heading = Number(lastPosition?.heading);
@@ -21802,38 +21904,62 @@ function getCenterGpsFollowMapCenter(pos, zoom) {
         }
 
         const headingRad = headingDeg * Math.PI / 180;
-        const forwardX = Math.sin(headingRad);
-        const forwardY = -Math.cos(headingRad);
-        const behindX = -forwardX;
-        const behindY = -forwardY;
+        let sinHeading = Math.sin(headingRad);
+        let cosHeading = Math.cos(headingRad);
+
+        // Évite toute composante parasite aux caps cardinaux (ex. cos(90°)).
+        if (Math.abs(sinHeading) < CENTER_GPS_FOLLOW_CARDINAL_EPSILON) sinHeading = 0;
+        if (Math.abs(cosHeading) < CENTER_GPS_FOLLOW_CARDINAL_EPSILON) cosHeading = 0;
 
         const centerX = width / 2;
         const centerY = height / 2;
-        const safeLeft = Math.min(centerX - 20, Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, width * CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO));
-        const safeRight = Math.max(centerX + 20, width - Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, width * CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO));
-        const safeTop = Math.min(centerY - 20, Math.max(CENTER_GPS_FOLLOW_MIN_TOP_MARGIN_PX, height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO));
-        const safeBottom = Math.max(centerY + 20, height - Math.max(CENTER_GPS_FOLLOW_MIN_BOTTOM_MARGIN_PX, height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO));
 
         /*
-         * On cherche jusqu'où l'avion peut reculer sur l'axe opposé au cap
-         * sans sortir du rectangle sûr. Pour un cap diagonal, la même distance
-         * vectorielle est appliquée sur X/Y : plus de normalisation par l'axe
-         * dominant, qui poussait auparavant l'avion jusque dans un coin.
+         * Position souhaitée du POINT GPS à l'écran :
+         * - Est/Ouest : hauteur exactement centrée ;
+         * - Nord/Sud : largeur exactement centrée ;
+         * - diagonales : interpolation naturelle par sinus/cosinus.
+         *
+         * Les amplitudes sont volontairement plus modérées que v15.78 afin de
+         * garder la silhouette Q400, l'altitude et le badge SIM loin des bords.
          */
-        const EPS = 1e-7;
-        let maxTravel = Infinity;
-        if (behindX < -EPS) maxTravel = Math.min(maxTravel, (centerX - safeLeft) / (-behindX));
-        if (behindX > EPS) maxTravel = Math.min(maxTravel, (safeRight - centerX) / behindX);
-        if (behindY < -EPS) maxTravel = Math.min(maxTravel, (centerY - safeTop) / (-behindY));
-        if (behindY > EPS) maxTravel = Math.min(maxTravel, (safeBottom - centerY) / behindY);
+        const desiredX = centerX
+            - sinHeading * width * CENTER_GPS_FOLLOW_HORIZONTAL_OFFSET_RATIO;
+        const desiredY = centerY
+            + cosHeading * height * CENTER_GPS_FOLLOW_VERTICAL_OFFSET_RATIO;
 
-        if (!Number.isFinite(maxTravel) || maxTravel <= 0) return pos;
+        const safeLeft = Math.min(
+            centerX,
+            Math.max(
+                CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX,
+                width * CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO
+            )
+        );
+        const safeRight = Math.max(
+            centerX,
+            width - Math.max(
+                CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX,
+                width * CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO
+            )
+        );
+        const safeTop = Math.min(
+            centerY,
+            Math.max(
+                CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX,
+                height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO
+            )
+        );
+        const safeBottom = Math.max(
+            centerY,
+            height - Math.max(
+                CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX,
+                height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO
+            )
+        );
 
-        const travel = maxTravel * CENTER_GPS_FOLLOW_SAFE_EDGE_USAGE;
-        const aircraftScreenX = centerX + behindX * travel;
-        const aircraftScreenY = centerY + behindY * travel;
+        const aircraftScreenX = Math.min(safeRight, Math.max(safeLeft, desiredX));
+        const aircraftScreenY = Math.min(safeBottom, Math.max(safeTop, desiredY));
 
-        // Décalage du centre cartographique nécessaire pour obtenir ce point écran.
         const aheadX = centerX - aircraftScreenX;
         const aheadY = centerY - aircraftScreenY;
 
@@ -34222,13 +34348,22 @@ const SIA_VRP_AIRPORT_COLOR_PALETTE = Object.freeze([
     '#00e5ff', // cyan
     '#39ff14', // vert fluorescent
     '#ff7a00', // orange
-    '#ff1744'  // rouge vif
+    '#ff1744', // rouge vif
+    '#7c4dff', // violet électrique
+    '#00ff95', // turquoise fluorescent
+    '#2979ff'  // bleu électrique
 ]);
 const SIA_VRP_AIRPORT_COLOR_OVERRIDES = Object.freeze({
     LFTW: '#ff00ff', // Nîmes-Garons
     LFMT: '#ffff00'  // Montpellier-Méditerranée
 });
-const SIA_VRP_NEIGHBOUR_DISTANCE_NM = 100;
+/*
+ * v15.79 — « voisin » signifie ici terrain suffisamment proche pour que ses
+ * VRP puissent être visibles dans la même zone opérationnelle. À 55 NM, le
+ * dataset AIRAC 08/26 est coloriable avec la palette limitée de 9 couleurs,
+ * sans conflit entre voisins (notamment LFTW / LFMI).
+ */
+const SIA_VRP_NEIGHBOUR_DISTANCE_NM = 55;
 let siaVrpAirportColorMap = null;
 let siaVrpAirportColorDataset = null;
 
@@ -34238,7 +34373,6 @@ function getSiaVrpReadableTextColor(background) {
     const r = parseInt(hex.slice(0, 2), 16);
     const g = parseInt(hex.slice(2, 4), 16);
     const b = parseInt(hex.slice(4, 6), 16);
-    // Contraste simple sRGB : texte noir sur les teintes très lumineuses.
     const luminance = (0.299 * r) + (0.587 * g) + (0.114 * b);
     return luminance >= 150 ? '#000000' : '#ffffff';
 }
@@ -34254,10 +34388,11 @@ function buildSiaVrpAirportColorMap(dataset) {
             .filter(Boolean)
     ));
 
+    const airportSet = new Set(airports);
     const coordsByAirport = new Map();
     for (const terrain of dataset.terrain || []) {
         const code = String(terrain?.c || '').trim().toUpperCase();
-        if (!airports.includes(code) || coordsByAirport.has(code)) continue;
+        if (!airportSet.has(code) || coordsByAirport.has(code)) continue;
         const lat = Number(terrain?.x);
         const lon = Number(terrain?.y);
         if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -34265,7 +34400,7 @@ function buildSiaVrpAirportColorMap(dataset) {
         }
     }
 
-    const neighbours = new Map(airports.map(code => [code, []]));
+    const neighbours = new Map(airports.map(code => [code, new Set()]));
     for (let i = 0; i < airports.length; i += 1) {
         const aCode = airports[i];
         const a = coordsByAirport.get(aCode);
@@ -34276,58 +34411,109 @@ function buildSiaVrpAirportColorMap(dataset) {
             if (!b) continue;
             const distance = calculateDistanceInNm(a.lat, a.lon, b.lat, b.lon);
             if (Number.isFinite(distance) && distance <= SIA_VRP_NEIGHBOUR_DISTANCE_NM) {
-                neighbours.get(aCode).push(bCode);
-                neighbours.get(bCode).push(aCode);
+                neighbours.get(aCode).add(bCode);
+                neighbours.get(bCode).add(aCode);
             }
         }
     }
 
-    const paletteIndexByColor = new Map(SIA_VRP_AIRPORT_COLOR_PALETTE.map((color, index) => [color.toLowerCase(), index]));
+    const paletteIndexByColor = new Map(
+        SIA_VRP_AIRPORT_COLOR_PALETTE.map((color, index) => [color.toLowerCase(), index])
+    );
     const assignedIndex = new Map();
     const usage = new Array(SIA_VRP_AIRPORT_COLOR_PALETTE.length).fill(0);
 
-    // Affectations imposées par l'utilisateur.
     Object.entries(SIA_VRP_AIRPORT_COLOR_OVERRIDES).forEach(([code, color]) => {
         const index = paletteIndexByColor.get(String(color).toLowerCase());
-        if (Number.isInteger(index) && airports.includes(code)) {
+        if (Number.isInteger(index) && airportSet.has(code)) {
             assignedIndex.set(code, index);
             usage[index] += 1;
         }
     });
 
-    const orderedAirports = airports
-        .filter(code => !assignedIndex.has(code))
-        .sort((a, b) => ((neighbours.get(b)?.length || 0) - (neighbours.get(a)?.length || 0)) || a.localeCompare(b));
+    const stableSeed = code => Array.from(code).reduce(
+        (sum, char) => ((sum * 33) + char.charCodeAt(0)) >>> 0,
+        5381
+    );
 
-    const stableSeed = code => Array.from(code).reduce((sum, char) => ((sum * 33) + char.charCodeAt(0)) >>> 0, 5381);
+    /*
+     * DSATUR : on traite d'abord le terrain dont les voisins déjà colorés
+     * utilisent le plus de couleurs différentes. Contrairement à v15.78, une
+     * couleur déjà utilisée par un voisin n'est PAS candidate tant qu'une
+     * couleur libre existe.
+     */
+    while (assignedIndex.size < airports.length) {
+        const unassigned = airports.filter(code => !assignedIndex.has(code));
+        if (!unassigned.length) break;
 
-    for (const code of orderedAirports) {
-        const nearCodes = neighbours.get(code) || [];
-        const seed = stableSeed(code) % SIA_VRP_AIRPORT_COLOR_PALETTE.length;
-        let bestIndex = 0;
-        let bestScore = Infinity;
+        unassigned.sort((a, b) => {
+            const saturationA = new Set(
+                Array.from(neighbours.get(a) || [])
+                    .map(code => assignedIndex.get(code))
+                    .filter(Number.isInteger)
+            ).size;
+            const saturationB = new Set(
+                Array.from(neighbours.get(b) || [])
+                    .map(code => assignedIndex.get(code))
+                    .filter(Number.isInteger)
+            ).size;
+            if (saturationA !== saturationB) return saturationB - saturationA;
+            const degreeA = neighbours.get(a)?.size || 0;
+            const degreeB = neighbours.get(b)?.size || 0;
+            if (degreeA !== degreeB) return degreeB - degreeA;
+            return a.localeCompare(b);
+        });
 
-        for (let offset = 0; offset < SIA_VRP_AIRPORT_COLOR_PALETTE.length; offset += 1) {
-            const index = (seed + offset) % SIA_VRP_AIRPORT_COLOR_PALETTE.length;
-            const conflicts = nearCodes.reduce((count, neighbourCode) => (
-                count + (assignedIndex.get(neighbourCode) === index ? 1 : 0)
-            ), 0);
-            // Les conflits locaux coûtent très cher ; à égalité on réutilise la couleur la moins chargée.
-            const score = (conflicts * 1000) + usage[index] + (offset * 0.001);
-            if (score < bestScore) {
-                bestScore = score;
-                bestIndex = index;
-            }
+        const code = unassigned[0];
+        const usedByNeighbours = new Set(
+            Array.from(neighbours.get(code) || [])
+                .map(neighbourCode => assignedIndex.get(neighbourCode))
+                .filter(Number.isInteger)
+        );
+
+        let candidates = SIA_VRP_AIRPORT_COLOR_PALETTE
+            .map((_color, index) => index)
+            .filter(index => !usedByNeighbours.has(index));
+
+        /*
+         * Garde-fou pour un futur AIRAC plus dense : sur le dataset actuel ce
+         * repli n'est jamais utilisé. S'il devenait nécessaire, on minimise
+         * alors le nombre de conflits au lieu d'échouer complètement.
+         */
+        if (!candidates.length) {
+            let minimumConflicts = Infinity;
+            candidates = [];
+            SIA_VRP_AIRPORT_COLOR_PALETTE.forEach((_color, index) => {
+                const conflicts = Array.from(neighbours.get(code) || [])
+                    .reduce((count, neighbourCode) => (
+                        count + (assignedIndex.get(neighbourCode) === index ? 1 : 0)
+                    ), 0);
+                if (conflicts < minimumConflicts) {
+                    minimumConflicts = conflicts;
+                    candidates = [index];
+                } else if (conflicts === minimumConflicts) {
+                    candidates.push(index);
+                }
+            });
         }
 
-        assignedIndex.set(code, bestIndex);
-        usage[bestIndex] += 1;
+        const seed = stableSeed(code) % SIA_VRP_AIRPORT_COLOR_PALETTE.length;
+        candidates.sort((a, b) => (
+            usage[a] - usage[b]
+            || ((a - seed + SIA_VRP_AIRPORT_COLOR_PALETTE.length) % SIA_VRP_AIRPORT_COLOR_PALETTE.length)
+                - ((b - seed + SIA_VRP_AIRPORT_COLOR_PALETTE.length) % SIA_VRP_AIRPORT_COLOR_PALETTE.length)
+        ));
+
+        const chosenIndex = candidates[0] ?? 0;
+        assignedIndex.set(code, chosenIndex);
+        usage[chosenIndex] += 1;
     }
 
     airports.forEach(code => {
         const forced = SIA_VRP_AIRPORT_COLOR_OVERRIDES[code];
         const index = assignedIndex.get(code);
-        const background = forced || SIA_VRP_AIRPORT_COLOR_PALETTE[Number.isInteger(index) ? index : 0];
+        const background = forced
+            || SIA_VRP_AIRPORT_COLOR_PALETTE[Number.isInteger(index) ? index : 0];
         mapByAirport.set(code, {
             background,
             foreground: getSiaVrpReadableTextColor(background)
@@ -36862,6 +37048,8 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
 
     const segments = [];
     const safeInset = Math.max(7, Number(insetPixels) || 7);
+    const MAX_SUBDIVISION_DEPTH = 5;
+    const MIN_SOURCE_PIECE_PX = 10;
 
     const isLayerPointInsideGeometry = point => {
         try {
@@ -36887,63 +37075,42 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
         if (isLayerPointInsideGeometry(endpoint)) return endpoint;
         if (!isLayerPointInsideGeometry(midpoint)) return null;
 
-        /*
-         * v15.77 — certaines zones triangulaires/étroites (ex. R108 A F1)
-         * avaient leur longue limite intérieure supprimée : le milieu du
-         * segment décalé était bien dans la zone mais une extrémité, proche
-         * d'un angle, sortait encore après le retrait fixe de 6 px.
-         *
-         * On cherche alors par dichotomie le premier point réellement intérieur
-         * entre l'angle et le milieu, puis on avance encore de 4 px pour que
-         * l'arrondi du trait de 12 px reste lui aussi à l'intérieur.
-         */
         let outside = endpoint;
         let inside = midpoint;
-
-        for (let step = 0; step < 8; step += 1) {
+        for (let step = 0; step < 9; step += 1) {
             const candidate = L.point(
                 (outside.x + inside.x) / 2,
                 (outside.y + inside.y) / 2
             );
-            if (isLayerPointInsideGeometry(candidate)) {
-                inside = candidate;
-            } else {
-                outside = candidate;
-            }
+            if (isLayerPointInsideGeometry(candidate)) inside = candidate;
+            else outside = candidate;
         }
 
-        return movePointToward(inside, midpoint, 4);
+        // 2 px suffisent : l'axe reste déjà décalé de 7 px pour un trait de 12 px.
+        return movePointToward(inside, midpoint, 2);
     };
 
-    for (let i = 1; i < raw.length; i += 1) {
-        const a = raw[i - 1];
-        const b = raw[i];
-        if (!Array.isArray(a) || !Array.isArray(b) || a.length < 2 || b.length < 2) continue;
-
-        const pa = map.latLngToLayerPoint(L.latLng(Number(a[1]), Number(a[0])));
-        const pb = map.latLngToLayerPoint(L.latLng(Number(b[1]), Number(b[0])));
+    const tryInsetPiece = (pa, pb, trimStart, trimEnd) => {
         const dx = pb.x - pa.x;
         const dy = pb.y - pa.y;
         const length = Math.hypot(dx, dy);
-        if (!Number.isFinite(length) || length < 1) continue;
+        if (!Number.isFinite(length) || length < 2) return null;
 
         const tx = dx / length;
         const ty = dy / length;
+        const endpointTrim = Math.min(5, length * 0.16);
+        const startTrim = trimStart ? endpointTrim : 0;
+        const endTrim = trimEnd ? endpointTrim : 0;
+        if (startTrim + endTrim >= length - 2) return null;
+
+        const baseA = L.point(pa.x + tx * startTrim, pa.y + ty * startTrim);
+        const baseB = L.point(pb.x - tx * endTrim, pb.y - ty * endTrim);
         const normals = [
             { x: -ty, y: tx },
             { x: ty, y: -tx }
         ];
 
-        /*
-         * Bande 12 px : axe à au moins 7 px de la frontière.
-         * Le retrait initial de 6 px reste conservé ; v15.77 ajoute seulement
-         * un retrait adaptatif aux angles lorsque nécessaire.
-         */
-        const trim = Math.min(6, length * 0.20);
-        const baseA = L.point(pa.x + tx * trim, pa.y + ty * trim);
-        const baseB = L.point(pb.x - tx * trim, pb.y - ty * trim);
-
-        let shiftedSegment = null;
+        let best = null;
         for (const normal of normals) {
             const shiftedA = L.point(
                 baseA.x + normal.x * safeInset,
@@ -36958,6 +37125,7 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
                 (shiftedA.y + shiftedB.y) / 2
             );
 
+            // Le milieu tranche le côté intérieur ; les autres points évaluent la robustesse.
             if (!isLayerPointInsideGeometry(shiftedMid)) continue;
 
             const safeA = findFirstInsideTowardMid(shiftedA, shiftedMid);
@@ -36965,30 +37133,67 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
             if (!safeA || !safeB) continue;
 
             const safeLength = Math.hypot(safeB.x - safeA.x, safeB.y - safeA.y);
-            if (!Number.isFinite(safeLength) || safeLength < 4) continue;
+            if (!Number.isFinite(safeLength) || safeLength < 3) continue;
 
-            const quarterA = L.point(
-                safeA.x + (safeB.x - safeA.x) * 0.25,
-                safeA.y + (safeB.y - safeA.y) * 0.25
+            const testPoints = [0.20, 0.35, 0.50, 0.65, 0.80].map(ratio => L.point(
+                safeA.x + (safeB.x - safeA.x) * ratio,
+                safeA.y + (safeB.y - safeA.y) * ratio
+            ));
+            const insideCount = testPoints.reduce(
+                (count, point) => count + (isLayerPointInsideGeometry(point) ? 1 : 0),
+                0
             );
-            const quarterB = L.point(
-                safeA.x + (safeB.x - safeA.x) * 0.75,
-                safeA.y + (safeB.y - safeA.y) * 0.75
-            );
+            if (insideCount < 5) continue;
 
-            if (![safeA, quarterA, shiftedMid, quarterB, safeB].every(isLayerPointInsideGeometry)) {
-                continue;
+            if (!best || safeLength > best.safeLength) {
+                best = { safeA, safeB, safeLength };
             }
-
-            shiftedSegment = [
-                map.layerPointToLatLng(safeA),
-                map.layerPointToLatLng(safeB)
-            ];
-            break;
         }
 
-        // Si aucune portion suffisamment sûre n'est trouvée, ce segment reste omis.
-        if (shiftedSegment) segments.push(shiftedSegment);
+        return best ? [best.safeA, best.safeB] : null;
+    };
+
+    const buildPieceRecursively = (pa, pb, depth, trimStart, trimEnd) => {
+        const direct = tryInsetPiece(pa, pb, trimStart, trimEnd);
+        if (direct) return [direct];
+
+        const length = Math.hypot(pb.x - pa.x, pb.y - pa.y);
+        if (
+            depth >= MAX_SUBDIVISION_DEPTH
+            || !Number.isFinite(length)
+            || length < MIN_SOURCE_PIECE_PX
+        ) {
+            return [];
+        }
+
+        /*
+         * v15.79 — au lieu de supprimer toute une limite lorsqu'un angle ou une
+         * concavité invalide une partie du segment, on coupe la limite en deux
+         * et on ne conserve que les portions réellement intérieures.
+         */
+        const midpoint = L.point((pa.x + pb.x) / 2, (pa.y + pb.y) / 2);
+        return [
+            ...buildPieceRecursively(pa, midpoint, depth + 1, trimStart, false),
+            ...buildPieceRecursively(midpoint, pb, depth + 1, false, trimEnd)
+        ];
+    };
+
+    for (let i = 1; i < raw.length; i += 1) {
+        const a = raw[i - 1];
+        const b = raw[i];
+        if (!Array.isArray(a) || !Array.isArray(b) || a.length < 2 || b.length < 2) continue;
+
+        const pa = map.latLngToLayerPoint(L.latLng(Number(a[1]), Number(a[0])));
+        const pb = map.latLngToLayerPoint(L.latLng(Number(b[1]), Number(b[0])));
+        const pieces = buildPieceRecursively(pa, pb, 0, true, true);
+
+        pieces.forEach(piece => {
+            if (!Array.isArray(piece) || piece.length !== 2) return;
+            segments.push([
+                map.layerPointToLatLng(piece[0]),
+                map.layerPointToLatLng(piece[1])
+            ]);
+        });
     }
 
     return segments;
