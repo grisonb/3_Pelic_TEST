@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.74 */
+/* NPF_STYLE_BUILD_VERSION: v15.75 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -15863,4 +15863,228 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
 
 .sia-boundary-label-text.sia-siv-label.sia-zone-label-near .sia-boundary-label-altitude {
     font-size: 13px !important;
+}
+
+
+/* ==========================================================================
+   v15.75 — CHAT : CANAL/PSEUDO RESTAURÉS + AU-DESSUS DE L'ÉCHELLE
+   ========================================================================== */
+#team-chat-panel {
+    z-index: 1650 !important;
+}
+
+.chat-config-row {
+    display: grid !important;
+    grid-template-columns: minmax(150px, 1.25fr) minmax(135px, 1fr) auto !important;
+    align-items: end !important;
+    gap: 8px !important;
+    justify-content: stretch !important;
+}
+
+.chat-config-cell {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    color: #526174;
+    font-size: 11px;
+    font-weight: 850;
+}
+
+.chat-config-cell > span {
+    padding-left: 3px;
+}
+
+.chat-config-cell input {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: #fff;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 750;
+}
+
+#chat-connect-button {
+    min-width: 132px !important;
+    min-height: 40px;
+}
+
+.chat-connect-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 4px 0 12px;
+}
+
+.chat-connect-summary > div {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 10px;
+    border: 1px solid #d5deea;
+    border-radius: 10px;
+    background: #f7faff;
+}
+
+.chat-connect-summary span {
+    color: #68778a;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.chat-connect-summary strong {
+    overflow: hidden;
+    color: #0b3154;
+    font-size: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .chat-config-row {
+        grid-template-columns: 1fr 1fr !important;
+    }
+    #chat-connect-button {
+        grid-column: 1 / -1;
+        width: 100% !important;
+    }
+}
+
+/* ==========================================================================
+   v15.75 — PROFIL : FILTRES PROPRES + MASQUAGE GRAPHIQUE CARTE
+   ========================================================================== */
+.sia-profile-zone-toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(17,24,39,.18);
+    background: #f5f8fc;
+}
+
+.sia-profile-zone-toolbar-main {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.sia-profile-zone-toolbar-title {
+    flex: 0 0 auto;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 950;
+    white-space: nowrap;
+}
+
+.sia-profile-zone-filters {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 1px 3px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.sia-profile-zone-filter-item {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    box-sizing: border-box;
+    padding: 3px 6px;
+    border: 1px solid #b9c8da;
+    border-radius: 8px;
+    background: #fff;
+    color: #1f2937;
+    font-size: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.sia-profile-zone-filter-item input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: #0b63d1;
+}
+
+.sia-profile-zone-empty {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.sia-profile-map-zones-toggle {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 5px 9px;
+    border: 1px solid #6b7280;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    font-size: 10px;
+    font-weight: 900;
+    white-space: nowrap;
+    touch-action: manipulation;
+}
+
+.sia-profile-map-zones-toggle.is-hidden {
+    border-color: #b42318;
+    background: #fff0ee;
+    color: #9d1c12;
+}
+
+/* Une ligne d'options supplémentaire : conserver une surface utile au graphique. */
+.sia-profile-panel {
+    height: min(43dvh, 430px);
+}
+
+@supports not (height: 1dvh) {
+    .sia-profile-panel {
+        height: min(43vh, 430px);
+    }
+}
+
+@media (max-width: 760px) {
+    .sia-profile-zone-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .sia-profile-zone-toolbar-main {
+        width: 100%;
+    }
+    .sia-profile-map-zones-toggle {
+        align-self: flex-end;
+    }
+}
+
+/* ==========================================================================
+   v15.75 — LECTEUR GAAR : GROSSISSEMENT DU DIAGRAMME
+   ========================================================================== */
+.briefing-doc-viewer-modal.briefing-doc-viewer-gaar-zoom .briefing-doc-viewer-stage .briefing-doc-viewer-frame {
+    width: 68.97% !important;
+    height: 68.97% !important;
+    min-width: 68.97% !important;
+    min-height: 68.97% !important;
+    max-width: none !important;
+    max-height: none !important;
+    flex: none !important;
+    transform: scale(1.45) !important;
+    transform-origin: 0 0 !important;
 }
