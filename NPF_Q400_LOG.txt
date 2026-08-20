@@ -1,3 +1,54 @@
+VERSION TEST v15.76 — SÉPARATION DONNÉES SIA / SCRIPT
+Date : 20/08/2026
+Base : TEST v15.75
+
+OBJECTIF
+- Version exclusivement structurelle : sortir la grosse base SIA embarquée de `script.js` sans modifier le comportement fonctionnel de NPF.
+- Aucune nouvelle fonction métier et aucune modification des données aéronautiques.
+
+1. NOUVEAU FICHIER `sia.js`
+- Création d'un septième fichier de déploiement dédié aux données SIA.
+- `sia.js` contient uniquement :
+  - la révision SIA `15.69` ;
+  - les métadonnées AIRAC ;
+  - `SIA_EMBEDDED_GZIP_BASE64` provenant strictement de v15.75.
+- Le payload Base64 est bit-à-bit identique à v15.75 / v15.74 / v15.69.
+- Les données sont exposées par `window.NPF_SIA_EMBEDDED`.
+
+2. `script.js` ALLÉGÉ
+- Retrait du bloc Base64 SIA de 1 172 808 caractères.
+- Toute la logique SIA reste dans `script.js` : IndexedDB, décodage gzip, filtres, carte, sélection, profil, fréquences SIV et rendu.
+- `script.js` lit désormais le payload depuis `window.NPF_SIA_EMBEDDED`.
+- Une petite copie des métadonnées attendues reste dans le Script uniquement comme garde-fou : si `sia.js` manque mais que l'iPad possède déjà une base SIA valide dans IndexedDB, cette base locale peut encore être reconnue.
+- Si `sia.js` est absent sur une installation neuve, le reste de NPF continue de démarrer ; seule l'initialisation SIA échoue avec un message explicite.
+
+3. `index.html`
+- Chargement de `sia.js?siav=15.69` juste avant `script.js?appv=v15.76`.
+- La révision SIA est volontairement indépendante de la version NPF.
+
+4. SERVICE WORKER / HORS LIGNE
+- Nouveau cache SIA séparé : `npf-q400-sia-data-15.69`.
+- `sia.js` est préchargé de façon non bloquante lors de l'installation du Service Worker.
+- L'échec du chargement SIA ne peut pas faire échouer l'installation du shell principal NPF.
+- Les requêtes `sia.js` utilisent leur cache dédié, en priorité, afin qu'une évolution NPF ne retélécharge pas inutilement la même base SIA.
+- Aucun cache de tuiles n'est modifié.
+
+5. DONNÉES / PÉRIMÈTRE INCHANGÉS
+- AIRAC 08/26, effet 06/08/2026.
+- 5 066 espaces, 877 terrains/AHP, 1 899 points non-IFR : dataset inchangé.
+- Fréquences SIV, parents techniques, profil, GAAR, Chat, simulation, GPS et comportement v15.75 conservés.
+- Aucune mise à jour automatique SIA ajoutée dans cette version.
+- Aucun changement NAS.
+
+6. CONTRÔLES
+- `node --check` Script.
+- `node --check` SIA.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.76 / SIA 15.69.
+- Décodage gzip et hash du payload contrôlés par rapport à v15.75.
+
+
 VERSION TEST v15.75 — VECTEUR / GAAR / STABILITÉ SIA / CHAT / PROFIL
 Date : 19/08/2026
 Base : TEST v15.74 (elle-même rebasée sur v15.69 fonctionnelle)
