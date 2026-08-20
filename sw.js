@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-76_split_sia_data';
-const APP_VERSION = 'v15.76';
+const SW_VERSION = 'sw-v15-77_sim_follow_longpress_pelic_sia_band';
+const APP_VERSION = 'v15.77';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
