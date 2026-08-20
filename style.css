@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.77 */
+/* NPF_STYLE_BUILD_VERSION: v15.78 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16099,4 +16099,15 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     opacity: .45 !important;
     filter: grayscale(.35);
     cursor: default !important;
+}
+
+
+/* ==========================================================================
+   v15.78 — VRP : COULEUR PAR AÉROPORT DE RATTACHEMENT
+   ========================================================================== */
+.sia-vrp-symbol {
+    background: var(--sia-vrp-bg, #ff00ff) !important;
+    color: var(--sia-vrp-fg, #ffffff) !important;
+    border-color: #000000 !important;
+    font-weight: 900 !important;
 }
