@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.79';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.80';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -684,6 +684,7 @@ let isGaarMode = false;
 let isDrawingMode = false;
 const manualCircuitColors = ['#ff00ff', '#00ffff', '#ff8c00', '#00ff00', '#ff1493'];
 let gaarLayer = null;
+let gaarEditTouchRenderer = null;
 let db; // Variable pour la connexion à la base de données IndexedDB
 let offlineDbOpenPromise = null;
 const OFFLINE_DB_NAME = 'OfflineTilesDB_v13_70_clean';
@@ -5246,6 +5247,19 @@ function initMap() {
             ownAircraftPane.style.pointerEvents = 'none';
         }
     }
+    /* v15.80 — hitbox des points GAAR au-dessus des surfaces tactiles SIA. */
+    if (map.createPane && !map.getPane('gaarEditTouchPane')) {
+        map.createPane('gaarEditTouchPane');
+        const pane = map.getPane('gaarEditTouchPane');
+        if (pane) {
+            pane.style.zIndex = '695';
+            pane.style.pointerEvents = 'auto';
+        }
+    }
+    if (!gaarEditTouchRenderer && L.svg) {
+        gaarEditTouchRenderer = L.svg({ padding: 0.35, pane: 'gaarEditTouchPane' });
+    }
+
     if (map.createPane && !map.getPane('npfRunwaysPane')) {
         map.createPane('npfRunwaysPane');
         const runwayPane = map.getPane('npfRunwaysPane');
@@ -5360,6 +5374,12 @@ function beginMapVisualRenderGuard(reason = 'map-start') {
     clearTimeout(roadOverlayRefreshTimer);
     roadOverlayRefreshTimer = null;
     roadOverlayRefreshToken += 1;
+
+    /* v15.80 — un nouveau geste rend obsolète un refresh SIA encore différé. */
+    if (siaRefreshTimer) {
+        clearTimeout(siaRefreshTimer);
+        siaRefreshTimer = null;
+    }
     if (isRoadOverlayLoading) {
         isRoadOverlayLoading = false;
         refreshRoadOverlayButtonState();
@@ -7073,6 +7093,64 @@ function keepKeyboardAfterSearchClear() {
     }, 80);
 }
 
+/*
+ * v15.80 — moteur communes partagé entre la recherche principale et GAAR.
+ * Une seule implémentation conserve le scoring, les alias et le filtre département.
+ */
+function searchCommunesWithSharedEngine(rawSearch, limit = 10) {
+    const {
+        departmentFilter,
+        searchTerm
+    } = parseSearchDepartmentFilter(rawSearch);
+    const simplifiedSearch = simplifyString(searchTerm);
+    if (simplifiedSearch.length < 2) {
+        return {
+            departmentFilter,
+            searchTerm,
+            simplifiedSearch,
+            searchWords: [],
+            results: []
+        };
+    }
+
+    const searchWords = simplifiedSearch.split(' ').filter(Boolean);
+    const searchCompact = searchWords.join('');
+    const communesToSearch = departmentFilter
+        ? allCommunes.filter(c => c.dep_code === departmentFilter)
+        : allCommunes;
+
+    const scoredResults = communesToSearch
+        .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
+        .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords, departmentFilter) }))
+        .filter(c => c.score < 999);
+
+    const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
+    const seenResultKeys = new Set(
+        scoredResults.map(c => `commune:${c.code_insee}:${simplifyString(c.nom_standard)}`)
+    );
+
+    aliasResults.forEach((alias) => {
+        const key = `alias:${alias.alias_target_code_insee}:${simplifyString(alias.nom_standard)}`;
+        const sameVisibleNameAlreadyPresent = seenResultKeys.has(
+            `commune:${alias.code_insee}:${simplifyString(alias.nom_standard)}`
+        );
+        if (!seenResultKeys.has(key) && !sameVisibleNameAlreadyPresent) {
+            seenResultKeys.add(key);
+            scoredResults.push(alias);
+        }
+    });
+
+    scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
+
+    return {
+        departmentFilter,
+        searchTerm,
+        simplifiedSearch,
+        searchWords,
+        results: scoredResults.slice(0, Math.max(1, Number(limit) || 10))
+    };
+}
+
 function setupEventListeners() {
     const searchInput = document.getElementById('search-input');
     const clearSearchBtn = document.getElementById('clear-search');
@@ -7097,6 +7175,7 @@ function setupEventListeners() {
     const roadOverlayButton = document.getElementById('road-overlay-button');
     const opsFrequenciesButton = document.getElementById('ops-frequencies-pdf-button');
     const quickOfflineMapButton = document.getElementById('quick-offline-map-button');
+    const quickSiaZonesToggleButton = document.getElementById('quick-sia-zones-toggle');
     const quickOfflineMapModal = document.getElementById('quick-offline-map-modal');
     const closeQuickOfflineMapModalButton = document.getElementById('close-quick-offline-map-modal');
     const trafficLayerButton = document.getElementById('traffic-layer-button');
@@ -7212,6 +7291,16 @@ function setupEventListeners() {
         installQuickOfflineMapButtonInteractions(quickOfflineMapButton);
     }
 
+
+    if (quickSiaZonesToggleButton) {
+        updateSiaProfileMapZonesToggleButton();
+        quickSiaZonesToggleButton.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setSiaMapAirspacesVisible(!siaMapAirspacesVisible);
+        });
+    }
+
     if (closeQuickOfflineMapModalButton) {
         closeQuickOfflineMapModalButton.addEventListener('click', () => {
             closeQuickOfflineMapSelector();
@@ -7241,13 +7330,15 @@ function setupEventListeners() {
         const rawSearch = searchInput.value;
         clearSearchBtn.style.display = rawSearch.length > 0 ? 'block' : 'none';
 
+        const communeSearch = searchCommunesWithSharedEngine(rawSearch, 10);
         const {
             departmentFilter,
-            searchTerm
-        } = parseSearchDepartmentFilter(
-            rawSearch
-        );
-        const simplifiedSearch = simplifyString(searchTerm);
+            searchTerm,
+            simplifiedSearch,
+            searchWords,
+            results: localResults
+        } = communeSearch;
+
         if (simplifiedSearch.length < 2) {
             namedPlacesSearchSequence += 1;
 
@@ -7258,31 +7349,6 @@ function setupEventListeners() {
             }
             return;
         }
-        const searchWords = simplifiedSearch.split(' ').filter(Boolean);
-        const searchCompact = searchWords.join('');
-        const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
-
-        const scoredResults = communesToSearch
-            .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
-            .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords, departmentFilter) }))
-            .filter(c => c.score < 999);
-
-        const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
-        const seenResultKeys = new Set(scoredResults.map(c => `commune:${c.code_insee}:${simplifyString(c.nom_standard)}`));
-
-        aliasResults.forEach((alias) => {
-            const key = `alias:${alias.alias_target_code_insee}:${simplifyString(alias.nom_standard)}`;
-            const sameVisibleNameAlreadyPresent = seenResultKeys.has(`commune:${alias.code_insee}:${simplifyString(alias.nom_standard)}`);
-            if (!seenResultKeys.has(key) && !sameVisibleNameAlreadyPresent) {
-                seenResultKeys.add(key);
-                scoredResults.push(alias);
-            }
-        });
-
-        scoredResults.sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length);
-
-        const localResults =
-            scoredResults.slice(0, 10);
         displayResults(localResults);
 
         const sequence =
@@ -21861,19 +21927,19 @@ function installCenterGpsButtonPressHandlers(button) {
 }
 
 /*
- * v15.79 — Suivi : position écran déterministe selon le cap.
- * Les caps cardinaux conservent strictement l'axe orthogonal centré :
- * 090/270 -> Y = 50 %, 000/180 -> X = 50 %. Les diagonales utilisent les
- * composantes sinus/cosinus sans pousser l'avion jusque sur les bords.
+ * v15.80 — Suivi : référence = viewport réellement visible de l'iPad.
+ * Le conteneur Leaflet peut être plus haut que la zone visible (100lvh / Safari).
+ * On choisit donc la position avion dans le viewport visible, puis on la convertit
+ * en coordonnées du conteneur Leaflet. Les caps 090/270 restent à Y visible = 50 %.
  */
 const CENTER_GPS_FOLLOW_HORIZONTAL_OFFSET_RATIO = 0.25;
-const CENTER_GPS_FOLLOW_VERTICAL_OFFSET_RATIO = 0.26;
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO = 0.18;
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO = 0.18;
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO = 0.16;
-const CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO = 0.16;
-const CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX = 165;
-const CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX = 120;
+const CENTER_GPS_FOLLOW_VERTICAL_OFFSET_RATIO = 0.24;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO = 0.17;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO = 0.17;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO = 0.15;
+const CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO = 0.17;
+const CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX = 145;
+const CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX = 105;
 const CENTER_GPS_FOLLOW_CARDINAL_EPSILON = 1e-8;
 
 function getCenterGpsFollowHeadingDegrees() {
@@ -21887,6 +21953,35 @@ function getCenterGpsFollowHeadingDegrees() {
     }
 
     return null;
+}
+
+function getCenterGpsFollowVisibleMapRect(width, height) {
+    const fallback = { left: 0, top: 0, width, height };
+    try {
+        const container = map?.getContainer?.();
+        if (!container) return fallback;
+        const rect = container.getBoundingClientRect();
+        const vv = window.visualViewport;
+
+        const viewportWidth = Number(vv?.width) || Number(window.innerWidth) || width;
+        const viewportHeight = Number(vv?.height) || Number(window.innerHeight) || height;
+        const viewportLeft = Number(vv?.offsetLeft) || 0;
+        const viewportTop = Number(vv?.offsetTop) || 0;
+
+        let left = Math.max(0, viewportLeft - Number(rect.left || 0));
+        let top = Math.max(0, viewportTop - Number(rect.top || 0));
+        let visibleWidth = Math.min(width - left, viewportWidth, Number(rect.width) || width);
+        let visibleHeight = Math.min(height - top, viewportHeight, Number(rect.height) || height);
+
+        if (!Number.isFinite(visibleWidth) || visibleWidth < 100) visibleWidth = width;
+        if (!Number.isFinite(visibleHeight) || visibleHeight < 100) visibleHeight = height;
+        if (!Number.isFinite(left) || left < 0 || left + visibleWidth > width + 1) left = 0;
+        if (!Number.isFinite(top) || top < 0 || top + visibleHeight > height + 1) top = 0;
+
+        return { left, top, width: visibleWidth, height: visibleHeight };
+    } catch (_) {
+        return fallback;
+    }
 }
 
 function getCenterGpsFollowMapCenter(pos, zoom) {
@@ -21903,65 +21998,56 @@ function getCenterGpsFollowMapCenter(pos, zoom) {
             return pos;
         }
 
+        const visible = getCenterGpsFollowVisibleMapRect(width, height);
         const headingRad = headingDeg * Math.PI / 180;
         let sinHeading = Math.sin(headingRad);
         let cosHeading = Math.cos(headingRad);
 
-        // Évite toute composante parasite aux caps cardinaux (ex. cos(90°)).
         if (Math.abs(sinHeading) < CENTER_GPS_FOLLOW_CARDINAL_EPSILON) sinHeading = 0;
         if (Math.abs(cosHeading) < CENTER_GPS_FOLLOW_CARDINAL_EPSILON) cosHeading = 0;
 
-        const centerX = width / 2;
-        const centerY = height / 2;
+        const mapCenterX = width / 2;
+        const mapCenterY = height / 2;
+        const visibleCenterX = visible.left + visible.width / 2;
+        const visibleCenterY = visible.top + visible.height / 2;
 
-        /*
-         * Position souhaitée du POINT GPS à l'écran :
-         * - Est/Ouest : hauteur exactement centrée ;
-         * - Nord/Sud : largeur exactement centrée ;
-         * - diagonales : interpolation naturelle par sinus/cosinus.
-         *
-         * Les amplitudes sont volontairement plus modérées que v15.78 afin de
-         * garder la silhouette Q400, l'altitude et le badge SIM loin des bords.
-         */
-        const desiredX = centerX
-            - sinHeading * width * CENTER_GPS_FOLLOW_HORIZONTAL_OFFSET_RATIO;
-        const desiredY = centerY
-            + cosHeading * height * CENTER_GPS_FOLLOW_VERTICAL_OFFSET_RATIO;
+        const desiredX = visibleCenterX
+            - sinHeading * visible.width * CENTER_GPS_FOLLOW_HORIZONTAL_OFFSET_RATIO;
+        const desiredY = visibleCenterY
+            + cosHeading * visible.height * CENTER_GPS_FOLLOW_VERTICAL_OFFSET_RATIO;
 
-        const safeLeft = Math.min(
-            centerX,
-            Math.max(
-                CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX,
-                width * CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO
-            )
+        const sideMargin = Math.min(
+            visible.width / 2,
+            Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, visible.width * CENTER_GPS_FOLLOW_SAFE_MARGIN_LEFT_RATIO)
         );
-        const safeRight = Math.max(
-            centerX,
-            width - Math.max(
-                CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX,
-                width * CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO
-            )
+        const rightMargin = Math.min(
+            visible.width / 2,
+            Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, visible.width * CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO)
         );
-        const safeTop = Math.min(
-            centerY,
-            Math.max(
-                CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX,
-                height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO
-            )
+        const topMargin = Math.min(
+            visible.height / 2,
+            Math.max(CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX, visible.height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO)
         );
-        const safeBottom = Math.max(
-            centerY,
-            height - Math.max(
-                CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX,
-                height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO
-            )
+        const bottomMargin = Math.min(
+            visible.height / 2,
+            Math.max(CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX, visible.height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO)
         );
+
+        const safeLeft = visible.left + sideMargin;
+        const safeRight = visible.left + visible.width - rightMargin;
+        const safeTop = visible.top + topMargin;
+        const safeBottom = visible.top + visible.height - bottomMargin;
 
         const aircraftScreenX = Math.min(safeRight, Math.max(safeLeft, desiredX));
         const aircraftScreenY = Math.min(safeBottom, Math.max(safeTop, desiredY));
 
-        const aheadX = centerX - aircraftScreenX;
-        const aheadY = centerY - aircraftScreenY;
+        /*
+         * map.setView place toujours le centre géographique au centre du
+         * CONTENEUR Leaflet. On convertit donc le point écran visible souhaité
+         * vers ce centre interne, même lorsque le conteneur dépasse le viewport.
+         */
+        const aheadX = mapCenterX - aircraftScreenX;
+        const aheadY = mapCenterY - aircraftScreenY;
 
         const aircraftPixel = map.project(L.latLng(pos.lat, pos.lng), zoom);
         const mapCenterPixel = L.point(
@@ -23657,42 +23743,7 @@ function formatGaarCommuneResultName(c) {
 }
 
 function searchCommunesForGaarPoint(rawSearch) {
-    let departmentFilter = null;
-    let searchTerm = String(rawSearch || '');
-    const depRegex = /\s(\d{1,3}|2A|2B)$/i;
-    const match = searchTerm.match(depRegex);
-    if (match) {
-        departmentFilter = match[1].length === 1 ? '0' + match[1] : match[1].toUpperCase();
-        searchTerm = searchTerm.substring(0, match.index).trim();
-    }
-
-    const simplifiedSearch = simplifyString(searchTerm);
-    if (simplifiedSearch.length < 2) return [];
-
-    const searchWords = simplifiedSearch.split(' ').filter(Boolean);
-    const searchCompact = searchWords.join('');
-    const communesToSearch = departmentFilter ? allCommunes.filter(c => c.dep_code === departmentFilter) : allCommunes;
-
-    const scoredResults = communesToSearch
-        .filter(c => shouldSearchCandidate(c, searchWords, searchCompact, departmentFilter))
-        .map(c => ({ ...c, score: scoreCommuneSearchCandidate(c, searchWords, departmentFilter) }))
-        .filter(c => c.score < 999);
-
-    const aliasResults = searchAliasCommunes(searchWords, departmentFilter);
-    const seenResultKeys = new Set(scoredResults.map(c => `commune:${c.code_insee}:${simplifyString(c.nom_standard)}`));
-
-    aliasResults.forEach((alias) => {
-        const key = `alias:${alias.alias_target_code_insee}:${simplifyString(alias.nom_standard)}`;
-        const sameVisibleNameAlreadyPresent = seenResultKeys.has(`commune:${alias.code_insee}:${simplifyString(alias.nom_standard)}`);
-        if (!seenResultKeys.has(key) && !sameVisibleNameAlreadyPresent) {
-            seenResultKeys.add(key);
-            scoredResults.push(alias);
-        }
-    });
-
-    return scoredResults
-        .sort((a, b) => a.score - b.score || a.nom_standard.length - b.nom_standard.length)
-        .slice(0, 10);
+    return searchCommunesWithSharedEngine(rawSearch, 10).results;
 }
 
 function getGaarCommuneLatLng(commune) {
@@ -24085,6 +24136,41 @@ function redrawGaarCircuits() {
                     direction: 'top',
                     offset: [0, -10],
                     className: 'gaar-point-label'
+                });
+            }
+
+
+            /*
+             * v15.80 — la modification/suppression d'un point ne dépend plus du
+             * hit-testing du petit cercle visuel. Une hitbox SVG de 48 px, dans
+             * un pane supérieur aux surfaces tactiles SIA, ouvre toujours
+             * l'éditeur lorsque CRÉER/MODIFIER est actif.
+             */
+            if (isDrawingMode && gaarEditTouchRenderer) {
+                const editHitbox = L.circleMarker([point.lat, point.lng], {
+                    pane: 'gaarEditTouchPane',
+                    renderer: gaarEditTouchRenderer,
+                    radius: 24,
+                    stroke: false,
+                    opacity: 0,
+                    fill: true,
+                    fillColor: circuit.color,
+                    fillOpacity: 0.002,
+                    interactive: true,
+                    bubblingMouseEvents: false,
+                    keyboard: false,
+                    className: 'gaar-point-edit-hitbox'
+                }).addTo(gaarLayer);
+
+                ['mousedown', 'touchstart', 'pointerdown'].forEach(type => {
+                    editHitbox.on(type, event => {
+                        stopGaarUiEvent(event, { preventDefault: false, durationMs: 1000 });
+                    });
+                });
+                editHitbox.on('click', event => {
+                    stopGaarUiEvent(event, { durationMs: 1100 });
+                    suppressNextGaarMapClick(1200);
+                    openGaarPointSearchOverlay(circuitIndex, pointIndex);
                 });
             }
         });
@@ -33287,10 +33373,14 @@ let siaProfileFilterPrefs = null;
 let siaMapAirspacesVisible = true;
 
 // v15.75 — tampon de rendu et cache de géométries pour limiter les reconstructions iPad.
-const SIA_RENDER_BOUNDS_PAD_RATIO = 0.25;
+const SIA_RENDER_BOUNDS_PAD_RATIO = 0.35;
 let siaRenderedCoverageBounds = null;
 let siaRenderedZoom = null;
 let siaRenderedSignature = '';
+let siaRenderedAirspaceFeatures = [];
+let siaZoomDependentLayers = [];
+let siaRenderedShowDesignatedPoints = null;
+let siaRenderedPointLabelsEnabled = null;
 let siaRefreshInProgress = false;
 let siaRefreshPendingReason = null;
 const SIA_GEOMETRY_CACHE_MAX = 900;
@@ -33555,15 +33645,30 @@ function scheduleSiaCoverageRefresh(reason = 'moveend') {
 }
 
 function updateSiaProfileMapZonesToggleButton() {
-    const button = document.getElementById('sia-profile-map-zones-toggle');
-    if (!button) return;
     const hidden = !siaMapAirspacesVisible;
-    button.textContent = hidden ? 'Afficher zones' : 'Masquer zones';
-    button.classList.toggle('is-hidden', hidden);
-    button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
-    button.title = hidden
-        ? 'Réafficher sur la carte les zones toujours sélectionnées dans le filtre SIA'
-        : 'Masquer temporairement les zones de la carte sans modifier les filtres';
+    const button = document.getElementById('sia-profile-map-zones-toggle');
+    if (button) {
+        button.textContent = hidden ? 'Afficher zones' : 'Masquer zones';
+        button.classList.toggle('is-hidden', hidden);
+        button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        button.title = hidden
+            ? 'Réafficher sur la carte les zones toujours sélectionnées dans le filtre SIA'
+            : 'Masquer temporairement les zones de la carte sans modifier les filtres';
+    }
+
+    /* v15.80 — même commande, accessible directement sur le bouton France. */
+    const quickButton = document.getElementById('quick-sia-zones-toggle');
+    if (quickButton) {
+        quickButton.classList.toggle('is-hidden', hidden);
+        quickButton.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        quickButton.title = hidden
+            ? 'Réafficher les zones SIA de la carte'
+            : 'Masquer temporairement les zones SIA de la carte';
+        quickButton.setAttribute(
+            'aria-label',
+            hidden ? 'Réafficher les zones SIA de la carte' : 'Masquer les zones SIA de la carte'
+        );
+    }
 }
 
 function setSiaMapAirspacesVisible(visible) {
@@ -33888,6 +33993,10 @@ function clearSiaRenderedLayers() {
     siaRenderedCoverageBounds = null;
     siaRenderedZoom = null;
     siaRenderedSignature = '';
+    siaRenderedAirspaceFeatures = [];
+    siaZoomDependentLayers = [];
+    siaRenderedShowDesignatedPoints = null;
+    siaRenderedPointLabelsEnabled = null;
     clearSiaSelectionHighlight();
     siaSelectedCtrTouchLayer = null;
     siaSelectedCtrKey = null;
@@ -34584,7 +34693,13 @@ function buildSiaPointPopup(item) {
 
 function scheduleSiaLayerRefresh(reason = 'unspecified') {
     clearTimeout(siaRefreshTimer);
-    const delay = reason === 'moveend' ? 320 : 120;
+    /*
+     * v15.80 — après un geste carte, laisser la priorité aux tuiles de fond.
+     * Les anciens calques SIA restent en place pendant ce court délai.
+     */
+    const delay = reason === 'moveend'
+        ? 420
+        : (reason === 'zoomend' ? 360 : 120);
     siaRefreshTimer = setTimeout(() => {
         refreshSiaLayers(reason).catch(error => {
             console.warn('[SIA] Rafraîchissement impossible:', reason, error);
@@ -37047,9 +37162,12 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
     if (!isClosed && raw.length >= 3) raw.push(raw[0]);
 
     const segments = [];
-    const safeInset = Math.max(7, Number(insetPixels) || 7);
-    const MAX_SUBDIVISION_DEPTH = 5;
-    const MIN_SOURCE_PIECE_PX = 10;
+    const preferredInset = Math.max(7, Number(insetPixels) || 7);
+    const insetCandidates = [preferredInset, 6, 5, 4, 3, 2]
+        .filter((value, index, values) => value > 0 && values.indexOf(value) === index)
+        .sort((a, b) => b - a);
+    const MAX_SUBDIVISION_DEPTH = 7;
+    const MIN_SOURCE_PIECE_PX = 3;
 
     const isLayerPointInsideGeometry = point => {
         try {
@@ -37101,7 +37219,7 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
         const endpointTrim = Math.min(5, length * 0.16);
         const startTrim = trimStart ? endpointTrim : 0;
         const endTrim = trimEnd ? endpointTrim : 0;
-        if (startTrim + endTrim >= length - 2) return null;
+        if (startTrim + endTrim >= length - 1) return null;
 
         const baseA = L.point(pa.x + tx * startTrim, pa.y + ty * startTrim);
         const baseB = L.point(pb.x - tx * endTrim, pb.y - ty * endTrim);
@@ -37110,47 +37228,51 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
             { x: ty, y: -tx }
         ];
 
-        let best = null;
-        for (const normal of normals) {
-            const shiftedA = L.point(
-                baseA.x + normal.x * safeInset,
-                baseA.y + normal.y * safeInset
-            );
-            const shiftedB = L.point(
-                baseB.x + normal.x * safeInset,
-                baseB.y + normal.y * safeInset
-            );
-            const shiftedMid = L.point(
-                (shiftedA.x + shiftedB.x) / 2,
-                (shiftedA.y + shiftedB.y) / 2
-            );
+        /*
+         * v15.80 — 7 px reste la cible. Si la géométrie locale devient trop
+         * étroite à un niveau de zoom donné, on rapproche progressivement l'axe
+         * de la limite au lieu de faire disparaître toute la bande.
+         */
+        for (const inset of insetCandidates) {
+            let best = null;
+            for (const normal of normals) {
+                const shiftedA = L.point(
+                    baseA.x + normal.x * inset,
+                    baseA.y + normal.y * inset
+                );
+                const shiftedB = L.point(
+                    baseB.x + normal.x * inset,
+                    baseB.y + normal.y * inset
+                );
+                const shiftedMid = L.point(
+                    (shiftedA.x + shiftedB.x) / 2,
+                    (shiftedA.y + shiftedB.y) / 2
+                );
 
-            // Le milieu tranche le côté intérieur ; les autres points évaluent la robustesse.
-            if (!isLayerPointInsideGeometry(shiftedMid)) continue;
+                if (!isLayerPointInsideGeometry(shiftedMid)) continue;
 
-            const safeA = findFirstInsideTowardMid(shiftedA, shiftedMid);
-            const safeB = findFirstInsideTowardMid(shiftedB, shiftedMid);
-            if (!safeA || !safeB) continue;
+                const safeA = findFirstInsideTowardMid(shiftedA, shiftedMid);
+                const safeB = findFirstInsideTowardMid(shiftedB, shiftedMid);
+                if (!safeA || !safeB) continue;
 
-            const safeLength = Math.hypot(safeB.x - safeA.x, safeB.y - safeA.y);
-            if (!Number.isFinite(safeLength) || safeLength < 3) continue;
+                const safeLength = Math.hypot(safeB.x - safeA.x, safeB.y - safeA.y);
+                if (!Number.isFinite(safeLength) || safeLength < 2) continue;
 
-            const testPoints = [0.20, 0.35, 0.50, 0.65, 0.80].map(ratio => L.point(
-                safeA.x + (safeB.x - safeA.x) * ratio,
-                safeA.y + (safeB.y - safeA.y) * ratio
-            ));
-            const insideCount = testPoints.reduce(
-                (count, point) => count + (isLayerPointInsideGeometry(point) ? 1 : 0),
-                0
-            );
-            if (insideCount < 5) continue;
+                const testRatios = safeLength < 12 ? [0.35, 0.50, 0.65] : [0.20, 0.35, 0.50, 0.65, 0.80];
+                const allInside = testRatios.every(ratio => isLayerPointInsideGeometry(L.point(
+                    safeA.x + (safeB.x - safeA.x) * ratio,
+                    safeA.y + (safeB.y - safeA.y) * ratio
+                )));
+                if (!allInside) continue;
 
-            if (!best || safeLength > best.safeLength) {
-                best = { safeA, safeB, safeLength };
+                if (!best || safeLength > best.safeLength) {
+                    best = { safeA, safeB, safeLength };
+                }
             }
+            if (best) return [best.safeA, best.safeB];
         }
 
-        return best ? [best.safeA, best.safeB] : null;
+        return null;
     };
 
     const buildPieceRecursively = (pa, pb, depth, trimStart, trimEnd) => {
@@ -37167,9 +37289,9 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
         }
 
         /*
-         * v15.79 — au lieu de supprimer toute une limite lorsqu'un angle ou une
-         * concavité invalide une partie du segment, on coupe la limite en deux
-         * et on ne conserve que les portions réellement intérieures.
+         * v15.80 — subdivision de dernier recours. Les petites portions ne sont
+         * plus abandonnées au seuil fixe de 10 px de v15.79 ; le décalage local
+         * adaptatif est essayé avant chaque nouvelle subdivision.
          */
         const midpoint = L.point((pa.x + pb.x) / 2, (pa.y + pb.y) / 2);
         return [
@@ -37200,18 +37322,14 @@ function buildSiaCtrInsetSegmentsLatLngs(ring, geometry, insetPixels = 7) {
 }
 
 function addSiaCtrInnerBand(geometry, color = '#0066ff') {
-    if (!siaLayerGroup || !geometry || isCurrentOfflineOaciMap()) return;
+    if (!siaLayerGroup || !geometry || isCurrentOfflineOaciMap()) return [];
+    const createdLayers = [];
     const rings = getSiaCtrOuterRings(geometry);
     rings.forEach(ring => {
         const segments = buildSiaCtrInsetSegmentsLatLngs(ring, geometry, 7);
         if (!segments.length) return;
 
-        /*
-         * Un MultiPolyline en une seule couche conserve les performances iPad,
-         * tout en empêchant une jonction artificielle entre deux segments dont
-         * la normale intérieure change.
-         */
-        L.polyline(segments, {
+        const layer = L.polyline(segments, {
             pane: 'siaAirspacePane',
             renderer: siaAirspaceRenderer,
             color,
@@ -37221,7 +37339,9 @@ function addSiaCtrInnerBand(geometry, color = '#0066ff') {
             lineJoin: 'round',
             interactive: false
         }).addTo(siaLayerGroup);
+        createdLayers.push(layer);
     });
+    return createdLayers;
 }
 
 function normalizeSiaBoundaryLabelAngle(angleDeg) {
@@ -37418,25 +37538,25 @@ function findSiaBoundaryLabelPlacements(item, geometry) {
 }
 
 function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
-    if (!siaLayerGroup || !map || !item || !geometry) return;
-    if (isCurrentOfflineOaciMap()) return;
-    if (Number(item?.co || 0) === 1) return;
+    if (!siaLayerGroup || !map || !item || !geometry) return null;
+    if (isCurrentOfflineOaciMap()) return null;
+    if (Number(item?.co || 0) === 1) return null;
 
     // Les noms ne sont pas affichés lorsque la carte est trop dézoomée.
-    if (getCurrentNpfScaleNm() > 50.000001) return;
+    if (getCurrentNpfScaleNm() > 50.000001) return null;
 
     const type = String(geometry.type || '');
-    if (type !== 'Polygon' && type !== 'MultiPolygon') return;
+    if (type !== 'Polygon' && type !== 'MultiPolygon') return null;
 
     const state = labelState || { points: [], count: 0 };
-    if (state.count >= 70) return;
+    if (state.count >= 70) return null;
 
     const text = getSiaAirspaceBoundaryLabelText(item);
-    if (!text) return;
+    if (!text) return null;
     const verticalText = getSiaAirspaceBoundaryVerticalText(item);
 
     const placements = findSiaBoundaryLabelPlacements(item, geometry);
-    if (!placements.length) return;
+    if (!placements.length) return null;
 
     const priority = getSiaBoundaryLabelPriority(item);
     const nearFiveNm = getCurrentNpfScaleNm() <= 5.000001;
@@ -37445,7 +37565,7 @@ function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
     const placement = placements.find(candidate =>
         !state.points.some(point => point.distanceTo(candidate.point) < collisionDistance)
     );
-    if (!placement) return;
+    if (!placement) return null;
 
     const marker = L.marker(placement.latlng, {
         pane: 'siaAirspacePane',
@@ -37462,6 +37582,7 @@ function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
     marker.addTo(siaLayerGroup);
     state.points.push(placement.point);
     state.count += 1;
+    return marker;
 }
 
 function getCurrentNpfScaleNm() {
@@ -38197,9 +38318,53 @@ function addSiaCtrTouchSurface(feature) {
     return touchGeoJson;
 }
 
+function clearSiaZoomDependentLayers() {
+    if (!siaLayerGroup || !Array.isArray(siaZoomDependentLayers)) {
+        siaZoomDependentLayers = [];
+        return;
+    }
+    siaZoomDependentLayers.forEach(layer => {
+        try { siaLayerGroup.removeLayer(layer); } catch (_) {}
+    });
+    siaZoomDependentLayers = [];
+}
+
+function renderSiaZoomDependentDecorations(features) {
+    clearSiaZoomDependentLayers();
+    if (!siaMapAirspacesVisible || !Array.isArray(features) || !features.length) return;
+
+    const labelState = { points: [], count: 0 };
+    features.forEach(feature => {
+        const item = feature?.properties?.siaItem;
+        if (!item || Number(item?.co || 0) === 1) return;
+        const itemStyle = getSiaAirspaceStyle(item);
+        const layers = addSiaCtrInnerBand(feature.geometry, itemStyle.color);
+        if (Array.isArray(layers)) siaZoomDependentLayers.push(...layers);
+    });
+
+    features
+        .filter(feature => Number(feature?.properties?.siaItem?.co || 0) !== 1)
+        .sort((a, b) =>
+            getSiaBoundaryLabelPriority(a.properties.siaItem)
+            - getSiaBoundaryLabelPriority(b.properties.siaItem)
+        )
+        .forEach(feature => {
+            const marker = addSiaAirspaceBoundaryLabel(
+                feature.properties.siaItem,
+                feature.geometry,
+                labelState
+            );
+            if (marker) siaZoomDependentLayers.push(marker);
+        });
+}
+
 async function refreshSiaLayers(reason = 'manual') {
     if (!map) return;
     ensureSiaMapPanes();
+
+    let previousSiaLayerGroupForSwap = null;
+    let replacementSiaLayerGroupForSwap = null;
+    let replacementSiaLayerGroupCommitted = false;
 
     if (siaRefreshInProgress) {
         siaRefreshPendingReason = reason;
@@ -38216,6 +38381,28 @@ async function refreshSiaLayers(reason = 'manual') {
         const currentBounds = map.getBounds();
         const zoom = map.getZoom();
         const signature = getSiaRenderSignature();
+        const showSiaDesignatedPointsNow = shouldDisplaySiaDesignatedPoints();
+        const pointLabelsEnabledNow = zoom >= 8;
+
+        /*
+         * v15.80 — zoom dans une couverture déjà chargée : conserver volumes,
+         * points et hitboxes. Seules les bandes intérieures et étiquettes de
+         * zones, dépendantes des pixels écran, sont recalculées.
+         */
+        if (
+            reason === 'zoomend'
+            && siaRenderedCoverageBounds
+            && siaRenderedSignature === signature
+            && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
+            && siaRenderedShowDesignatedPoints === showSiaDesignatedPointsNow
+            && siaRenderedPointLabelsEnabled === pointLabelsEnabledNow
+            && Array.isArray(siaRenderedAirspaceFeatures)
+        ) {
+            renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+            siaRenderedZoom = zoom;
+            scheduleSiaProfileRefresh('sia-zoomend-decorations');
+            return;
+        }
 
         // v15.75 — un petit recentrage GPS dans la couverture déjà dessinée ne
         // reconstruit aucun GeoJSON/label/surface tactile.
@@ -38232,13 +38419,18 @@ async function refreshSiaLayers(reason = 'manual') {
         const dataset = await ensureSiaDatasetLoaded();
         const siaTmaOperationalFamilies = buildSiaTmaOperationalFamilySet(dataset);
 
-        if (!siaLayerGroup) {
-            siaLayerGroup = L.layerGroup().addTo(map);
-        }
+        /*
+         * v15.80 — double tampon : l'ancien rendu SIA reste affiché pendant la
+         * construction du nouveau. Aucun clearLayers() global avant que le
+         * remplacement soit entièrement prêt.
+         */
+        previousSiaLayerGroupForSwap = siaLayerGroup;
+        replacementSiaLayerGroupForSwap = L.layerGroup();
+        siaLayerGroup = replacementSiaLayerGroupForSwap;
 
         siaSelectedCtrTouchLayer = null;
         siaAirspaceTouchEntries = [];
-        siaLayerGroup.clearLayers();
+        siaZoomDependentLayers = [];
 
         // Charger légèrement au-delà du viewport évite les reconstructions à
         // chaque mouvement du suivi GPS tout en bornant la mémoire Safari/iPad.
@@ -38247,7 +38439,6 @@ async function refreshSiaLayers(reason = 'manual') {
         let rendered = 0;
 
         const visibleAirspaceFeatures = [];
-        const siaBoundaryLabelState = { points: [], count: 0 };
 
         if (siaMapAirspacesVisible) {
             for (const item of dataset.airspaces || []) {
@@ -38297,31 +38488,14 @@ async function refreshSiaLayers(reason = 'manual') {
             airspaceLayer.addTo(siaLayerGroup);
 
             visibleAirspaceFeatures.forEach(feature => {
-                const item = feature.properties.siaItem;
                 addSiaCtrTouchSurface(feature);
-                if (Number(item?.co || 0) === 1) return;
-                const itemStyle = getSiaAirspaceStyle(item);
-                addSiaCtrInnerBand(feature.geometry, itemStyle.color);
             });
 
-            visibleAirspaceFeatures
-                .filter(feature => Number(feature.properties?.siaItem?.co || 0) !== 1)
-                .sort((a, b) =>
-                    getSiaBoundaryLabelPriority(a.properties.siaItem)
-                    - getSiaBoundaryLabelPriority(b.properties.siaItem)
-                )
-                .forEach(feature => {
-                    addSiaAirspaceBoundaryLabel(
-                        feature.properties.siaItem,
-                        feature.geometry,
-                        siaBoundaryLabelState
-                    );
-                });
-
+            renderSiaZoomDependentDecorations(visibleAirspaceFeatures);
             rendered += visibleAirspaceFeatures.length;
         }
 
-        const showSiaDesignatedPoints = shouldDisplaySiaDesignatedPoints();
+        const showSiaDesignatedPoints = showSiaDesignatedPointsNow;
 
         for (const item of dataset.terrain || []) {
             if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
@@ -38404,10 +38578,24 @@ async function refreshSiaLayers(reason = 'manual') {
             rendered += 1;
         }
 
+        /* Le nouveau groupe devient visible d'un bloc, puis l'ancien est retiré. */
+        replacementSiaLayerGroupForSwap.addTo(map);
+        if (
+            previousSiaLayerGroupForSwap
+            && previousSiaLayerGroupForSwap !== replacementSiaLayerGroupForSwap
+            && map.hasLayer(previousSiaLayerGroupForSwap)
+        ) {
+            map.removeLayer(previousSiaLayerGroupForSwap);
+        }
+        replacementSiaLayerGroupCommitted = true;
+
         // Couverture et signature ne sont validées qu'après un rendu complet.
         siaRenderedCoverageBounds = renderBounds;
         siaRenderedZoom = zoom;
         siaRenderedSignature = signature;
+        siaRenderedAirspaceFeatures = visibleAirspaceFeatures;
+        siaRenderedShowDesignatedPoints = showSiaDesignatedPointsNow;
+        siaRenderedPointLabelsEnabled = pointLabelsEnabledNow;
 
         const footer = document.getElementById('sia-filter-footer-status');
         if (footer) {
@@ -38421,6 +38609,13 @@ async function refreshSiaLayers(reason = 'manual') {
         }
 
         scheduleSiaProfileRefresh(`sia-${reason}`);
+    } catch (error) {
+        /* En cas d'échec, conserver intégralement l'ancien rendu opérationnel. */
+        if (replacementSiaLayerGroupForSwap && !replacementSiaLayerGroupCommitted) {
+            try { replacementSiaLayerGroupForSwap.clearLayers(); } catch (_) {}
+            siaLayerGroup = previousSiaLayerGroupForSwap;
+        }
+        throw error;
     } finally {
         siaRefreshInProgress = false;
         const pending = siaRefreshPendingReason;
