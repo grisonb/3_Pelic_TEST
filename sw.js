@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-81_sia_labels_siv_profile_touch';
-const APP_VERSION = 'v15.81';
+const SW_VERSION = 'sw-v15-82_sia_hidden_perf_google_earth_history';
+const APP_VERSION = 'v15.82';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
