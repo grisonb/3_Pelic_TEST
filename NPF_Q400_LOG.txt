@@ -1,3 +1,121 @@
+VERSION TEST v15.85 — NUMÉROTATION STABLE DES FEUX D'UNE MÊME COMMUNE
+Date : 22/08/2026
+Base : TEST v15.84
+
+OBJECTIFS
+- Distinguer sans ambiguïté plusieurs feux créés dans une même commune.
+- Conserver un numéro stable pendant toute la vie d'un feu, y compris si un autre feu de la commune est supprimé.
+- Répercuter ce numéro sur la carte, le bandeau, l'Historique et les exports ForeFlight / SDVFR / G. Earth.
+
+1. NUMÉROTATION PAR COMMUNE
+- Un premier feu isolé conserve le nom historique sans numéro, par exemple « MARTIGUES (13) ».
+- À la création d'un deuxième feu différent dans la même commune, le premier devient « MARTIGUES 1 (13) » et le nouveau « MARTIGUES 2 (13) ».
+- Les feux suivants prennent 3, 4, etc.
+- La commune est identifiée par son nom + département ; pour un lieu-dit rattaché à une commune connue, la commune administrative sert de clé de regroupement.
+- Deux positions réellement différentes dans la même commune restent deux entrées distinctes.
+
+2. NUMÉROS STABLES — AUCUNE RENUMÉROTATION APRÈS SUPPRESSION
+- Le numéro est enregistré dans chaque entrée de l'Historique (`fireNumber`).
+- Supprimer le feu 1 ne transforme pas le feu 2 en feu 1 : « MARTIGUES 2 » reste « MARTIGUES 2 ».
+- Le prochain feu créé dans cette commune prend toujours le numéro supérieur au maximum restant : si 1 a été supprimé et 2 existe encore, le nouveau feu devient 3.
+- Les trous de numérotation ne sont donc pas réutilisés pendant l'historique courant.
+
+3. MIGRATION DES FEUX DÉJÀ MÉMORISÉS
+- Si plusieurs feux d'une même commune existaient déjà avant v15.85 sans numéro, ils sont numérotés une seule fois dans leur ordre de création : 1, 2, 3, etc.
+- Les numéros déjà présents sont toujours conservés.
+- Un feu historique qui reste seul et n'a jamais fait partie d'une série conserve son nom sans « 1 ».
+
+4. DÉDOUBLONNAGE CONSERVÉ
+- La clé d'identité d'un feu continue d'utiliser nom, département et coordonnées arrondies à 5 décimales.
+- Réafficher ou recréer exactement le même point ne crée pas artificiellement un nouveau numéro.
+- Le numéro existant et la date de création du feu sont alors conservés.
+
+5. AFFICHAGE COHÉRENT PARTOUT
+- La fonction centrale de nommage ajoute le numéro avant le département : « MARTIGUES 2 (13) ».
+- L'étiquette permanente de la flamme sur la carte reprend ce nom.
+- Le bandeau du feu actif reprend ce nom.
+- Chaque ligne de l'Historique reprend ce nom.
+- Les exports ForeFlight KML, SDVFR CSV et G. Earth KML utilisent également le nom numéroté afin que les différents feux restent identifiables hors de NPF.
+
+6. ÉLÉMENTS v15.84 CONSERVÉS
+- Icônes PÉLIC 26 × 26 px.
+- Cerclage extérieur rouge RETARDANT / bleu EAU.
+- Bouton « G. Earth » dans l'Historique.
+- Mot « BASE » agrandi dans l'étiquette Base + Pélic.
+- Priorité au fond NPF avant le SIA et mémorisation Afficher/Masquer zones.
+
+7. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.84.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement NAS.
+- Aucun changement du moteur de tuiles NPF / IndexedDB.
+
+8. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.85 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.84.
+- Vérification des cas : premier feu sans numéro ; second feu -> 1/2 ; suppression de 1 -> 2 inchangé ; nouveau feu -> 3 ; même point -> aucun nouveau numéro.
+
+
+VERSION TEST v15.84 — PÉLIC 26 PX + CERCLAGE EAU/RLT / G. EARTH / BASE PLUS LISIBLE
+Date : 22/08/2026
+Base : TEST v15.83
+
+OBJECTIFS
+- Donner aux icônes PÉLIC la même taille visuelle standard que les points VFR courts, soit 26 px, sans réduire leur zone tactile.
+- Ajouter un cerclage extérieur large permettant d'identifier immédiatement le type de pélicandrome : rouge pour RETARDANT, bleu pour EAU.
+- Rendre l'export Google Earth plus explicite dans l'Historique des feux en remplaçant « GE » par « G. Earth ».
+- Agrandir le mot « BASE » dans l'étiquette d'une route lorsque le même terrain est à la fois Base et Pélic.
+
+1. ICÔNES PÉLIC — TAILLE ALIGNÉE SUR LES POINTS VFR
+- Taille visuelle portée de 16 × 16 px à 26 × 26 px pour les pélicandromes permanents.
+- La même taille 26 × 26 px est appliquée aux terrains ajoutés manuellement comme PÉLIC.
+- L'ancrage Leaflet est recalé au centre à 13 × 13 px afin que le changement de taille ne décale pas la position géographique du symbole.
+- La grande hitbox tactile séparée reste inchangée : seule la représentation visuelle est agrandie.
+- Les états sélectionné, désactivé et les pictogrammes existants restent conservés.
+
+2. ICÔNES PÉLIC — CERCLAGE EXTÉRIEUR EAU / RETARDANT
+- PÉLIC en mode RETARDANT : cercle extérieur large rouge autour de l'icône.
+- PÉLIC en mode EAU : cercle extérieur large bleu autour de l'icône.
+- Le cerclage ne modifie ni le point géographique, ni la hitbox tactile, ni le fonctionnement des boutons EAU / RETARDANT.
+- Un pélicandrome sélectionné conserve son remplissage vert fluorescent ; le cercle extérieur continue d'indiquer le type RETARDANT ou EAU.
+- Un terrain désactivé conserve son apparence désactivée et n'utilise pas le cerclage opérationnel rouge/bleu.
+
+3. HISTORIQUE DES FEUX — LIBELLÉ GOOGLE EARTH
+- Le bouton d'export Google Earth de chaque feu mémorisé affiche désormais « G. Earth » au lieu de « GE ».
+- Le moteur KML et les coordonnées exportées sont strictement inchangés.
+- Aucun dialogue ni aucune action supplémentaire n'est ajouté au bouton Marquer position pendant le vol.
+
+4. ÉTIQUETTE BASE + PÉLIC
+- Dans l'étiquette d'une route vers un pélicandrome qui est également la Base, le mot « BASE » est agrandi de 10 px à 14 px.
+- L'OACI, la distance, le temps de vol, la route et le comportement tactile de l'étiquette restent inchangés.
+
+5. FONCTIONS v15.83 CONSERVÉES
+- Priorité réelle au fond NPF avant reprise des traitements SIA après déplacement/zoom.
+- Affichage/Masquage des zones mémorisé entre deux ouvertures de la PWA.
+- Mode zones masquées allégé, tampon SIA 25 %, rendu léger au zoom et invalidation des calculs obsolètes.
+- Noms des zones masqués à partir de 10 NM, SIV prioritaires dans Sélection Zone et cases PROFIL 20 × 20 px.
+- Export Google Earth disponible uniquement depuis l'Historique des feux.
+
+6. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.83.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement NAS.
+- Aucun changement du moteur de tuiles NPF / IndexedDB.
+
+7. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.84 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.83.
+- Vérification des deux créations d'icônes PÉLIC : 26 × 26 px, ancrage 13 × 13 px.
+- Vérification du bouton « G. Earth » dans chaque ligne de l'Historique des feux.
+- Vérification du cerclage rouge RETARDANT / bleu EAU et du mot BASE à 14 px.
+
+
 VERSION TEST v15.83 — PRIORITÉ RÉELLE AU FOND NPF / MÉMORISATION AFFICHAGE ZONES
 Date : 22/08/2026
 Base : TEST v15.82
