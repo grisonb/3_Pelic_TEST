@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.80 */
+/* NPF_STYLE_BUILD_VERSION: v15.81 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16002,10 +16002,11 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
+    height: 28px;
     min-height: 28px;
     box-sizing: border-box;
-    padding: 3px 6px;
+    padding: 2px 6px;
     border: 1px solid #b9c8da;
     border-radius: 8px;
     background: #fff;
@@ -16017,11 +16018,15 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     -webkit-user-select: none;
 }
 
+/* v15.81 — case plus grande, sans augmenter la hauteur de la ligne PROFIL. */
 .sia-profile-zone-filter-item input {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    min-height: 20px;
     margin: 0;
     accent-color: #0b63d1;
+    flex: 0 0 20px;
 }
 
 .sia-profile-zone-empty {
