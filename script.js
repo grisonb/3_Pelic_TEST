@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.85';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.86';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -11204,17 +11204,31 @@ function sanitizeOwnTrafficAircraftSessionEntry(entry) {
     const id = String(entry.id || entry.hex || '')
         .trim()
         .toUpperCase();
-    if (!id) return null;
+    const callsign = String(entry.callsign || entry.call_sign || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+    const registration = String(entry.registration || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+
+    /*
+     * v15.86 — « Mon avion » peut venir de SafeSky, de GLR ou d'une saisie
+     * manuelle. L'identifiant technique SafeSky n'est donc plus obligatoire :
+     * un indicatif exploitable suffit pour masquer le même avion dans les deux
+     * sources pendant la session PWA courante.
+     */
+    if (!id && !callsign && !registration) return null;
 
     return {
         id,
-        callsign: String(entry.callsign || entry.call_sign || '')
-            .trim()
-            .toUpperCase(),
-        registration: String(entry.registration || '')
-            .trim()
-            .toUpperCase(),
+        callsign,
+        registration,
         type: String(entry.type || entry.beaconType || '')
+            .trim()
+            .toUpperCase(),
+        source: String(entry.source || '')
             .trim()
             .toUpperCase(),
         selectedAt: Number(entry.selectedAt) || Date.now()
@@ -11257,10 +11271,73 @@ function getTrafficAircraftIdentifier(aircraftOrId) {
     ).trim().toUpperCase();
 }
 
+function areOwnTrafficCallsignsEquivalent(left, right) {
+    const a = String(left || '').trim();
+    const b = String(right || '').trim();
+    if (!a || !b) return false;
+
+    const normalizedA = normalizeTrafficSourceCallsign(a);
+    const normalizedB = normalizeTrafficSourceCallsign(b);
+    if (!normalizedA || !normalizedB) return false;
+    if (normalizedA === normalizedB) return true;
+
+    try {
+        return !!compareTrafficSourceCallsigns(a, b)?.match;
+    } catch (_) {
+        return false;
+    }
+}
+
+function getOwnTrafficCallsignCandidates(ownAircraft) {
+    if (!ownAircraft) return [];
+    return Array.from(new Set([
+        ownAircraft.callsign,
+        ownAircraft.registration
+    ].map(value => String(value || '').trim()).filter(Boolean)));
+}
+
+function getTrafficAircraftCallsignCandidates(aircraftOrId) {
+    if (!aircraftOrId || typeof aircraftOrId === 'string') return [];
+    return Array.from(new Set([
+        aircraftOrId.callsign,
+        aircraftOrId.call_sign,
+        aircraftOrId.registration,
+        aircraftOrId.raw?.callsign,
+        aircraftOrId.raw?.call_sign,
+        aircraftOrId.raw?.registration
+    ].map(value => String(value || '').trim()).filter(Boolean)));
+}
+
 function isOwnTrafficAircraft(aircraftOrId) {
     const ownAircraft = getOwnTrafficAircraftSession();
+    if (!ownAircraft) return false;
+
     const identifier = getTrafficAircraftIdentifier(aircraftOrId);
-    return !!ownAircraft && !!identifier && ownAircraft.id === identifier;
+    if (ownAircraft.id && identifier && ownAircraft.id === identifier) {
+        return true;
+    }
+
+    const ownCallsigns = getOwnTrafficCallsignCandidates(ownAircraft);
+    const candidateCallsigns = typeof aircraftOrId === 'string'
+        ? [aircraftOrId]
+        : getTrafficAircraftCallsignCandidates(aircraftOrId);
+
+    return ownCallsigns.some(ownCallsign => (
+        candidateCallsigns.some(candidate => (
+            areOwnTrafficCallsignsEquivalent(ownCallsign, candidate)
+        ))
+    ));
+}
+
+function isOwnGlobalLinkAircraft(item) {
+    const ownAircraft = getOwnTrafficAircraftSession();
+    if (!ownAircraft) return false;
+    const glrName = String(item?.name || '').trim();
+    if (!glrName) return false;
+
+    return getOwnTrafficCallsignCandidates(ownAircraft).some(identifier => (
+        areOwnTrafficCallsignsEquivalent(identifier, glrName)
+    ));
 }
 
 function refreshOwnTrafficAircraftUi() {
@@ -11355,6 +11432,7 @@ function setOwnTrafficAircraftSession(aircraft) {
             || normalized?.type
             || aircraft?.type
             || '',
+        source: 'SAFESKY',
         selectedAt: Date.now()
     });
 
@@ -11370,6 +11448,36 @@ function setOwnTrafficAircraftSession(aircraft) {
     return entry;
 }
 
+function setOwnTrafficAircraftCallsign(callsign, options = {}) {
+    const cleanCallsign = String(callsign || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toUpperCase();
+    if (!cleanCallsign || !normalizeTrafficSourceCallsign(cleanCallsign)) {
+        throw new Error('Saisis un indicatif exploitable pour « Mon avion ».');
+    }
+
+    const entry = sanitizeOwnTrafficAircraftSessionEntry({
+        id: String(options.id || '').trim().toUpperCase(),
+        callsign: cleanCallsign,
+        registration: String(options.registration || '').trim().toUpperCase(),
+        type: String(options.type || '').trim().toUpperCase(),
+        source: String(options.source || 'MANUAL').trim().toUpperCase(),
+        selectedAt: Date.now()
+    });
+
+    ownTrafficAircraftSessionFallback = entry;
+    try {
+        sessionStorage.setItem(
+            TRAFFIC_OWN_AIRCRAFT_SESSION_KEY,
+            JSON.stringify(entry)
+        );
+    } catch (_) {}
+
+    redrawTrafficAfterOwnAircraftChange('own-aircraft-callsign-set');
+    return entry;
+}
+
 function clearOwnTrafficAircraftSession() {
     ownTrafficAircraftSessionFallback = null;
     try {
@@ -11377,6 +11485,9 @@ function clearOwnTrafficAircraftSession() {
             TRAFFIC_OWN_AIRCRAFT_SESSION_KEY
         );
     } catch (_) {}
+
+    const manualInput = document.getElementById('traffic-own-aircraft-manual-input');
+    if (manualInput) manualInput.value = '';
 
     redrawTrafficAfterOwnAircraftChange('own-aircraft-reset');
 }
@@ -11531,6 +11642,23 @@ function ensureTrafficSettingsModal() {
                             disabled>
                         Réinitialiser
                     </button>
+                </div>
+                <div class="traffic-own-aircraft-manual-row">
+                    <input id="traffic-own-aircraft-manual-input"
+                           type="text"
+                           maxlength="24"
+                           autocomplete="off"
+                           autocapitalize="characters"
+                           spellcheck="false"
+                           placeholder="Indicatif, ex. PELIC34">
+                    <button type="button"
+                            id="traffic-own-aircraft-manual-apply"
+                            class="traffic-tool-button traffic-own-aircraft-select-button">
+                        Définir
+                    </button>
+                </div>
+                <div class="traffic-tools-note">
+                    L'indicatif saisi sert à masquer « Mon avion » dans SafeSky et GLR pour la session courante.
                 </div>
             </div>
 
@@ -11689,6 +11817,32 @@ function ensureTrafficSettingsModal() {
     modal.querySelector('#traffic-own-aircraft-reset')
         .addEventListener('click', clearOwnTrafficAircraftSession);
 
+    const applyManualOwnAircraft = () => {
+        const input = modal.querySelector('#traffic-own-aircraft-manual-input');
+        try {
+            const entry = setOwnTrafficAircraftCallsign(input?.value || '', {
+                source: 'MANUAL'
+            });
+            if (input) input.value = entry?.callsign || '';
+            refreshOwnTrafficAircraftUi();
+        } catch (error) {
+            if (input) {
+                input.setCustomValidity(error?.message || 'Indicatif invalide.');
+                input.reportValidity();
+                setTimeout(() => input.setCustomValidity(''), 0);
+            }
+        }
+    };
+
+    modal.querySelector('#traffic-own-aircraft-manual-apply')
+        .addEventListener('click', applyManualOwnAircraft);
+    modal.querySelector('#traffic-own-aircraft-manual-input')
+        .addEventListener('keydown', event => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            applyManualOwnAircraft();
+        });
+
     modal.addEventListener('click', (event) => {
         if (event.target === modal) closeModal();
     });
@@ -11749,6 +11903,12 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
     modal.querySelector('#traffic-drone-advisories-input').checked = !!current.showDroneAdvisories;
     modal.querySelector('#traffic-only-tracked-input').checked = !!current.onlyTrackedIdentifiers;
+
+    const ownAircraft = getOwnTrafficAircraftSession();
+    const manualOwnInput = modal.querySelector('#traffic-own-aircraft-manual-input');
+    if (manualOwnInput) {
+        manualOwnInput.value = ownAircraft?.callsign || ownAircraft?.registration || '';
+    }
 
     refreshTrackedTrafficListUi();
     refreshOwnTrafficAircraftUi();
@@ -16562,7 +16722,6 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     routesLayer.clearLayers();
     lftwRouteLayer.clearLayers();
     resetRouteTooltipOffsets();
-    drawPermanentAirportMarkers();
     drawFireHistoryMarkers();
 
     updateCommuneDisplay(commune);
@@ -16646,6 +16805,10 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     if (!selectedPelicanOACI || !closestOACIs.has(selectedPelicanOACI) || !isSelectablePelicanAirport(selectedPelicanOACI)) {
         selectedPelicanOACI = closestAirports.length > 0 ? closestAirports[0].oaci : null;
     }
+
+    /* v15.86 — dessiner les PÉLIC après résolution de la sélection pour que
+     * l'intérieur vert corresponde immédiatement au PÉLIC réellement choisi. */
+    drawPermanentAirportMarkers();
 
     closestAirports.forEach(ap => {
         allPoints.push([ap.lat, ap.lon]);
@@ -19599,6 +19762,7 @@ function renderGlobalLinkPositions(positions) {
             };
         })
         .filter(Boolean)
+        .filter(item => !isOwnGlobalLinkAircraft(item))
         .sort((a, b) => (a.ageSeconds - b.ageSeconds) || a.name.localeCompare(b.name, 'fr'));
 
     /*
@@ -19711,7 +19875,23 @@ function renderGlobalLinkPositions(positions) {
         const altitude = item.altitude === null || item.altitude === undefined || item.altitude === ''
             ? '—'
             : escapeGlobalLinkHtml(item.altitude);
-        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}</div>`);
+        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}<button type="button" class="traffic-popup-own-button global-link-popup-own-button">Définir comme mon avion et masquer</button></div>`);
+        marker.on('popupopen', () => {
+            const popupElement = marker.getPopup()?.getElement?.();
+            const ownButton = popupElement?.querySelector?.('.global-link-popup-own-button');
+            if (!ownButton) return;
+            ownButton.onclick = event => {
+                event.preventDefault();
+                event.stopPropagation();
+                try {
+                    setOwnTrafficAircraftCallsign(item.name, {
+                        source: 'GLR'
+                    });
+                } catch (error) {
+                    console.warn('[GLR] Définition Mon avion impossible:', error);
+                }
+            };
+        });
         marker.addTo(layer);
 
         if (placement && labelLatLng) {
@@ -19721,12 +19901,21 @@ function renderGlobalLinkPositions(positions) {
                 iconSize: [placement.width, placement.height],
                 iconAnchor: [placement.width / 2, placement.height / 2]
             });
-            L.marker(labelLatLng, {
+            const labelMarker = L.marker(labelLatLng, {
                 pane: NPF_GLOBAL_LINK_PANE_NAME,
                 icon: labelIcon,
-                interactive: false,
-                keyboard: false
-            }).addTo(layer);
+                interactive: true,
+                bubblingMouseEvents: false,
+                keyboard: false,
+                title: item.name
+            });
+            labelMarker.on('click', event => {
+                try {
+                    if (event?.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+                } catch (_) {}
+                try { marker.openPopup(); } catch (_) {}
+            });
+            labelMarker.addTo(layer);
         }
     });
     updateGlobalLinkButton();
@@ -20420,10 +20609,29 @@ function addAirportTouchHitbox(airport, popupHtml) {
 }
 
 /*
- * v15.84 — PÉLIC : taille visuelle 26 px (référence VRP court).
- * La hitbox tactile indépendante reste inchangée ; le CSS final ajoute le
- * cerclage extérieur rouge RETARDANT / bleu EAU.
+ * v15.86 — PÉLIC : symbole avion vectoriel « Avion A ».
+ * Le cercle reste à 26 px comme les VRP courts. Le contour opérationnel est
+ * directement porté par la bordure : rouge RETARDANT / bleu EAU. La sélection
+ * colore uniquement l'intérieur en vert fluorescent et conserve ce code couleur.
  */
+function buildPelicanAircraftSymbolHtml() {
+    return `<svg class="pelic-aircraft-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11.2 2.4c0-.9 1.6-.9 1.6 0v5.7l7.7 3.9c.7.35 1 .95.8 1.6l-.35 1.15-8.15-1.95v5.1l2.75 2.05-.3 1.25L12 20.3l-3.25.9-.3-1.25 2.75-2.05v-5.1l-8.15 1.95-.35-1.15c-.2-.65.1-1.25.8-1.6l7.7-3.9V2.4Z"/></svg>`;
+}
+
+function buildPelicanMapIconClass(airport, isDisabled, isWater) {
+    const classes = [
+        'custom-marker-icon',
+        'airport-marker-base',
+        'airport-marker-pelic'
+    ];
+    if (isDisabled) classes.push('airport-marker-disabled');
+    else classes.push(isWater ? 'airport-marker-water' : 'airport-marker-retardant');
+    if (!isDisabled && selectedPelicanOACI === airport?.oaci) {
+        classes.push('airport-marker-selected');
+    }
+    return classes.join(' ');
+}
+
 function drawPermanentAirportMarkers() {
     permanentAirportLayer.clearLayers();
 
@@ -20456,8 +20664,8 @@ function drawPermanentAirportMarkers() {
         if (isCustomPelic) {
             const isDisabled = disabledAirports.has(airport.oaci);
             const isWater = waterAirports.has(airport.oaci);
-            let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
-            isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
+            const iconClass = buildPelicanMapIconClass(airport, isDisabled, isWater);
+            const iconHTML = isDisabled ? '<b>+</b>' : buildPelicanAircraftSymbolHtml();
             const waterButtonText = isWater ? "RETARDANT" : "EAU";
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
@@ -20509,8 +20717,8 @@ function drawPermanentAirportMarkers() {
     pelicanAirports.forEach(airport => {
         const isDisabled = disabledAirports.has(airport.oaci);
         const isWater = waterAirports.has(airport.oaci);
-        let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
-        isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
+        const iconClass = buildPelicanMapIconClass(airport, isDisabled, isWater);
+        const iconHTML = isDisabled ? '<b>+</b>' : buildPelicanAircraftSymbolHtml();
         const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
