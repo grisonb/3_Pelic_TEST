@@ -1,3 +1,71 @@
+VERSION TEST v15.86 — MON AVION MANUEL + SÉLECTION GLR / NOUVELLE ICÔNE PÉLIC « AVION A »
+Date : 22/08/2026
+Base : TEST v15.85
+
+OBJECTIFS
+- Permettre de définir « Mon avion » en saisissant directement son indicatif dans Filtres trafic.
+- Pouvoir définir un trafic GLR comme « Mon avion » depuis son symbole ou son étiquette, comme avec SafeSky.
+- Masquer le même avion dans SafeSky et GLR même lorsque les deux sources n'écrivent pas exactement l'indicatif de la même façon.
+- Tester le nouveau dessin PÉLIC validé : avion noir type « Avion A », cercle 26 px et bordure EAU/RLT plus marquée.
+
+1. FILTRES TRAFIC — SAISIE MANUELLE « MON AVION »
+- La section « Mon avion » reçoit un champ Indicatif et un bouton « Définir ».
+- Exemples acceptés : PELIC34, PELICAN 34, MILAN75, etc.
+- La validation peut se faire avec le bouton ou avec Entrée.
+- L'indicatif est conservé uniquement pour la session PWA courante, comme le fonctionnement historique de « Mon avion ».
+- « Réinitialiser » efface la sélection et le champ manuel.
+- Le statut « Mon avion masqué » reste affiché dans la même section.
+
+2. IDENTITÉ COMMUNE SAFESKY / GLR
+- « Mon avion » ne dépend plus obligatoirement d'un identifiant technique SafeSky.
+- Si un identifiant SafeSky existe, il reste prioritaire pour l'égalité exacte.
+- Sinon, NPF compare l'indicatif / immatriculation avec le moteur de rapprochement déjà utilisé entre GLR et SafeSky.
+- Les formes fortement équivalentes restent reconnues, notamment PELIC34 <-> PELICAN 34 et MILAN75 <-> MILAN 75.
+- La règle de sécurité du moteur existant est conservée : les suffixes numériques différents ne sont pas fusionnés.
+
+3. GLR — « DÉFINIR COMME MON AVION »
+- Le symbole GLR conserve sa fiche existante mais reçoit le bouton « Définir comme mon avion et masquer ».
+- L'étiquette GLR devient cliquable/tactile et ouvre exactement la même fiche que le symbole.
+- Après validation, le plot GLR correspondant disparaît immédiatement.
+- Si le même appareil est également reçu par SafeSky, son plot SafeSky est également masqué.
+- Inversement, un indicatif saisi manuellement ou choisi côté SafeSky masque le GLR équivalent.
+- La déduplication SafeSky prioritaire / GLR reste conservée.
+
+4. PÉLIC — NOUVEAU SYMBOLE « AVION A »
+- Taille extérieure conservée à 26 × 26 px, identique à la référence VRP court validée précédemment.
+- L'emoji avion est supprimé afin d'éviter les variations de rendu iPad/iOS.
+- Il est remplacé par un avion noir vectoriel SVG, vu de dessus, avec ailes droites et empennage simple (« Avion A »).
+- L'intérieur est blanc lorsque le PÉLIC n'est pas sélectionné.
+- RETARDANT : bordure rouge franche de 4 px.
+- EAU : bordure bleue franche de 4 px.
+- PÉLIC sélectionné : intérieur vert fluorescent #39ff14 ; la bordure reste rouge ou bleue afin de conserver l'information RLT/EAU.
+- Terrain désactivé : état gris neutre et symbole + conservé.
+- La hitbox tactile indépendante reste strictement inchangée.
+- Même rendu pour les 27 PÉLIC permanents et les terrains ajoutés manuellement comme PÉLIC.
+
+5. ÉLÉMENTS v15.85 CONSERVÉS
+- Numérotation stable des feux multiples d'une même commune.
+- Export Google Earth « G. Earth » dans l'Historique.
+- Mot BASE agrandi sur l'étiquette Base + Pélic.
+- Priorité réelle au fond NPF avant SIA et mémorisation Afficher/Masquer zones.
+- Données SIA / VRP / AIRAC inchangées.
+
+6. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.85.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement NAS.
+- Aucun changement du moteur de tuiles NPF / IndexedDB.
+
+7. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.86 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.85.
+- Vérification des deux chemins PÉLIC (permanent + personnalisé) : 26 px, SVG Avion A, bordure RLT/EAU, sélection verte.
+- Vérification du champ manuel « Mon avion », du bouton GLR et de l'interactivité de l'étiquette GLR.
+
+
 VERSION TEST v15.85 — NUMÉROTATION STABLE DES FEUX D'UNE MÊME COMMUNE
 Date : 22/08/2026
 Base : TEST v15.84
