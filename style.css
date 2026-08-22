@@ -16111,3 +16111,95 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     border-color: #000000 !important;
     font-weight: 900 !important;
 }
+
+/* ==========================================================================
+   v15.80 — commande Zones intégrée au bouton France + priorité tactile GAAR
+   ========================================================================== */
+.quick-offline-map-control {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    flex: 0 0 90px;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.quick-offline-map-control > .quick-offline-map-button {
+    width: 100% !important;
+    height: 100% !important;
+    pointer-events: auto;
+}
+
+.quick-sia-zones-toggle {
+    position: absolute;
+    right: -10px;
+    bottom: -10px;
+    z-index: 6;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 5px;
+    border: 2px solid var(--primary-color);
+    border-radius: 50%;
+    background: rgba(255,255,255,.98);
+    color: var(--primary-color);
+    box-shadow: 0 2px 7px rgba(0,0,0,.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+.quick-sia-zones-toggle svg {
+    width: 24px;
+    height: 24px;
+    overflow: visible;
+}
+
+.quick-sia-eye-outline,
+.quick-sia-eye-slash {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.quick-sia-eye-pupil { fill: currentColor; }
+.quick-sia-eye-slash { display: none; stroke-width: 3.2; }
+
+.quick-sia-zones-toggle.is-hidden {
+    background: #b42318;
+    border-color: #ffffff;
+    color: #ffffff;
+}
+.quick-sia-zones-toggle.is-hidden .quick-sia-eye-slash { display: block; }
+
+.gaar-point-edit-hitbox {
+    pointer-events: auto !important;
+}
+
+@media (max-width: 760px) {
+    .quick-offline-map-control {
+        width: var(--right-tools-size, 52px) !important;
+        height: var(--right-tools-size, 52px) !important;
+        flex-basis: var(--right-tools-size, 52px) !important;
+    }
+    .quick-sia-zones-toggle {
+        right: -7px;
+        bottom: -7px;
+        width: 29px;
+        height: 29px;
+        min-width: 29px;
+        min-height: 29px;
+        padding: 4px;
+        border-width: 2px;
+    }
+    .quick-sia-zones-toggle svg {
+        width: 19px;
+        height: 19px;
+    }
+}
+
