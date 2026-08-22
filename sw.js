@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-79_corrections';
-const APP_VERSION = 'v15.79';
+const SW_VERSION = 'sw-v15-80_follow_gaar_sia_stability';
+const APP_VERSION = 'v15.80';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
