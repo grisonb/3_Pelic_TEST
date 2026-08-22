@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.83 */
+/* NPF_STYLE_BUILD_VERSION: v15.85 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16206,5 +16206,55 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
         width: 19px;
         height: 19px;
     }
+}
+
+/* ==========================================================================
+   v15.84 — PÉLIC 26 PX / CERCLAGE EAU-RLT / BASE PLUS LISIBLE
+   ========================================================================== */
+
+/*
+ * Même taille visuelle standard que les VRP courts (26 px).
+ * La hitbox tactile est un calque JS séparé et n'est donc pas agrandie ici.
+ */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-active,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-water,
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    width: 26px !important;
+    height: 26px !important;
+    line-height: 26px !important;
+    font-size: 16px !important;
+    border-width: 2px !important;
+    box-sizing: border-box !important;
+}
+
+/* RETARDANT = état opérationnel normal : cercle extérieur rouge large. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-active {
+    box-shadow:
+        0 0 0 4px #d71920,
+        0 2px 7px rgba(0,0,0,.45) !important;
+}
+
+/* EAU : cercle extérieur bleu large. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-water {
+    box-shadow:
+        0 0 0 4px #0077c8,
+        0 2px 7px rgba(0,0,0,.45) !important;
+}
+
+/* Terrain indisponible : conserver un état neutre, sans code EAU/RLT. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-disabled {
+    line-height: 22px !important;
+    font-size: 18px !important;
+    box-shadow:
+        0 0 0 2px rgba(255,255,255,.92),
+        0 2px 6px rgba(0,0,0,.40) !important;
+}
+
+/* Terrain à la fois BASE et PÉLIC : rendre BASE immédiatement lisible. */
+.route-tooltip .route-label-base-flag {
+    font-size: 14px !important;
+    line-height: 1 !important;
+    font-weight: 950 !important;
 }
 
