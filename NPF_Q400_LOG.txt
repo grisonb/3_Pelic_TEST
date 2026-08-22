@@ -1,3 +1,61 @@
+VERSION TEST v15.83 — PRIORITÉ RÉELLE AU FOND NPF / MÉMORISATION AFFICHAGE ZONES
+Date : 22/08/2026
+Base : TEST v15.82
+
+OBJECTIFS
+- Éliminer la concurrence restante entre le chargement des tuiles de la carte NPF et les rafraîchissements SIA après déplacement/zoom.
+- Ne plus considérer un simple délai fixe comme une garantie que le fond de carte est prêt : le moteur SIA attend désormais l'état visuel réel des tuiles.
+- Mémoriser le choix « Afficher zones / Masquer zones » entre deux ouvertures de la PWA.
+
+1. CARTE NPF — PRIORITÉ RÉELLE AUX TUILES AVANT LE SIA
+- Les anciens délais fixes 420 ms après `moveend` et 360 ms après `zoomend` ne déclenchent plus à eux seuls le rendu SIA.
+- Après un déplacement ou un zoom, NPF contrôle l'état des tuiles réellement visibles du fond de carte avant de laisser repartir le travail SIA.
+- Sur la carte NPF offline, le contrôle vérifie notamment que le niveau Leaflet demandé correspond au zoom courant et que les tuiles visibles ont terminé leur chargement/décodage.
+- Deux contrôles successifs stables sont demandés avant reprise du SIA afin d'éviter de repartir sur les anciennes tuiles encore présentes juste après un zoom.
+- Un délai maximal de sécurité évite de bloquer indéfiniment le SIA si une tuile est absente ou si Safari ne remonte pas un état parfait.
+- Le mécanisme s'applique aussi au chargement SIA de démarrage : le gros dataset n'est plus volontairement lu/décompressé avant que le fond de carte initial ait eu sa priorité.
+- Un nouveau geste carte invalide immédiatement l'attente ou le rendu SIA de la vue précédente ; aucun traitement obsolète n'est poursuivi.
+- Le filet de sécurité existant du fond de carte (contrôles 260/760 ms et redraw uniquement si aucune tuile visible) reste inchangé.
+- Le moteur IndexedDB des tuiles NPF, sa file de lectures et les packs Offline ne sont pas modifiés dans cette version.
+
+2. SIA — MODE ZONES MASQUÉES ALLÉGÉ
+- Lorsque les volumes SIA sont masqués, le calcul des familles TMA opérationnelles n'est plus exécuté inutilement pendant une reconstruction de points/terrains.
+- Aucun contour, hitbox de volume, bande intérieure ou nom de zone n'est construit tant que « Masquer zones » est actif.
+- Les terrains, AHP et VRP/points restent disponibles conformément aux filtres et seuils existants.
+- Le tampon de couverture reste à 25 % et les optimisations de conservation/rendu léger héritées de v15.75/v15.80/v15.82 sont conservées.
+
+3. AFFICHER / MASQUER ZONES — ÉTAT MÉMORISÉ
+- Nouvelle préférence locale `npfSiaMapAirspacesVisible_v1`.
+- Chaque action sur « Afficher zones / Masquer zones » est enregistrée immédiatement dans `localStorage`.
+- À l'ouverture suivante de la PWA, la carte reprend automatiquement le dernier état choisi.
+- En l'absence de préférence existante (première utilisation/migration), les zones restent affichées par défaut pour conserver le comportement historique.
+- Le bouton œil du bouton France et le bouton du PROFIL sont synchronisés dès l'initialisation avec la valeur restaurée.
+- Cette préférence n'altère jamais les cases du filtre SIA principal ni les cases du PROFIL.
+
+4. ÉLÉMENTS v15.82 CONSERVÉS
+- Export Google Earth « GE » uniquement depuis l'Historique des feux ; aucune étape ajoutée au bouton Marquer position en vol.
+- Noms/fréquences/limites verticales des zones masqués à partir de l'échelle 10 NM en dézoomant.
+- SIV toujours placés en premier dans « ESPACES À CET ENDROIT ».
+- Cases du PROFIL 20 × 20 px dans une ligne de hauteur inchangée.
+- Suivi basé sur le viewport visible iPad, modification/suppression GAAR, toggle Zones intégré au bouton France et bandes intérieures adaptatives conservés.
+
+5. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.82.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement NAS.
+- Aucune mise à jour automatique SIA ajoutée.
+
+6. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.83 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.82.
+- Vérification de la persistance `npfSiaMapAirspacesVisible_v1` et du défaut « zones affichées » en absence de préférence.
+- Vérification : le chemin `startup-prefs` ne précharge plus directement le dataset SIA avant la priorité donnée au fond de carte.
+- Vérification : attente réelle du fond pour `startup-prefs`, `moveend` et `zoomend`, avec invalidation sur nouveau geste.
+
+
 VERSION TEST v15.82 — FLUIDITÉ NPF ZONES MASQUÉES / EXPORT GOOGLE EARTH HISTORIQUE
 Date : 22/08/2026
 Base : TEST v15.81
