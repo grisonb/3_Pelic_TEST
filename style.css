@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.85 */
+/* NPF_STYLE_BUILD_VERSION: v15.86 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16258,3 +16258,114 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     font-weight: 950 !important;
 }
 
+
+
+/* ==========================================================================
+   v15.86 — PÉLIC « AVION A » / MON AVION MANUEL + GLR
+   ========================================================================== */
+
+/*
+ * PÉLIC : cercle 26 px, pictogramme avion SVG stable (aucun emoji système),
+ * bordure opérationnelle fortement marquée. Les anciennes couleurs/ombres des
+ * classes historiques sont neutralisées ici par ce bloc final.
+ */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+    padding: 0 !important;
+    border: 4px solid #111827 !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    line-height: 18px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.34) !important;
+    overflow: hidden !important;
+}
+
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-retardant {
+    border-color: #e00000 !important;
+}
+
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-water {
+    border-color: #006ee6 !important;
+}
+
+/* Sélection : intérieur vert fluo, contour EAU/RLT conservé. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-selected {
+    background: #39ff14 !important;
+}
+
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-disabled {
+    border-color: #64748b !important;
+    background: #f8fafc !important;
+    color: #475569 !important;
+    line-height: 18px !important;
+    font-size: 17px !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25) !important;
+}
+
+.pelic-aircraft-svg {
+    display: block;
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.pelic-aircraft-svg path {
+    fill: #071426;
+    stroke: none;
+}
+
+/* Filtres trafic > Mon avion : saisie manuelle de l'indicatif. */
+.traffic-own-aircraft-manual-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+#traffic-own-aircraft-manual-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+/* Les étiquettes GLR deviennent réellement tactiles pour ouvrir leur fiche. */
+.global-link-aircraft-label-marker {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+.global-link-aircraft-label-marker .global-link-aircraft-label {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+@media (max-width: 560px) {
+    .traffic-own-aircraft-manual-row {
+        grid-template-columns: 1fr;
+    }
+
+    #traffic-own-aircraft-manual-apply {
+        width: 100%;
+    }
+}
