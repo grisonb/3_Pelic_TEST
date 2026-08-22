@@ -1,3 +1,59 @@
+VERSION TEST v15.82 — FLUIDITÉ NPF ZONES MASQUÉES / EXPORT GOOGLE EARTH HISTORIQUE
+Date : 22/08/2026
+Base : TEST v15.81
+
+OBJECTIFS
+- Corriger la régression de fluidité ressentie sur la carte NPF lorsque les zones SIA sont masquées.
+- Conserver les optimisations SIA utiles de v15.75/v15.80 sans maintenir inutilement un double rendu lorsque les volumes sont invisibles.
+- Permettre l'export d'une position marquée vers Google Earth depuis l'Historique des feux, sans ajouter aucune étape pendant le vol.
+
+1. SIA — FLUIDITÉ CARTE NPF LORSQUE LES ZONES SONT MASQUÉES
+- Le tampon de couverture SIA revient de 35 % à 25 %, valeur éprouvée de v15.75.
+- Les petits déplacements qui restent dans la couverture chargée continuent à ne provoquer aucune reconstruction SIA.
+- Le rendu léger au zoom de v15.80 est conservé : les volumes déjà chargés ne sont pas reconstruits si la couverture et les seuils restent compatibles.
+- Le double tampon est conservé uniquement lorsque les zones SIA sont réellement visibles.
+- Lorsque « Masquer zones » est actif, l'ancien groupe SIA n'est plus conservé en mémoire pendant la reconstruction : il est retiré/libéré avant de préparer le nouveau groupe de points utiles.
+- Les points SIA/VRP/terrains restent disponibles selon leurs filtres et seuils existants ; aucun filtre utilisateur n'est modifié.
+- Le fond de carte NPF reste prioritaire : les reconstructions SIA longues sont découpées par petites respirations du thread principal.
+- Un nouveau geste carte invalide également une reconstruction SIA déjà commencée. Le rendu obsolète est abandonné à la prochaine respiration au lieu de continuer à consommer CPU/mémoire pour une vue qui n'est plus affichée.
+- Aucune modification du moteur de tuiles NPF, des bases IndexedDB ou des packs Offline.
+
+2. MARQUER POSITION — AUCUNE ÉTAPE SUPPLÉMENTAIRE EN VOL
+- Le bouton de marquage GPS conserve exactement son fonctionnement immédiat.
+- Aucun popup, aucune confirmation et aucun choix d'export n'est ajouté au moment du marquage.
+- La position continue d'être mémorisée automatiquement dans l'Historique des feux via le mécanisme existant.
+
+3. HISTORIQUE DES FEUX — EXPORT GOOGLE EARTH
+- Chaque ligne de l'Historique des feux propose désormais : ForeFlight / SDVFR / GE / suppression.
+- Le bouton compact « GE » exporte le feu mémorisé au format KML compatible Google Earth.
+- L'export reprend strictement les latitude/longitude mémorisées dans l'historique ; il ne recalcule ni ne déplace le point.
+- Le moteur KML existant est réutilisé afin de ne pas dupliquer la logique d'export.
+- L'export est volontairement placé uniquement dans l'historique pour rester transparent pendant la phase de vol.
+
+4. FONCTIONS v15.81 CONSERVÉES
+- Noms/fréquences/limites verticales des zones masqués à partir de l'échelle 10 NM en dézoomant.
+- SIV systématiquement présentés en premier dans « ESPACES À CET ENDROIT ».
+- Cases du PROFIL agrandies à 20 × 20 px sans augmenter la hauteur de la ligne.
+- Correctif de version Style empêchant le refus d'installation PWA.
+- Positionnement Suivi viewport iPad, modification/suppression GAAR, toggle Zones sur bouton France et bandes intérieures adaptatives conservés.
+
+5. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.81.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucune mise à jour automatique SIA ajoutée.
+- Aucun changement NAS.
+
+6. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.82 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.81.
+- Vérification : aucun dialogue ajouté au bouton de marquage GPS.
+- Vérification : bouton « GE » présent sur chaque ligne d'historique et relié au moteur KML existant.
+- Vérification : tampon SIA = 25 % et double tampon conditionné à l'affichage réel des zones.
+
+
 VERSION TEST v15.81 — LABELS SIA 10 NM / SIV PRIORITAIRE / PROFIL TACTILE / CORRECTIF MAJ
 Date : 22/08/2026
 Base : TEST v15.80
