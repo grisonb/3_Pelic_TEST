@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.83';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.85';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -2680,6 +2680,9 @@ function normalizeHistoryCommune(commune) {
                 commune.locality_source
                 || ''
             ).trim(),
+            fireNumber: Number.isInteger(Number(commune.fireNumber)) && Number(commune.fireNumber) > 0
+                ? Number(commune.fireNumber)
+                : null,
             savedAt:
                 commune.savedAt || Date.now()
         };
@@ -2716,8 +2719,65 @@ function normalizeHistoryCommune(commune) {
         latitude_mairie: lat,
         longitude_mairie: lon,
         isManual: !!commune.isManual,
+        fireNumber: Number.isInteger(Number(commune.fireNumber)) && Number(commune.fireNumber) > 0
+            ? Number(commune.fireNumber)
+            : null,
         savedAt: commune.savedAt || Date.now()
     };
+}
+
+/*
+ * v15.85 — numérotation stable des feux d'une même commune.
+ * - un feu isolé historique reste sans numéro ;
+ * - dès qu'une commune possède plusieurs feux, les anciens feux non numérotés
+ *   sont numérotés dans leur ordre de création (1, 2, ...);
+ * - les numéros existants ne sont jamais renumérotés après suppression ;
+ * - un nouveau feu prend toujours max + 1, donc un trou n'est pas réutilisé.
+ */
+function getFireCommuneNumberingKey(item) {
+    if (!item || typeof item !== 'object') return '';
+    const communeName = item.locality_match && String(item.locality_commune_name || '').trim()
+        ? String(item.locality_commune_name).trim()
+        : String(item.nom_standard || item.name || '').trim();
+    if (!communeName) return '';
+    return [
+        simplifyString(communeName),
+        String(item.dep_code || '').trim().toUpperCase()
+    ].join('|');
+}
+
+function stabilizeExistingFireHistoryNumbers(history) {
+    const items = Array.isArray(history) ? history : [];
+    const groups = new Map();
+
+    items.forEach((item, index) => {
+        const key = getFireCommuneNumberingKey(item);
+        if (!key) return;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ item, index });
+    });
+
+    let changed = false;
+
+    groups.forEach(entries => {
+        if (entries.length < 2) return;
+
+        const validNumbers = entries
+            .map(entry => Number(entry.item.fireNumber))
+            .filter(value => Number.isInteger(value) && value > 0);
+        let nextNumber = validNumbers.length ? Math.max(...validNumbers) + 1 : 1;
+
+        // L'historique est stocké du plus récent au plus ancien : on attribue
+        // donc d'abord les numéros aux éléments les plus anciens.
+        [...entries].reverse().forEach(entry => {
+            const currentNumber = Number(entry.item.fireNumber);
+            if (Number.isInteger(currentNumber) && currentNumber > 0) return;
+            entry.item.fireNumber = nextNumber++;
+            changed = true;
+        });
+    });
+
+    return { items, changed };
 }
 
 function getFireHistory() {
@@ -2725,10 +2785,15 @@ function getFireHistory() {
         const rawHistory = localStorage.getItem(FIRE_HISTORY_STORAGE_KEY);
         const parsed = JSON.parse(rawHistory || '[]');
         if (!Array.isArray(parsed)) return [];
-        return parsed
+        const normalizedHistory = parsed
             .map(normalizeHistoryCommune)
             .filter(Boolean)
             .slice(0, FIRE_HISTORY_MAX_ITEMS);
+        const stabilized = stabilizeExistingFireHistoryNumbers(normalizedHistory);
+        if (stabilized.changed) {
+            localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(stabilized.items));
+        }
+        return stabilized.items;
     } catch (_) {
         return [];
     }
@@ -2767,8 +2832,49 @@ function saveFireHistory(commune) {
         Number(item.longitude_mairie).toFixed(5)
     ].join('|');
 
-    const currentHistory = getFireHistory();
+    let currentHistory = getFireHistory();
     const normalizedKey = keyFor(normalized);
+    const exactExisting = currentHistory.find(item => keyFor(item) === normalizedKey) || null;
+
+    if (exactExisting) {
+        const existingNumber = Number(exactExisting.fireNumber);
+        if (Number.isInteger(existingNumber) && existingNumber > 0) {
+            normalized.fireNumber = existingNumber;
+        }
+        normalized.savedAt = exactExisting.savedAt || normalized.savedAt;
+    } else {
+        const communeKey = getFireCommuneNumberingKey(normalized);
+        const sameCommune = communeKey
+            ? currentHistory.filter(item => getFireCommuneNumberingKey(item) === communeKey)
+            : [];
+
+        if (sameCommune.length) {
+            let maxNumber = sameCommune.reduce((max, item) => {
+                const value = Number(item.fireNumber);
+                return Number.isInteger(value) && value > max ? value : max;
+            }, 0);
+
+            /*
+             * Le premier doublon transforme le feu historique unique en « 1 ».
+             * Les groupes plus anciens non numérotés ont normalement déjà été
+             * migrés par getFireHistory(), mais ce garde-fou couvre aussi les
+             * données locales atypiques.
+             */
+            if (maxNumber === 0) {
+                const sameCommuneKeys = new Set(sameCommune.map(keyFor));
+                let nextExistingNumber = 1;
+                currentHistory = currentHistory.map(item => {
+                    if (!sameCommuneKeys.has(keyFor(item))) return item;
+                    const updated = { ...item, fireNumber: nextExistingNumber++ };
+                    return updated;
+                });
+                maxNumber = sameCommune.length;
+            }
+
+            normalized.fireNumber = maxNumber + 1;
+        }
+    }
+
     const nextHistory = [
         normalized,
         ...currentHistory.filter(item => keyFor(item) !== normalizedKey)
@@ -2776,6 +2882,21 @@ function saveFireHistory(commune) {
 
     try {
         localStorage.setItem(FIRE_HISTORY_STORAGE_KEY, JSON.stringify(nextHistory));
+
+        // Le feu actif doit porter immédiatement le numéro attribué : bandeau,
+        // étiquette carte et exports affichent ainsi le même identifiant sans reload.
+        if (commune && typeof commune === 'object') {
+            if (Number.isInteger(Number(normalized.fireNumber)) && Number(normalized.fireNumber) > 0) {
+                commune.fireNumber = Number(normalized.fireNumber);
+            }
+            commune.savedAt = normalized.savedAt;
+        }
+        if (currentCommune && keyFor(currentCommune) === normalizedKey) {
+            currentCommune.fireNumber = normalized.fireNumber || null;
+            currentCommune.savedAt = normalized.savedAt;
+            localStorage.setItem('currentCommune', JSON.stringify(currentCommune));
+        }
+
         drawFireHistoryMarkers();
     } catch (error) {
         console.warn('Impossible de mémoriser le feu:', error);
@@ -2784,9 +2905,14 @@ function saveFireHistory(commune) {
 
 function buildFireDisplayName(item) {
     const normalized = normalizeHistoryCommune(item) || item || {};
+    const baseName = String(normalized.nom_standard || normalized.name || 'Feu').trim() || 'Feu';
+    const fireNumber = Number(normalized.fireNumber);
+    const numberedName = Number.isInteger(fireNumber) && fireNumber > 0
+        ? `${baseName} ${fireNumber}`
+        : baseName;
     const name = normalized.dep_code
-        ? `${normalized.nom_standard || normalized.name || 'Feu'} (${normalized.dep_code})`
-        : (normalized.nom_standard || normalized.name || 'Feu');
+        ? `${numberedName} (${normalized.dep_code})`
+        : numberedName;
     return String(name || 'Feu');
 }
 
@@ -2994,14 +3120,14 @@ function displayFireHistory() {
         const li = document.createElement('li');
         li.className = 'fire-history-item';
 
-        const name = item.dep_code ? `${item.nom_standard || item.name || 'Feu'} (${item.dep_code})` : (item.nom_standard || item.name || 'Feu');
+        const name = buildFireDisplayName(item);
 
         li.innerHTML = `
             <button type="button" class="fire-history-select" title="Reprendre ce feu">${name}</button>
             <div class="fire-history-export-actions" aria-label="Exports du feu">
                 <button type="button" class="fire-history-export-btn fire-history-export-kml" title="Exporter ce feu vers ForeFlight">ForeFlight</button>
                 <button type="button" class="fire-history-export-btn fire-history-export-sdvfr" title="Exporter ce feu vers SDVFR Next">SDVFR</button>
-                <button type="button" class="fire-history-export-btn fire-history-export-ge" title="Exporter ce feu vers Google Earth">GE</button>
+                <button type="button" class="fire-history-export-btn fire-history-export-ge" title="Exporter ce feu vers Google Earth">G. Earth</button>
             </div>
             <button type="button" class="fire-history-delete" title="Supprimer ce feu">✕</button>
         `;
@@ -20293,6 +20419,11 @@ function addAirportTouchHitbox(airport, popupHtml) {
     return hitbox;
 }
 
+/*
+ * v15.84 — PÉLIC : taille visuelle 26 px (référence VRP court).
+ * La hitbox tactile indépendante reste inchangée ; le CSS final ajoute le
+ * cerclage extérieur rouge RETARDANT / bleu EAU.
+ */
 function drawPermanentAirportMarkers() {
     permanentAirportLayer.clearLayers();
 
@@ -20332,7 +20463,7 @@ function drawPermanentAirportMarkers() {
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
             const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
-            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10] }), zIndexOffset: 2500, keyboard: false });
+            const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
             addAirportTouchHitbox(airport, popupHtml);
@@ -20380,7 +20511,7 @@ function drawPermanentAirportMarkers() {
         const isWater = waterAirports.has(airport.oaci);
         let iconClass = "custom-marker-icon airport-marker-base ", iconHTML = "✈️";
         isDisabled ? (iconClass += "airport-marker-disabled", iconHTML = "<b>+</b>") : isWater ? (iconClass += "airport-marker-water", iconHTML = "💧") : iconClass += "airport-marker-active";
-        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10] });
+        const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
         const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
@@ -22676,7 +22807,7 @@ async function exportCurrentFireKml(event = null, communeOverride = null, button
          * et fournir un vrai fichier .kml à ouvrir/importer ensuite depuis Fichiers.
          * Coordonnées KML : longitude,latitude,altitude.
          */
-        const rawName = targetCommune.nom_standard || 'POINT_Q400';
+        const rawName = buildFireDisplayName(targetCommune) || 'POINT_Q400';
         const safeName = rawName
             .toUpperCase()
             .normalize('NFD')
@@ -22788,8 +22919,9 @@ async function exportCurrentFireSdvfrCsv(event = null, communeOverride = null, b
          * name;description;type;latitude;longitude;shape;color
          * BELCODENE;Belcodene;FEU;43.427222;5.589444;diamond;yellow
          */
-        const pointName = buildSdvfrPointName(targetCommune.nom_standard || 'POINT_Q400');
-        const description = formatSdvfrCsvValue(targetCommune.nom_standard || pointName);
+        const fireDisplayName = buildFireDisplayName(targetCommune) || 'POINT_Q400';
+        const pointName = buildSdvfrPointName(fireDisplayName);
+        const description = formatSdvfrCsvValue(fireDisplayName || pointName);
         const csv = [
             'name;description;type;latitude;longitude;shape;color',
             `${formatSdvfrCsvValue(pointName)};${description};FEU;${lat.toFixed(6)};${lon.toFixed(6)};diamond;yellow`
