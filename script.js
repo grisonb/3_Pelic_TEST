@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.82';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.83';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -33383,8 +33383,29 @@ let siaProfileSegments = [];
 const SIA_PROFILE_FILTER_PREFS_KEY = 'npfSiaProfileFilterPrefs_v1';
 let siaProfileFilterPrefs = null;
 
-// v15.75 — masquage uniquement graphique des zones de la carte.
-let siaMapAirspacesVisible = true;
+// v15.83 — l'affichage graphique des volumes est mémorisé entre deux ouvertures.
+const SIA_MAP_AIRSPACES_VISIBLE_PREF_KEY = 'npfSiaMapAirspacesVisible_v1';
+
+function loadSiaMapAirspacesVisiblePreference() {
+    try {
+        const stored = localStorage.getItem(SIA_MAP_AIRSPACES_VISIBLE_PREF_KEY);
+        if (stored === 'false') return false;
+        if (stored === 'true') return true;
+    } catch (_) {}
+    // Migration / première utilisation : conserver le comportement historique.
+    return true;
+}
+
+function saveSiaMapAirspacesVisiblePreference(visible) {
+    try {
+        localStorage.setItem(
+            SIA_MAP_AIRSPACES_VISIBLE_PREF_KEY,
+            visible === false ? 'false' : 'true'
+        );
+    } catch (_) {}
+}
+
+let siaMapAirspacesVisible = loadSiaMapAirspacesVisiblePreference();
 
 // v15.75 — tampon de rendu et cache de géométries pour limiter les reconstructions iPad.
 const SIA_RENDER_BOUNDS_PAD_RATIO = 0.25;
@@ -33667,7 +33688,7 @@ function updateSiaProfileMapZonesToggleButton() {
         button.setAttribute('aria-pressed', hidden ? 'true' : 'false');
         button.title = hidden
             ? 'Réafficher sur la carte les zones toujours sélectionnées dans le filtre SIA'
-            : 'Masquer temporairement les zones de la carte sans modifier les filtres';
+            : 'Masquer les zones de la carte sans modifier les filtres';
     }
 
     /* v15.80 — même commande, accessible directement sur le bouton France. */
@@ -33677,7 +33698,7 @@ function updateSiaProfileMapZonesToggleButton() {
         quickButton.setAttribute('aria-pressed', hidden ? 'true' : 'false');
         quickButton.title = hidden
             ? 'Réafficher les zones SIA de la carte'
-            : 'Masquer temporairement les zones SIA de la carte';
+            : 'Masquer les zones SIA de la carte';
         quickButton.setAttribute(
             'aria-label',
             hidden ? 'Réafficher les zones SIA de la carte' : 'Masquer les zones SIA de la carte'
@@ -33687,6 +33708,7 @@ function updateSiaProfileMapZonesToggleButton() {
 
 function setSiaMapAirspacesVisible(visible) {
     const next = visible !== false;
+    saveSiaMapAirspacesVisiblePreference(next);
     if (siaMapAirspacesVisible === next) {
         updateSiaProfileMapZonesToggleButton();
         return;
@@ -34705,19 +34727,129 @@ function buildSiaPointPopup(item) {
     `;
 }
 
+function getVisibleBaseTileLoadStateForSia() {
+    if (!map || !baseTileLayer) return { total: 0, loaded: 0, tileZoomReady: true };
+
+    try {
+        const layerContainer = baseTileLayer.getContainer?.();
+        const mapContainer = map.getContainer?.();
+        if (!layerContainer || !mapContainer) {
+            return { total: 0, loaded: countVisibleLoadedBaseTiles(), tileZoomReady: true };
+        }
+
+        const mapRect = mapContainer.getBoundingClientRect();
+        const tiles = layerContainer.querySelectorAll('img.leaflet-tile');
+        let total = 0;
+        let loaded = 0;
+
+        tiles.forEach(tile => {
+            if (!tile || tile.style.display === 'none') return;
+            const rect = tile.getBoundingClientRect();
+            if (
+                rect.width <= 1
+                || rect.height <= 1
+                || rect.right <= mapRect.left
+                || rect.left >= mapRect.right
+                || rect.bottom <= mapRect.top
+                || rect.top >= mapRect.bottom
+            ) {
+                return;
+            }
+
+            total += 1;
+            if (
+                tile.classList.contains('leaflet-tile-loaded')
+                || (tile.complete && Number(tile.naturalWidth) > 0)
+            ) {
+                loaded += 1;
+            }
+        });
+
+        const layerZoom = Number(baseTileLayer._tileZoom);
+        const mapZoom = Number(map.getZoom?.());
+        const tileZoomReady = !Number.isFinite(layerZoom)
+            || !Number.isFinite(mapZoom)
+            || Math.abs(layerZoom - mapZoom) < 0.001;
+
+        return { total, loaded, tileZoomReady };
+    } catch (_) {
+        return { total: 0, loaded: countVisibleLoadedBaseTiles(), tileZoomReady: true };
+    }
+}
+
+function shouldSiaWaitForBaseMap(reason) {
+    return reason === 'moveend'
+        || reason === 'zoomend'
+        || reason === 'startup-prefs';
+}
+
+async function waitForBaseMapBeforeSiaRefresh(reason, refreshGeneration) {
+    if (!shouldSiaWaitForBaseMap(reason) || !map || !baseTileLayer) return;
+
+    const directNpfOffline = !!(
+        offlineTilesMode
+        && typeof isNpfOfflinePackSelection === 'function'
+        && isNpfOfflinePackSelection()
+    );
+    const maxWaitMs = directNpfOffline ? 2400 : 1000;
+    const pollMs = directNpfOffline ? 90 : 70;
+    const startedAt = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now();
+    let stablePasses = 0;
+
+    while (true) {
+        throwIfSiaRefreshObsolete(refreshGeneration);
+
+        const state = getVisibleBaseTileLoadStateForSia();
+        const allVisibleTilesReady = state.total > 0
+            && state.loaded >= state.total
+            && state.tileZoomReady;
+
+        if (allVisibleTilesReady) {
+            stablePasses += 1;
+            if (stablePasses >= 2) {
+                // Dernière respiration : laisser Safari peindre les tuiles avant le Canvas/SVG SIA.
+                await yieldSiaRefreshToMap(refreshGeneration);
+                return;
+            }
+        } else {
+            stablePasses = 0;
+        }
+
+        const now = (typeof performance !== 'undefined' && performance.now)
+            ? performance.now()
+            : Date.now();
+        if (now - startedAt >= maxWaitMs) {
+            // Filet de sécurité : une tuile absente ne doit jamais bloquer le SIA indéfiniment.
+            await yieldSiaRefreshToMap(refreshGeneration);
+            return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, pollMs));
+    }
+}
+
 function scheduleSiaLayerRefresh(reason = 'unspecified') {
     clearTimeout(siaRefreshTimer);
+
     /*
-     * v15.80 — après un geste carte, laisser la priorité aux tuiles de fond.
-     * Les anciens calques SIA restent en place pendant ce court délai.
+     * v15.83 — après un geste carte, le SIA ne repart plus sur un chronomètre
+     * arbitraire. Il attend l'état visuel réel des tuiles de fond.
      */
-    const delay = reason === 'moveend'
-        ? 420
-        : (reason === 'zoomend' ? 360 : 120);
-    siaRefreshTimer = setTimeout(() => {
-        refreshSiaLayers(reason).catch(error => {
+    const delay = shouldSiaWaitForBaseMap(reason) ? 40 : 120;
+    const scheduledGeneration = getSiaRefreshGeneration();
+
+    siaRefreshTimer = setTimeout(async () => {
+        siaRefreshTimer = null;
+        try {
+            await waitForBaseMapBeforeSiaRefresh(reason, scheduledGeneration);
+            throwIfSiaRefreshObsolete(scheduledGeneration);
+            await refreshSiaLayers(reason);
+        } catch (error) {
+            if (error?.name === SIA_REFRESH_ABORT_ERROR_NAME) return;
             console.warn('[SIA] Rafraîchissement impossible:', reason, error);
-        });
+        }
     }, delay);
 }
 
@@ -35937,6 +36069,7 @@ function initializeSiaSystem() {
     migrateSiaSivFilterPreference();
     bindSiaManagementButtons();
     initializeSiaAirspaceProfileUi();
+    updateSiaProfileMapZonesToggleButton();
     refreshSiaManagementStatus();
 
     if (map && !map.__npfSiaEventsBound) {
@@ -35949,9 +36082,8 @@ function initializeSiaSystem() {
 
     if (hasAnyEnabledSiaFilter()) {
         setTimeout(() => {
-            ensureSiaDatasetLoaded()
-                .then(() => scheduleSiaLayerRefresh('startup-prefs'))
-                .catch(error => console.warn('[SIA] Restauration au démarrage impossible:', error));
+            // v15.83 — ne pas charger/décompresser le dataset avant le fond de carte.
+            scheduleSiaLayerRefresh('startup-prefs');
         }, 900);
     }
 }
@@ -38460,7 +38592,10 @@ async function refreshSiaLayers(reason = 'manual') {
 
         const dataset = await ensureSiaDatasetLoaded();
         throwIfSiaRefreshObsolete(refreshGeneration);
-        const siaTmaOperationalFamilies = buildSiaTmaOperationalFamilySet(dataset);
+        // v15.83 — inutile de scanner les familles TMA lorsque les volumes sont masqués.
+        const siaTmaOperationalFamilies = siaMapAirspacesVisible
+            ? buildSiaTmaOperationalFamilySet(dataset)
+            : null;
 
         /*
          * v15.82 — le double tampon n'est utile que lorsque les volumes SIA sont
@@ -38678,7 +38813,7 @@ async function refreshSiaLayers(reason = 'manual') {
                 : ' Points SIA masqués : ils apparaissent à partir de l’échelle 5 NM.';
             const zonesNote = siaMapAirspacesVisible
                 ? ''
-                : ' Zones carte temporairement masquées.';
+                : ' Zones carte masquées.';
             footer.textContent = `${rendered} objet${rendered > 1 ? 's' : ''} SIA affiché${rendered > 1 ? 's' : ''} dans la zone chargée.${zonesNote}${scaleNote}`;
         }
 
