@@ -1,3 +1,77 @@
+VERSION TEST v15.80 — SUIVI VIEWPORT IPAD / GAAR / TOGGLE ZONES / STABILITÉ SIA AU ZOOM
+Date : 22/08/2026
+Base : TEST v15.79
+
+OBJECTIFS
+- Corriger le placement du propre avion en mode Suivi à partir de la zone réellement visible de l'iPad, et non de la hauteur interne éventuellement supérieure du conteneur Leaflet.
+- Restaurer une modification/suppression fiable des points de circuits GAAR et conserver le même moteur de recherche de communes que la recherche principale.
+- Ajouter sur la carte un accès immédiat Afficher/Masquer zones sans ajouter un nouveau gros bouton.
+- Prolonger l'optimisation SIA v15.75 : éviter la reconstruction complète lors des zooms qui restent dans une couverture déjà chargée et donner la priorité au chargement du fond de carte.
+- Stabiliser les bandes intérieures SIA quel que soit le niveau de zoom.
+
+1. MODE SUIVI — POSITIONNEMENT SUR LE VIEWPORT RÉELLEMENT VISIBLE
+- Cause corrigée : sur iPad/PWA, le conteneur Leaflet peut utiliser une hauteur `100lvh` supérieure à la partie réellement visible ; `map.getSize()` seul ne représente alors pas le milieu visuel de l'écran.
+- La position cible est désormais calculée dans le viewport réellement visible (`visualViewport`, avec repli `innerWidth/innerHeight`) puis convertie vers le centre interne Leaflet.
+- Cap 090° Est et 270° Ouest : Y = 50 % de la hauteur réellement visible, même si le conteneur carte est plus haut.
+- Cap 000° Nord et 180° Sud : X = 50 % de la largeur réellement visible.
+- Caps intermédiaires : interpolation sinus/cosinus conservée.
+- Décentrage vertical légèrement ramené à 24 % et marges recalculées sur la zone visible pour protéger silhouette Q400, altitude et badge SIM.
+- Zoom courant et pause de 10 s après geste manuel inchangés.
+
+2. CIRCUITS GAAR — MODIFIER / SUPPRIMER UN POINT
+- Le code d'édition existant (renommer/déplacer sur commune/supprimer) est conservé.
+- En mode CRÉER/MODIFIER, chaque point reçoit une hitbox SVG tactile invisible de 48 px dans un pane dédié z-index 695, au-dessus des surfaces tactiles SIA.
+- Toucher un point ouvre donc obligatoirement son panneau d'édition au lieu d'être absorbé par une zone SIA ou interprété comme un nouveau point carte.
+- Le bouton Supprimer, le bouton OK, la persistance locale et le maintien du mode CRÉER/MODIFIER restent inchangés.
+- Le scoring communes, les alias et le filtre département sont désormais regroupés dans un moteur commun `searchCommunesWithSharedEngine()` utilisé à la fois par la recherche principale et par GAAR.
+
+3. BOUTON CARTE — AFFICHER / MASQUER LES ZONES
+- Le bouton France reste l'accès au sélecteur de cartes offline par appui court et aux filtres SIA par appui long.
+- Ajout d'un petit bouton œil superposé dans son coin inférieur droit, sans ajouter de ligne supplémentaire dans la colonne de commandes.
+- Appui sur l'œil : même fonction que `Masquer zones / Afficher zones` du PROFIL.
+- Le masquage reste purement graphique : aucune case du filtre SIA ni du PROFIL n'est modifiée.
+- État synchronisé entre le bouton PROFIL et le nouvel œil ; œil barré rouge lorsque les zones de carte sont masquées.
+
+4. BANDES INTÉRIEURES SIA — STABILITÉ AU ZOOM
+- La cible reste un axe décalé de 7 px, bande 12 px / opacité 22 %.
+- Si 7 px n'est localement plus possible à un niveau de zoom, le moteur essaie progressivement 6, 5, 4, 3 puis 2 px au lieu de supprimer la portion entière.
+- Subdivision portée à 7 niveaux et seuil minimal abaissé de 10 px à 3 px pour éviter la disparition de petites limites selon le zoom.
+- Le côté intérieur continue d'être validé par inclusion réelle dans la géométrie officielle.
+- Aucune géométrie AIRAC n'est modifiée.
+
+5. SIA — STABILITÉ / CHARGEMENT DU FOND DE CARTE
+- L'optimisation v15.75 est conservée et prolongée, pas remplacée.
+- Tampon de couverture porté de 25 % à 35 % pour réduire les reconstructions lors des déplacements.
+- Après `moveend`, reconstruction éventuelle retardée à 420 ms ; après `zoomend`, 360 ms, afin de laisser les tuiles de fond se charger en priorité.
+- Un nouveau geste carte annule un rafraîchissement SIA différé devenu obsolète avant qu'il ne démarre.
+- Lors d'un zoom dont le nouveau viewport reste dans la couverture SIA déjà chargée, les volumes, points et hitboxes ne sont plus effacés/recréés.
+- Seules les décorations dépendantes des pixels écran sont recalculées : bandes intérieures et libellés de limites.
+- Si une reconstruction complète devient nécessaire (zoom hors couverture, filtre, seuil points/étiquettes), elle utilise maintenant un double tampon : l'ancien rendu reste visible pendant la construction et n'est retiré qu'une fois le nouveau groupe entièrement prêt.
+- En cas d'erreur de reconstruction, l'ancien rendu est conservé au lieu de laisser un calque SIA vide.
+- Le verrou anti-rendus concurrents et le cache LRU de géométries v15.75 sont conservés.
+
+6. BULLE AUTOUR DES TRAFICS
+- Fonction volontairement NON ajoutée dans cette version.
+- Aucun masque dynamique autour de SafeSky/GLR afin de ne pas introduire de charge GPU supplémentaire tant que la stabilité SIA n'est pas validée.
+
+7. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.79.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucune mise à jour automatique SIA ajoutée.
+- Aucun changement NAS.
+- Service Worker : logique inchangée ; version/cache uniquement porté en v15.80.
+
+8. CONTRÔLES
+- Contrôle syntaxique `node --check` du Script.
+- Contrôle syntaxique `node --check` de `sia.js`.
+- Contrôle syntaxique `node --check` du Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.80 dans Index / Script / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.79.
+- Vérification de présence du toggle Zones carte, de la hitbox GAAR dédiée et du moteur communes partagé.
+- Vérification que le chemin `zoomend` peut conserver les couches SIA de base lorsque la couverture et les seuils d'affichage restent compatibles.
+
+
 VERSION TEST v15.79 — SUIVI CARDINAL / BANDES SIA / VRP / DÉDUPLICATION SS-GLR / NETTOYAGE TRAFICS
 Date : 20/08/2026
 Base : TEST v15.78 (architecture SIA / Script scindée)
