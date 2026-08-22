@@ -1,3 +1,63 @@
+VERSION TEST v15.81 — LABELS SIA 10 NM / SIV PRIORITAIRE / PROFIL TACTILE / CORRECTIF MAJ
+Date : 22/08/2026
+Base : TEST v15.80
+
+OBJECTIFS
+- Corriger le blocage de mise à jour de v15.80 provoqué par le marqueur de version resté en v15.79 dans `style.css`.
+- Alléger la carte lorsque l'on dézoome en supprimant les noms de zones SIA à partir de l'échelle 10 NM.
+- Présenter systématiquement les SIV en premier dans la liste « ESPACES À CET ENDROIT » ouverte par Sélection Zone.
+- Améliorer la manipulation tactile des cases du PROFIL sans augmenter la hauteur de la ligne d'options.
+
+1. CORRECTIF DE MISE À JOUR PWA
+- Le marqueur `NPF_STYLE_BUILD_VERSION` de `style.css` est porté correctement en v15.81.
+- Le Service Worker continue à valider atomiquement Index / Script / Style / Manifest avant installation.
+- Les références applicatives Index / Manifest / Script / SW sont portées en v15.81.
+- Cette correction supprime la cause identifiée du refus d'installation de v15.80.
+
+2. NOMS DES ZONES SIA — SEUIL 10 NM
+- Les noms, fréquences et limites verticales affichés sur les limites des zones restent visibles aux échelles inférieures à 10 NM.
+- À partir de 10 NM en dézoomant, les libellés de zones ne sont plus affichés.
+- Les contours, couleurs, bandes intérieures, filtres et fonctions de sélection restent actifs.
+- Le recalcul léger des décorations SIA au zoom hérité de v15.80 est conservé : le changement de seuil ne force pas une reconstruction complète des volumes lorsqu'elle n'est pas nécessaire.
+
+3. SÉLECTION ZONE — SIV TOUJOURS EN PREMIER
+- Dans « ESPACES À CET ENDROIT », tout SIV contenant le point sélectionné est placé avant CTR / R-P-D / TMA / CTA / autres espaces.
+- Si plusieurs SIV couvrent le point, ils restent regroupés en tête de liste et sont départagés par la logique existante.
+- Les SIV restent toujours sélectionnables même lorsque leur filtre d'affichage carte est désactivé.
+- L'ordre de dessin des espaces et les filtres ne sont pas modifiés.
+
+4. PROFIL — CASES À COCHER PLUS FACILES À TOUCHER
+- Taille des cases portée de 16 × 16 px à 20 × 20 px.
+- Hauteur des pastilles de filtre maintenue strictement à 28 px ; aucun agrandissement vertical de la ligne « Zones du profil ».
+- Padding vertical ajusté pour absorber l'augmentation de la case dans la hauteur existante.
+- Toute la pastille reste une étiquette tactile : toucher le texte ou la case conserve le même comportement.
+
+5. FONCTIONS v15.80 CONSERVÉES
+- Positionnement Suivi basé sur le viewport réellement visible de l'iPad.
+- Modification / suppression tactile des points GAAR et moteur commun de recherche des communes.
+- Toggle Afficher/Masquer zones intégré au bouton France.
+- Bandes intérieures SIA adaptatives selon le zoom.
+- Optimisation SIA : couverture tampon, rendu léger au zoom, priorité au fond de carte et double tampon lors des reconstructions complètes.
+- La bulle graphique autour des trafics reste volontairement non implémentée.
+
+6. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.80 / v15.79.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucune mise à jour automatique SIA ajoutée.
+- Aucun changement NAS.
+
+7. CONTRÔLES
+- `node --check` Script.
+- `node --check` SIA.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.81 dans Index / Script / Style / Manifest / SW.
+- Vérification du seuil de libellés SIA à 10 NM.
+- Vérification de la priorité SIV dans le tri de Sélection Zone.
+- Vérification CSS : cases 20 × 20 px dans une pastille conservée à 28 px.
+- Vérification bit-à-bit de `sia.js` avec v15.80.
+
+
 VERSION TEST v15.80 — SUIVI VIEWPORT IPAD / GAAR / TOGGLE ZONES / STABILITÉ SIA AU ZOOM
 Date : 22/08/2026
 Base : TEST v15.79
