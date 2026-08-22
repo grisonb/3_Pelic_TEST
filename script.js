@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.81';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.82';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -3001,6 +3001,7 @@ function displayFireHistory() {
             <div class="fire-history-export-actions" aria-label="Exports du feu">
                 <button type="button" class="fire-history-export-btn fire-history-export-kml" title="Exporter ce feu vers ForeFlight">ForeFlight</button>
                 <button type="button" class="fire-history-export-btn fire-history-export-sdvfr" title="Exporter ce feu vers SDVFR Next">SDVFR</button>
+                <button type="button" class="fire-history-export-btn fire-history-export-ge" title="Exporter ce feu vers Google Earth">GE</button>
             </div>
             <button type="button" class="fire-history-delete" title="Supprimer ce feu">✕</button>
         `;
@@ -3011,6 +3012,14 @@ function displayFireHistory() {
 
         li.querySelector('.fire-history-export-sdvfr')?.addEventListener('click', (event) => {
             exportCurrentFireSdvfrCsv(event, item, event.currentTarget);
+        });
+
+        /*
+         * v15.82 — Google Earth : export KML uniquement depuis l'historique.
+         * Aucun dialogue n'est ajouté au marquage GPS pendant le vol.
+         */
+        li.querySelector('.fire-history-export-ge')?.addEventListener('click', (event) => {
+            exportCurrentFireKml(event, item, event.currentTarget);
         });
 
         li.querySelector('.fire-history-select').addEventListener('click', () => {
@@ -5375,7 +5384,12 @@ function beginMapVisualRenderGuard(reason = 'map-start') {
     roadOverlayRefreshTimer = null;
     roadOverlayRefreshToken += 1;
 
-    /* v15.80 — un nouveau geste rend obsolète un refresh SIA encore différé. */
+    /*
+     * v15.82 — un nouveau geste invalide aussi bien le refresh SIA différé
+     * qu'une reconstruction déjà commencée. Celle-ci s'arrêtera à la prochaine
+     * respiration du thread principal.
+     */
+    window.__npfSiaRefreshGeneration = (Number(window.__npfSiaRefreshGeneration) || 0) + 1;
     if (siaRefreshTimer) {
         clearTimeout(siaRefreshTimer);
         siaRefreshTimer = null;
@@ -33373,7 +33387,7 @@ let siaProfileFilterPrefs = null;
 let siaMapAirspacesVisible = true;
 
 // v15.75 — tampon de rendu et cache de géométries pour limiter les reconstructions iPad.
-const SIA_RENDER_BOUNDS_PAD_RATIO = 0.35;
+const SIA_RENDER_BOUNDS_PAD_RATIO = 0.25;
 let siaRenderedCoverageBounds = null;
 let siaRenderedZoom = null;
 let siaRenderedSignature = '';
@@ -38361,10 +38375,35 @@ function renderSiaZoomDependentDecorations(features) {
         });
 }
 
+const SIA_REFRESH_ABORT_ERROR_NAME = 'NpfSiaRefreshAborted';
+
+function getSiaRefreshGeneration() {
+    return Number(window.__npfSiaRefreshGeneration) || 0;
+}
+
+function throwIfSiaRefreshObsolete(refreshGeneration) {
+    if (getSiaRefreshGeneration() === refreshGeneration) return;
+    const error = new Error('Rendu SIA devenu obsolète');
+    error.name = SIA_REFRESH_ABORT_ERROR_NAME;
+    throw error;
+}
+
+async function yieldSiaRefreshToMap(refreshGeneration) {
+    await new Promise(resolve => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => resolve());
+        } else {
+            setTimeout(resolve, 0);
+        }
+    });
+    throwIfSiaRefreshObsolete(refreshGeneration);
+}
+
 async function refreshSiaLayers(reason = 'manual') {
     if (!map) return;
     ensureSiaMapPanes();
 
+    const refreshGeneration = getSiaRefreshGeneration();
     let previousSiaLayerGroupForSwap = null;
     let replacementSiaLayerGroupForSwap = null;
     let replacementSiaLayerGroupCommitted = false;
@@ -38420,16 +38459,31 @@ async function refreshSiaLayers(reason = 'manual') {
         }
 
         const dataset = await ensureSiaDatasetLoaded();
+        throwIfSiaRefreshObsolete(refreshGeneration);
         const siaTmaOperationalFamilies = buildSiaTmaOperationalFamilySet(dataset);
 
         /*
-         * v15.80 — double tampon : l'ancien rendu SIA reste affiché pendant la
-         * construction du nouveau. Aucun clearLayers() global avant que le
-         * remplacement soit entièrement prêt.
+         * v15.82 — le double tampon n'est utile que lorsque les volumes SIA sont
+         * visibles. Zones masquées : libérer immédiatement l'ancien groupe évite
+         * de conserver deux jeux de marqueurs/points pendant la reconstruction.
          */
+        const preservePreviousSiaDuringRebuild = siaMapAirspacesVisible;
         previousSiaLayerGroupForSwap = siaLayerGroup;
         replacementSiaLayerGroupForSwap = L.layerGroup();
         siaLayerGroup = replacementSiaLayerGroupForSwap;
+
+        if (
+            !preservePreviousSiaDuringRebuild
+            && previousSiaLayerGroupForSwap
+        ) {
+            try {
+                if (map.hasLayer(previousSiaLayerGroupForSwap)) {
+                    map.removeLayer(previousSiaLayerGroupForSwap);
+                }
+                previousSiaLayerGroupForSwap.clearLayers();
+            } catch (_) {}
+            previousSiaLayerGroupForSwap = null;
+        }
 
         siaSelectedCtrTouchLayer = null;
         siaAirspaceTouchEntries = [];
@@ -38444,7 +38498,12 @@ async function refreshSiaLayers(reason = 'manual') {
         const visibleAirspaceFeatures = [];
 
         if (siaMapAirspacesVisible) {
+            let siaAirspaceScanIndex = 0;
             for (const item of dataset.airspaces || []) {
+                siaAirspaceScanIndex += 1;
+                if (siaAirspaceScanIndex % 768 === 0) {
+                    await yieldSiaRefreshToMap(refreshGeneration);
+                }
                 if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
                 if (shouldHideSiaAirspaceAboveFl115(item)) continue;
                 if (isSiaTechnicalTmaUnionParent(item)) continue;
@@ -38500,7 +38559,12 @@ async function refreshSiaLayers(reason = 'manual') {
 
         const showSiaDesignatedPoints = showSiaDesignatedPointsNow;
 
+        let siaTerrainScanIndex = 0;
         for (const item of dataset.terrain || []) {
+            siaTerrainScanIndex += 1;
+            if (siaTerrainScanIndex % 256 === 0) {
+                await yieldSiaRefreshToMap(refreshGeneration);
+            }
             if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
             const latlng = L.latLng(Number(item.x), Number(item.y));
             if (!pointBounds.contains(latlng)) continue;
@@ -38527,8 +38591,13 @@ async function refreshSiaLayers(reason = 'manual') {
             rendered += 1;
         }
 
+        let siaPointScanIndex = 0;
         for (const item of dataset.points || []) {
             if (!showSiaDesignatedPoints) break;
+            siaPointScanIndex += 1;
+            if (siaPointScanIndex % 512 === 0) {
+                await yieldSiaRefreshToMap(refreshGeneration);
+            }
             if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
             const latlng = L.latLng(Number(item.x), Number(item.y));
             if (!pointBounds.contains(latlng)) continue;
@@ -38581,6 +38650,8 @@ async function refreshSiaLayers(reason = 'manual') {
             rendered += 1;
         }
 
+        throwIfSiaRefreshObsolete(refreshGeneration);
+
         /* Le nouveau groupe devient visible d'un bloc, puis l'ancien est retiré. */
         replacementSiaLayerGroupForSwap.addTo(map);
         if (
@@ -38617,6 +38688,9 @@ async function refreshSiaLayers(reason = 'manual') {
         if (replacementSiaLayerGroupForSwap && !replacementSiaLayerGroupCommitted) {
             try { replacementSiaLayerGroupForSwap.clearLayers(); } catch (_) {}
             siaLayerGroup = previousSiaLayerGroupForSwap;
+        }
+        if (error?.name === SIA_REFRESH_ABORT_ERROR_NAME) {
+            return;
         }
         throw error;
     } finally {
