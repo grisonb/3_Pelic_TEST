@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.80';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.81';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -37542,8 +37542,9 @@ function addSiaAirspaceBoundaryLabel(item, geometry, labelState) {
     if (isCurrentOfflineOaciMap()) return null;
     if (Number(item?.co || 0) === 1) return null;
 
-    // Les noms ne sont pas affichés lorsque la carte est trop dézoomée.
-    if (getCurrentNpfScaleNm() > 50.000001) return null;
+    /* v15.81 — à partir de l'échelle 10 NM en dézoomant, conserver les zones
+     * mais supprimer leurs noms/fréquences/altitudes pour alléger la carte. */
+    if (getCurrentNpfScaleNm() >= 10) return null;
 
     const type = String(geometry.type || '');
     if (type !== 'Polygon' && type !== 'MultiPolygon') return null;
@@ -37928,12 +37929,14 @@ function siaGeometryContainsLatLng(geometry, latlng) {
 }
 
 function getSiaAirspaceChoicePriority(item) {
+    /* v15.81 — Sélection Zone : les SIV sont toujours présentés en premier. */
+    if (isSiaFlightInformationSector(item)) return 0;
+
     const type = String(item?.t || '').toUpperCase();
     if (type === 'CTR') return 10;
     if (type === 'P' || type === 'R' || type === 'D' || type === 'TRA') return 20;
     if (type === 'TMA') return 30;
     if (type === 'CTA') return 40;
-    if (isSiaFlightInformationSector(item)) return 45;
     if (type === 'D-OTHER') return 50;
     if (type === 'RAS' || type === 'SECTOR' || type === 'SECTOR-C') return 60;
     if (type === 'OCA' || type === 'UTA') return 70;
