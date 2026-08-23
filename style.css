@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.86 */
+/* NPF_STYLE_BUILD_VERSION: v15.87 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16369,3 +16369,90 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
         width: 100%;
     }
 }
+
+/* ==========================================================================
+   v15.87 — VRP PLUS COMPACTS / PÉLIC CERCLES RLT-EAU + X DÉSACTIVÉ
+   ========================================================================== */
+
+/*
+ * Les dimensions VRP sont pilotées par getSiaVrpVisualSize() dans script.js.
+ * La grande hitbox tactile SIA reste indépendante et inchangée.
+ */
+
+/* PÉLIC actif : cercle simple, sans pictogramme central. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+    padding: 0 !important;
+    border-width: 4px !important;
+    border-style: solid !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    color: transparent !important;
+    line-height: 18px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.34) !important;
+    overflow: hidden !important;
+}
+
+/* RETARDANT = cercle rouge. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-retardant {
+    border-color: #e00000 !important;
+}
+
+/* EAU = cercle bleu. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-water {
+    border-color: #006ee6 !important;
+}
+
+/* Sélection conservée : intérieur vert fluorescent, contour fonctionnel inchangé. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-selected {
+    background: #39ff14 !important;
+}
+
+/* Désactivé = cercle rouge + X rouge centré. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-disabled {
+    border-color: #e00000 !important;
+    background: #ffffff !important;
+    color: #e00000 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.28) !important;
+}
+
+.pelic-disabled-x {
+    position: relative;
+    display: block;
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+}
+
+.pelic-disabled-x::before,
+.pelic-disabled-x::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 3px;
+    border-radius: 2px;
+    background: #e00000;
+    transform-origin: center;
+}
+
+.pelic-disabled-x::before {
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.pelic-disabled-x::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+}
+
