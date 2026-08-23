@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.87';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.88';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -5456,6 +5456,8 @@ function initMap() {
     communesLabelsLayer = L.layerGroup();
     drawNpfRunwayMapLayer();
     map.on('zoomend', drawNpfRunwayMapLayer);
+    applyPelicanVisualScale();
+    map.on('zoomend', applyPelicanVisualScale);
     drawPermanentAirportMarkers();
     drawFireHistoryMarkers();
     redrawGaarCircuits();
@@ -20609,13 +20611,36 @@ function addAirportTouchHitbox(airport, popupHtml) {
 }
 
 /*
- * v15.87 — PÉLIC : retour au cercle simple.
- * Aucun pictogramme n'est affiché au centre d'un PÉLIC actif : le contour rouge
- * RETARDANT ou bleu EAU porte l'information. Un PÉLIC désactivé reçoit un X
- * rouge dédié, indépendant des emoji et centré par CSS.
+ * v15.88 — PÉLIC : avion noir restauré + taille visuelle liée au zoom.
+ * Les états opérationnels sont portés par le cercle : vert RETARDANT, bleu EAU,
+ * rouge + X pour un terrain désactivé. La hitbox tactile reste indépendante.
  */
+function buildPelicanAircraftSymbolHtml() {
+    return `<svg class="pelic-aircraft-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11.2 2.4c0-.9 1.6-.9 1.6 0v5.7l7.7 3.9c.7.35 1 .95.8 1.6l-.35 1.15-8.15-1.95v5.1l2.75 2.05-.3 1.25L12 20.3l-3.25.9-.3-1.25 2.75-2.05v-5.1l-8.15 1.95-.35-1.15c-.2-.65.1-1.25.8-1.6l7.7-3.9V2.4Z"/></svg>`;
+}
+
 function buildPelicanDisabledSymbolHtml() {
     return '<span class="pelic-disabled-x" aria-hidden="true"></span>';
+}
+
+function getPelicanVisualMetricsForZoom(zoomValue) {
+    const zoom = Number.isFinite(Number(zoomValue)) ? Number(zoomValue) : 9;
+    if (zoom >= 9) return { size: 26, border: 4, aircraft: 17, xSize: 14, xLine: 16, xWeight: 3 };
+    if (zoom >= 8) return { size: 22, border: 3.5, aircraft: 14.5, xSize: 12, xLine: 14, xWeight: 2.6 };
+    if (zoom >= 7) return { size: 18, border: 3, aircraft: 12, xSize: 10, xLine: 12, xWeight: 2.3 };
+    return { size: 14, border: 2, aircraft: 9, xSize: 8, xLine: 9.5, xWeight: 2 };
+}
+
+function applyPelicanVisualScale() {
+    const metrics = getPelicanVisualMetricsForZoom(map && Number.isFinite(map.getZoom()) ? map.getZoom() : 9);
+    const root = document.documentElement;
+    if (!root) return;
+    root.style.setProperty('--npf-pelic-size', `${metrics.size}px`);
+    root.style.setProperty('--npf-pelic-border', `${metrics.border}px`);
+    root.style.setProperty('--npf-pelic-aircraft-size', `${metrics.aircraft}px`);
+    root.style.setProperty('--npf-pelic-x-size', `${metrics.xSize}px`);
+    root.style.setProperty('--npf-pelic-x-line', `${metrics.xLine}px`);
+    root.style.setProperty('--npf-pelic-x-weight', `${metrics.xWeight}px`);
 }
 
 function buildPelicanMapIconClass(airport, isDisabled, isWater) {
@@ -20665,7 +20690,7 @@ function drawPermanentAirportMarkers() {
             const isDisabled = disabledAirports.has(airport.oaci);
             const isWater = waterAirports.has(airport.oaci);
             const iconClass = buildPelicanMapIconClass(airport, isDisabled, isWater);
-            const iconHTML = isDisabled ? buildPelicanDisabledSymbolHtml() : '';
+            const iconHTML = isDisabled ? buildPelicanDisabledSymbolHtml() : buildPelicanAircraftSymbolHtml();
             const waterButtonText = isWater ? "RETARDANT" : "EAU";
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
@@ -20718,7 +20743,7 @@ function drawPermanentAirportMarkers() {
         const isDisabled = disabledAirports.has(airport.oaci);
         const isWater = waterAirports.has(airport.oaci);
         const iconClass = buildPelicanMapIconClass(airport, isDisabled, isWater);
-        const iconHTML = isDisabled ? buildPelicanDisabledSymbolHtml() : '';
+        const iconHTML = isDisabled ? buildPelicanDisabledSymbolHtml() : buildPelicanAircraftSymbolHtml();
         const icon = L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] });
         const marker = L.marker([airport.lat, airport.lon], { icon: icon, zIndexOffset: 2500, keyboard: false });
         const disableButtonText = isDisabled ? "Activer" : "Désactiver";
@@ -36521,11 +36546,9 @@ function getSiaVrpSymbolText(item) {
 
 /* v15.87 — VRP légèrement plus compacts ; hitbox tactile inchangée. */
 function getSiaVrpVisualSize(label) {
-    const length = String(label || '').length;
-    if (length <= 2) return 24;
-    if (length === 3) return 28;
-    if (length === 4) return 32;
-    return 36;
+    // v15.88 — diamètre visuel homogène ; seule la taille du texte varie.
+    void label;
+    return 24;
 }
 
 function addSiaTouchHitbox(latlng, popupHtml) {
