@@ -1,3 +1,42 @@
+VERSION TEST v15.89 — CALQUE DÉPARTEMENTS AUTONOME / PLUS DE BLOCAGE ETALAB
+Date : 23/08/2026
+Base : TEST v15.88
+
+OBJECTIF
+- Rendre le calque « Départements » disponible sur une installation neuve, même si le téléchargement externe Etalab échoue.
+- Supprimer la dépendance réseau bloquante observée sur iPad, sans modifier les autres calques ni le moteur Offline.
+
+1. DÉPARTEMENTS — GÉOMÉTRIE LOCALE EMBARQUÉE
+- Ajout dans `script.js` d'un GeoJSON simplifié couvrant les 101 départements.
+- Cette géométrie est reconstruite à partir de la base communale polygonale 2025 déjà utilisée par NPF, puis simplifiée pour limiter le poids embarqué.
+- Si une copie Etalab valide existe déjà dans le cache de l'appareil, elle reste utilisée afin de conserver le rendu historique.
+- Si aucun cache valide n'existe, NPF utilise immédiatement la copie locale : aucun téléchargement réseau n'est attendu avant l'affichage.
+- Les codes départementaux, les étiquettes, le style selon le zoom et la recherche du département au point GPS conservent la logique existante.
+
+2. ETALAB — ACTUALISATION NON BLOQUANTE
+- Après l'affichage, NPF tente en arrière-plan de récupérer le GeoJSON Etalab officiel pour entretenir le cache.
+- Un échec réseau, CORS, redirection ou timeout n'empêche plus l'affichage du calque.
+- Une réponse Etalab valide peut toujours être conservée dans le cache historique `npf-q400-departments-v13-54`.
+- Le message trompeur imposant un « préchargement » du calque est supprimé ; en cas d'erreur interne exceptionnelle, le message indique seulement que le calque ne peut pas être chargé.
+
+3. ÉLÉMENTS INCHANGÉS
+- PÉLIC v15.88 : avion noir actif, vert RETARDANT, bleu EAU, rouge + X désactivé, échelle 26 / 22 / 18 / 14 px selon le zoom.
+- Points VFR / VRP : diamètre visuel unique 24 px et hitbox tactile 56 px.
+- Hitbox PÉLIC : 64 px.
+- `sia.js` strictement inchangé.
+- AIRAC 08/26 / dataset NPF 15.69 inchangés.
+- Cartes Offline / IndexedDB, communes, SafeSky, GLR, VAC, GAAR et autres fonctions inchangés.
+
+4. CONTRÔLES
+- GeoJSON local : FeatureCollection valide, 101 codes départementaux uniques.
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.89 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.88.
+- Vérification ciblée : le chargement du calque Départements ne dépend plus de la réussite d'un `fetch()` Etalab.
+
+
 VERSION TEST v15.88 — AVION PÉLIC RESTAURÉ / TAILLE LIÉE AU ZOOM / COULEURS CORRIGÉES / VRP 24 PX
 Date : 23/08/2026
 Base : TEST v15.87
