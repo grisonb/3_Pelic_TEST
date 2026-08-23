@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-87_vrp_compact_pelic_circles_x';
-const APP_VERSION = 'v15.87';
+const SW_VERSION = 'sw-v15-88_pelic_aircraft_zoom_scale_colors';
+const APP_VERSION = 'v15.88';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
