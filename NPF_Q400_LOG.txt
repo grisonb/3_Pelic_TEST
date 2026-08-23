@@ -1,3 +1,59 @@
+VERSION TEST v15.87 — POINTS VFR PLUS COMPACTS / PÉLIC CERCLES RLT-EAU + X DÉSACTIVÉ
+Date : 23/08/2026
+Base : TEST v15.86
+
+OBJECTIFS
+- Réduire légèrement la taille visuelle des points VFR / VRP sans modifier leur grande zone tactile.
+- Revenir pour les pélicandromes à un symbole circulaire simple, sans pictogramme avion au centre.
+- Conserver le code couleur opérationnel : cercle rouge pour RETARDANT, cercle bleu pour EAU.
+- Afficher un pélicandrome désactivé avec un cercle rouge et un X rouge parfaitement centré.
+
+1. POINTS VFR / VRP — TAILLE VISUELLE RÉDUITE
+- Codes de 1 à 2 caractères : 26 px -> 24 px.
+- Codes de 3 caractères : 30 px -> 28 px.
+- Codes de 4 caractères : 34 px -> 32 px.
+- Codes de 5 caractères et plus : 38 px -> 36 px.
+- La taille du texte et la logique de couleur par aérodrome de rattachement restent inchangées.
+- La hitbox tactile SIA séparée reste strictement inchangée : diamètre 56 px.
+
+2. PÉLICANDROMES — RETOUR AU CERCLE SIMPLE
+- Taille visuelle PÉLIC conservée à 26 × 26 px.
+- Le pictogramme avion SVG introduit en v15.86 est retiré du centre du cercle.
+- RETARDANT : cercle à bord rouge, intérieur blanc hors sélection.
+- EAU : cercle à bord bleu, intérieur blanc hors sélection.
+- PÉLIC sélectionné : intérieur vert fluorescent #39ff14 ; le contour rouge/bleu continue d'indiquer RETARDANT/EAU.
+- La même présentation est appliquée aux pélicandromes permanents et aux terrains ajoutés manuellement comme PÉLIC.
+
+3. PÉLICANDROME DÉSACTIVÉ
+- Le contour devient rouge, comme demandé.
+- Le symbole + historique est remplacé par un X rouge.
+- Le X est centré par flexbox dans le cercle et ne dépend pas d'un emoji ou d'une police système particulière.
+- Un terrain désactivé n'utilise ni le contour EAU ni le contour RETARDANT actif.
+
+4. ÉLÉMENTS v15.86 CONSERVÉS
+- Saisie manuelle « Mon avion » et sélection depuis un trafic GLR.
+- Déduplication SafeSky / GLR et masquage commun de « Mon avion ».
+- Numérotation stable des feux multiples d'une même commune.
+- Export Google Earth « G. Earth » dans l'Historique.
+- Mot BASE agrandi dans l'étiquette Base + Pélic.
+- Priorité réelle au fond NPF avant SIA et mémorisation Afficher/Masquer zones.
+
+5. DONNÉES / OFFLINE
+- `sia.js` strictement inchangé par rapport à v15.86.
+- AIRAC 08/26, effet 06/08/2026 ; révision dataset NPF `15.69`.
+- Aucun changement NAS.
+- Aucun changement du moteur de tuiles NPF / IndexedDB.
+
+6. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.87 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.86.
+- Vérification des quatre tailles VRP : 24 / 28 / 32 / 36 px.
+- Vérification des deux chemins PÉLIC (permanent + personnalisé) : 26 px, cercle rouge RETARDANT, cercle bleu EAU, sélection verte, cercle rouge + X rouge désactivé.
+
+
 VERSION TEST v15.86 — MON AVION MANUEL + SÉLECTION GLR / NOUVELLE ICÔNE PÉLIC « AVION A »
 Date : 22/08/2026
 Base : TEST v15.85
