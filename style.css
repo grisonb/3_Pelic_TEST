@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.87 */
+/* NPF_STYLE_BUILD_VERSION: v15.88 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16456,3 +16456,104 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     transform: translate(-50%, -50%) rotate(-45deg);
 }
 
+
+
+/* ==========================================================================
+   v15.88 — PÉLIC AVION RESTAURÉ / COULEURS OPÉRATIONNELLES / ÉCHELLE AU ZOOM
+   ========================================================================== */
+
+/*
+ * Taille visuelle pilotée par script.js :
+ * zoom >= 9 : 26 px ; zoom 8 : 22 px ; zoom 7 : 18 px ; zoom < 7 : 14 px.
+ * La hitbox tactile NPF séparée reste à 64 px de diamètre.
+ */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic {
+    width: var(--npf-pelic-size, 26px) !important;
+    height: var(--npf-pelic-size, 26px) !important;
+    min-width: var(--npf-pelic-size, 26px) !important;
+    min-height: var(--npf-pelic-size, 26px) !important;
+    margin-left: calc(var(--npf-pelic-size, 26px) / -2) !important;
+    margin-top: calc(var(--npf-pelic-size, 26px) / -2) !important;
+    padding: 0 !important;
+    border-width: var(--npf-pelic-border, 4px) !important;
+    border-style: solid !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    color: #071426 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.34) !important;
+    overflow: hidden !important;
+}
+
+/* RETARDANT = vert. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-retardant {
+    border-color: #16a000 !important;
+}
+
+/* EAU = bleu. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-water {
+    border-color: #006ee6 !important;
+}
+
+/* Sélection : remplissage vert fluorescent historique, contour fonctionnel conservé. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-selected {
+    background: #39ff14 !important;
+}
+
+/* Désactivé = rouge + X rouge, sans avion. */
+.leaflet-marker-icon.custom-marker-icon.airport-marker-base.airport-marker-pelic.airport-marker-disabled {
+    border-color: #e00000 !important;
+    background: #ffffff !important;
+    color: #e00000 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.28) !important;
+}
+
+.pelic-aircraft-svg {
+    display: block !important;
+    width: var(--npf-pelic-aircraft-size, 17px) !important;
+    height: var(--npf-pelic-aircraft-size, 17px) !important;
+    flex: 0 0 var(--npf-pelic-aircraft-size, 17px) !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+}
+
+.pelic-aircraft-svg path {
+    fill: #071426 !important;
+    stroke: none !important;
+}
+
+.pelic-disabled-x {
+    position: relative !important;
+    display: block !important;
+    width: var(--npf-pelic-x-size, 14px) !important;
+    height: var(--npf-pelic-x-size, 14px) !important;
+    flex: 0 0 var(--npf-pelic-x-size, 14px) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+}
+
+.pelic-disabled-x::before,
+.pelic-disabled-x::after {
+    content: '' !important;
+    position: absolute !important;
+    left: 50% !important;
+    top: 50% !important;
+    width: var(--npf-pelic-x-line, 16px) !important;
+    height: var(--npf-pelic-x-weight, 3px) !important;
+    border-radius: 2px !important;
+    background: #e00000 !important;
+    transform-origin: center !important;
+}
+
+.pelic-disabled-x::before {
+    transform: translate(-50%, -50%) rotate(45deg) !important;
+}
+
+.pelic-disabled-x::after {
+    transform: translate(-50%, -50%) rotate(-45deg) !important;
+}
