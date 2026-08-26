@@ -1,3 +1,56 @@
+VERSION TEST v15.90 — CENTRAGE GPS / RECHERCHE COMMUNE / VRP LISIBLES / RATTACHEMENT VRP
+Date : 26/08/2026
+Base : TEST v15.89
+
+OBJECTIFS
+- Un clic sur « Centrer » doit placer exactement l'avion au centre de la carte.
+- Rendre la recherche commune plus tolérante aux fautes phonétiques courantes, notamment « paln de cuc 13 » pour Plan-de-Cuques.
+- Rendre entièrement lisibles les codes VRP à 3 caractères dans le cercle 24 px.
+- Corriger globalement les VRP dépourvus d'aérodrome associé dans l'export SIA lorsque leur groupe géographique permet un rattachement fiable.
+
+1. BOUTON « CENTRER » — AVION AU CENTRE EXACT
+- Le clic court sur « Centrer » utilise désormais directement les coordonnées de l'avion comme centre Leaflet, même si le Suivi est actif.
+- Le zoom courant est conservé.
+- Si le Suivi est actif, son recentrage anticipé est temporairement suspendu après le clic afin que le centrage exact reste visible ; le Suivi reprend ensuite normalement.
+- L'appui long et le comportement de suivi anticipé restent inchangés.
+
+2. RECHERCHE COMMUNE — TOLÉRANCE « PALN DE CUC 13 »
+- La clé phonétique française assimile désormais C / Q / K dans la comparaison compacte effectuée avec un filtre département.
+- Le moteur existant conserve ses contrôles Levenshtein / Soundex / alias.
+- Cas cible validé : « paln de cuc 13 » retrouve Plan-de-Cuques (13075).
+- La tolérance renforcée reste limitée aux recherches avec département pour éviter d'élargir inutilement les résultats nationaux.
+
+3. POINTS VFR / VRP — CODES À 3 CARACTÈRES
+- Le diamètre visuel reste unique à 24 px et la hitbox tactile reste à 56 px.
+- La police est adaptée plus finement à la longueur : 3 caractères utilisent 9 px afin de ne plus être rognés par le contour noir.
+- Les codes 4 caractères et plus sont également légèrement réduits ; les codes courts restent inchangés.
+
+4. VRP — RATTACHEMENT DE SECOURS PAR COHÉRENCE GÉOGRAPHIQUE
+- Les rattachements officiels SIA présents dans `sia.js` restent prioritaires et ne sont jamais modifiés.
+- Pour un VRP sans `AhpUidAssoc`, NPF analyse les VRP officiellement rattachés dans un rayon de 25 NM.
+- Un rattachement n'est accepté que si le terrain dominant possède au moins 3 VRP de soutien, une part pondérée >= 52 %, une avance >= 18 points sur le second et un VRP de soutien à <= 10 NM.
+- Les cas ambigus restent volontairement sans rattachement.
+- Cas explicitement confirmés : ND / MMND → LFMC ; SR / MMSR → LFML.
+- La couleur du point et le titre de sa fiche utilisent le rattachement effectif calculé.
+- `sia.js` reste strictement inchangé : la correction est portée par le moteur NPF, pas par une altération de la donnée AIRAC.
+
+5. ÉLÉMENTS INCHANGÉS
+- Calque Départements autonome v15.89 inchangé.
+- PÉLIC v15.88 inchangés : avion noir actif, vert RETARDANT, bleu EAU, rouge + X désactivé, échelle suivant le zoom.
+- AIRAC 08/26 / dataset NPF 15.69 inchangés.
+- Cartes Offline / IndexedDB, SafeSky, GLR, VAC, GAAR et autres fonctions inchangés.
+
+6. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence des références v15.90 dans Index / Script / Style / Manifest / SW.
+- Vérification bit-à-bit de `sia.js` avec v15.89.
+- Test ciblé du scoring « paln de cuc 13 » → Plan-de-Cuques.
+- Test ciblé des rattachements ND → LFMC et SR → LFML.
+- Vérification diamètre VRP 24 px / hitbox 56 px.
+
+
 VERSION TEST v15.89 — CALQUE DÉPARTEMENTS AUTONOME / PLUS DE BLOCAGE ETALAB
 Date : 23/08/2026
 Base : TEST v15.88
