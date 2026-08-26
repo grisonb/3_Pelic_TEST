@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.90';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.91';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -16784,32 +16784,12 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
     const closestAirports = getClosestAirports(lat, lon, numAirports);
 
     /*
-     * v15.77 — « Nbr Pélic. » est une limite stricte.
-     * Auparavant, un pélic sélectionné mais hors des N plus proches était ajouté
-     * en supplément : 3 demandés pouvaient donc donner 4 routes.
-     *
-     * On conserve le pélic sélectionné lorsqu'il existe, mais IL REMPLACE le
-     * plus éloigné de la liste automatique au lieu d'être ajouté en plus.
+     * v15.91 — les routes automatiques sont strictement les N PÉLIC actifs
+     * les plus proches du feu. Déclarer un nouvel aérodrome comme PÉLIC ne peut
+     * plus imposer ce terrain dans la sélection s'il est géographiquement loin.
+     * Une sélection manuelle reste conservée uniquement tant qu'elle appartient
+     * réellement à cette liste des N plus proches.
      */
-    const selectedPelicAirport = getSelectedPelicanAirport();
-    if (
-        numAirports > 0
-        && selectedPelicAirport
-        && !disabledAirports.has(selectedPelicAirport.oaci)
-        && !closestAirports.some(ap => ap.oaci === selectedPelicAirport.oaci)
-    ) {
-        const selectedEntry = {
-            ...selectedPelicAirport,
-            distance: calculateDistanceInNm(lat, lon, selectedPelicAirport.lat, selectedPelicAirport.lon)
-        };
-
-        if (closestAirports.length >= numAirports) {
-            closestAirports.pop();
-        }
-        closestAirports.push(selectedEntry);
-        closestAirports.sort((a, b) => Number(a.distance) - Number(b.distance));
-    }
-
     const closestOACIs = new Set(closestAirports.map(ap => ap.oaci));
     if (!selectedPelicanOACI || !closestOACIs.has(selectedPelicanOACI) || !isSelectablePelicanAirport(selectedPelicanOACI)) {
         selectedPelicanOACI = closestAirports.length > 0 ? closestAirports[0].oaci : null;
@@ -18961,6 +18941,8 @@ let npfGlobalLinkAttempt = '';
 let npfGlobalLinkLastPositions = [];
 /* v15.30 — état de fusion GLR/SafeSky. */
 let npfGlobalLinkRenderedCount = 0;
+let npfGlobalLinkAirborneRenderedCount = 0;
+let npfGlobalLinkGroundRenderedCount = 0;
 let npfGlobalLinkSafeSkyMatches = [];
 let npfGlobalLinkRelayoutTimer = null;
 /* v15.51 — authentification GLR : mot de passe masqué et chargement captcha sérialisé. */
@@ -19600,52 +19582,104 @@ window.getGlobalLinkSafeSkyMatches = () => (
         : []
 );
 
+function parseGlobalLinkBoolean(value) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return value !== 0;
+    const normalized = String(value ?? '').trim().toLowerCase();
+    if (!normalized) return null;
+    if (['1','true','yes','oui','y','on'].includes(normalized)) return true;
+    if (['0','false','no','non','n','off'].includes(normalized)) return false;
+    return null;
+}
+
+function isGlobalLinkGroundTraffic(item, ageSeconds = null) {
+    if (!item || typeof item !== 'object') return false;
+
+    /*
+     * v15.91 — priorité à un état explicite fourni par GLR si l'API l'expose.
+     * Les noms sont volontairement tolérants pour rester compatibles avec une
+     * évolution du relais sans modifier de nouveau l'interface.
+     */
+    for (const key of ['onGround', 'isOnGround', 'ground', 'grounded']) {
+        if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+        const parsed = parseGlobalLinkBoolean(item[key]);
+        if (parsed !== null) return parsed;
+    }
+
+    for (const key of ['airborne', 'inFlight', 'isAirborne']) {
+        if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+        const parsed = parseGlobalLinkBoolean(item[key]);
+        if (parsed !== null) return !parsed;
+    }
+
+    const stateText = [
+        item.flightStatus,
+        item.status,
+        item.state
+    ].map(value => String(value ?? '').trim().toLowerCase()).join(' ');
+
+    if (/\b(ground|grounded|landed|parked|sol|au sol|stationn)/i.test(stateText)) return true;
+    if (/\b(airborne|in[- ]?flight|flying|en vol|flight)\b/i.test(stateText)) return false;
+
+    /*
+     * Le relais utilisé par la v15.90 ne transmet pas encore de champ sol/en vol
+     * exploité par NPF. Le comportement observé est conservé en secours :
+     * une mission qui ne renouvelle plus sa position depuis 180 s est classée sol.
+     */
+    const age = Number.isFinite(Number(ageSeconds))
+        ? Number(ageSeconds)
+        : (() => {
+            const ts = Date.parse(String(item.updatedAt || ''));
+            return Number.isFinite(ts) ? Math.max(0, (Date.now() - ts) / 1000) : Infinity;
+        })();
+    return age > NPF_GLOBAL_LINK_FRESH_SECONDS;
+}
+
 function updateGlobalLinkButton(options = {}) {
     const button = document.getElementById('global-link-layer-button');
-    const count = document.getElementById('global-link-button-count');
+    const airborneCount = document.getElementById('global-link-button-count');
+    const groundCount = document.getElementById('global-link-ground-button-count');
     if (!button) return;
+
     const hasSession = !!getStoredGlobalLinkSession();
     const positions = Array.isArray(npfGlobalLinkLastPositions) ? npfGlobalLinkLastPositions : [];
-    const now = Date.now();
-    /* v15.26 — ne plus masquer les missions GLR anciennes.
-     * Global Link conserve certains moyens (DRAGON, PUMA, etc.) visibles même
-     * lorsqu'ils n'ont pas émis depuis plus de 15 min. NPF affiche donc toutes
-     * les positions renvoyées par le relais et utilise uniquement la couleur
-     * pour signaler leur ancienneté.
-     */
-    const visible = positions.filter(item => (
+    const detected = positions.filter(item => (
         Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))
     ));
-    const fresh = visible.filter(item => {
-        const ts = Date.parse(String(item.updatedAt || ''));
-        const age = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
-        return age <= NPF_GLOBAL_LINK_FRESH_SECONDS;
-    });
+
     button.classList.remove('global-link-auth-needed','global-link-ready','global-link-active','global-link-stale','loading');
     if (options.loading) button.classList.add('loading');
+
+    /*
+     * v15.91 — le contour répond à la disponibilité opérationnelle du trafic :
+     * vert dès qu'au moins un trafic GLR valide est détecté, indépendamment du
+     * fait qu'il soit classé en vol ou au sol.
+     */
     if (!hasSession) {
         button.classList.add('global-link-auth-needed');
         button.title = 'GLR — connexion requise';
-    } else if (npfGlobalLinkEnabled && fresh.length) {
+    } else if (npfGlobalLinkEnabled && detected.length) {
         button.classList.add('global-link-active');
-        button.title = `GLR — ${fresh.length} appareil(s) actif(s) — appuyer pour masquer`;
-    } else if (npfGlobalLinkEnabled && visible.length) {
-        button.classList.add('global-link-stale');
-        button.title = 'GLR — positions anciennes ou en attente de mise à jour';
+        button.title = `GLR — ${detected.length} trafic(s) détecté(s) — appuyer pour masquer`;
     } else {
         button.classList.add('global-link-ready');
-        button.title = npfGlobalLinkEnabled ? 'GLR — aucune position récente' : 'GLR — appuyer pour afficher';
+        button.title = npfGlobalLinkEnabled
+            ? 'GLR — aucun trafic détecté'
+            : 'GLR — appuyer pour afficher';
     }
-    if (count) {
-        const displayedCount = Math.max(
-            0,
-            Math.round(Number(npfGlobalLinkRenderedCount) || 0)
-        );
-        count.textContent = String(npfGlobalLinkEnabled ? displayedCount : 0);
-        count.style.display = npfGlobalLinkEnabled ? 'inline-flex' : 'none';
-        count.title = npfGlobalLinkSafeSkyMatches.length
-            ? `${displayedCount} GLR affiché(s) · ${npfGlobalLinkSafeSkyMatches.length} fusionné(s) avec SafeSky`
-            : `${displayedCount} GLR affiché(s)`;
+
+    const inFlight = Math.max(0, Math.round(Number(npfGlobalLinkAirborneRenderedCount) || 0));
+    const onGround = Math.max(0, Math.round(Number(npfGlobalLinkGroundRenderedCount) || 0));
+
+    if (airborneCount) {
+        airborneCount.textContent = String(inFlight);
+        airborneCount.style.display = npfGlobalLinkEnabled && inFlight > 0 ? 'inline-flex' : 'none';
+        airborneCount.title = `${inFlight} trafic(s) GLR en vol affiché(s)`;
+    }
+    if (groundCount) {
+        groundCount.textContent = String(onGround);
+        groundCount.style.display = npfGlobalLinkEnabled && onGround > 0 ? 'inline-flex' : 'none';
+        groundCount.title = `${onGround} trafic(s) GLR au sol affiché(s)`;
     }
 }
 
@@ -19741,6 +19775,8 @@ function renderGlobalLinkPositions(positions) {
     purgeGlobalLinkDomArtifacts();
     if (!npfGlobalLinkEnabled) {
         npfGlobalLinkRenderedCount = 0;
+        npfGlobalLinkAirborneRenderedCount = 0;
+        npfGlobalLinkGroundRenderedCount = 0;
         npfGlobalLinkSafeSkyMatches = [];
         updateGlobalLinkButton();
         return;
@@ -19764,9 +19800,15 @@ function renderGlobalLinkPositions(positions) {
             const ts = Date.parse(String(item.updatedAt || ''));
             const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
             const name = String(item.name || 'Global Link').trim();
+            const ground = isGlobalLinkGroundTraffic(item, ageSeconds);
             return {
                 ...item, lat, lon, ageSeconds, name,
-                stale: ageSeconds > NPF_GLOBAL_LINK_FRESH_SECONDS,
+                ground,
+                /*
+                 * Compatibilité CSS historique : la classe « stale » orange est
+                 * désormais utilisée pour matérialiser le trafic au sol.
+                 */
+                stale: ground,
                 key: `${String(item.groupId || item.missionId || name)}|${sourceIndex}`
             };
         })
@@ -19798,6 +19840,11 @@ function renderGlobalLinkPositions(positions) {
     });
 
     npfGlobalLinkRenderedCount = deduplicatedItems.length;
+    npfGlobalLinkGroundRenderedCount = deduplicatedItems.filter(item => item.ground === true).length;
+    npfGlobalLinkAirborneRenderedCount = Math.max(
+        0,
+        npfGlobalLinkRenderedCount - npfGlobalLinkGroundRenderedCount
+    );
     const labelLayout = buildGlobalLinkLabelLayout(deduplicatedItems);
     deduplicatedItems.forEach(item => {
         const safeName = escapeGlobalLinkHtml(item.name);
@@ -19840,8 +19887,8 @@ function renderGlobalLinkPositions(positions) {
                     ? ' stale'
                     : '';
                 /*
-                 * v15.32 — mêmes couleurs que le symbole GLR défini dans le
-                 * style : #198754 (frais) / #e67e22 (ancien).
+                 * v15.91 — mêmes couleurs que le symbole GLR :
+                 * #198754 (en vol) / #e67e22 (au sol).
                  */
                 const connectorColor = item.stale
                     ? '#e67e22'
@@ -21864,7 +21911,10 @@ window.toggleCustomPelican = oaci => {
     } else {
         customPelicanAirports.add(normalizedOaci);
         disabledAirports.delete(normalizedOaci);
-        selectedPelicanOACI = normalizedOaci;
+        /*
+         * v15.91 — déclarer un terrain comme PÉLIC enrichit seulement la liste
+         * des candidats. Le PÉLIC du feu reste choisi par proximité réelle.
+         */
     }
     saveState();
     refreshUI();
@@ -33849,6 +33899,10 @@ let siaRenderedShowDesignatedPoints = null;
 let siaRenderedPointLabelsEnabled = null;
 let siaRefreshInProgress = false;
 let siaRefreshPendingReason = null;
+/* v15.91 — préchargement progressif pendant un déplacement manuel/GPS. */
+let siaMovePreloadLastTriggerAt = 0;
+const SIA_MOVE_PRELOAD_MIN_INTERVAL_MS = 400;
+const SIA_MOVE_PRELOAD_INNER_PAD_RATIO = -0.08;
 const SIA_GEOMETRY_CACHE_MAX = 900;
 const siaGeometryCache = new Map();
 
@@ -34094,6 +34148,40 @@ function siaBoundsFullyContains(outer, inner) {
     }
 }
 
+function scheduleSiaMovePreloadRefresh() {
+    if (!map || !hasAnyEnabledSiaFilter() || !siaRenderedCoverageBounds) return;
+
+    const currentBounds = map.getBounds();
+    const currentZoom = map.getZoom();
+    const signature = getSiaRenderSignature();
+
+    if (
+        siaRenderedZoom !== currentZoom
+        || siaRenderedSignature !== signature
+    ) {
+        return;
+    }
+
+    /*
+     * v15.91 — ne pas attendre que le viewport sorte complètement du tampon.
+     * Dès qu'il approche de son bord, reconstruire en avance autour de la vue
+     * courante. Un throttle protège Safari/iPad pendant un pan continu.
+     */
+    let innerCoverage = null;
+    try {
+        innerCoverage = siaRenderedCoverageBounds.pad(SIA_MOVE_PRELOAD_INNER_PAD_RATIO);
+    } catch (_) {
+        innerCoverage = null;
+    }
+
+    if (innerCoverage && siaBoundsFullyContains(innerCoverage, currentBounds)) return;
+
+    const now = Date.now();
+    if ((now - siaMovePreloadLastTriggerAt) < SIA_MOVE_PRELOAD_MIN_INTERVAL_MS) return;
+    siaMovePreloadLastTriggerAt = now;
+    scheduleSiaLayerRefresh('move-preload');
+}
+
 function scheduleSiaCoverageRefresh(reason = 'moveend') {
     if (!map || !hasAnyEnabledSiaFilter()) return;
     const currentBounds = map.getBounds();
@@ -34105,6 +34193,15 @@ function scheduleSiaCoverageRefresh(reason = 'moveend') {
         && siaRenderedSignature === signature
         && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
     ) {
+        /*
+         * v15.91 — les géométries/points déjà chargés restent valides, mais les
+         * noms de zones sont dépendants de la position écran : les replacer à
+         * chaque fin de déplacement même sans reconstruction GeoJSON.
+         */
+        if (siaMapAirspacesVisible && Array.isArray(siaRenderedAirspaceFeatures)) {
+            renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+        }
+        scheduleSiaProfileRefresh('sia-moveend-decorations');
         return;
     }
     scheduleSiaLayerRefresh(reason);
@@ -36614,8 +36711,11 @@ function initializeSiaSystem() {
 
     if (map && !map.__npfSiaEventsBound) {
         map.__npfSiaEventsBound = true;
-        // v15.75 — pas de reconstruction SIA à chaque recentrage GPS.
-        // Le moveend ne recharge que lorsque le viewport sort du tampon déjà rendu.
+        /*
+         * v15.91 — précharger avant de sortir du tampon pendant le déplacement,
+         * puis repositionner/recharger proprement à la fin du geste.
+         */
+        map.on('move', scheduleSiaMovePreloadRefresh);
         map.on('moveend', () => scheduleSiaCoverageRefresh('moveend'));
         map.on('zoomend', () => scheduleSiaLayerRefresh('zoomend'));
     }
@@ -39117,8 +39217,9 @@ async function refreshSiaLayers(reason = 'manual') {
             return;
         }
 
-        // v15.75 — un petit recentrage GPS dans la couverture déjà dessinée ne
-        // reconstruit aucun GeoJSON/label/surface tactile.
+        // v15.91 — dans une couverture déjà dessinée, conserver les GeoJSON,
+        // points et surfaces tactiles mais recalculer les décorations dépendantes
+        // de l'écran afin que les noms de zones suivent toujours la nouvelle vue.
         if (
             reason === 'moveend'
             && siaRenderedCoverageBounds
@@ -39126,6 +39227,10 @@ async function refreshSiaLayers(reason = 'manual') {
             && siaRenderedSignature === signature
             && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
         ) {
+            if (siaMapAirspacesVisible && Array.isArray(siaRenderedAirspaceFeatures)) {
+                renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+            }
+            scheduleSiaProfileRefresh('sia-moveend-decorations');
             return;
         }
 
