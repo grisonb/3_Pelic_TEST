@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.90 */
+/* NPF_STYLE_BUILD_VERSION: v15.91 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16556,4 +16556,70 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
 
 .pelic-disabled-x::after {
     transform: translate(-50%, -50%) rotate(-45deg) !important;
+}
+
+
+/* ==========================================================================
+   v15.91 — GLR : CONTOUR DÉTECTION / COMPTEURS VOL + SOL
+   ========================================================================== */
+
+/* Le bouton est vert dès qu'au moins un trafic GLR est détecté. */
+#global-link-layer-button.global-link-active {
+    background: #ffffff !important;
+    border-color: #16a34a !important;
+    color: var(--primary-color) !important;
+    box-shadow:
+        0 0 0 2px rgba(255,255,255,.96),
+        0 2px 9px rgba(22,163,74,.42) !important;
+}
+
+/* Pastille droite : trafics en vol. */
+#global-link-layer-button .global-link-button-count {
+    top: -8px !important;
+    right: -8px !important;
+    left: auto !important;
+    z-index: 6 !important;
+    background: #16a34a !important;
+    color: #ffffff !important;
+    border: 2px solid rgba(255,255,255,.96) !important;
+    opacity: 1 !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+/* Pastille gauche : trafics au sol. */
+#global-link-layer-button .global-link-ground-button-count {
+    position: absolute !important;
+    top: -8px !important;
+    left: -8px !important;
+    right: auto !important;
+    z-index: 6 !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    padding: 0 6px !important;
+    border-radius: 999px !important;
+    box-sizing: border-box !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #8b5a2b !important;
+    color: #ffffff !important;
+    border: 2px solid rgba(255,255,255,.96) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,.28) !important;
+    font: 950 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+    pointer-events: none !important;
+    opacity: 1 !important;
+    animation: none !important;
+    transition: none !important;
+}
+
+@media (max-width: 760px) {
+    #global-link-layer-button .global-link-ground-button-count {
+        top: -6px !important;
+        left: -6px !important;
+        min-width: 24px !important;
+        height: 24px !important;
+        padding: 0 5px !important;
+        font-size: 12px !important;
+    }
 }
