@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-89_departments_embedded_local';
-const APP_VERSION = 'v15.89';
+const SW_VERSION = 'sw-v15-90_center_search_vrp_assoc';
+const APP_VERSION = 'v15.90';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
