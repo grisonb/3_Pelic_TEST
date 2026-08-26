@@ -1,3 +1,52 @@
+VERSION TEST v15.91 — DÉPLACEMENT SIA / PÉLIC PAR PROXIMITÉ / GLR VOL-SOL
+Date : 26/08/2026
+Base : TEST v15.90
+
+OBJECTIFS
+- Éviter la disparition progressive des points SIA/VFR et des noms de zones lors du déplacement de la carte.
+- Garantir que les routes PÉLIC automatiques correspondent toujours aux N pélicandromes actifs réellement les plus proches du feu.
+- Rendre l'état du bouton GLR cohérent avec les trafics détectés et séparer les compteurs « en vol » / « au sol ».
+
+1. CARTE SIA — DÉPLACEMENT CONTINU
+- Ajout d'un préchargement progressif lorsque le viewport approche du bord du tampon SIA déjà rendu.
+- Le préchargement est limité dans le temps (throttle) pour préserver les performances Safari/iPad.
+- À chaque `moveend` dans une couverture déjà chargée, les géométries et points sont conservés mais les noms/bandes dépendant des pixels écran sont recalculés pour la nouvelle vue.
+- Lors d'une reconstruction complète, l'ancien groupe reste affiché jusqu'à ce que le nouveau soit prêt, comme en v15.90.
+
+2. PÉLIC — N PLUS PROCHES STRICTS
+- Suppression de la logique v15.77 qui forçait un PÉLIC sélectionné hors des N plus proches à remplacer le plus éloigné.
+- Déclarer un aérodrome comme PÉLIC l'ajoute seulement aux candidats disponibles ; il n'est plus sélectionné automatiquement pour le feu courant.
+- Les N routes affichées sont strictement les N PÉLIC actifs les plus proches du feu.
+- Une sélection manuelle est conservée uniquement tant que ce PÉLIC appartient réellement aux N plus proches ; sinon le plus proche devient la sélection.
+
+3. GLR — CONTOUR ET DEUX COMPTEURS
+- Le contour GLR devient vert dès qu'au moins un trafic GLR valide est détecté.
+- Pastille verte en haut à droite : nombre de trafics GLR en vol actuellement affichés.
+- Pastille marron en haut à gauche : nombre de trafics GLR au sol actuellement affichés.
+- L'état « sol » utilise en priorité un indicateur explicite fourni par l'API (`onGround`, `ground`, `airborne`, statut, etc.) lorsqu'il existe.
+- Avec le relais actuel, qui ne fournit pas encore à NPF un champ sol/en vol explicite exploité, le secours conserve le comportement observable : absence de nouvelle position depuis 180 s = trafic au sol.
+- Les symboles orange GLR historiques suivent désormais cette classification « au sol ».
+
+4. ÉLÉMENTS INCHANGÉS
+- Centrage exact v15.90.
+- Recherche commune tolérante v15.90.
+- VRP 24 px / codes 3 caractères et rattachement géographique v15.90.
+- Calque Départements autonome v15.89.
+- PÉLIC visuels v15.88.
+- `sia.js` et données AIRAC strictement inchangés.
+- Cartes Offline / IndexedDB, VAC, GAAR, SafeSky et autres fonctions inchangés.
+
+5. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v15.91 Index / Script / Style / Manifest / SW.
+- Vérification `sia.js` bit-à-bit avec v15.90.
+- Vérification de la suppression du forçage d'un PÉLIC lointain.
+- Vérification du préchargement SIA sur `move` et du repositionnement des noms sur `moveend`.
+- Vérification des deux compteurs GLR et du contour vert dès détection.
+
+
 VERSION TEST v15.90 — CENTRAGE GPS / RECHERCHE COMMUNE / VRP LISIBLES / RATTACHEMENT VRP
 Date : 26/08/2026
 Base : TEST v15.89
