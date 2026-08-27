@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.92 */
+/* NPF_STYLE_BUILD_VERSION: v15.93 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -13398,6 +13398,22 @@ body.gaar-point-search-open .gaar-editing-banner {
 .global-link-aircraft-label-marker .global-link-aircraft-label.stale {
     border-color: rgba(192,90,0,.48);
     color: #9a4a00;
+}
+/* v15.93 — étiquette GLR sur deux lignes : indicatif + altitude convertie en ft. */
+.global-link-aircraft-label-marker .global-link-aircraft-label.glr-with-altitude {
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.02;
+}
+.global-link-aircraft-label .glr-label-name {
+    display: block;
+    font-weight: 900;
+}
+.global-link-aircraft-label .glr-label-altitude {
+    display: block;
+    font-size: 11px;
+    font-weight: 850;
+    opacity: .88;
 }
 .global-link-popup { font: 14px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 .global-link-popup strong { color: #0b2f6b; }
