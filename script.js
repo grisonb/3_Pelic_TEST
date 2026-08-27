@@ -1,4 +1,12 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.95';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.96';
+
+/*
+ * v15.96 — séquence de démarrage prioritaire :
+ * 1) carte / premières tuiles ; 2) recherche communes + alias ; 3) PÉLIC.
+ * Les couches et services non indispensables sont relâchés seulement après.
+ */
+let npfStartupCorePriorityActive = true;
+window.__npfStartupCoreReady = false;
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -3366,6 +3374,7 @@ function computeConvexHull(latLngPoints) {
 async function initializeApp() {
     const statusMessage = document.getElementById('status-message');
     const searchSection = document.getElementById('search-section');
+
     try {
         loadState();
     } catch (stateError) {
@@ -3374,11 +3383,12 @@ async function initializeApp() {
         localStorage.removeItem('water_airports');
         localStorage.removeItem('selected_base_oaci');
     }
- // v12.67 — le bouton Route BASE a été retiré de l'interface, mais la route base reste active.
- // On ignore donc l'ancien état local éventuel (ex. utilisateur avait désactivé la route avant suppression du bouton).
+
+    // v12.67 — le bouton Route BASE a été retiré de l'interface, mais la route base reste active.
     showLftwRoute = true;
     localStorage.setItem('showLftwRoute', 'true');
     localStorage.setItem(SHOW_DEPARTMENTS_LAYER_KEY, 'false');
+
     const savedGaarJSON = localStorage.getItem('gaarCircuits');
     if (savedGaarJSON) {
         try {
@@ -3390,10 +3400,19 @@ async function initializeApp() {
             localStorage.removeItem('gaarCircuits');
         }
     }
+
+    /*
+     * v15.96 — PRIORITÉ 1 : déterminer uniquement la source de fond depuis
+     * localStorage, puis créer Leaflet immédiatement. Aucune ouverture IndexedDB,
+     * base communes, alias, SIA ou trafic ne peut précéder les premières tuiles.
+     */
     if (!FORCE_DISPLAY_MODE) {
         activeOfflinePacks = JSON.parse(localStorage.getItem(OFFLINE_ACTIVE_PACKS_KEY) || '[]');
         if (!Array.isArray(activeOfflinePacks)) activeOfflinePacks = [];
-        activeOfflinePackDatabases = JSON.parse(localStorage.getItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY) || '[]');
+
+        activeOfflinePackDatabases = JSON.parse(
+            localStorage.getItem(OFFLINE_ACTIVE_PACK_DATABASES_KEY) || '[]'
+        );
         if (!Array.isArray(activeOfflinePackDatabases) || !activeOfflinePackDatabases.length) {
             activeOfflinePackDatabases = getOfflineActivePackDatabasesForPacks(activeOfflinePacks);
         }
@@ -3402,56 +3421,32 @@ async function initializeApp() {
             localStorage.getItem(OFFLINE_ACTIVE_PACK_ALIASES_KEY) || '[]'
         );
         if (!Array.isArray(activeOfflinePackAliases) || !activeOfflinePackAliases.length) {
-            activeOfflinePackAliases = getOfflineActivePackAliasesForPacks(
-                activeOfflinePacks
-            );
+            activeOfflinePackAliases = getOfflineActivePackAliasesForPacks(activeOfflinePacks);
         }
 
         const savedMapSourceMode = localStorage.getItem(MAP_SOURCE_MODE_KEY);
-        mapSourceMode = savedMapSourceMode === 'offline' ? 'offline' : DEFAULT_MAP_SOURCE_MODE;
+        mapSourceMode = savedMapSourceMode === 'offline'
+            ? 'offline'
+            : DEFAULT_MAP_SOURCE_MODE;
+
+        /*
+         * Valeur immédiate nécessaire à setupBaseTileLayer().
+         * initializeOfflineTilePreference() viendra ensuite consolider l'état
+         * sans bloquer le premier rendu.
+         */
+        offlineTilesMode = mapSourceMode === 'offline';
+
         offlineOnlineFallbackMode = localStorage.getItem(OFFLINE_ONLINE_FALLBACK_KEY) === null
             ? DEFAULT_OFFLINE_ONLINE_FALLBACK
             : localStorage.getItem(OFFLINE_ONLINE_FALLBACK_KEY) === 'true';
-
-        try {
-            await withTimeout(initDB(), 12000, 'Timeout ouverture IndexedDB');
-        } catch (startupError) {
-            console.warn('Initialisation IndexedDB lente/indisponible au démarrage:', startupError);
-            setTimeout(() => {
-                initDB().catch(() => {});
-            }, 0);
-        }
-
-        /*
-         * v14.63 — l'interface ne doit jamais attendre IndexedDB ou le
-         * service worker avant de créer la carte et de lier les boutons.
-         */
-        initializeOfflineTilePreference().catch(error => {
-            console.warn('[Offline] Initialisation différée:', error);
-        });
- // Le scan de zoom est utile mais non bloquant pour l'ouverture de l'interface.
-        withTimeout(
-            updateBaseTileNativeZoomFromAvailability({ forceScan: false }),
-            2200,
-            'Timeout analyse initiale des cartes offline'
-        ).then(() => {
-            if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v14.69');
-        }).catch(error => {
-            console.warn('[Offline] Plage de zoom initiale conservée:', error);
-        });
-        displayInstalledMaps();
     } else {
         mapSourceMode = DEFAULT_MAP_SOURCE_MODE;
+        offlineTilesMode = DEFAULT_OFFLINE_TILES_ENABLED;
         offlineOnlineFallbackMode = DEFAULT_OFFLINE_ONLINE_FALLBACK;
         activeOfflinePacks = [];
         activeOfflinePackDatabases = [];
         activeOfflinePackAliases = [];
-        displayInstalledMaps();
-        setTimeout(() => {
-            initDB()
-                .then(() => displayInstalledMaps())
-                .catch(() => {});
-        }, 0);
+
         try {
             const cleanedUrl = new URL(window.location.href);
             cleanedUrl.searchParams.delete('force_display');
@@ -3459,9 +3454,65 @@ async function initializeApp() {
             window.history.replaceState({}, '', cleanedUrl.toString());
         } catch (_) {}
     }
+
+    if (statusMessage) statusMessage.style.display = 'none';
+    if (searchSection) searchSection.style.display = 'none';
+
+    initMap();
+    scheduleRememberedOfflineMapStartupRecovery(
+        'initializeApp-v15.96-map-first'
+    );
+
+    /*
+     * Laisser WebKit peindre Leaflet et lancer les requêtes de tuiles avant
+     * tout parsing/indexage de la base communes.
+     */
+    await new Promise(resolve => {
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => resolve());
+        } else {
+            setTimeout(resolve, 0);
+        }
+    });
+
+    /*
+     * IndexedDB reste utile au mode offline, mais son ouverture est désormais
+     * non bloquante pour la carte et pour la recherche communes/alias.
+     */
+    const startupDbPromise = initDB()
+        .catch((startupError) => {
+            console.warn('Initialisation IndexedDB différée indisponible:', startupError);
+            return null;
+        });
+
+    startupDbPromise.then(() => {
+        if (!FORCE_DISPLAY_MODE) {
+            initializeOfflineTilePreference().catch(error => {
+                console.warn('[Offline] Initialisation différée:', error);
+            });
+
+            withTimeout(
+                updateBaseTileNativeZoomFromAvailability({ forceScan: false }),
+                2200,
+                'Timeout analyse initiale des cartes offline'
+            ).then(() => {
+                if (map) rebuildBaseTileLayerAfterOfflineSwitch('startup-zoom-ready-v15.96');
+            }).catch(error => {
+                console.warn('[Offline] Plage de zoom initiale conservée:', error);
+            });
+        }
+
+        try { displayInstalledMaps(); } catch (_) {}
+    });
+
+    /*
+     * v15.96 — PRIORITÉ 2 : recherche communes + alias.
+     * Cette phase démarre immédiatement après le premier rendu de la carte.
+     */
     let communesLoadError = null;
     try {
         let data = null;
+
         if (FORCE_DISPLAY_MODE) {
             const cachedData = localStorage.getItem(COMMUNES_CACHE_KEY);
             if (cachedData) {
@@ -3471,7 +3522,9 @@ async function initializeApp() {
                 } catch (_) {}
             }
         }
+
         if (!data) data = await loadCommunesData();
+
         allCommunes = data.data.map(c => {
             const normalizedName = simplifyString(c.nom_standard);
             const searchParts = normalizedName.split(' ').filter(Boolean);
@@ -3483,38 +3536,83 @@ async function initializeApp() {
                 soundex_parts: searchParts.map(part => soundex(part))
             };
         });
-        communesByCodeInsee = new Map(allCommunes.map((commune) => [String(commune.code_insee || '').trim(), commune]).filter(([code]) => code));
+
+        communesByCodeInsee = new Map(
+            allCommunes
+                .map(commune => [
+                    String(commune.code_insee || '').trim(),
+                    commune
+                ])
+                .filter(([code]) => code)
+        );
+
         communeAliases = await loadCommunesAliases();
     } catch (error) {
         communesLoadError = error;
         allCommunes = [];
-        console.error('Chargement communes indisponible:', error);
+        communeAliases = [];
+        console.error('Chargement communes/alias indisponible:', error);
     }
 
-    statusMessage.style.display = 'none';
-    searchSection.style.display = 'block';
-    initMap();
-    scheduleRememberedOfflineMapStartupRecovery(
-        'initializeApp-v14.69'
-    );
-    initializeTeamChat();
+    if (searchSection) searchSection.style.display = 'block';
+
     try {
         setupEventListeners();
     } catch (uiError) {
         console.error('Erreur setupEventListeners:', uiError);
     }
+
     try {
-        initializeSiaSystem();
-    } catch (siaInitError) {
-        console.error('[SIA] Erreur initialisation système:', siaInitError);
+        map?.invalidateSize?.({ animate: false, pan: false });
+    } catch (_) {}
+
+    /*
+     * v15.96 — PRIORITÉ 3 : PÉLIC / aérodromes permanents.
+     * Aucun dessin de cette couche n'est lancé par initMap() pendant la phase
+     * prioritaire ; il est effectué ici seulement après communes + alias.
+     */
+    try {
+        drawPermanentAirportMarkers();
+        applyPelicanVisualScale();
+    } catch (pelicError) {
+        console.error('Affichage PÉLIC au démarrage impossible:', pelicError);
     }
+
+    npfStartupCorePriorityActive = false;
+    window.__npfStartupCoreReady = true;
+    try {
+        window.dispatchEvent(new CustomEvent('npf-startup-core-ready'));
+    } catch (_) {}
+
+    /*
+     * Toutes les tâches suivantes sont explicitement postérieures aux trois
+     * priorités. Elles restent asynchrones/différées pour ne pas reprendre le
+     * thread principal juste après l'affichage des PÉLIC.
+     */
+    setTimeout(() => {
+        try { drawNpfRunwayMapLayer(); } catch (_) {}
+        try { drawFireHistoryMarkers(); } catch (_) {}
+        try { redrawGaarCircuits(); } catch (_) {}
+        try { scheduleStartupAuxiliaryLayers(); } catch (_) {}
+
+        try {
+            initializeTeamChat();
+        } catch (chatInitError) {
+            console.warn('Initialisation chat différée:', chatInitError);
+        }
+
+        try {
+            initializeSiaSystem();
+        } catch (siaInitError) {
+            console.error('[SIA] Erreur initialisation système:', siaInitError);
+        }
+    }, 180);
+
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
     setTimeout(showUpdateReminderIfDue, 1700);
 
     /*
-     * v14.93 — le contrôle VAC est volontairement différé et non bloquant.
-     * Hors connexion, fetchVacManifest() échoue silencieusement et les VAC
-     * déjà présentes dans IndexedDB restent immédiatement disponibles.
+     * VAC : contrôle différé et non bloquant.
      */
     setTimeout(() => {
         reconcileVacInstalledIndexFromDb()
@@ -3527,22 +3625,29 @@ async function initializeApp() {
             });
     }, 2500);
 
-
     /*
-     * v15.13 — aucun contrôle réseau FdS / GAAR au démarrage.
-     * Les boutons sont calculés uniquement depuis IndexedDB. Le NAS n'est interrogé
-     * qu'à la demande : premier téléchargement ou bouton « Maj » du lecteur.
+     * FdS / GAAR : lecture locale différée, aucun contrôle réseau au démarrage.
      */
     setTimeout(() => {
         refreshBriefingDocMapButtons().catch(error => {
-            console.info('[FDS/GAAR] Lecture locale de démarrage ignorée:', error?.message || error);
+            console.info(
+                '[FDS/GAAR] Lecture locale de démarrage ignorée:',
+                error?.message || error
+            );
         });
     }, 1200);
 
     setTimeout(() => {
-        scheduleOfflineTileWake('startup-post-init');
+        scheduleOfflineTileWake('startup-post-core-v15.96');
     }, 250);
+
     setupGpsResumeHandlers();
+
+    /*
+     * Les polygones communes 500 m sont volontairement postérieurs à
+     * carte -> recherche/alias -> PÉLIC. Ils servent ensuite à la commune
+     * survolée et au positionnement précis des feux manuels.
+     */
     setTimeout(() => {
         ensureCommunesLayerDataLoaded()
             .then(() => {
@@ -3557,21 +3662,15 @@ async function initializeApp() {
                     refreshNearestCommuneDisplayFromKnownGps();
                 }
             });
-    }, 500);
+    }, 650);
+
     setTimeout(() => {
         loadNamedPlacesOfflineDatabase()
             .then(() => {
                 if (!namedPlacesOfflineIndex) return;
-                const noticeKey =
-                    'npfNamedPlacesFranceReadyNoticeVersion';
-                if (
-                    localStorage.getItem(noticeKey)
-                        !== 'v14.69'
-                ) {
-                    localStorage.setItem(
-                        noticeKey,
-                        'v14.69'
-                    );
+                const noticeKey = 'npfNamedPlacesFranceReadyNoticeVersion';
+                if (localStorage.getItem(noticeKey) !== 'v14.69') {
+                    localStorage.setItem(noticeKey, 'v14.69');
                     showNamedPlacesOfflineStatus(
                         `Base localités France hors ligne prête — ${Number(
                             namedPlacesOfflineIndex.total_count
@@ -3585,7 +3684,7 @@ async function initializeApp() {
                     { error: true, duration: 6500 }
                 );
             });
-    }, 1000);
+    }, 1150);
 
     setTimeout(() => {
         ensureDepartmentsLayerDataLoaded()
@@ -3598,25 +3697,47 @@ async function initializeApp() {
             .catch((error) => {
                 console.warn('Préchargement calque départements impossible:', error);
             });
-    }, 650);
-    primeGpsFromStoredPosition();
-    setTimeout(() => {
-        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps();
     }, 900);
+
+    primeGpsFromStoredPosition();
+
     setTimeout(() => {
-        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') refreshNearestCommuneDisplayFromKnownGps();
-    }, 2600);
+        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+            refreshNearestCommuneDisplayFromKnownGps();
+        }
+    }, 1050);
+
+    setTimeout(() => {
+        if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
+            refreshNearestCommuneDisplayFromKnownGps();
+        }
+    }, 2750);
+
     if (localStorage.getItem('liveGpsActive') === 'true') {
         restartLiveGpsWatch({ silent: true });
     } else {
-        requestOneShotGps({ silent: true, highAccuracy: true, timeout: 30000, maximumAge: 600000 });
+        requestOneShotGps({
+            silent: true,
+            highAccuracy: true,
+            timeout: 30000,
+            maximumAge: 600000
+        });
     }
+
     const savedCommuneJSON = localStorage.getItem('currentCommune');
     if (savedCommuneJSON) {
-        currentCommune = JSON.parse(savedCommuneJSON);
-        displayCommuneDetails(currentCommune, true);
-        setTimeout(() => fitMapToStartupFireContext({ reason: 'saved-fire-after-display' }), 350);
-        setTimeout(() => fitMapToStartupFireContext({ reason: 'saved-fire-after-gps' }), 1400);
+        try {
+            currentCommune = JSON.parse(savedCommuneJSON);
+            displayCommuneDetails(currentCommune, true);
+            setTimeout(
+                () => fitMapToStartupFireContext({ reason: 'saved-fire-after-display' }),
+                350
+            );
+            setTimeout(
+                () => fitMapToStartupFireContext({ reason: 'saved-fire-after-gps' }),
+                1400
+            );
+        } catch (_) {}
     }
 
     setTimeout(() => {
@@ -3625,11 +3746,6 @@ async function initializeApp() {
         }
     }, 750);
 
-    /*
-     * v12.13 — restauration plans d'eau au démarrage.
-     * Si le bouton Plan d'eau était actif avant fermeture, les points doivent
-     * réapparaître sans devoir désélectionner/résélectionner le bouton.
-     */
     setTimeout(() => {
         try {
             refreshWaterPointsButtonState();
@@ -3639,7 +3755,9 @@ async function initializeApp() {
 
     if (communesLoadError) {
         setTimeout(() => {
-            alert("Mode dégradé: base communes indisponible au démarrage. La carte reste utilisable, réessayez avec réseau pour la recherche commune.");
+            alert(
+                "Mode dégradé: base communes/alias indisponible. La carte reste utilisable ; réessayez avec réseau pour la recherche commune."
+            );
         }, 400);
     }
 }
@@ -5468,15 +5586,25 @@ function initMap() {
     trafficAdvisoryLayer.addTo(trafficLayer);
     communesLayerGroup = L.layerGroup();
     communesLabelsLayer = L.layerGroup();
-    drawNpfRunwayMapLayer();
+    /*
+     * v15.96 — pendant la phase prioritaire, initMap() ne dessine que le fond
+     * de carte et prépare les groupes. Les couches métier sont relâchées après
+     * recherche communes/alias puis affichage PÉLIC.
+     */
+    if (!npfStartupCorePriorityActive) {
+        drawNpfRunwayMapLayer();
+    }
     map.on('zoomend', drawNpfRunwayMapLayer);
+
     applyPelicanVisualScale();
     map.on('zoomend', applyPelicanVisualScale);
-    drawPermanentAirportMarkers();
-    drawFireHistoryMarkers();
-    redrawGaarCircuits();
 
-    scheduleStartupAuxiliaryLayers();
+    if (!npfStartupCorePriorityActive) {
+        drawPermanentAirportMarkers();
+        drawFireHistoryMarkers();
+        redrawGaarCircuits();
+        scheduleStartupAuxiliaryLayers();
+    }
 
     map.on('moveend zoomend', () => {
         if (showRoadOverlayLayer) {
@@ -20466,10 +20594,10 @@ function initializeGlobalLinkUi() {
     if (!window.__npfGlobalLinkLifecycleBound) {
         window.__npfGlobalLinkLifecycleBound = true;
         window.addEventListener('online', () => {
-            if (npfGlobalLinkEnabled) refreshGlobalLinkPositions({ silent: true });
+            if (npfGlobalLinkEnabled && window.__npfStartupCoreReady !== false) refreshGlobalLinkPositions({ silent: true });
         });
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && npfGlobalLinkEnabled) {
+            if (document.visibilityState === 'visible' && npfGlobalLinkEnabled && window.__npfStartupCoreReady !== false) {
                 refreshGlobalLinkPositions({ silent: true });
             }
         });
@@ -20479,13 +20607,33 @@ function initializeGlobalLinkUi() {
     }
     try { npfGlobalLinkEnabled = localStorage.getItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY) === '1'; } catch (_) {}
     updateGlobalLinkButton();
-    if (npfGlobalLinkEnabled && getStoredGlobalLinkSession() && getStoredBriefingDocsSession()) {
+
+    const startStoredGlobalLinkAfterCore = () => {
+        if (!npfGlobalLinkEnabled) return;
+        if (!getStoredGlobalLinkSession() || !getStoredBriefingDocsSession()) {
+            npfGlobalLinkEnabled = false;
+            try { localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, '0'); } catch (_) {}
+            updateGlobalLinkButton();
+            return;
+        }
         startGlobalLinkRefreshTimer();
-        setTimeout(() => refreshGlobalLinkPositions({ silent: true }), 800);
-    } else if (npfGlobalLinkEnabled) {
-        npfGlobalLinkEnabled = false;
-        try { localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, '0'); } catch (_) {}
-        updateGlobalLinkButton();
+        setTimeout(() => {
+            if (window.__npfStartupCoreReady === true) {
+                refreshGlobalLinkPositions({ silent: true });
+            }
+        }, 250);
+    };
+
+    if (npfGlobalLinkEnabled) {
+        if (window.__npfStartupCoreReady === true) {
+            startStoredGlobalLinkAfterCore();
+        } else {
+            window.addEventListener(
+                'npf-startup-core-ready',
+                startStoredGlobalLinkAfterCore,
+                { once: true }
+            );
+        }
     }
 }
 
@@ -22021,15 +22169,16 @@ function isTouchTabletForCommunesLayer() {
 
 function getCommunesGeojsonUrl() {
     /*
-     * v14.98 — une nouvelle PWA iPad ne doit plus dépendre du gros fichier
-     * Etalab au premier lancement. Le GeoJSON 1000 m est désormais hébergé avec
-     * NPF et chargé depuis la même origine. Le PC conserve pour l'instant le
-     * fichier officiel 50 m afin de préserver la précision existante.
+     * v15.96 — iPad : compromis précision / performances.
+     * Le GeoJSON local 500 m remplace le 1000 m pour affiner les contours
+     * visibles, la commune survolée et le nommage des feux manuels, tout en
+     * restant bien plus léger que le 50/100 m complet.
+     * Le PC conserve le fichier officiel 50 m.
      */
     if (isTouchTabletForCommunesLayer()) {
         return {
-            precision: '1000m-local',
-            url: './data/communes-1000m.geojson'
+            precision: '500m-local',
+            url: './data/communes-500m.geojson'
         };
     }
 
