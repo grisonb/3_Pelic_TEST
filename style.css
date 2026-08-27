@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.93 */
+/* NPF_STYLE_BUILD_VERSION: v15.94 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -13336,29 +13336,73 @@ body.gaar-point-search-open .gaar-editing-banner {
 }
 .global-link-aircraft-symbol {
     position: relative;
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    border: 3px solid #ffffff;
-    background: #198754;
-    color: #ffffff;
-    font-size: 20px;
-    font-weight: 950;
-    box-shadow: 0 2px 8px rgba(0,0,0,.42);
+    border: 3px solid currentColor;
+    background: rgba(255,255,255,.96);
+    color: #f4c400;
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,.92),
+        0 2px 8px rgba(0,0,0,.38);
 }
-/* Classe historique « stale » : en v15.92 elle matérialise uniquement l'état GLR Off. */
-.global-link-aircraft-symbol.stale { background: #e67e22; }
+/* v15.94 — Off : cercle + silhouette gris ; l'étiquette reste marron. */
+.global-link-aircraft-symbol.stale {
+    color: #6b7280;
+}
+.global-link-aircraft-silhouette {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    transform: none;
+}
+.global-link-aircraft-silhouette svg {
+    display: block;
+    width: 28px;
+    height: 28px;
+    overflow: visible;
+    filter: drop-shadow(0 1px 1px rgba(15,23,42,.22));
+}
+.global-link-aircraft-silhouette svg .ss-fill {
+    fill: currentColor !important;
+    stroke: currentColor !important;
+}
+.global-link-aircraft-silhouette svg .ss-line,
+.global-link-aircraft-silhouette svg .ss-line * {
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 3.2px !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    vector-effect: non-scaling-stroke !important;
+}
+.global-link-aircraft-silhouette svg .ss-ring {
+    fill: #ffffff !important;
+    stroke: currentColor !important;
+    stroke-width: 3px !important;
+    vector-effect: non-scaling-stroke !important;
+}
+.global-link-aircraft-silhouette svg .ss-cut {
+    fill: none !important;
+    stroke: #ffffff !important;
+    stroke-width: 1.8px !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
+    vector-effect: non-scaling-stroke !important;
+}
 .global-link-aircraft-label {
     position: absolute;
     padding: 3px 6px;
     border-radius: 5px;
-    border: 1px solid rgba(11,47,107,.32);
+    border: 1px solid rgba(25,135,84,.44);
     background: rgba(255,255,255,.96);
-    color: #0b2f6b;
+    color: #198754;
     font: 900 13px/1.05 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     white-space: nowrap;
     box-shadow: 0 1px 4px rgba(0,0,0,.18);
@@ -13396,24 +13440,12 @@ body.gaar-point-search-open .gaar-editing-banner {
     justify-content: center;
 }
 .global-link-aircraft-label-marker .global-link-aircraft-label.stale {
-    border-color: rgba(192,90,0,.48);
-    color: #9a4a00;
-}
-/* v15.93 — étiquette GLR sur deux lignes : indicatif + altitude convertie en ft. */
-.global-link-aircraft-label-marker .global-link-aircraft-label.glr-with-altitude {
-    flex-direction: column;
-    gap: 2px;
-    line-height: 1.02;
+    border-color: rgba(139,90,43,.56);
+    color: #8b5a2b;
 }
 .global-link-aircraft-label .glr-label-name {
     display: block;
     font-weight: 900;
-}
-.global-link-aircraft-label .glr-label-altitude {
-    display: block;
-    font-size: 11px;
-    font-weight: 850;
-    opacity: .88;
 }
 .global-link-popup { font: 14px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 .global-link-popup strong { color: #0b2f6b; }
@@ -16640,3 +16672,103 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
         font-size: 12px !important;
     }
 }
+
+/* ==========================================================================
+   v15.94 — GLR AVION/HÉLICO + FILTRE OFF / ÉTIQUETTES SS SUIVIES
+   ========================================================================== */
+
+/*
+ * SafeSky suivi : indicatif à 13 px, identique aux étiquettes GLR.
+ * Le cartouche se dimensionne au contenu au lieu d'imposer une largeur mini.
+ */
+.traffic-aircraft-symbol-wrap.traffic-aircraft-tracked
+.traffic-aircraft-altitude-label {
+    width: max-content !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    padding: 3px 6px !important;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-aircraft-tracked
+.traffic-label-line {
+    width: auto !important;
+    max-width: none !important;
+}
+
+.traffic-aircraft-symbol-wrap.traffic-aircraft-tracked
+.traffic-label-line-primary {
+    font-size: 13px !important;
+    line-height: 1.05 !important;
+    font-weight: 900 !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+/* Menu d'appui long GLR. */
+.global-link-options-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 7200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    box-sizing: border-box;
+    background: rgba(15,23,42,.28);
+}
+
+.global-link-options-card {
+    width: min(390px, calc(100vw - 36px));
+    box-sizing: border-box;
+    padding: 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 12px 36px rgba(15,23,42,.28);
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.global-link-options-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 950;
+}
+
+.global-link-options-close {
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 9px;
+    background: #eef2f7;
+    color: #334155;
+    font-size: 25px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.global-link-options-check-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-height: 50px;
+    padding: 8px 6px;
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.global-link-options-check-row input[type="checkbox"] {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 auto;
+    accent-color: #198754;
+}
+
