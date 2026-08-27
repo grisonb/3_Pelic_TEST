@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.94 */
+/* NPF_STYLE_BUILD_VERSION: v15.95 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16770,5 +16770,73 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     height: 28px;
     flex: 0 0 auto;
     accent-color: #198754;
+}
+
+/* ==========================================================================
+   v15.95 — BOUTON N VFR SUR FRANCE / COMMANDE SECONDAIRE SAFESKY
+   ========================================================================== */
+
+/* Bas-gauche du bouton France : N magenta = VRP visibles, gris = masqués. */
+.quick-sia-vrp-toggle {
+    position: absolute;
+    left: -10px;
+    bottom: -10px;
+    z-index: 6;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #d000a8;
+    color: #ffffff;
+    box-shadow: 0 2px 7px rgba(0,0,0,.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    touch-action: manipulation;
+    font: 950 17px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.quick-sia-vrp-toggle.is-hidden {
+    background: #6b7280;
+    border-color: #ffffff;
+    color: #ffffff;
+}
+
+/*
+ * La pastille verte SafeSky devient une vraie commande tactile indépendante.
+ * La pastille jaune reste informative et conserve pointer-events:none.
+ */
+#traffic-layer-button .traffic-button-count {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+}
+
+#traffic-layer-button .traffic-button-count.traffic-nontracked-hidden {
+    background: #6b7280 !important;
+    color: #ffffff !important;
+}
+
+@media (max-width: 760px) {
+    .quick-sia-vrp-toggle {
+        left: -7px;
+        bottom: -7px;
+        width: 29px;
+        height: 29px;
+        min-width: 29px;
+        min-height: 29px;
+        border-width: 2px;
+        font-size: 14px;
+    }
 }
 
