@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.91 */
+/* NPF_STYLE_BUILD_VERSION: v15.92 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -13350,6 +13350,7 @@ body.gaar-point-search-open .gaar-editing-banner {
     font-weight: 950;
     box-shadow: 0 2px 8px rgba(0,0,0,.42);
 }
+/* Classe historique « stale » : en v15.92 elle matérialise uniquement l'état GLR Off. */
 .global-link-aircraft-symbol.stale { background: #e67e22; }
 .global-link-aircraft-label {
     position: absolute;
@@ -16560,7 +16561,7 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
 
 
 /* ==========================================================================
-   v15.91 — GLR : CONTOUR DÉTECTION / COMPTEURS VOL + SOL
+   v15.92 — GLR : CONTOUR DÉTECTION / COMPTEURS ACTIF + OFF
    ========================================================================== */
 
 /* Le bouton est vert dès qu'au moins un trafic GLR est détecté. */
@@ -16573,7 +16574,7 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
         0 2px 9px rgba(22,163,74,.42) !important;
 }
 
-/* Pastille droite : trafics en vol. */
+/* Pastille droite : trafics GLR actifs, total national. */
 #global-link-layer-button .global-link-button-count {
     top: -8px !important;
     right: -8px !important;
@@ -16587,8 +16588,8 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     transition: none !important;
 }
 
-/* Pastille gauche : trafics au sol. */
-#global-link-layer-button .global-link-ground-button-count {
+/* Pastille gauche : trafics GLR Off, total national. */
+#global-link-layer-button .global-link-off-button-count {
     position: absolute !important;
     top: -8px !important;
     left: -8px !important;
@@ -16614,7 +16615,7 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
 }
 
 @media (max-width: 760px) {
-    #global-link-layer-button .global-link-ground-button-count {
+    #global-link-layer-button .global-link-off-button-count {
         top: -6px !important;
         left: -6px !important;
         min-width: 24px !important;
