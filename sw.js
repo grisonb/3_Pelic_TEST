@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-91_sia_pan_pelic_glr_counts';
-const APP_VERSION = 'v15.91';
+const SW_VERSION = 'sw-v15-92_safesky_glr_national_counts';
+const APP_VERSION = 'v15.92';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
