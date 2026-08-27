@@ -1,3 +1,52 @@
+VERSION TEST v15.92 — COMPTEURS NATIONAUX SAFESKY / GLR ACTIF-OFF
+Date : 27/08/2026
+Base : TEST v15.91
+
+OBJECTIFS
+- Faire représenter au badge « liste suivie » de SafeSky le nombre total de trafics suivis détectés par la recherche directe, indépendamment de la zone actuellement affichée.
+- Faire représenter aux deux badges GLR les totaux de tous les trafics GLR reçus, indépendamment du cadrage de la carte.
+- Corriger la sémantique GLR : marron/orange = `Off`, vert = actif ; aucune assimilation à un trafic au sol.
+
+1. SAFESKY — BADGE LISTE SUIVIE INDÉPENDANT DU VIEWPORT
+- Le comptage de la liste suivie est désormais calculé à partir de l'interrogation directe SafeSky de chacun des identifiants suivis.
+- Ce comptage ne dépend plus du centre de carte, du zoom ni des seuls marqueurs présents à l'écran.
+- Les résultats sont dédupliqués par identifiant trafic et l'appareil défini comme « mon avion » reste exclu du comptage des trafics.
+- Le rendu cartographique et les filtres SafeSky existants restent inchangés.
+
+2. GLR — COMPTEURS TOTAUX ACTIF / OFF
+- Pastille verte en haut à droite : nombre total de trafics GLR actifs reçus.
+- Pastille marron en haut à gauche : nombre total de trafics GLR `Off` reçus.
+- Les deux compteurs sont calculés avant le filtrage par limites de la carte et avant la déduplication d'affichage avec SafeSky : déplacer ou zoomer la carte ne modifie donc plus les nombres.
+- Les marqueurs/étiquettes réellement dessinés restent limités au viewport et SafeSky reste prioritaire pour la déduplication visuelle.
+- Le contour GLR reste vert dès qu'au moins un trafic GLR valide est détecté.
+
+3. GLR — MARRON/ORANGE = OFF
+- Suppression de l'interprétation v15.91 « marron/orange = au sol ».
+- Les symboles, étiquettes et connecteurs marron/orange correspondent désormais à l'état `Off` ; les éléments verts correspondent à l'état actif.
+- Si l'API expose ultérieurement un indicateur explicite (`off`, `isOff`, `active`, `status`, etc.), celui-ci est prioritaire.
+- Avec le relais actuel, le comportement historique qui produit les éléments marron/orange est conservé en secours : position non renouvelée depuis plus de 180 s = `Off`.
+- Aucun calcul ou affichage « au sol / en vol » n'est déduit de `Off`.
+
+4. ÉLÉMENTS INCHANGÉS
+- Aucun changement du relais PHP GLR : les nouveaux identifiants donnent déjà accès à tous les trafics attendus.
+- Préchargement et repositionnement SIA v15.91 inchangés.
+- Sélection des N PÉLIC les plus proches v15.91 inchangée.
+- Centrage / recherche commune / VRP v15.90 inchangés.
+- Calque Départements v15.89 et visuels PÉLIC v15.88 inchangés.
+- `sia.js` / AIRAC strictement inchangé.
+- Offline / IndexedDB, VAC, GAAR et autres fonctions inchangés.
+
+5. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v15.92 Index / Script / Style / Manifest / SW.
+- Vérification `sia.js` bit-à-bit avec v15.91.
+- Vérification ciblée : badge SafeSky liste suivie alimenté par la recherche directe globale.
+- Vérification ciblée : compteurs GLR calculés avant filtrage viewport.
+- Vérification ciblée : marron = `Off`, vert = actif ; aucune mention opérationnelle « au sol » dans la logique GLR v15.92.
+
+
 VERSION TEST v15.91 — DÉPLACEMENT SIA / PÉLIC PAR PROXIMITÉ / GLR VOL-SOL
 Date : 26/08/2026
 Base : TEST v15.90
