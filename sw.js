@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-93_ss_labels_glr_altitude';
-const APP_VERSION = 'v15.93';
+const SW_VERSION = 'sw-v15-94_glr_symbols_filter_ss_labels';
+const APP_VERSION = 'v15.94';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
