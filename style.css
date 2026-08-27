@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.95 */
+/* NPF_STYLE_BUILD_VERSION: v15.96 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16194,10 +16194,10 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     min-width: 36px;
     min-height: 36px;
     padding: 5px;
-    border: 2px solid var(--primary-color);
+    border: 2px solid #ffffff;
     border-radius: 50%;
-    background: rgba(255,255,255,.98);
-    color: var(--primary-color);
+    background: var(--primary-color);
+    color: #ffffff;
     box-shadow: 0 2px 7px rgba(0,0,0,.28);
     display: flex;
     align-items: center;
@@ -16225,7 +16225,7 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
 .quick-sia-eye-slash { display: none; stroke-width: 3.2; }
 
 .quick-sia-zones-toggle.is-hidden {
-    background: #b42318;
+    background: #6b7280;
     border-color: #ffffff;
     color: #ffffff;
 }
@@ -16771,6 +16771,15 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     flex: 0 0 auto;
     accent-color: #198754;
 }
+
+/* ==========================================================================
+   v15.96 — ÉTAT VISUEL ŒIL FRANCE
+   ========================================================================== */
+/*
+ * Zones visibles : fond bleu + œil blanc.
+ * Zones masquées : fond gris + œil barré blanc.
+ * Le bouton N VFR reste indépendant (magenta / gris).
+ */
 
 /* ==========================================================================
    v15.95 — BOUTON N VFR SUR FRANCE / COMMANDE SECONDAIRE SAFESKY
