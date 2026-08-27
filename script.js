@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.91';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.92';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -13027,6 +13027,26 @@ async function fetchTrackedTrafficBeacons() {
 }
 
 /*
+ * v15.92 — compteur national de la liste suivie.
+ * Les balises de la liste sont interrogées directement par identifiant, donc
+ * ce compteur ne dépend ni du viewport ni du rayon actuellement affiché.
+ */
+function countTrackedTrafficDirectDetections(rawList) {
+    const seen = new Set();
+
+    (Array.isArray(rawList) ? rawList : [])
+        .map(normalizeTrafficAircraft)
+        .filter(Boolean)
+        .filter(ac => !isOwnTrafficAircraft(ac))
+        .forEach(ac => {
+            const key = buildTrafficAircraftKey(ac);
+            if (key) seen.add(key);
+        });
+
+    return seen.size;
+}
+
+/*
  * v14.41 — SafeSky est strictement utilisé en lecture.
  * Ces fonctions restent comme stubs de compatibilité interne, sans requête POST.
  */
@@ -16165,10 +16185,17 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         });
 
     lastTrafficTotalEligibleCount = allEligibleAircraft.length;
-    lastTrafficTrackedDetectedCount = allEligibleAircraft.filter(ac => (
-        trackedIdentifierSet.has(String(ac.hex || '').toUpperCase())
-        || isTrafficAircraftTracked(ac)
-    )).length;
+
+    /*
+     * v15.92 — le badge « liste suivie » est alimenté par la recherche directe
+     * nationale transmise dans meta, jamais par les seuls appareils rendus.
+     */
+    if (Number.isFinite(Number(meta.trackedNationalCount))) {
+        lastTrafficTrackedDetectedCount = Math.max(
+            0,
+            Math.round(Number(meta.trackedNationalCount))
+        );
+    }
 
     const uniqueAircraft = allEligibleAircraft.filter(ac => (
         !settings.onlyTrackedIdentifiers
@@ -16370,10 +16397,10 @@ function refreshTrafficButtonState(count = null) {
         );
         trackedCountEl.textContent = String(trackedCount);
         trackedCountEl.style.display = showTrafficLayer ? 'inline-flex' : 'none';
-        trackedCountEl.title = `${trackedCount} trafic${trackedCount > 1 ? 's' : ''} de la liste suivie détecté${trackedCount > 1 ? 's' : ''}`;
+        trackedCountEl.title = `${trackedCount} trafic${trackedCount > 1 ? 's' : ''} de la liste suivie détecté${trackedCount > 1 ? 's' : ''} — total national`;
         trackedCountEl.setAttribute(
             'aria-label',
-            `${trackedCount} trafic${trackedCount > 1 ? 's' : ''} de la liste suivie détecté${trackedCount > 1 ? 's' : ''}`
+            `${trackedCount} trafic${trackedCount > 1 ? 's' : ''} de la liste suivie détecté${trackedCount > 1 ? 's' : ''} — total national`
         );
     }
 
@@ -16481,6 +16508,9 @@ async function refreshTrafficLayer(options = {}) {
         const errors = [];
         const combinedAircraft = [];
         const usedProviders = [];
+        let trackedNationalCount = trackedIdentifiers.length
+            ? lastTrafficTrackedDetectedCount
+            : 0;
 
         for (const point of points) {
             try {
@@ -16531,9 +16561,11 @@ async function refreshTrafficLayer(options = {}) {
 
         if (trackedIdentifiers.length) {
             try {
-                combinedAircraft.push(
-                    ...await fetchTrackedTrafficBeacons()
+                const trackedDirectAircraft = await fetchTrackedTrafficBeacons();
+                trackedNationalCount = countTrackedTrafficDirectDetections(
+                    trackedDirectAircraft
                 );
+                combinedAircraft.push(...trackedDirectAircraft);
                 if (!usedProviders.includes('SafeSky direct')) {
                     usedProviders.push('SafeSky direct');
                 }
@@ -16576,7 +16608,8 @@ async function refreshTrafficLayer(options = {}) {
         renderTrafficAircraft(combinedAircraft, {
             points,
             provider: { label: usedProviders.join(' + ') },
-            now: lastTrafficRefreshAt
+            now: lastTrafficRefreshAt,
+            trackedNationalCount
         });
     } catch (error) {
         if (
@@ -18927,7 +18960,7 @@ const NPF_GLOBAL_LINK_SESSION_KEY = 'npfGlobalLinkSessionV1';
 const NPF_GLOBAL_LINK_SESSION_EXP_KEY = 'npfGlobalLinkSessionExpV1';
 const NPF_GLOBAL_LINK_LAYER_ENABLED_KEY = 'npfGlobalLinkLayerEnabledV1';
 const NPF_GLOBAL_LINK_REFRESH_MS = 15000;
-const NPF_GLOBAL_LINK_FRESH_SECONDS = 180;
+const NPF_GLOBAL_LINK_OFF_SECONDS = 180;
 const NPF_GLOBAL_LINK_PANE_NAME = 'npfGlobalLinkPane';
 const NPF_GLOBAL_LINK_PANE_Z_INDEX = 645;
 const NPF_GLOBAL_LINK_CONNECTOR_PANE_NAME = 'npfGlobalLinkConnectorPane';
@@ -18941,8 +18974,8 @@ let npfGlobalLinkAttempt = '';
 let npfGlobalLinkLastPositions = [];
 /* v15.30 — état de fusion GLR/SafeSky. */
 let npfGlobalLinkRenderedCount = 0;
-let npfGlobalLinkAirborneRenderedCount = 0;
-let npfGlobalLinkGroundRenderedCount = 0;
+let npfGlobalLinkActiveTotalCount = 0;
+let npfGlobalLinkOffTotalCount = 0;
 let npfGlobalLinkSafeSkyMatches = [];
 let npfGlobalLinkRelayoutTimer = null;
 /* v15.51 — authentification GLR : mot de passe masqué et chargement captcha sérialisé. */
@@ -19592,21 +19625,22 @@ function parseGlobalLinkBoolean(value) {
     return null;
 }
 
-function isGlobalLinkGroundTraffic(item, ageSeconds = null) {
+function isGlobalLinkOffTraffic(item, ageSeconds = null) {
     if (!item || typeof item !== 'object') return false;
 
     /*
-     * v15.91 — priorité à un état explicite fourni par GLR si l'API l'expose.
-     * Les noms sont volontairement tolérants pour rester compatibles avec une
-     * évolution du relais sans modifier de nouveau l'interface.
+     * v15.92 — marron/orange signifie exclusivement « Off ».
+     * Si le relais expose un état explicite, il est toujours prioritaire.
      */
-    for (const key of ['onGround', 'isOnGround', 'ground', 'grounded']) {
+    for (const key of ['off', 'isOff', 'disabled', 'inactive']) {
         if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+        const raw = String(item[key] ?? '').trim().toLowerCase();
+        if (raw === 'off' || raw === 'inactive' || raw === 'disabled') return true;
         const parsed = parseGlobalLinkBoolean(item[key]);
         if (parsed !== null) return parsed;
     }
 
-    for (const key of ['airborne', 'inFlight', 'isAirborne']) {
+    for (const key of ['active', 'isActive', 'enabled', 'online']) {
         if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
         const parsed = parseGlobalLinkBoolean(item[key]);
         if (parsed !== null) return !parsed;
@@ -19615,16 +19649,19 @@ function isGlobalLinkGroundTraffic(item, ageSeconds = null) {
     const stateText = [
         item.flightStatus,
         item.status,
-        item.state
+        item.state,
+        item.groupStatus,
+        item.missionStatus
     ].map(value => String(value ?? '').trim().toLowerCase()).join(' ');
 
-    if (/\b(ground|grounded|landed|parked|sol|au sol|stationn)/i.test(stateText)) return true;
-    if (/\b(airborne|in[- ]?flight|flying|en vol|flight)\b/i.test(stateText)) return false;
+    if (/\b(off|inactive|disabled|stopped|offline)\b/i.test(stateText)) return true;
+    if (/\b(active|enabled|online|on)\b/i.test(stateText)) return false;
 
     /*
-     * Le relais utilisé par la v15.90 ne transmet pas encore de champ sol/en vol
-     * exploité par NPF. Le comportement observé est conservé en secours :
-     * une mission qui ne renouvelle plus sa position depuis 180 s est classée sol.
+     * Le relais actuel ne transmet pas encore l'étiquette « Off » affichée par
+     * l'interface GLR. On conserve donc le comportement historique qui produit
+     * les éléments marron/orange : position non renouvelée depuis plus de 180 s.
+     * Cela ne signifie en aucun cas « au sol ».
      */
     const age = Number.isFinite(Number(ageSeconds))
         ? Number(ageSeconds)
@@ -19632,13 +19669,13 @@ function isGlobalLinkGroundTraffic(item, ageSeconds = null) {
             const ts = Date.parse(String(item.updatedAt || ''));
             return Number.isFinite(ts) ? Math.max(0, (Date.now() - ts) / 1000) : Infinity;
         })();
-    return age > NPF_GLOBAL_LINK_FRESH_SECONDS;
+    return age > NPF_GLOBAL_LINK_OFF_SECONDS;
 }
 
 function updateGlobalLinkButton(options = {}) {
     const button = document.getElementById('global-link-layer-button');
-    const airborneCount = document.getElementById('global-link-button-count');
-    const groundCount = document.getElementById('global-link-ground-button-count');
+    const activeCountEl = document.getElementById('global-link-button-count');
+    const offCountEl = document.getElementById('global-link-off-button-count');
     if (!button) return;
 
     const hasSession = !!getStoredGlobalLinkSession();
@@ -19651,16 +19688,15 @@ function updateGlobalLinkButton(options = {}) {
     if (options.loading) button.classList.add('loading');
 
     /*
-     * v15.91 — le contour répond à la disponibilité opérationnelle du trafic :
-     * vert dès qu'au moins un trafic GLR valide est détecté, indépendamment du
-     * fait qu'il soit classé en vol ou au sol.
+     * v15.92 — le contour est national : vert dès qu'au moins un trafic GLR
+     * valide est reçu, indépendamment du viewport et de son état Actif/Off.
      */
     if (!hasSession) {
         button.classList.add('global-link-auth-needed');
         button.title = 'GLR — connexion requise';
     } else if (npfGlobalLinkEnabled && detected.length) {
         button.classList.add('global-link-active');
-        button.title = `GLR — ${detected.length} trafic(s) détecté(s) — appuyer pour masquer`;
+        button.title = `GLR — ${detected.length} trafic(s) détecté(s) au total — appuyer pour masquer`;
     } else {
         button.classList.add('global-link-ready');
         button.title = npfGlobalLinkEnabled
@@ -19668,18 +19704,18 @@ function updateGlobalLinkButton(options = {}) {
             : 'GLR — appuyer pour afficher';
     }
 
-    const inFlight = Math.max(0, Math.round(Number(npfGlobalLinkAirborneRenderedCount) || 0));
-    const onGround = Math.max(0, Math.round(Number(npfGlobalLinkGroundRenderedCount) || 0));
+    const activeCount = Math.max(0, Math.round(Number(npfGlobalLinkActiveTotalCount) || 0));
+    const offCount = Math.max(0, Math.round(Number(npfGlobalLinkOffTotalCount) || 0));
 
-    if (airborneCount) {
-        airborneCount.textContent = String(inFlight);
-        airborneCount.style.display = npfGlobalLinkEnabled && inFlight > 0 ? 'inline-flex' : 'none';
-        airborneCount.title = `${inFlight} trafic(s) GLR en vol affiché(s)`;
+    if (activeCountEl) {
+        activeCountEl.textContent = String(activeCount);
+        activeCountEl.style.display = npfGlobalLinkEnabled && activeCount > 0 ? 'inline-flex' : 'none';
+        activeCountEl.title = `${activeCount} trafic(s) GLR actif(s) — total national`;
     }
-    if (groundCount) {
-        groundCount.textContent = String(onGround);
-        groundCount.style.display = npfGlobalLinkEnabled && onGround > 0 ? 'inline-flex' : 'none';
-        groundCount.title = `${onGround} trafic(s) GLR au sol affiché(s)`;
+    if (offCountEl) {
+        offCountEl.textContent = String(offCount);
+        offCountEl.style.display = npfGlobalLinkEnabled && offCount > 0 ? 'inline-flex' : 'none';
+        offCountEl.title = `${offCount} trafic(s) GLR Off — total national`;
     }
 }
 
@@ -19775,46 +19811,58 @@ function renderGlobalLinkPositions(positions) {
     purgeGlobalLinkDomArtifacts();
     if (!npfGlobalLinkEnabled) {
         npfGlobalLinkRenderedCount = 0;
-        npfGlobalLinkAirborneRenderedCount = 0;
-        npfGlobalLinkGroundRenderedCount = 0;
+        npfGlobalLinkActiveTotalCount = 0;
+        npfGlobalLinkOffTotalCount = 0;
         npfGlobalLinkSafeSkyMatches = [];
         updateGlobalLinkButton();
         return;
     }
     const now = Date.now();
     const currentBounds = map?.getBounds ? map.getBounds() : null;
-    const visibleItems = npfGlobalLinkLastPositions
+
+    /*
+     * v15.92 — préparer d'abord la totalité des trafics GLR reçus. Les badges
+     * Actif / Off sont calculés ici, avant tout filtrage par viewport ou fusion
+     * visuelle avec SafeSky.
+     */
+    const allItems = npfGlobalLinkLastPositions
         .map((item, sourceIndex) => {
             const lat = Number(item.lat);
             const lon = Number(item.lon);
             if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
 
-            /*
-             * v15.28 — aucun trafic hors champ ne doit générer un symbole,
-             * une étiquette ou un trait visible dans le viewport.
-             * Les données restent dans npfGlobalLinkLastPositions et seront
-             * réévaluées au prochain zoom/moveend.
-             */
-            if (currentBounds && !currentBounds.contains(L.latLng(lat, lon))) return null;
-
             const ts = Date.parse(String(item.updatedAt || ''));
             const ageSeconds = Number.isFinite(ts) ? Math.max(0, (now - ts) / 1000) : Infinity;
             const name = String(item.name || 'Global Link').trim();
-            const ground = isGlobalLinkGroundTraffic(item, ageSeconds);
+            const off = isGlobalLinkOffTraffic(item, ageSeconds);
             return {
                 ...item, lat, lon, ageSeconds, name,
-                ground,
+                off,
                 /*
-                 * Compatibilité CSS historique : la classe « stale » orange est
-                 * désormais utilisée pour matérialiser le trafic au sol.
+                 * Classe CSS historique conservée pour ne pas modifier le rendu :
+                 * « stale » signifie désormais uniquement « Off ».
                  */
-                stale: ground,
+                stale: off,
                 key: `${String(item.groupId || item.missionId || name)}|${sourceIndex}`
             };
         })
         .filter(Boolean)
         .filter(item => !isOwnGlobalLinkAircraft(item))
         .sort((a, b) => (a.ageSeconds - b.ageSeconds) || a.name.localeCompare(b.name, 'fr'));
+
+    npfGlobalLinkOffTotalCount = allItems.filter(item => item.off === true).length;
+    npfGlobalLinkActiveTotalCount = Math.max(
+        0,
+        allItems.length - npfGlobalLinkOffTotalCount
+    );
+
+    /*
+     * Le rendu cartographique reste limité au viewport : aucun trafic hors champ
+     * ne génère symbole, étiquette ou connecteur, mais il reste compté au bouton.
+     */
+    const visibleItems = currentBounds
+        ? allItems.filter(item => currentBounds.contains(L.latLng(item.lat, item.lon)))
+        : allItems.slice();
 
     /*
      * v15.43 — SafeSky reste prioritaire. En plus des trafics réellement
@@ -19840,11 +19888,6 @@ function renderGlobalLinkPositions(positions) {
     });
 
     npfGlobalLinkRenderedCount = deduplicatedItems.length;
-    npfGlobalLinkGroundRenderedCount = deduplicatedItems.filter(item => item.ground === true).length;
-    npfGlobalLinkAirborneRenderedCount = Math.max(
-        0,
-        npfGlobalLinkRenderedCount - npfGlobalLinkGroundRenderedCount
-    );
     const labelLayout = buildGlobalLinkLabelLayout(deduplicatedItems);
     deduplicatedItems.forEach(item => {
         const safeName = escapeGlobalLinkHtml(item.name);
@@ -19887,8 +19930,8 @@ function renderGlobalLinkPositions(positions) {
                     ? ' stale'
                     : '';
                 /*
-                 * v15.91 — mêmes couleurs que le symbole GLR :
-                 * #198754 (en vol) / #e67e22 (au sol).
+                 * v15.92 — mêmes couleurs que le symbole GLR :
+                 * #198754 (actif) / #e67e22 (Off).
                  */
                 const connectorColor = item.stale
                     ? '#e67e22'
