@@ -1,3 +1,71 @@
+VERSION TEST v15.94 — GLR AVION/HÉLICO / FILTRE NON ACTIFS / ÉTIQUETTES SS
+Date : 27/08/2026
+Base : TEST v15.93
+
+OBJECTIFS
+- Masquer pour le moment l'altitude GLR.
+- Remplacer le pictogramme GLR générique par les silhouettes avion / hélicoptère équivalentes à SafeSky.
+- Ajouter un filtre mémorisé « Afficher trafics non actifs » accessible par appui long sur le bouton GLR.
+- Agrandir l'indicatif des étiquettes SafeSky suivies et ajuster le cartouche à son contenu.
+
+1. GLR — ALTITUDE MASQUÉE
+- Suppression de l'altitude GLR dans l'étiquette cartographique.
+- Suppression de l'altitude GLR dans la popup.
+- Le champ brut `altitude` reste transmis par le relais et disponible en interne ; aucune donnée source n'est supprimée.
+- L'altitude GLR n'est toujours pas utilisée pour la déduplication GLR / SafeSky.
+
+2. GLR — PICTOGRAMMES AVION / HÉLICOPTÈRE
+- Le relais NAS transmet désormais `typePorteur`, issu du champ GLR `type_porteur`.
+- Mapping validé : `0 = hélicoptère`, `1 = avion`.
+- NPF réutilise exactement les SVG SafeSky des familles HÉLICOPTÈRE et AVION.
+- Les pictogrammes GLR restent volontairement orientés au nord : aucune route n'est calculée à partir des positions.
+- Trafic GLR actif : silhouette jaune + cercle jaune.
+- Trafic GLR Off / non actif : silhouette grise + cercle gris.
+- Étiquette GLR active : verte.
+- Étiquette GLR Off : marron.
+- Connecteur actif : vert ; connecteur Off : marron.
+
+3. GLR — APPUI LONG / TRAFICS NON ACTIFS
+- Appui long (650 ms) sur le bouton GLR : ouverture du menu GLR.
+- Option : « Afficher trafics non actifs ».
+- Par défaut, les trafics non actifs sont affichés.
+- Si l'option est décochée, seuls les trafics actifs sont dessinés sur la carte.
+- Le choix est sauvegardé dans `localStorage` et restauré au lancement suivant sur le même navigateur / iPad.
+- Même lorsque les trafics Off sont masqués, la pastille marron continue d'afficher leur nombre total national.
+- Les compteurs nationaux actif / Off sont calculés avant ce filtre et restent donc inchangés.
+
+4. SAFESKY — ÉTIQUETTES DES TRAFICS SUIVIS
+- L'indicatif de la première ligne passe à 13 px, soit la même taille que l'indicatif GLR.
+- Le cartouche suivi n'impose plus de largeur minimale fixe : sa largeur s'ajuste au contenu.
+- Contenu inchangé depuis v15.93 : indicatif sur la première ligne ; altitude + flèche montée/descente sur la seconde ligne.
+- Les étiquettes des trafics non suivis restent inchangées.
+
+5. RELAIS NAS GLR
+- Le fichier serveur `/web/briefing-api/npf-global-link-api.php` doit être remplacé par le relais v15.94 fourni séparément.
+- Seule donnée fonctionnelle ajoutée à la réponse `positions` : `typePorteur`.
+- Authentification, sessions, accès aux missions, déduplication serveur et autres champs restent inchangés.
+
+6. ÉLÉMENTS INCHANGÉS
+- SafeSky reste prioritaire pour la déduplication visuelle GLR / SS.
+- Compteurs SafeSky suivis et GLR nationaux v15.92 inchangés.
+- Rendu GLR limité au viewport inchangé.
+- SIA / PÉLIC / Départements / offline / IndexedDB / VAC / GAAR inchangés.
+- `sia.js` / AIRAC strictement inchangé.
+
+7. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- `php -l` relais NAS GLR.
+- Manifest JSON parsé.
+- Cohérence v15.94 Index / Script / Style / Manifest / SW.
+- Vérification `sia.js` bit-à-bit avec v15.93.
+- Vérification ciblée : aucun affichage altitude GLR.
+- Vérification ciblée : `typePorteur` relayé et utilisé pour avion / hélicoptère.
+- Vérification ciblée : masque Off uniquement cartographique, compteurs nationaux conservés.
+- Vérification ciblée : préférence Off mémorisée avec défaut = affiché.
+- Vérification ciblée : indicatif SafeSky suivi à 13 px et cartouche dimensionné au contenu.
+
+
 VERSION TEST v15.93 — ÉTIQUETTES SAFESKY SUIVIS / ALTITUDE GLR
 Date : 27/08/2026
 Base : TEST v15.92
