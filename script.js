@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.94';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.95';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -864,6 +864,13 @@ let lastTrafficDisplayedCount = 0;
  */
 let lastTrafficTotalEligibleCount = 0;
 let lastTrafficTrackedDetectedCount = 0;
+/*
+ * v15.95 — compteur vert = trafics éligibles correspondant aux filtres
+ * courants, hors liste suivie. Le masque secondaire ne modifie ni la requête
+ * SafeSky ni les filtres mémorisés.
+ */
+let lastTrafficNonTrackedEligibleCount = 0;
+let showNonTrackedTraffic = true;
 let lastTrafficAircraftSnapshot = [];
 let lastTrafficRenderMeta = null;
 
@@ -7324,6 +7331,7 @@ function setupEventListeners() {
     const roadOverlayButton = document.getElementById('road-overlay-button');
     const opsFrequenciesButton = document.getElementById('ops-frequencies-pdf-button');
     const quickOfflineMapButton = document.getElementById('quick-offline-map-button');
+    const quickSiaVrpToggleButton = document.getElementById('quick-sia-vrp-toggle');
     const quickSiaZonesToggleButton = document.getElementById('quick-sia-zones-toggle');
     const quickOfflineMapModal = document.getElementById('quick-offline-map-modal');
     const closeQuickOfflineMapModalButton = document.getElementById('close-quick-offline-map-modal');
@@ -7440,6 +7448,15 @@ function setupEventListeners() {
         installQuickOfflineMapButtonInteractions(quickOfflineMapButton);
     }
 
+
+    if (quickSiaVrpToggleButton) {
+        updateQuickSiaVrpToggleButton();
+        quickSiaVrpToggleButton.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            setSiaMapVrpVisible(!siaMapVrpVisible);
+        });
+    }
 
     if (quickSiaZonesToggleButton) {
         updateSiaProfileMapZonesToggleButton();
@@ -12013,6 +12030,10 @@ function installTrafficButtonInteractions(button) {
     let longPressTimer = null;
     let longPressTriggered = false;
 
+    const isNonTrackedCounterTarget = event => (
+        !!event?.target?.closest?.('#traffic-button-count')
+    );
+
     const clearLongPress = () => {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
@@ -12021,6 +12042,15 @@ function installTrafficButtonInteractions(button) {
     };
 
     const startLongPress = (event) => {
+        /*
+         * v15.95 — la pastille verte est une commande indépendante. Son appui
+         * ne doit jamais démarrer le timer d'appui long du bouton principal.
+         */
+        if (isNonTrackedCounterTarget(event)) {
+            clearLongPress();
+            longPressTriggered = false;
+            return;
+        }
         if (event && typeof event.preventDefault === 'function') event.preventDefault();
         clearLongPress();
         longPressTriggered = false;
@@ -12039,10 +12069,22 @@ function installTrafficButtonInteractions(button) {
     button.addEventListener('contextmenu', (event) => {
         event.preventDefault();
         clearLongPress();
+        if (isNonTrackedCounterTarget(event)) {
+            event.stopPropagation();
+            longPressTriggered = false;
+            return;
+        }
         longPressTriggered = true;
         openTrafficSettingsDialog();
     });
     button.addEventListener('click', (event) => {
+        if (isNonTrackedCounterTarget(event)) {
+            event.preventDefault();
+            event.stopPropagation();
+            longPressTriggered = false;
+            toggleTrafficNonTrackedVisibility();
+            return;
+        }
         if (longPressTriggered) {
             event.preventDefault();
             event.stopPropagation();
@@ -16194,6 +16236,16 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
     lastTrafficTotalEligibleCount = allEligibleAircraft.length;
 
     /*
+     * v15.95 — la pastille verte exclut tous les appareils appartenant à la
+     * liste suivie. Les appareils suivis interrogés directement au niveau
+     * national ne gonflent donc plus ce compteur.
+     */
+    lastTrafficNonTrackedEligibleCount = allEligibleAircraft.filter(ac => (
+        !trackedIdentifierSet.has(String(ac.hex || '').toUpperCase())
+        && !isTrafficAircraftTracked(ac)
+    )).length;
+
+    /*
      * v15.92 — le badge « liste suivie » est alimenté par la recherche directe
      * nationale transmise dans meta, jamais par les seuls appareils rendus.
      */
@@ -16204,14 +16256,33 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
         );
     }
 
-    const uniqueAircraft = allEligibleAircraft.filter(ac => (
-        !settings.onlyTrackedIdentifiers
-        || ac.forceDisplay
-        || trackedIdentifierSet.has(
-            String(ac.hex || '').toUpperCase()
-        )
-        || isTrafficAircraftTracked(ac)
-    ));
+    const uniqueAircraft = allEligibleAircraft.filter(ac => {
+        const isTracked = (
+            trackedIdentifierSet.has(
+                String(ac.hex || '').toUpperCase()
+            )
+            || isTrafficAircraftTracked(ac)
+        );
+
+        if (
+            settings.onlyTrackedIdentifiers
+            && !ac.forceDisplay
+            && !isTracked
+        ) {
+            return false;
+        }
+
+        /*
+         * v15.95 — masque cartographique secondaire de la pastille verte.
+         * Il n'agit que sur les aéronefs hors liste et ne touche pas aux
+         * filtres SafeSky ni aux zones advisory.
+         */
+        if (!showNonTrackedTraffic && !isTracked) {
+            return false;
+        }
+
+        return true;
+    });
 
     const renderNow = Date.now();
     const activeAircraftKeys = new Set();
@@ -16447,18 +16518,33 @@ function refreshTrafficButtonState(count = null) {
         : `SafeSky — afficher/masquer le trafic indicatif — appui long : filtres — ${getTrafficSettingsSummary()}`;
 
     if (countEl) {
+        const nonTrackedCount = Math.max(
+            0,
+            Math.round(Number(lastTrafficNonTrackedEligibleCount) || 0)
+        );
+        countEl.classList.toggle(
+            'traffic-nontracked-hidden',
+            !showNonTrackedTraffic
+        );
+        const nonTrackedStateLabel = showNonTrackedTraffic
+            ? 'affichés'
+            : 'masqués';
+        countEl.title = `${nonTrackedCount} trafic${nonTrackedCount > 1 ? 's' : ''} SafeSky hors liste suivie (${nonTrackedStateLabel}) — appuyer pour ${showNonTrackedTraffic ? 'masquer' : 'afficher'}`;
+        countEl.setAttribute(
+            'aria-label',
+            `${nonTrackedCount} trafic${nonTrackedCount > 1 ? 's' : ''} SafeSky hors liste suivie (${nonTrackedStateLabel}) — appuyer pour ${showNonTrackedTraffic ? 'masquer' : 'afficher'}`
+        );
+
         if (showTrafficLayer) {
             /*
-             * v13.99 — le nombre reste stable pendant l'interrogation suivante.
-             * Il passe directement de l'ancienne valeur à la nouvelle valeur
-             * lorsque les données ont été reçues, sans étape « … ».
+             * v15.95 — compteur hors liste uniquement. Il reste stable pendant
+             * l'interrogation suivante et ne tombe pas à zéro lorsque son
+             * masque cartographique est activé.
              */
             if (lastTrafficError && !isTrafficLoading) {
                 countEl.textContent = '!';
             } else {
-                countEl.textContent = String(
-                    Math.max(0, Math.round(Number(lastTrafficTotalEligibleCount) || 0))
-                );
+                countEl.textContent = String(nonTrackedCount);
             }
             countEl.style.display = 'inline-flex';
         } else {
@@ -16497,6 +16583,7 @@ async function refreshTrafficLayer(options = {}) {
         lastTrafficDisplayedCount = 0;
         lastTrafficTotalEligibleCount = 0;
         lastTrafficTrackedDetectedCount = 0;
+        lastTrafficNonTrackedEligibleCount = 0;
         refreshTrafficButtonState(0);
         updateTrafficStatus({ state: 'error', message: 'Trafic : aucun point de référence', visible: true });
         return;
@@ -16666,6 +16753,30 @@ function stopTrafficAutoRefresh() {
     if (trafficRefreshTimer) {
         clearInterval(trafficRefreshTimer);
         trafficRefreshTimer = null;
+    }
+}
+
+function toggleTrafficNonTrackedVisibility(forceState = null) {
+    const next = forceState === null
+        ? !showNonTrackedTraffic
+        : Boolean(forceState);
+
+    if (showNonTrackedTraffic === next) {
+        refreshTrafficButtonState();
+        return;
+    }
+
+    showNonTrackedTraffic = next;
+    refreshTrafficButtonState();
+
+    /*
+     * v15.95 — aucun nouvel appel réseau : le dernier snapshot SafeSky contient
+     * déjà les trafics correspondant aux filtres courants. On redessine
+     * seulement la couche, puis la déduplication GLR est réconciliée par le
+     * chemin normal de renderTrafficAircraft().
+     */
+    if (showTrafficLayer) {
+        redrawTrafficLayerFromSnapshot();
     }
 }
 
@@ -34096,6 +34207,45 @@ function saveSiaMapAirspacesVisiblePreference(visible) {
 
 let siaMapAirspacesVisible = loadSiaMapAirspacesVisiblePreference();
 
+/*
+ * v15.95 — masque rapide des points VFR / VRP depuis le coin bas-gauche du
+ * bouton France. Il est volontairement indépendant du filtre SIA principal :
+ * la case dpn:VRP reste inchangée. Aucun stockage persistant n'est ajouté.
+ */
+let siaMapVrpVisible = true;
+
+function updateQuickSiaVrpToggleButton() {
+    const button = document.getElementById('quick-sia-vrp-toggle');
+    if (!button) return;
+
+    const hidden = !siaMapVrpVisible;
+    button.classList.toggle('is-hidden', hidden);
+    button.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+    button.title = hidden
+        ? 'Réafficher les points VFR / VRP'
+        : 'Masquer les points VFR / VRP';
+    button.setAttribute(
+        'aria-label',
+        hidden
+            ? 'Réafficher les points VFR / VRP'
+            : 'Masquer les points VFR / VRP'
+    );
+}
+
+function setSiaMapVrpVisible(visible) {
+    const next = visible !== false;
+    if (siaMapVrpVisible === next) {
+        updateQuickSiaVrpToggleButton();
+        return;
+    }
+
+    siaMapVrpVisible = next;
+    updateQuickSiaVrpToggleButton();
+    scheduleSiaLayerRefresh(
+        next ? 'quick-vrp-show' : 'quick-vrp-hide'
+    );
+}
+
 // v15.75 — tampon de rendu et cache de géométries pour limiter les reconstructions iPad.
 const SIA_RENDER_BOUNDS_PAD_RATIO = 0.25;
 let siaRenderedCoverageBounds = null;
@@ -34343,7 +34493,8 @@ function getSiaRenderSignature() {
     return [
         enabled.join('|'),
         `fl115:${isSiaHideAboveFl115Enabled() ? 1 : 0}`,
-        `airspaces:${siaMapAirspacesVisible ? 1 : 0}`
+        `airspaces:${siaMapAirspacesVisible ? 1 : 0}`,
+        `vrp:${siaMapVrpVisible ? 1 : 0}`
     ].join('::');
 }
 
@@ -35798,6 +35949,7 @@ async function refreshSiaLayers(reason = 'manual') {
 
     for (const item of dataset.points || []) {
         if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
+        if (item.k === 'dpn:VRP' && !siaMapVrpVisible) continue;
         const latlng = L.latLng(Number(item.x), Number(item.y));
         if (!pointBounds.contains(latlng)) continue;
 
@@ -39586,6 +39738,7 @@ async function refreshSiaLayers(reason = 'manual') {
                 await yieldSiaRefreshToMap(refreshGeneration);
             }
             if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
+            if (item.k === 'dpn:VRP' && !siaMapVrpVisible) continue;
             const latlng = L.latLng(Number(item.x), Number(item.y));
             if (!pointBounds.contains(latlng)) continue;
 
