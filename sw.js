@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-94_glr_symbols_filter_ss_labels';
-const APP_VERSION = 'v15.94';
+const SW_VERSION = 'sw-v15-95_vrp_quick_ss_secondary_count';
+const APP_VERSION = 'v15.95';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
