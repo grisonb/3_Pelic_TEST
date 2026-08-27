@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.92';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.93';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -15570,10 +15570,17 @@ function buildTrafficMarkerIcon(aircraft) {
         getTrafficPermanentIdentifier(aircraft),
         12
     );
-    const permanentType = compactTrafficLabelText(
-        getTrafficPermanentType(aircraft),
-        18
-    );
+    /*
+     * v15.93 — pour les appareils de la liste suivie, l'étiquette reste
+     * volontairement opérationnelle et compacte : indicatif + altitude +
+     * tendance verticale. Le pictogramme conserve à lui seul le type aéronef.
+     */
+    const permanentType = isTrackedAircraft
+        ? ''
+        : compactTrafficLabelText(
+            getTrafficPermanentType(aircraft),
+            18
+        );
     const permanentAltitude = (
         aircraft.altitude
         && aircraft.altitude !== '--'
@@ -19728,6 +19735,24 @@ function globalLinkRectsOverlap(a, b, gap = 3) {
     );
 }
 
+const NPF_GLOBAL_LINK_ALTITUDE_RAW_TO_FEET = 0.03280839895;
+
+function getGlobalLinkAltitudeFeet(rawAltitude) {
+    if (rawAltitude === null || rawAltitude === undefined || rawAltitude === '') return null;
+    const raw = Number(rawAltitude);
+    if (!Number.isFinite(raw)) return null;
+    const feet = raw * NPF_GLOBAL_LINK_ALTITUDE_RAW_TO_FEET;
+    return Number.isFinite(feet) ? feet : null;
+}
+
+function formatGlobalLinkAltitudeFeet(rawAltitude) {
+    const feet = getGlobalLinkAltitudeFeet(rawAltitude);
+    if (!Number.isFinite(feet)) return '';
+    const roundedFeet = Math.round(feet / 100) * 100;
+    const grouped = String(roundedFeet).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    return `${grouped} ft`;
+}
+
 function buildGlobalLinkLabelLayout(items) {
     const placements = new Map();
     if (!map?.latLngToContainerPoint || !map?.getSize) return placements;
@@ -19755,8 +19780,13 @@ function buildGlobalLinkLabelLayout(items) {
 
     items.forEach((item, index) => {
         const p = map.latLngToContainerPoint([item.lat, item.lon]);
-        const width = Math.max(68, Math.min(168, 20 + String(item.name || '').length * 8.4));
-        const height = 25;
+        const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
+        const longestLabelLength = Math.max(
+            String(item.name || '').length,
+            altitudeLabel.length
+        );
+        const width = Math.max(68, Math.min(178, 20 + longestLabelLength * 8.4));
+        const height = altitudeLabel ? 40 : 25;
         const hGap = 27 + width / 2;
         const vGap = 27 + height / 2;
         const shifts = [0, -30, 30, -60, 60, -90, 90, -120, 120];
@@ -19971,10 +20001,11 @@ function renderGlobalLinkPositions(positions) {
             keyboard: false,
             title: item.name
         });
-        const altitude = item.altitude === null || item.altitude === undefined || item.altitude === ''
-            ? '—'
-            : escapeGlobalLinkHtml(item.altitude);
-        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude source : ${altitude}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}<button type="button" class="traffic-popup-own-button global-link-popup-own-button">Définir comme mon avion et masquer</button></div>`);
+        const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
+        const safeAltitudeLabel = altitudeLabel
+            ? escapeGlobalLinkHtml(altitudeLabel)
+            : '—';
+        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude : ${safeAltitudeLabel}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}<button type="button" class="traffic-popup-own-button global-link-popup-own-button">Définir comme mon avion et masquer</button></div>`);
         marker.on('popupopen', () => {
             const popupElement = marker.getPopup()?.getElement?.();
             const ownButton = popupElement?.querySelector?.('.global-link-popup-own-button');
@@ -19994,9 +20025,13 @@ function renderGlobalLinkPositions(positions) {
         marker.addTo(layer);
 
         if (placement && labelLatLng) {
+            const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
+            const safeAltitudeLabel = altitudeLabel
+                ? escapeGlobalLinkHtml(altitudeLabel)
+                : '';
             const labelIcon = L.divIcon({
                 className: 'global-link-aircraft-label-marker',
-                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}">${safeName}</div>`,
+                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}${safeAltitudeLabel ? ' glr-with-altitude' : ''}"><span class="glr-label-name">${safeName}</span>${safeAltitudeLabel ? `<span class="glr-label-altitude">${safeAltitudeLabel}</span>` : ''}</div>`,
                 iconSize: [placement.width, placement.height],
                 iconAnchor: [placement.width / 2, placement.height / 2]
             });
