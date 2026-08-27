@@ -1,3 +1,60 @@
+VERSION TEST v15.95 — POINTS VFR RAPIDES / COMMANDE SECONDAIRE SAFESKY
+Date : 27/08/2026
+Base : TEST v15.94
+
+OBJECTIFS
+- Ajouter sur le bouton France une commande rapide dédiée aux points VFR / VRP.
+- Donner au compteur vert SafeSky le nombre de trafics correspondant aux filtres courants hors liste suivie.
+- Permettre un appui sur ce compteur pour masquer / réafficher uniquement les trafics SafeSky hors liste.
+- Conserver strictement l'action du bouton principal SafeSky.
+
+1. FRANCE — BOUTON RAPIDE POINTS VFR / VRP
+- Ajout d'un petit bouton circulaire « N » en bas à gauche du bouton France.
+- Le bouton « œil » des zones SIA reste inchangé en bas à droite.
+- État actif : rond magenta + « N » blanc ; les points VFR / VRP restent affichables selon le filtre SIA existant.
+- État désactivé : rond gris + « N » blanc ; les points VFR / VRP sont masqués de la carte.
+- Cette commande est un masque cartographique supplémentaire : elle ne modifie pas la case « Points VFR / VRP » du filtre SIA.
+- Aucun état persistant supplémentaire n'est imposé : au chargement de NPF, la commande rapide VFR démarre active.
+
+2. SAFESKY — COMPTEUR VERT HORS LISTE
+- Le compteur vert du bouton SafeSky ne représente plus le total incluant les trafics suivis.
+- Il représente désormais uniquement les trafics correspondant aux filtres SafeSky courants qui ne font pas partie de la liste suivie.
+- Les détections nationales de la liste suivie restent comptées séparément dans la pastille jaune.
+- Le compteur est calculé avant le masque secondaire afin de rester visible même lorsque les trafics hors liste sont masqués.
+
+3. SAFESKY — APPUI SUR LE COMPTEUR VERT
+- Appui sur le rond vert : masque uniquement les trafics SafeSky hors liste suivie.
+- Le rond devient gris lorsque ces trafics sont masqués.
+- Nouvel appui : réaffiche les trafics hors liste et le rond redevient vert.
+- La liste suivie reste affichée tant que le bouton principal SafeSky est actif.
+- Les zones drone / advisory ne sont pas concernées par ce masque d'aéronefs.
+- Ce masque secondaire n'altère pas les filtres SafeSky mémorisés et n'ajoute pas de préférence persistante.
+
+4. SAFESKY — BOUTON PRINCIPAL CONSERVÉ
+- Un appui sur le bouton principal SafeSky continue d'afficher / masquer l'ensemble de la couche SafeSky correspondant aux réglages sélectionnés.
+- L'appui long sur le bouton principal continue d'ouvrir les filtres SafeSky.
+- La pastille jaune de la liste suivie conserve son compteur national v15.92.
+
+5. ÉLÉMENTS INCHANGÉS
+- GLR v15.94 inchangé : altitude masquée, pictogrammes avion / hélicoptère, jaune actif / gris Off, étiquettes verte / marron, filtre Off mémorisé.
+- Relais NAS GLR v15.94 inchangé.
+- Déduplication SafeSky / GLR inchangée.
+- SIA AIRAC / données / géométries / moteur offline inchangés ; seule la visibilité cartographique des VRP est commandée par le nouveau bouton N.
+- PÉLIC / Départements / offline / IndexedDB / VAC / GAAR inchangés.
+- `sia.js` strictement inchangé.
+
+6. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v15.95 Index / Script / Style / Manifest / SW.
+- Vérification `sia.js` bit-à-bit avec v15.94.
+- Vérification ciblée : bouton N en bas à gauche, œil inchangé en bas à droite.
+- Vérification ciblée : masque VFR sans modification du filtre SIA.
+- Vérification ciblée : compteur vert = trafics filtrés hors liste suivie.
+- Vérification ciblée : clic compteur vert ne déclenche ni le bouton principal ni l'appui long SafeSky.
+
+
 VERSION TEST v15.94 — GLR AVION/HÉLICO / FILTRE NON ACTIFS / ÉTIQUETTES SS
 Date : 27/08/2026
 Base : TEST v15.93
