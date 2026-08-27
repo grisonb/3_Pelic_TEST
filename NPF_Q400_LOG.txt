@@ -1,3 +1,49 @@
+VERSION TEST v15.93 — ÉTIQUETTES SAFESKY SUIVIS / ALTITUDE GLR
+Date : 27/08/2026
+Base : TEST v15.92
+
+OBJECTIFS
+- Alléger les étiquettes SafeSky des trafics de la liste suivie : indicatif + altitude + tendance verticale uniquement.
+- Ajouter l'altitude GLR convertie en pieds dans l'étiquette cartographique.
+
+1. SAFESKY — ÉTIQUETTES DES TRAFICS SUIVIS
+- Pour un trafic appartenant à la liste suivie, suppression du libellé de type d'aéronef (« HÉLICOPTÈRE », « AVION », etc.) dans l'étiquette.
+- L'étiquette suivie conserve uniquement : indicatif sur la première ligne ; altitude et flèche montée/descente sur la seconde ligne.
+- Les pictogrammes SafeSky restent inchangés : le symbole continue donc à représenter le type d'aéronef.
+- Les trafics non suivis conservent leur présentation existante.
+
+2. GLR — ALTITUDE DANS L'ÉTIQUETTE
+- L'API GLR transmet déjà le champ brut `alt`. Les essais sur PELICAN 45 ont confirmé que cette valeur correspond à des centimètres d'altitude.
+- Conversion appliquée côté NPF : pieds = `alt × 0,03280839895`.
+- L'altitude affichée est arrondie à la centaine de pieds afin de ne pas suggérer une précision supérieure à la source.
+- Exemple : `176494` -> environ 5 790 ft -> affichage `5 800 ft`.
+- L'étiquette GLR devient donc : indicatif sur la première ligne, altitude en ft sur la seconde lorsqu'elle est disponible.
+- La popup GLR affiche également l'altitude convertie en ft.
+- L'altitude GLR n'entre pas dans la déduplication GLR / SafeSky : l'appariement reste fondé sur l'indicatif et, pour les rapprochements flous, la proximité géographique. Un éventuel écart barométrique/géométrique ne peut donc pas casser le matching.
+
+3. TYPE DE PORTEUR GLR — DIAGNOSTIC UNIQUEMENT
+- Le diagnostic NAS a établi que `type_porteur` est présent dans les missions GLR : 0 = hélicoptère ; 1 = avion.
+- Aucune modification de pictogramme GLR n'est faite dans cette version, car la demande actuelle porte uniquement sur l'altitude de l'étiquette.
+- Le relais PHP NAS reste donc inchangé en v15.93.
+
+4. ÉLÉMENTS INCHANGÉS
+- Compteurs SafeSky / GLR nationaux v15.92 inchangés.
+- GLR : vert = actif ; marron/orange = Off.
+- Déduplication visuelle SafeSky prioritaire inchangée.
+- Rendu des marqueurs GLR limité au viewport inchangé.
+- SIA / PÉLIC / Départements / offline / IndexedDB / VAC / GAAR inchangés.
+- `sia.js` / AIRAC strictement inchangé.
+
+5. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v15.93 Index / Script / Style / Manifest / SW.
+- Vérification `sia.js` bit-à-bit avec v15.92.
+- Vérification ciblée : type SafeSky supprimé uniquement pour les trafics suivis.
+- Vérification ciblée : altitude GLR convertie et ajoutée à l'étiquette sans modifier le matching GLR/SafeSky.
+
+
 VERSION TEST v15.92 — COMPTEURS NATIONAUX SAFESKY / GLR ACTIF-OFF
 Date : 27/08/2026
 Base : TEST v15.91
