@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-95_vrp_quick_ss_secondary_count';
-const APP_VERSION = 'v15.95';
+const SW_VERSION = 'sw-v15-96_map_first_communes500_eye_state';
+const APP_VERSION = 'v15.96';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
@@ -29,7 +29,7 @@ const COMMUNES_GEOJSON_URLS = Object.freeze([
     COMMUNES_GEOJSON_100M_URL,
     COMMUNES_GEOJSON_50M_URL
 ]);
-const LOCAL_COMMUNES_GEOJSON_URL = './data/communes-1000m.geojson';
+const LOCAL_COMMUNES_GEOJSON_URL = './data/communes-500m.geojson';
 const HIGH_VOLTAGE_LINES_GEOJSON_URL = './lignes_ht_rte_simplifiees.geojson';
 
 /*
@@ -630,6 +630,7 @@ function isAppDataRequest(request) {
         return [
             'communes.json',
             'communes_aliases.json',
+            'communes-500m.geojson',
             'communes-1000m.geojson',
             'localites-france-v14.56.zip',
             'lignes_ht_rte_simplifiees.geojson'
