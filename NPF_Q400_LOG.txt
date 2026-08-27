@@ -1,3 +1,78 @@
+VERSION TEST v15.96 — DÉMARRAGE PRIORITAIRE / COMMUNES 500 m / ŒIL FRANCE
+Date : 27/08/2026
+Base : TEST v15.95
+
+OBJECTIFS
+- Donner une priorité réelle au fond de carte lors de l'ouverture de la PWA.
+- Imposer l'ordre de démarrage demandé : 1) carte, 2) recherche villes + alias, 3) PÉLIC.
+- Améliorer les contours communaux sur iPad avec le fichier local 500 m.
+- Corriger l'état visuel de l'œil du bouton France : bleu actif, gris masqué.
+
+1. DÉMARRAGE — PRIORITÉ 1 : CARTE
+- Lecture immédiate uniquement des préférences minimales nécessaires à la source ONLINE/OFFLINE.
+- Création Leaflet et de la couche de tuiles avant toute attente IndexedDB, base communes, alias, SIA ou trafic.
+- Suppression de l'attente bloquante `await initDB()` avant `initMap()`.
+- Une frame navigateur est explicitement laissée à Leaflet pour lancer/peindre les premières tuiles avant le parsing des communes.
+- Le moteur de tuiles offline lui-même n'est pas refactoré : seul l'ordonnancement du démarrage change.
+- La récupération de la carte offline mémorisée reste déclenchée immédiatement après `initMap()`.
+
+2. DÉMARRAGE — PRIORITÉ 2 : RECHERCHE VILLES + ALIAS
+- `communes.json` puis l'index de recherche et `communes_aliases.json` sont chargés juste après le premier rendu de la carte.
+- Le champ de recherche est rendu disponible après cette phase.
+- IndexedDB continue de s'ouvrir en parallèle mais n'empêche plus ni l'affichage initial de la carte ni le démarrage de la recherche.
+
+3. DÉMARRAGE — PRIORITÉ 3 : PÉLIC
+- Le dessin initial des aérodromes / PÉLIC est retiré de la phase immédiate de `initMap()`.
+- Les PÉLIC sont dessinés seulement après disponibilité de la recherche communes + alias.
+- Les états PÉLIC existants sont conservés sans changement :
+  vert = RETARDANT ; bleu = EAU ; rouge = DÉSACTIVÉ avec X rouge centré ; sélection fluorescente inchangée.
+- Les autres dessins de démarrage (pistes NPF, historique feux, GAAR, couches auxiliaires) sont relâchés après les PÉLIC.
+
+4. SERVICES / COUCHES NON PRIORITAIRES
+- SIA, SafeSky, GLR et autres couches annexes ne doivent pas concurrencer les trois priorités.
+- Le démarrage automatique GLR mémorisé attend le signal de fin de la séquence carte -> recherche/alias -> PÉLIC.
+- Les couches auxiliaires déjà temporisées restent temporisées et ne sont programmées qu'après la séquence prioritaire.
+- VAC, FdS/GAAR, localités, départements et polygones communes restent différés.
+
+5. COMMUNES — 500 m LOCAL SUR IPAD
+- Sur tablette tactile/iPad, la source du contour communal devient :
+  `./data/communes-500m.geojson`
+  à la place de `./data/communes-1000m.geojson`.
+- Le PC conserve la source officielle 50 m.
+- Le fichier 500 m doit être présent dans le dépôt TEST sous :
+  `data/communes-500m.geojson`.
+- Cette géométrie sert à la fois au contour affiché, à la commune survolée GPS et au nommage par polygone des feux manuels.
+- Le chargement de cette géométrie reste postérieur aux trois priorités de démarrage.
+
+6. FRANCE — ŒIL DES ZONES
+- Zones SIA affichées : bouton œil sur fond bleu, pictogramme blanc.
+- Zones SIA masquées : bouton œil grisé, pictogramme barré blanc.
+- Position inchangée : bas à droite du bouton France.
+- Le bouton N VFR reste indépendant en bas à gauche :
+  magenta = points VFR visibles ; gris = points VFR masqués.
+
+7. ÉLÉMENTS INCHANGÉS
+- Commande N VFR v15.95 inchangée.
+- Compteur vert SafeSky hors liste + masque secondaire v15.95 inchangés.
+- Bouton principal SafeSky inchangé.
+- GLR v15.94 inchangé.
+- Déduplication SafeSky / GLR inchangée.
+- SIA AIRAC / `sia.js` strictement inchangé.
+- VAC / GAAR / Bloc-Fuel / export / logique opérationnelle non demandée inchangés.
+
+8. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v15.96 Index / Script / Style / Manifest / SW.
+- Vérification `sia.js` bit-à-bit avec v15.95.
+- Vérification ciblée : `initMap()` apparaît avant le chargement communes/alias dans `initializeApp()`.
+- Vérification ciblée : aucun `await initDB()` avant la création de la carte.
+- Vérification ciblée : PÉLIC dessinés après communes + alias.
+- Vérification ciblée : source iPad = `./data/communes-500m.geojson`.
+- Vérification ciblée : œil France bleu actif / gris masqué.
+
+
 VERSION TEST v15.95 — POINTS VFR RAPIDES / COMMANDE SECONDAIRE SAFESKY
 Date : 27/08/2026
 Base : TEST v15.94
