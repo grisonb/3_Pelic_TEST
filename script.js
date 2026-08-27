@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.93';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.94';
 window.NPF_SCRIPT_BUILD_VERSION = NPF_SCRIPT_BUILD_VERSION;
 
 // Base fonctionnelle : pérenne v2026.65.
@@ -18966,6 +18966,7 @@ const NPF_GLOBAL_LINK_API_URL = 'https://grisonb.synology.me/briefing-api/npf-gl
 const NPF_GLOBAL_LINK_SESSION_KEY = 'npfGlobalLinkSessionV1';
 const NPF_GLOBAL_LINK_SESSION_EXP_KEY = 'npfGlobalLinkSessionExpV1';
 const NPF_GLOBAL_LINK_LAYER_ENABLED_KEY = 'npfGlobalLinkLayerEnabledV1';
+const NPF_GLOBAL_LINK_SHOW_OFF_KEY = 'npfGlobalLinkShowOffTrafficV1';
 const NPF_GLOBAL_LINK_REFRESH_MS = 15000;
 const NPF_GLOBAL_LINK_OFF_SECONDS = 180;
 const NPF_GLOBAL_LINK_PANE_NAME = 'npfGlobalLinkPane';
@@ -18988,6 +18989,39 @@ let npfGlobalLinkRelayoutTimer = null;
 /* v15.51 — authentification GLR : mot de passe masqué et chargement captcha sérialisé. */
 let npfGlobalLinkCaptchaLoadPromise = null;
 let npfGlobalLinkPasswordAuthPromise = null;
+
+/*
+ * v15.94 — les trafics GLR non actifs sont affichés par défaut.
+ * Si l'utilisateur les masque via l'appui long GLR, ce choix est mémorisé
+ * localement et restauré aux ouvertures suivantes.
+ */
+function loadGlobalLinkShowOffPreference() {
+    try {
+        const stored = localStorage.getItem(NPF_GLOBAL_LINK_SHOW_OFF_KEY);
+        if (stored === null) return true;
+        return stored !== '0';
+    } catch (_) {
+        return true;
+    }
+}
+
+let npfGlobalLinkShowOffTraffic = loadGlobalLinkShowOffPreference();
+
+function setGlobalLinkShowOffTraffic(enabled) {
+    npfGlobalLinkShowOffTraffic = !!enabled;
+    try {
+        localStorage.setItem(
+            NPF_GLOBAL_LINK_SHOW_OFF_KEY,
+            npfGlobalLinkShowOffTraffic ? '1' : '0'
+        );
+    } catch (_) {}
+
+    if (npfGlobalLinkEnabled && npfGlobalLinkLastPositions.length) {
+        renderGlobalLinkPositions(npfGlobalLinkLastPositions);
+    } else {
+        updateGlobalLinkButton();
+    }
+}
 
 function getStoredGlobalLinkSession() {
     try {
@@ -19703,12 +19737,12 @@ function updateGlobalLinkButton(options = {}) {
         button.title = 'GLR — connexion requise';
     } else if (npfGlobalLinkEnabled && detected.length) {
         button.classList.add('global-link-active');
-        button.title = `GLR — ${detected.length} trafic(s) détecté(s) au total — appuyer pour masquer`;
+        button.title = `GLR — ${detected.length} trafic(s) détecté(s) au total — appuyer pour masquer · appui long : options`;
     } else {
         button.classList.add('global-link-ready');
         button.title = npfGlobalLinkEnabled
-            ? 'GLR — aucun trafic détecté'
-            : 'GLR — appuyer pour afficher';
+            ? 'GLR — aucun trafic détecté · appui long : options'
+            : 'GLR — appuyer pour afficher · appui long : options';
     }
 
     const activeCount = Math.max(0, Math.round(Number(npfGlobalLinkActiveTotalCount) || 0));
@@ -19735,22 +19769,21 @@ function globalLinkRectsOverlap(a, b, gap = 3) {
     );
 }
 
-const NPF_GLOBAL_LINK_ALTITUDE_RAW_TO_FEET = 0.03280839895;
-
-function getGlobalLinkAltitudeFeet(rawAltitude) {
-    if (rawAltitude === null || rawAltitude === undefined || rawAltitude === '') return null;
-    const raw = Number(rawAltitude);
-    if (!Number.isFinite(raw)) return null;
-    const feet = raw * NPF_GLOBAL_LINK_ALTITUDE_RAW_TO_FEET;
-    return Number.isFinite(feet) ? feet : null;
-}
-
-function formatGlobalLinkAltitudeFeet(rawAltitude) {
-    const feet = getGlobalLinkAltitudeFeet(rawAltitude);
-    if (!Number.isFinite(feet)) return '';
-    const roundedFeet = Math.round(feet / 100) * 100;
-    const grouped = String(roundedFeet).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    return `${grouped} ft`;
+/*
+ * v15.94 — GLR réutilise exactement les silhouettes SafeSky avion/hélicoptère.
+ * Le relais NAS transmet `typePorteur` issu de `type_porteur` :
+ * 0 = hélicoptère ; 1 = avion. En l'absence de type exploitable, on conserve
+ * le repli historique vers la silhouette avion.
+ */
+function getGlobalLinkVisualDefinition(item) {
+    const rawType = item?.typePorteur ?? item?.type_porteur;
+    const typePorteur = (
+        rawType === null
+        || rawType === undefined
+        || rawType === ''
+    ) ? null : Number(rawType);
+    const beaconType = typePorteur === 0 ? 'HELICOPTER' : 'MOTORPLANE';
+    return getTrafficAircraftVisualDefinition({ beaconType });
 }
 
 function buildGlobalLinkLabelLayout(items) {
@@ -19780,13 +19813,8 @@ function buildGlobalLinkLabelLayout(items) {
 
     items.forEach((item, index) => {
         const p = map.latLngToContainerPoint([item.lat, item.lon]);
-        const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
-        const longestLabelLength = Math.max(
-            String(item.name || '').length,
-            altitudeLabel.length
-        );
-        const width = Math.max(68, Math.min(178, 20 + longestLabelLength * 8.4));
-        const height = altitudeLabel ? 40 : 25;
+        const width = Math.max(68, Math.min(178, 20 + String(item.name || '').length * 8.4));
+        const height = 25;
         const hGap = 27 + width / 2;
         const vGap = 27 + height / 2;
         const shifts = [0, -30, 30, -60, 60, -90, 90, -120, 120];
@@ -19887,12 +19915,21 @@ function renderGlobalLinkPositions(positions) {
     );
 
     /*
+     * v15.94 — l'option « Afficher trafics non actifs » agit uniquement sur le
+     * rendu cartographique. Les compteurs Actif / Off restent nationaux et ne
+     * dépendent donc jamais de ce filtre.
+     */
+    const displayItems = npfGlobalLinkShowOffTraffic
+        ? allItems
+        : allItems.filter(item => item.off !== true);
+
+    /*
      * Le rendu cartographique reste limité au viewport : aucun trafic hors champ
      * ne génère symbole, étiquette ou connecteur, mais il reste compté au bouton.
      */
     const visibleItems = currentBounds
-        ? allItems.filter(item => currentBounds.contains(L.latLng(item.lat, item.lon)))
-        : allItems.slice();
+        ? displayItems.filter(item => currentBounds.contains(L.latLng(item.lat, item.lon)))
+        : displayItems.slice();
 
     /*
      * v15.43 — SafeSky reste prioritaire. En plus des trafics réellement
@@ -19960,11 +19997,11 @@ function renderGlobalLinkPositions(positions) {
                     ? ' stale'
                     : '';
                 /*
-                 * v15.92 — mêmes couleurs que le symbole GLR :
-                 * #198754 (actif) / #e67e22 (Off).
+                 * v15.94 — le connecteur reste associé à l'état de l'étiquette :
+                 * vert pour actif, marron pour Off.
                  */
                 const connectorColor = item.stale
-                    ? '#e67e22'
+                    ? '#8b5a2b'
                     : '#198754';
 
                 const connectorIcon = L.divIcon({
@@ -19989,11 +20026,13 @@ function renderGlobalLinkPositions(positions) {
             }
         }
 
+        const glrVisual = getGlobalLinkVisualDefinition(item);
+        const glrSymbolSvg = `<svg viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" focusable="false" aria-hidden="true">${glrVisual.svg}</svg>`;
         const symbolIcon = L.divIcon({
             className: 'global-link-aircraft-marker',
-            html: `<div class="global-link-aircraft-symbol${item.stale ? ' stale' : ''}">✈</div>`,
-            iconSize: [34,34],
-            iconAnchor: [17,17]
+            html: `<div class="global-link-aircraft-symbol${item.stale ? ' stale' : ''} glr-type-${escapeGlobalLinkHtml(glrVisual.className)}"><span class="global-link-aircraft-silhouette" aria-label="${escapeGlobalLinkHtml(glrVisual.label)}">${glrSymbolSvg}</span></div>`,
+            iconSize: [38,38],
+            iconAnchor: [19,19]
         });
         const marker = L.marker([item.lat, item.lon], {
             pane: NPF_GLOBAL_LINK_PANE_NAME,
@@ -20001,11 +20040,7 @@ function renderGlobalLinkPositions(positions) {
             keyboard: false,
             title: item.name
         });
-        const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
-        const safeAltitudeLabel = altitudeLabel
-            ? escapeGlobalLinkHtml(altitudeLabel)
-            : '—';
-        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Altitude : ${safeAltitudeLabel}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}<button type="button" class="traffic-popup-own-button global-link-popup-own-button">Définir comme mon avion et masquer</button></div>`);
+        marker.bindPopup(`<div class="global-link-popup"><strong>${safeName}</strong><br>Source : Global Link Rescue<br>Position : ${item.lat.toFixed(5)}, ${item.lon.toFixed(5)}<br>Âge : ${escapeGlobalLinkHtml(formatGlobalLinkAge(item.ageSeconds))}<button type="button" class="traffic-popup-own-button global-link-popup-own-button">Définir comme mon avion et masquer</button></div>`);
         marker.on('popupopen', () => {
             const popupElement = marker.getPopup()?.getElement?.();
             const ownButton = popupElement?.querySelector?.('.global-link-popup-own-button');
@@ -20025,13 +20060,9 @@ function renderGlobalLinkPositions(positions) {
         marker.addTo(layer);
 
         if (placement && labelLatLng) {
-            const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
-            const safeAltitudeLabel = altitudeLabel
-                ? escapeGlobalLinkHtml(altitudeLabel)
-                : '';
             const labelIcon = L.divIcon({
                 className: 'global-link-aircraft-label-marker',
-                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}${safeAltitudeLabel ? ' glr-with-altitude' : ''}"><span class="glr-label-name">${safeName}</span>${safeAltitudeLabel ? `<span class="glr-label-altitude">${safeAltitudeLabel}</span>` : ''}</div>`,
+                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}"><span class="glr-label-name">${safeName}</span></div>`,
                 iconSize: [placement.width, placement.height],
                 iconAnchor: [placement.width / 2, placement.height / 2]
             });
@@ -20143,6 +20174,120 @@ async function handleGlobalLinkButtonClick() {
     setGlobalLinkEnabled(true, { refresh: true, silent: false });
 }
 
+/*
+ * v15.94 — menu GLR accessible par appui long sur le bouton de carte.
+ * Il ne contient pour l'instant que le filtre des trafics non actifs.
+ */
+function ensureGlobalLinkOptionsMenu() {
+    let modal = document.getElementById('global-link-options-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'global-link-options-modal';
+    modal.className = 'global-link-options-modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+        <div class="global-link-options-card" role="dialog" aria-modal="true" aria-labelledby="global-link-options-title">
+            <div class="global-link-options-header">
+                <strong id="global-link-options-title">Global Link Rescue</strong>
+                <button type="button" class="global-link-options-close" aria-label="Fermer">×</button>
+            </div>
+            <label class="global-link-options-check-row">
+                <input id="global-link-show-off-input" type="checkbox">
+                <span>Afficher trafics non actifs</span>
+            </label>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeButton = modal.querySelector('.global-link-options-close');
+    const checkbox = modal.querySelector('#global-link-show-off-input');
+
+    const close = () => {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+    };
+
+    closeButton?.addEventListener('click', close);
+    modal.addEventListener('click', event => {
+        if (event.target === modal) close();
+    });
+    checkbox?.addEventListener('change', () => {
+        setGlobalLinkShowOffTraffic(checkbox.checked);
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && modal.style.display === 'flex') close();
+    });
+
+    return modal;
+}
+
+function openGlobalLinkOptionsMenu() {
+    const modal = ensureGlobalLinkOptionsMenu();
+    const checkbox = modal.querySelector('#global-link-show-off-input');
+    if (checkbox) checkbox.checked = npfGlobalLinkShowOffTraffic;
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+}
+
+function installGlobalLinkButtonInteractions(button) {
+    if (!button || button.dataset.globalLinkBound === '1') return;
+    button.dataset.globalLinkBound = '1';
+
+    protectNpfLongPressControlFromIosSelection(button);
+
+    let longPressTimer = null;
+    let longPressTriggered = false;
+
+    const clearLongPress = () => {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    };
+
+    const startLongPress = event => {
+        if (event && event.button !== undefined && event.button !== 0) return;
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+        clearLongPress();
+        longPressTriggered = false;
+        longPressTimer = setTimeout(() => {
+            longPressTriggered = true;
+            openGlobalLinkOptionsMenu();
+        }, 650);
+    };
+
+    button.addEventListener('pointerdown', startLongPress, { passive: false });
+    button.addEventListener('pointerup', clearLongPress);
+    button.addEventListener('pointerleave', clearLongPress);
+    button.addEventListener('pointercancel', clearLongPress);
+    button.addEventListener('contextmenu', event => {
+        event.preventDefault();
+        clearLongPress();
+        longPressTriggered = true;
+        openGlobalLinkOptionsMenu();
+    });
+    button.addEventListener('click', event => {
+        if (longPressTriggered) {
+            event.preventDefault();
+            event.stopPropagation();
+            longPressTriggered = false;
+            return;
+        }
+        handleGlobalLinkButtonClick().catch(error => {
+            console.warn('[Global Link]', error);
+            if (
+                error?.message
+                && error.message !== 'Autorisation annulée.'
+                && !isGlobalLinkAbortError(error)
+            ) {
+                alert(`Global Link : ${error.message}`);
+            }
+            updateGlobalLinkButton();
+        });
+    });
+}
+
 function initializeGlobalLinkUi() {
     const button = document.getElementById('global-link-layer-button');
 
@@ -20163,22 +20308,7 @@ function initializeGlobalLinkUi() {
     const submitButton = document.getElementById('global-link-auth-submit');
     const captchaInput = document.getElementById('global-link-captcha-input');
 
-    if (button && button.dataset.bound !== '1') {
-        button.dataset.bound = '1';
-        button.addEventListener('click', () => {
-            handleGlobalLinkButtonClick().catch(error => {
-                console.warn('[Global Link]', error);
-                if (
-                    error?.message
-                    && error.message !== 'Autorisation annulée.'
-                    && !isGlobalLinkAbortError(error)
-                ) {
-                    alert(`Global Link : ${error.message}`);
-                }
-                updateGlobalLinkButton();
-            });
-        });
-    }
+    installGlobalLinkButtonInteractions(button);
     if (closeButton && closeButton.dataset.bound !== '1') {
         closeButton.dataset.bound = '1';
         closeButton.addEventListener('click', closeGlobalLinkAuthModal);
