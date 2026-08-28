@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.99';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.00';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -806,6 +806,7 @@ const NPF_BRIEFING_DOC_TYPES = Object.freeze(['fds', 'gaar']);
 let npfBriefingDocsDb = null;
 let npfBriefingDocsSyncInProgress = false;
 let npfBriefingDocsPendingType = null;
+let npfBriefingDocsBfgPairingOnly = false; // v16.00 — association BFG accessible même si NPF est déjà autorisé.
 let npfBriefingDocViewerType = null;
 let npfBriefingDocViewerObjectUrl = null;
 
@@ -18445,6 +18446,19 @@ function getStoredNpfBfgBridgeCredentials() {
     }
 }
 
+function updateBriefingDocsBfgPairButton() {
+    const button = document.getElementById('briefing-docs-bfg-pair-button');
+    if (!button) return;
+    const paired = Boolean(getStoredNpfBfgBridgeCredentials());
+    button.classList.toggle('paired', paired);
+    button.textContent = paired ? 'BFG ✓' : 'BFG';
+    const label = paired
+        ? 'BFG associé à cet iPad — appuyer pour réassocier'
+        : 'Associer BFG à NPF';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+}
+
 function storeNpfBfgBridgeCredentials(bridgeId, deviceSecret) {
     const cleanId = String(bridgeId || '').trim().toLowerCase();
     const cleanSecret = String(deviceSecret || '').trim().toLowerCase();
@@ -18452,6 +18466,7 @@ function storeNpfBfgBridgeCredentials(bridgeId, deviceSecret) {
     try {
         localStorage.setItem(NPF_BFG_BRIDGE_ID_KEY, cleanId);
         localStorage.setItem(NPF_BFG_BRIDGE_DEVICE_SECRET_KEY, cleanSecret);
+        updateBriefingDocsBfgPairButton();
         return true;
     } catch (_) {
         return false;
@@ -18462,6 +18477,7 @@ function clearNpfBfgBridgeCredentials() {
     try {
         localStorage.removeItem(NPF_BFG_BRIDGE_ID_KEY);
         localStorage.removeItem(NPF_BFG_BRIDGE_DEVICE_SECRET_KEY);
+        updateBriefingDocsBfgPairButton();
     } catch (_) {}
 }
 
@@ -18755,6 +18771,7 @@ function openBriefingDocSelectorModal() {
     const modal = document.getElementById('briefing-doc-selector-modal');
     if (!modal) return false;
     refreshBriefingDocMapButtons().catch(() => {});
+    updateBriefingDocsBfgPairButton();
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     return true;
@@ -18835,6 +18852,7 @@ function closeBriefingDocsPasswordModal() {
     if (bfgCodeInput) bfgCodeInput.value = '';
     if (status) status.textContent = '';
     npfBriefingDocsPendingType = null;
+    npfBriefingDocsBfgPairingOnly = false;
 }
 
 function openBriefingDocsPasswordModal(type) {
@@ -18845,20 +18863,55 @@ function openBriefingDocsPasswordModal(type) {
     const help = document.getElementById('briefing-docs-password-help');
     const input = document.getElementById('briefing-docs-password-input');
     const bfgCodeInput = document.getElementById('briefing-docs-bfg-code-input');
+    const authorizeButton = document.getElementById('briefing-docs-authorize-button');
+    const separator = modal?.querySelector('.briefing-docs-bfg-pairing-separator');
     const status = document.getElementById('briefing-docs-password-status');
     if (!modal) return false;
 
+    npfBriefingDocsBfgPairingOnly = false;
     npfBriefingDocsPendingType = safeType;
     const label = safeType === 'gaar' ? 'GAAR' : 'FdS';
     if (title) title.textContent = `Accès ${label}`;
     if (help) help.textContent = `Si BFG a déjà été connecté aujourd’hui, NPF tente d’abord l’autorisation automatique. Sinon utilise le mot de passe NPF ou le code BFG pour la première association.`;
+    if (input) { input.value = ''; input.style.display = ''; }
+    if (authorizeButton) authorizeButton.style.display = '';
+    if (separator) separator.style.display = '';
+    if (bfgCodeInput) { bfgCodeInput.value = ''; bfgCodeInput.style.display = ''; }
     if (status) status.textContent = '';
-    if (input) input.value = '';
-    if (bfgCodeInput) bfgCodeInput.value = '';
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     setTimeout(() => {
         try { input?.focus({ preventScroll: true }); } catch (_) { try { input?.focus(); } catch (_) {} }
+    }, 60);
+    return true;
+}
+
+function openBriefingDocsBfgPairingModal() {
+    const modal = document.getElementById('briefing-docs-password-modal');
+    const title = document.getElementById('briefing-docs-password-title');
+    const help = document.getElementById('briefing-docs-password-help');
+    const input = document.getElementById('briefing-docs-password-input');
+    const authorizeButton = document.getElementById('briefing-docs-authorize-button');
+    const separator = modal?.querySelector('.briefing-docs-bfg-pairing-separator');
+    const bfgCodeInput = document.getElementById('briefing-docs-bfg-code-input');
+    const status = document.getElementById('briefing-docs-password-status');
+    if (!modal) return false;
+
+    npfBriefingDocsBfgPairingOnly = true;
+    npfBriefingDocsPendingType = null;
+    if (title) title.textContent = 'Association BFG ↔ NPF';
+    if (help) help.textContent = 'Saisis le code à 8 chiffres affiché dans BFG. Cette association n’est nécessaire qu’une seule fois sur cet iPad.';
+    if (input) { input.value = ''; input.style.display = 'none'; }
+    if (authorizeButton) authorizeButton.style.display = 'none';
+    if (separator) separator.style.display = 'none';
+    if (bfgCodeInput) { bfgCodeInput.value = ''; bfgCodeInput.style.display = ''; }
+    if (status) status.textContent = getStoredNpfBfgBridgeCredentials()
+        ? 'BFG est déjà associé. Un nouveau code permet de refaire l’association.'
+        : '';
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => {
+        try { bfgCodeInput?.focus({ preventScroll: true }); } catch (_) { try { bfgCodeInput?.focus(); } catch (_) {} }
     }, 60);
     return true;
 }
@@ -19159,6 +19212,7 @@ function initializeBriefingDocsUi() {
     const selectorCloseButton = document.getElementById('close-briefing-doc-selector-modal');
     const fdsButton = document.getElementById('briefing-fds-map-button');
     const gaarButton = document.getElementById('briefing-gaar-map-button');
+    const bfgPairButton = document.getElementById('briefing-docs-bfg-pair-button');
     const modal = document.getElementById('briefing-docs-password-modal');
     const closeButton = document.getElementById('briefing-docs-password-close');
     const passwordInput = document.getElementById('briefing-docs-password-input');
@@ -19197,6 +19251,15 @@ function initializeBriefingDocsUi() {
 
     bindDocButton(fdsButton, 'fds');
     bindDocButton(gaarButton, 'gaar');
+
+    if (bfgPairButton && bfgPairButton.dataset.bound !== '1') {
+        bfgPairButton.dataset.bound = '1';
+        bfgPairButton.addEventListener('click', () => {
+            closeBriefingDocSelectorModal();
+            openBriefingDocsBfgPairingModal();
+        });
+    }
+    updateBriefingDocsBfgPairButton();
 
     if (viewerCloseButton && viewerCloseButton.dataset.bound !== '1') {
         viewerCloseButton.dataset.bound = '1';
@@ -19258,6 +19321,7 @@ function initializeBriefingDocsUi() {
     }
 
     const authorizeWithBfgPairingCode = async () => {
+        const pairingOnly = npfBriefingDocsBfgPairingOnly;
         const targetType = npfBriefingDocsPendingType || 'fds';
         const code = String(bfgCodeInput?.value || '').replace(/\D/g, '');
         if (!/^\d{8}$/.test(code)) {
@@ -19275,6 +19339,13 @@ function initializeBriefingDocsUi() {
             if (authorizeButton) authorizeButton.disabled = true;
             if (passwordStatus) passwordStatus.textContent = 'Association BFG / NPF en cours…';
             await claimBfgBridgePairingCode(code);
+            updateBriefingDocsBfgPairButton();
+            if (pairingOnly) {
+                if (passwordStatus) passwordStatus.textContent = 'Association BFG / NPF réussie.';
+                closeBriefingDocsPasswordModal();
+                openBriefingDocSelectorModal();
+                return;
+            }
             if (passwordStatus) passwordStatus.textContent = `Association réussie. Téléchargement ${getBriefingDocLabel(targetType)} du jour…`;
 
             const result = await refreshSingleBriefingDocFromNas(targetType);
@@ -20209,18 +20280,38 @@ function globalLinkRectsOverlap(a, b, gap = 3) {
 }
 
 /*
- * v15.94 — GLR réutilise exactement les silhouettes SafeSky avion/hélicoptère.
- * Le relais NAS transmet `typePorteur` issu de `type_porteur` :
- * 0 = hélicoptère ; 1 = avion. En l'absence de type exploitable, on conserve
- * le repli historique vers la silhouette avion.
+ * v16.00 — GLR : le type de porteur est normalisé avant le choix de l'icône.
+ * La valeur nominale reste `0 = hélicoptère`, `1 = avion`, mais NPF accepte
+ * aussi les formes texte usuelles. Si un ancien relais ne transmet pas encore
+ * `typePorteur`, les indicatifs GLR hélicoptère clairement identifiables
+ * (DRAGON / DRAGO / PUMA / HÉLI) servent uniquement de repli visuel.
  */
+function normalizeGlobalLinkCarrierType(item) {
+    const rawType = item?.typePorteur ?? item?.type_porteur ?? item?.carrierType ?? item?.typeCarrier;
+    if (rawType !== null && rawType !== undefined && rawType !== '') {
+        const numeric = Number(rawType);
+        if (numeric === 0 || numeric === 1) return numeric;
+        const text = String(rawType)
+            .trim()
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+        if (/^(?:HELICOPTER|HELICOPTERE|HELICO|HELI)$/.test(text)) return 0;
+        if (/^(?:AIRPLANE|PLANE|AVION|MOTORPLANE)$/.test(text)) return 1;
+    }
+
+    const normalizedName = String(item?.name || '')
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Z0-9]/g, '');
+    if (/^(?:DRAGON|DRAGO|PUMA|HELI)/.test(normalizedName)) return 0;
+    return null;
+}
+
 function getGlobalLinkVisualDefinition(item) {
-    const rawType = item?.typePorteur ?? item?.type_porteur;
-    const typePorteur = (
-        rawType === null
-        || rawType === undefined
-        || rawType === ''
-    ) ? null : Number(rawType);
+    const typePorteur = normalizeGlobalLinkCarrierType(item);
     const beaconType = typePorteur === 0 ? 'HELICOPTER' : 'MOTORPLANE';
     return getTrafficAircraftVisualDefinition({ beaconType });
 }
