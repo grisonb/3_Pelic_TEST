@@ -1,3 +1,67 @@
+VERSION TEST v15.98 — CORRECTION MAJ / MÉMOIRE DES CHOIX D’AFFICHAGE
+Date : 28/08/2026
+Base : TEST v15.97
+
+OBJECTIFS
+- Corriger le refus d’installation de v15.97 causé par le marqueur de version CSS resté en v15.96.
+- Mémoriser les choix d’affichage de la carte afin qu’ils soient restaurés à la réouverture de NPF.
+- Conserver le diagnostic BFG / NPF de v15.97 sans créer de dépendance envers BFG.
+
+1. CORRECTION DU MÉCANISME DE MISE À JOUR
+- `style.css` porte désormais le marqueur obligatoire `NPF_STYLE_BUILD_VERSION: v15.98`.
+- Index, Manifest, Script, Style et Service Worker sont contrôlés ensemble sur la même version v15.98.
+- Le Service Worker garde son mécanisme d’installation atomique existant ; aucune suppression des cartes offline / IndexedDB n’est ajoutée.
+- La transition depuis v15.96 peut donc accepter le nouveau shell v15.98 lorsque GitHub Pages sert les cinq fichiers cohérents.
+
+2. MÉMORISATION — POINTS VFR / VRP (BOUTON N)
+- L’état du bouton `N` est maintenant enregistré dans `localStorage`.
+- Si les points VFR / VRP sont masqués, ils restent masqués après fermeture puis réouverture de NPF.
+- S’ils sont réaffichés, cet état est également mémorisé.
+- Le filtre SIA principal `dpn:VRP` reste indépendant et inchangé.
+
+3. MÉMORISATION — DÉPARTEMENTS / COMMUNES
+- Le choix Départements n’est plus forcé à OFF à chaque démarrage.
+- Les états enregistrés `showDepartmentsLayer` et `showCommunesLayer` sont restaurés avant l’affichage des commandes.
+- Le chargement effectif de ces couches reste différé après la séquence prioritaire carte -> recherche/alias -> PÉLIC.
+
+4. MÉMORISATION — SAFESKY
+- Le bouton principal SafeSky était déjà mémorisé : comportement conservé.
+- Le masque secondaire du compteur vert « trafics hors liste suivie » devient lui aussi persistant.
+- Les filtres SafeSky existants restent inchangés.
+
+5. MÉMORISATION — GAAR
+- Lorsqu’un choix explicite d’affichage/masquage des circuits GAAR a été fait, ce choix est désormais mémorisé.
+- Une préférence GAAR absente conserve le comportement historique de l’installation existante.
+- Une préférence GAAR explicitement OFF empêche les redessins ultérieurs de faire réapparaître les circuits pendant la session.
+
+6. CHOIX DÉJÀ PERSISTANTS — CONSERVÉS
+- Œil zones SIA : déjà mémorisé, inchangé.
+- Communes : stockage existant conservé et restauration avancée au démarrage.
+- Plans d’eau : déjà mémorisés, inchangés.
+- Lignes HT : déjà mémorisées, inchangées.
+- Calque routier : déjà mémorisé, inchangé.
+- SafeSky principal : déjà mémorisé, inchangé.
+- Global Link : état principal + affichage des trafics non actifs déjà mémorisés, inchangés.
+- Source de carte ONLINE / OFFLINE et GPS live : mécanismes de mémorisation existants inchangés.
+
+7. BFG / NPF
+- Le diagnostic v15.97 est conservé : NPF cherche toujours la clé neutre `npf_bfg_storage_test_v1` puis affiche OUI / NON.
+- Aucun mot de passe BFG et aucun jeton BFG ne sont lus par ce diagnostic.
+- NPF reste autonome si BFG est fermé, absent ou indisponible.
+
+8. FICHIERS MÉTIER INCHANGÉS
+- `sia.js` : strictement inchangé bit pour bit par rapport à v15.97 / v15.96.
+- Le fichier communal iPad reste `./data/communes-500m.geojson`.
+- Aucune modification du moteur de tuiles offline, de la base SIA, de VAC, du Bloc/Fuel ou de la logique PÉLIC.
+
+9. CONTRÔLES AVANT LIVRAISON
+- Manifest JSON parsé.
+- `node --check` réel sur Script et Service Worker via copies temporaires `.js`.
+- Cohérence croisée v15.98 vérifiée selon les mêmes critères que le Service Worker : Index / Script / Style / Manifest / SW.
+- Vérification spécifique du marqueur CSS `NPF_STYLE_BUILD_VERSION: v15.98`.
+- Vérification SIA bit-à-bit.
+- Vérification ciblée des clés de persistance N VFR/VRP, SafeSky secondaire, Départements/Communes et GAAR.
+
 VERSION TEST v15.97 — DIAGNOSTIC STOCKAGE BFG / NPF
 Date : 28/08/2026
 Base : TEST v15.96
