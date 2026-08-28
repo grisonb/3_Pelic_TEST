@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v15.98 */
+/* NPF_STYLE_BUILD_VERSION: v15.99 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -13540,7 +13540,8 @@ body.gaar-point-search-open .gaar-editing-banner {
     cursor: pointer;
 }
 
-#briefing-docs-password-input {
+#briefing-docs-password-input,
+#briefing-docs-bfg-code-input {
     box-sizing: border-box;
     width: 100%;
     min-height: 52px;
@@ -13552,6 +13553,20 @@ body.gaar-point-search-open .gaar-editing-banner {
     color: var(--text-color);
     font-size: 17px;
     text-align: center;
+}
+
+.briefing-docs-bfg-pairing-separator {
+    margin: 16px 0 10px;
+    padding-top: 14px;
+    border-top: 1px solid #d8e0e8;
+    color: #52606d;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.briefing-docs-bfg-code-submit {
+    background: #0f766e;
 }
 
 .briefing-docs-password-submit {
