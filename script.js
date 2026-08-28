@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.96';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.97';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -3369,6 +3369,63 @@ function computeConvexHull(latLngPoints) {
 }
 
 // =========================================================================
+// v15.97 TEST — DIAGNOSTIC PARTAGE localStorage BFG / NPF
+// =========================================================================
+const BFG_NPF_STORAGE_TEST_KEY = 'npf_bfg_storage_test_v1';
+const BFG_NPF_STORAGE_TEST_MARKER = 'OK_BFG_20260828';
+
+function showBfgNpfStorageSharingDiagnostic() {
+    let raw = '';
+    let parsed = null;
+    let markerVisible = false;
+
+    try {
+        raw = String(localStorage.getItem(BFG_NPF_STORAGE_TEST_KEY) || '');
+        if (raw) {
+            try {
+                parsed = JSON.parse(raw);
+            } catch (_) {
+                parsed = null;
+            }
+
+            markerVisible = Boolean(
+                parsed
+                && parsed.marker === BFG_NPF_STORAGE_TEST_MARKER
+            );
+        }
+    } catch (error) {
+        console.warn('[BFG/NPF diagnostic] Lecture localStorage impossible:', error);
+    }
+
+    const lines = [
+        `Stockage BFG visible : ${markerVisible ? 'OUI' : 'NON'}`
+    ];
+
+    if (markerVisible && parsed) {
+        if (parsed.source || parsed.version) {
+            lines.push(
+                `Source : ${String(parsed.source || 'BFG')} ${parsed.version ? `v${String(parsed.version).replace(/^v/i, '')}` : ''}`.trim()
+            );
+        }
+        if (parsed.writtenAt) {
+            const writtenDate = new Date(parsed.writtenAt);
+            if (!Number.isNaN(writtenDate.getTime())) {
+                lines.push(`Écrit le : ${writtenDate.toLocaleString('fr-FR')}`);
+            }
+        }
+    } else {
+        lines.push('Le marqueur BFG TEST v4.58 n’est pas visible depuis cette PWA NPF.');
+    }
+
+    console.info('[BFG/NPF diagnostic]', lines.join(' | '));
+    try {
+        alert(lines.join('\n'));
+    } catch (_) {}
+
+    return markerVisible;
+}
+
+// =========================================================================
 // LOGIQUE PRINCIPALE DE L'APPLICATION
 // =========================================================================
 async function initializeApp() {
@@ -3610,6 +3667,13 @@ async function initializeApp() {
 
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
     setTimeout(showUpdateReminderIfDue, 1700);
+
+    /*
+     * v15.97 TEST — diagnostic purement local BFG / NPF.
+     * Il est volontairement postérieur à carte -> recherche/alias -> PÉLIC
+     * afin de ne jamais entrer dans la séquence de démarrage prioritaire.
+     */
+    setTimeout(showBfgNpfStorageSharingDiagnostic, 2200);
 
     /*
      * VAC : contrôle différé et non bloquant.
