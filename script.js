@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.98';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.99';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -798,6 +798,10 @@ const NPF_BRIEFING_DOCS_STORE_NAME = 'docs';
 const NPF_BRIEFING_DOCS_SESSION_TOKEN_KEY = 'npfBriefingDocsSessionTokenV1';
 const NPF_BRIEFING_DOCS_SESSION_EXP_KEY = 'npfBriefingDocsSessionExpV1';
 const NPF_BRIEFING_DOCS_LAST_SYNC_KEY = 'npfBriefingDocsLastSyncV1';
+// v15.99 — association persistante de cette PWA NPF avec BFG via le NAS.
+const NPF_BFG_BRIDGE_ID_KEY = 'npfBfgBridgeIdV1';
+const NPF_BFG_BRIDGE_DEVICE_SECRET_KEY = 'npfBfgBridgeDeviceSecretV1';
+let npfBfgBridgeAuthorizationPromise = null;
 const NPF_BRIEFING_DOC_TYPES = Object.freeze(['fds', 'gaar']);
 let npfBriefingDocsDb = null;
 let npfBriefingDocsSyncInProgress = false;
@@ -3372,63 +3376,6 @@ function computeConvexHull(latLngPoints) {
 }
 
 // =========================================================================
-// v15.97 TEST — DIAGNOSTIC PARTAGE localStorage BFG / NPF
-// =========================================================================
-const BFG_NPF_STORAGE_TEST_KEY = 'npf_bfg_storage_test_v1';
-const BFG_NPF_STORAGE_TEST_MARKER = 'OK_BFG_20260828';
-
-function showBfgNpfStorageSharingDiagnostic() {
-    let raw = '';
-    let parsed = null;
-    let markerVisible = false;
-
-    try {
-        raw = String(localStorage.getItem(BFG_NPF_STORAGE_TEST_KEY) || '');
-        if (raw) {
-            try {
-                parsed = JSON.parse(raw);
-            } catch (_) {
-                parsed = null;
-            }
-
-            markerVisible = Boolean(
-                parsed
-                && parsed.marker === BFG_NPF_STORAGE_TEST_MARKER
-            );
-        }
-    } catch (error) {
-        console.warn('[BFG/NPF diagnostic] Lecture localStorage impossible:', error);
-    }
-
-    const lines = [
-        `Stockage BFG visible : ${markerVisible ? 'OUI' : 'NON'}`
-    ];
-
-    if (markerVisible && parsed) {
-        if (parsed.source || parsed.version) {
-            lines.push(
-                `Source : ${String(parsed.source || 'BFG')} ${parsed.version ? `v${String(parsed.version).replace(/^v/i, '')}` : ''}`.trim()
-            );
-        }
-        if (parsed.writtenAt) {
-            const writtenDate = new Date(parsed.writtenAt);
-            if (!Number.isNaN(writtenDate.getTime())) {
-                lines.push(`Écrit le : ${writtenDate.toLocaleString('fr-FR')}`);
-            }
-        }
-    } else {
-        lines.push('Le marqueur BFG TEST v4.58 n’est pas visible depuis cette PWA NPF.');
-    }
-
-    console.info('[BFG/NPF diagnostic]', lines.join(' | '));
-    try {
-        alert(lines.join('\n'));
-    } catch (_) {}
-
-    return markerVisible;
-}
-
-// =========================================================================
 // LOGIQUE PRINCIPALE DE L'APPLICATION
 // =========================================================================
 async function initializeApp() {
@@ -3683,11 +3630,14 @@ async function initializeApp() {
     setTimeout(showUpdateReminderIfDue, 1700);
 
     /*
-     * v15.97 TEST — diagnostic purement local BFG / NPF.
-     * Il est volontairement postérieur à carte -> recherche/alias -> PÉLIC
-     * afin de ne jamais entrer dans la séquence de démarrage prioritaire.
+     * v15.99 — autorisation BFG -> NPF silencieuse et non bloquante.
+     * Elle reste postérieure à carte -> recherche/alias -> PÉLIC.
      */
-    setTimeout(showBfgNpfStorageSharingDiagnostic, 2200);
+    setTimeout(() => {
+        tryAuthorizeBriefingDocsFromBfgBridge({ silent: true })
+            .then(() => refreshBriefingDocMapButtons().catch(() => {}))
+            .catch(() => {});
+    }, 2200);
 
     /*
      * VAC : contrôle différé et non bloquant.
@@ -18484,6 +18434,102 @@ function storeBriefingDocsSession(token, expiresAt) {
     }
 }
 
+function getStoredNpfBfgBridgeCredentials() {
+    try {
+        const bridgeId = String(localStorage.getItem(NPF_BFG_BRIDGE_ID_KEY) || '').trim().toLowerCase();
+        const deviceSecret = String(localStorage.getItem(NPF_BFG_BRIDGE_DEVICE_SECRET_KEY) || '').trim().toLowerCase();
+        if (!/^[a-f0-9]{32}$/.test(bridgeId) || !/^[a-f0-9]{64}$/.test(deviceSecret)) return null;
+        return { bridgeId, deviceSecret };
+    } catch (_) {
+        return null;
+    }
+}
+
+function storeNpfBfgBridgeCredentials(bridgeId, deviceSecret) {
+    const cleanId = String(bridgeId || '').trim().toLowerCase();
+    const cleanSecret = String(deviceSecret || '').trim().toLowerCase();
+    if (!/^[a-f0-9]{32}$/.test(cleanId) || !/^[a-f0-9]{64}$/.test(cleanSecret)) return false;
+    try {
+        localStorage.setItem(NPF_BFG_BRIDGE_ID_KEY, cleanId);
+        localStorage.setItem(NPF_BFG_BRIDGE_DEVICE_SECRET_KEY, cleanSecret);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function clearNpfBfgBridgeCredentials() {
+    try {
+        localStorage.removeItem(NPF_BFG_BRIDGE_ID_KEY);
+        localStorage.removeItem(NPF_BFG_BRIDGE_DEVICE_SECRET_KEY);
+    } catch (_) {}
+}
+
+async function tryAuthorizeBriefingDocsFromBfgBridge(options = {}) {
+    const silent = options.silent !== false;
+    const existing = getStoredBriefingDocsSession();
+    if (existing) return existing;
+    if (!navigator.onLine) return null;
+
+    const credentials = getStoredNpfBfgBridgeCredentials();
+    if (!credentials) return null;
+    if (npfBfgBridgeAuthorizationPromise) return npfBfgBridgeAuthorizationPromise;
+
+    npfBfgBridgeAuthorizationPromise = (async () => {
+        try {
+            const response = await fetchBriefingDocsNas(`${NPF_BRIEFING_DOCS_API_URL}?action=bridge-session&t=${Date.now()}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(credentials)
+            }, 9000);
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload || payload.ok !== true || !payload.token || !payload.expiresAt) {
+                const errorCode = String(payload?.error || '');
+                if (['bridge_unknown', 'bridge_not_paired', 'bridge_invalid_device'].includes(errorCode)) {
+                    clearNpfBfgBridgeCredentials();
+                }
+                if (!silent && errorCode !== 'bridge_not_granted') {
+                    console.warn('[BFG -> NPF] Autorisation refusée:', payload?.message || errorCode || response.status);
+                }
+                return null;
+            }
+            if (!storeBriefingDocsSession(payload.token, payload.expiresAt)) return null;
+            console.info('[BFG -> NPF] Session NPF récupérée automatiquement.');
+            return getStoredBriefingDocsSession();
+        } catch (error) {
+            if (!silent) console.warn('[BFG -> NPF] Pont indisponible:', error);
+            return null;
+        } finally {
+            npfBfgBridgeAuthorizationPromise = null;
+        }
+    })();
+
+    return npfBfgBridgeAuthorizationPromise;
+}
+
+async function claimBfgBridgePairingCode(code) {
+    const cleanCode = String(code || '').replace(/\D/g, '');
+    if (!/^\d{8}$/.test(cleanCode)) throw new Error('Saisis le code BFG à 8 chiffres.');
+    if (!navigator.onLine) throw new Error('Connexion Internet requise pour l’association BFG.');
+
+    const response = await fetchBriefingDocsNas(`${NPF_BRIEFING_DOCS_API_URL}?action=bridge-claim&t=${Date.now()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: cleanCode })
+    }, 12000);
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || payload.ok !== true || !payload.bridgeId || !payload.deviceSecret || !payload.token || !payload.expiresAt) {
+        throw new Error(payload?.message || payload?.error || `Association BFG refusée (${response.status})`);
+    }
+    if (!storeNpfBfgBridgeCredentials(payload.bridgeId, payload.deviceSecret)) {
+        throw new Error('Association reçue mais impossible à enregistrer sur cet iPad.');
+    }
+    if (!storeBriefingDocsSession(payload.token, payload.expiresAt)) {
+        throw new Error('Association réussie mais session NPF impossible à enregistrer.');
+    }
+    return getStoredBriefingDocsSession();
+}
+
 function formatBriefingDocsDate(value) {
     if (!value) return 'date inconnue';
     const date = new Date(value);
@@ -18779,12 +18825,14 @@ async function refreshBriefingDocMapButtons() {
 function closeBriefingDocsPasswordModal() {
     const modal = document.getElementById('briefing-docs-password-modal');
     const input = document.getElementById('briefing-docs-password-input');
+    const bfgCodeInput = document.getElementById('briefing-docs-bfg-code-input');
     const status = document.getElementById('briefing-docs-password-status');
     if (modal) {
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden', 'true');
     }
     if (input) input.value = '';
+    if (bfgCodeInput) bfgCodeInput.value = '';
     if (status) status.textContent = '';
     npfBriefingDocsPendingType = null;
 }
@@ -18796,15 +18844,17 @@ function openBriefingDocsPasswordModal(type) {
     const title = document.getElementById('briefing-docs-password-title');
     const help = document.getElementById('briefing-docs-password-help');
     const input = document.getElementById('briefing-docs-password-input');
+    const bfgCodeInput = document.getElementById('briefing-docs-bfg-code-input');
     const status = document.getElementById('briefing-docs-password-status');
     if (!modal) return false;
 
     npfBriefingDocsPendingType = safeType;
     const label = safeType === 'gaar' ? 'GAAR' : 'FdS';
     if (title) title.textContent = `Accès ${label}`;
-    if (help) help.textContent = `Saisis le mot de passe pour autoriser les téléchargements FdS / GAAR jusqu’à minuit.`;
+    if (help) help.textContent = `Si BFG a déjà été connecté aujourd’hui, NPF tente d’abord l’autorisation automatique. Sinon utilise le mot de passe NPF ou le code BFG pour la première association.`;
     if (status) status.textContent = '';
     if (input) input.value = '';
+    if (bfgCodeInput) bfgCodeInput.value = '';
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
     setTimeout(() => {
@@ -19068,6 +19118,9 @@ async function handleBriefingDocMapButtonClick(type) {
     if (!NPF_BRIEFING_DOC_TYPES.includes(safeType)) return false;
 
     if (!getStoredBriefingDocsSession()) {
+        await tryAuthorizeBriefingDocsFromBfgBridge({ silent: true });
+    }
+    if (!getStoredBriefingDocsSession()) {
         openBriefingDocsPasswordModal(safeType);
         return false;
     }
@@ -19110,6 +19163,8 @@ function initializeBriefingDocsUi() {
     const closeButton = document.getElementById('briefing-docs-password-close');
     const passwordInput = document.getElementById('briefing-docs-password-input');
     const authorizeButton = document.getElementById('briefing-docs-authorize-button');
+    const bfgCodeInput = document.getElementById('briefing-docs-bfg-code-input');
+    const bfgCodeButton = document.getElementById('briefing-docs-bfg-code-button');
     const passwordStatus = document.getElementById('briefing-docs-password-status');
     const viewerCloseButton = document.getElementById('briefing-doc-viewer-close');
     const viewerRefreshButton = document.getElementById('briefing-doc-viewer-refresh');
@@ -19153,6 +19208,9 @@ function initializeBriefingDocsUi() {
             const type = npfBriefingDocViewerType;
             if (!type) return;
 
+            if (!getStoredBriefingDocsSession()) {
+                await tryAuthorizeBriefingDocsFromBfgBridge({ silent: true });
+            }
             if (!getStoredBriefingDocsSession()) {
                 openBriefingDocsPasswordModal(type);
                 return;
@@ -19198,6 +19256,45 @@ function initializeBriefingDocsUi() {
             if (event.target === modal) closeModal();
         });
     }
+
+    const authorizeWithBfgPairingCode = async () => {
+        const targetType = npfBriefingDocsPendingType || 'fds';
+        const code = String(bfgCodeInput?.value || '').replace(/\D/g, '');
+        if (!/^\d{8}$/.test(code)) {
+            if (passwordStatus) passwordStatus.textContent = 'Saisis le code BFG à 8 chiffres affiché dans BFG.';
+            try { bfgCodeInput?.focus(); } catch (_) {}
+            return;
+        }
+
+        const originalText = bfgCodeButton?.textContent || 'Associer avec le code BFG';
+        try {
+            if (bfgCodeButton) {
+                bfgCodeButton.disabled = true;
+                bfgCodeButton.textContent = 'Association…';
+            }
+            if (authorizeButton) authorizeButton.disabled = true;
+            if (passwordStatus) passwordStatus.textContent = 'Association BFG / NPF en cours…';
+            await claimBfgBridgePairingCode(code);
+            if (passwordStatus) passwordStatus.textContent = `Association réussie. Téléchargement ${getBriefingDocLabel(targetType)} du jour…`;
+
+            const result = await refreshSingleBriefingDocFromNas(targetType);
+            if (!isBriefingDocRecordForToday(result.record)) {
+                if (passwordStatus) passwordStatus.textContent = `${getBriefingDocLabel(targetType)} du jour non disponible sur le NAS.`;
+                return;
+            }
+            closeBriefingDocsPasswordModal();
+            await displayBriefingDocInViewer(targetType, result.record);
+        } catch (error) {
+            if (passwordStatus) passwordStatus.textContent = error?.message || String(error);
+            await refreshBriefingDocMapButtons();
+        } finally {
+            if (bfgCodeButton) {
+                bfgCodeButton.disabled = false;
+                bfgCodeButton.textContent = originalText;
+            }
+            if (authorizeButton) authorizeButton.disabled = false;
+        }
+    };
 
     const authorizePending = async () => {
         const targetType = npfBriefingDocsPendingType || 'fds';
@@ -19247,6 +19344,23 @@ function initializeBriefingDocsUi() {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 authorizePending();
+            }
+        });
+    }
+
+    if (bfgCodeButton && bfgCodeButton.dataset.bound !== '1') {
+        bfgCodeButton.dataset.bound = '1';
+        bfgCodeButton.addEventListener('click', authorizeWithBfgPairingCode);
+    }
+    if (bfgCodeInput && bfgCodeInput.dataset.bound !== '1') {
+        bfgCodeInput.dataset.bound = '1';
+        bfgCodeInput.addEventListener('input', () => {
+            bfgCodeInput.value = String(bfgCodeInput.value || '').replace(/\D/g, '').slice(0, 8);
+        });
+        bfgCodeInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                authorizeWithBfgPairingCode();
             }
         });
     }
@@ -19545,6 +19659,8 @@ async function ensureGlobalLinkNpfAuthorization() {
     let docsSession = getStoredBriefingDocsSession();
     if (docsSession) return docsSession;
     if (!navigator.onLine) throw new Error('Connexion Internet requise.');
+    docsSession = await tryAuthorizeBriefingDocsFromBfgBridge({ silent: true });
+    if (docsSession) return docsSession;
     docsSession = await requestGlobalLinkNpfAuthorization();
     if (!docsSession) throw new Error('Autorisation NPF impossible.');
     return docsSession;
@@ -20692,8 +20808,11 @@ function initializeGlobalLinkUi() {
     try { npfGlobalLinkEnabled = localStorage.getItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY) === '1'; } catch (_) {}
     updateGlobalLinkButton();
 
-    const startStoredGlobalLinkAfterCore = () => {
+    const startStoredGlobalLinkAfterCore = async () => {
         if (!npfGlobalLinkEnabled) return;
+        if (!getStoredBriefingDocsSession()) {
+            await tryAuthorizeBriefingDocsFromBfgBridge({ silent: true });
+        }
         if (!getStoredGlobalLinkSession() || !getStoredBriefingDocsSession()) {
             npfGlobalLinkEnabled = false;
             try { localStorage.setItem(NPF_GLOBAL_LINK_LAYER_ENABLED_KEY, '0'); } catch (_) {}
