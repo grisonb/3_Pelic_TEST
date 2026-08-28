@@ -1,3 +1,52 @@
+VERSION TEST v15.99 — AUTORISATION NPF VIA BFG
+Date : 28/08/2026
+Base : TEST v15.98
+
+OBJECTIF
+- Remplacer le diagnostic localStorage BFG / NPF par un véritable pont d'autorisation via le NAS.
+- Conserver NPF totalement autonome si BFG n'est pas disponible ou n'a pas été connecté.
+
+1. ASSOCIATION INITIALE (UNE SEULE FOIS PAR INSTALLATION)
+- Après connexion à BFG TEST v4.59, BFG affiche un code d'association à 8 chiffres valable 20 minutes.
+- Dans NPF : ouvrir FdS / GAAR, puis saisir ce code dans la zone « Code BFG ».
+- NPF reçoit alors un identifiant d'association et un secret d'installation aléatoire.
+- Le secret reste uniquement dans le stockage local de cette PWA NPF ; le NAS n'enregistre que son hash SHA-256.
+- Le code d'association est à usage unique et disparaît du NAS après consommation.
+
+2. UTILISATION QUOTIDIENNE
+- Les jours suivants, la saisie du mot de passe dans BFG autorise automatiquement l'installation NPF associée jusqu'à minuit Europe/Paris.
+- À l'ouverture, NPF tente silencieusement de récupérer son jeton de session court via le NAS.
+- FdS / GAAR et le prérequis d'autorisation Global Link peuvent utiliser cette session sans redemander le mot de passe NPF.
+
+3. AUTONOMIE / REPLI
+- Si BFG est fermé, indisponible, non connecté ou si le NAS ne délivre pas d'autorisation BFG, NPF continue de démarrer et de fonctionner normalement.
+- Carte, GPS, PÉLIC, SIA, SafeSky, cartes offline, communes, VAC et les autres fonctions non protégées ne dépendent pas du pont.
+- Pour FdS / GAAR / prérequis Global Link, le mot de passe NPF actuel reste disponible comme solution de repli, exactement comme avant.
+- Une panne du pont ne supprime pas les données offline ni les réglages NPF.
+
+4. DIAGNOSTIC v15.97 RETIRÉ
+- La fenêtre « Stockage BFG visible : OUI/NON » est supprimée.
+- Les anciennes clés de diagnostic ne sont plus utilisées.
+
+5. NAS
+- Remplacer `/web/briefing-api/npf-docs-api.php` par le fichier v15.99 fourni.
+- Le NAS conserve un petit fichier d'état `briefing-data/npf-auth-bridge-v1.json`, créé automatiquement.
+- Aucun mot de passe n'est écrit dans ce fichier.
+
+6. CONSERVATION v15.98
+- Mémorisation des choix d'affichage conservée : N VFR/VRP, œil SIA, Départements/Communes, HT, plans d'eau, SafeSky, GAAR, GLR, etc.
+- SIA inchangé bit pour bit.
+- Communes iPad : `./data/communes-500m.geojson` inchangé.
+- Moteur offline / IndexedDB inchangé.
+
+7. CONTRÔLES AVANT LIVRAISON
+- Manifest JSON parsé.
+- Script et SW vérifiés avec `node --check` réel.
+- Cohérence croisée Index / Manifest / Script / Style / SW = v15.99.
+- PHP vérifié avec `php -l` lorsque PHP CLI est disponible.
+- SIA vérifié bit pour bit.
+- Ancien diagnostic localStorage absent de la nouvelle version.
+
 VERSION TEST v15.98 — CORRECTION MAJ / MÉMOIRE DES CHOIX D’AFFICHAGE
 Date : 28/08/2026
 Base : TEST v15.97
