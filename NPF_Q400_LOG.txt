@@ -1,3 +1,34 @@
+VERSION TEST v15.97 — DIAGNOSTIC STOCKAGE BFG / NPF
+Date : 28/08/2026
+Base : TEST v15.96
+
+OBJECTIF
+- Vérifier sur l’iPad réel si BFG TEST et NPF TEST, installés comme deux PWA distinctes, voient le même localStorage.
+- Aucun partage d’authentification n’est encore activé dans cette version : il s’agit uniquement d’un diagnostic.
+
+1. LECTURE DU MARQUEUR BFG
+- NPF recherche au démarrage la clé de test neutre `npf_bfg_storage_test_v1` écrite par BFG TEST v4.58 après une connexion Briefing réussie.
+- La valeur attendue contient le marqueur `OK_BFG_20260828`.
+- NPF ne lit aucun mot de passe BFG et aucun jeton d’authentification BFG.
+
+2. RÉSULTAT DU TEST
+- Environ 2,2 s après la fin de la séquence prioritaire de démarrage, NPF affiche une fenêtre de diagnostic :
+  - `Stockage BFG visible : OUI` si le marqueur BFG attendu est lisible ;
+  - `Stockage BFG visible : NON` sinon.
+- Si le marqueur est visible, la fenêtre indique aussi la source/version BFG et l’heure d’écriture quand elles sont disponibles.
+- Le diagnostic est volontairement temporaire et sera retiré après conclusion du test.
+
+3. AUTONOMIE NPF CONSERVÉE
+- NPF ne dépend pas de BFG pour démarrer ni pour fonctionner.
+- Aucune logique de carte, GPS, PÉLIC, SIA, SafeSky, GLR, FdS/GAAR, VAC, cartes offline, communes ou recherche n’est modifiée.
+- Si BFG est absent, fermé ou en panne, NPF continue de fonctionner exactement comme en v15.96.
+- Les mécanismes actuels d’authentification NPF restent inchangés.
+
+4. FICHIERS INCHANGÉS
+- `sia.js` : inchangé bit pour bit par rapport à v15.96.
+- `style.css` : inchangé bit pour bit par rapport à v15.96.
+- Le fichier communal local reste `./data/communes-500m.geojson`.
+
 VERSION TEST v15.96 — DÉMARRAGE PRIORITAIRE / COMMUNES 500 m / ŒIL FRANCE
 Date : 27/08/2026
 Base : TEST v15.95
