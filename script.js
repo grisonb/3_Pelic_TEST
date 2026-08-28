@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v15.97';
+const NPF_SCRIPT_BUILD_VERSION = 'v15.98';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -821,6 +821,8 @@ let showRoadOverlayLayer = localStorage.getItem(ROAD_OVERLAY_LAYER_KEY) === 'tru
 let isRoadOverlayLoading = false;
 
 const TRAFFIC_LAYER_KEY = 'showTrafficLayer';
+// v15.98 — état du masque secondaire SafeSky (compteur vert) restauré au redémarrage.
+const TRAFFIC_NON_TRACKED_VISIBLE_KEY = 'showSafeSkyNonTrackedTrafficV1';
 
 /*
  * v14.24 — appel direct de SafeSky Production depuis NPF.
@@ -878,7 +880,7 @@ let lastTrafficTrackedDetectedCount = 0;
  * SafeSky ni les filtres mémorisés.
  */
 let lastTrafficNonTrackedEligibleCount = 0;
-let showNonTrackedTraffic = true;
+let showNonTrackedTraffic = localStorage.getItem(TRAFFIC_NON_TRACKED_VISIBLE_KEY) !== 'false';
 let lastTrafficAircraftSnapshot = [];
 let lastTrafficRenderMeta = null;
 
@@ -1015,6 +1017,7 @@ const FIRE_HISTORY_MAX_ITEMS = 20;
 const FORCE_DISPLAY_MODE = new URLSearchParams(window.location.search).get('force_display') === '1';
 const SHOW_DEPARTMENTS_LAYER_KEY = 'showDepartmentsLayer';
 const SHOW_COMMUNES_LAYER_KEY = 'showCommunesLayer';
+const GAAR_LAYER_VISIBLE_KEY = 'showGaarLayerV1';
 const LAST_GPS_POSITION_KEY = 'lastGpsPositionV1';
 const COMMUNES_DISPLAY_MIN_ZOOM = 10.5;
 const ONLINE_MAX_NATIVE_ZOOM = 18;
@@ -3444,7 +3447,18 @@ async function initializeApp() {
     // v12.67 — le bouton Route BASE a été retiré de l'interface, mais la route base reste active.
     showLftwRoute = true;
     localStorage.setItem('showLftwRoute', 'true');
-    localStorage.setItem(SHOW_DEPARTMENTS_LAYER_KEY, 'false');
+
+    // v15.98 — restaurer les choix cartographiques au lieu de forcer Départements à OFF.
+    try {
+        areDepartmentsVisible = localStorage.getItem(SHOW_DEPARTMENTS_LAYER_KEY) === 'true';
+        areCommunesVisible = localStorage.getItem(SHOW_COMMUNES_LAYER_KEY) === 'true';
+
+        // GAAR : une ancienne installation sans préférence conserve son comportement historique.
+        const storedGaarVisibility = localStorage.getItem(GAAR_LAYER_VISIBLE_KEY);
+        if (storedGaarVisibility === 'true' || storedGaarVisibility === 'false') {
+            isGaarMode = storedGaarVisibility === 'true';
+        }
+    } catch (_) {}
 
     const savedGaarJSON = localStorage.getItem('gaarCircuits');
     if (savedGaarJSON) {
@@ -16959,6 +16973,12 @@ function toggleTrafficNonTrackedVisibility(forceState = null) {
     }
 
     showNonTrackedTraffic = next;
+    try {
+        localStorage.setItem(
+            TRAFFIC_NON_TRACKED_VISIBLE_KEY,
+            showNonTrackedTraffic ? 'true' : 'false'
+        );
+    } catch (_) {}
     refreshTrafficButtonState();
 
     /*
@@ -24641,7 +24661,17 @@ function drawLftwRoute() {
     drawRoute([lat, lon], [baseLat, baseLon], { isLftwRoute: true, magneticBearing: magneticBearing });
 }
 
-function toggleGaarVisibility() { isGaarMode = !isGaarMode; updateGaarButtonState(); if (isGaarMode) { redrawGaarCircuits(); } else { gaarLayer.clearLayers(); if (isDrawingMode) { toggleGaarDrawingMode(); } } }
+function toggleGaarVisibility() {
+    isGaarMode = !isGaarMode;
+    try { localStorage.setItem(GAAR_LAYER_VISIBLE_KEY, isGaarMode ? 'true' : 'false'); } catch (_) {}
+    updateGaarButtonState();
+    if (isGaarMode) {
+        redrawGaarCircuits();
+    } else {
+        gaarLayer.clearLayers();
+        if (isDrawingMode) { toggleGaarDrawingMode(); }
+    }
+}
 function updateGaarButtonState() { const gaarButton = document.getElementById('gaar-mode-button'); const gaarControls = document.getElementById('gaar-controls'); gaarButton.classList.toggle('active', isGaarMode); gaarControls.style.display = isGaarMode ? 'flex' : 'none'; }
 
 function setGaarEditingBannerVisible(active) {
@@ -25095,6 +25125,13 @@ function openGaarPointSearchOverlay(circuitIndex, pointIndex) {
 
 function redrawGaarCircuits() {
     gaarLayer.clearLayers();
+
+    // v15.98 — une préférence GAAR explicitement OFF reste prioritaire,
+    // y compris lorsqu’un import ou une tâche de démarrage demande un redraw.
+    try {
+        if (localStorage.getItem(GAAR_LAYER_VISIBLE_KEY) === 'false') return;
+    } catch (_) {}
+
     gaarCircuits.forEach((circuit, circuitIndex) => {
         if (!circuit || circuit.points.length === 0) return;
         const latlngs = circuit.points.map(p => [p.lat, p.lng]);
@@ -34421,11 +34458,31 @@ function saveSiaMapAirspacesVisiblePreference(visible) {
 let siaMapAirspacesVisible = loadSiaMapAirspacesVisiblePreference();
 
 /*
- * v15.95 — masque rapide des points VFR / VRP depuis le coin bas-gauche du
- * bouton France. Il est volontairement indépendant du filtre SIA principal :
- * la case dpn:VRP reste inchangée. Aucun stockage persistant n'est ajouté.
+ * v15.98 — masque rapide des points VFR / VRP depuis le coin bas-gauche du
+ * bouton France. Il reste indépendant du filtre SIA principal, mais son état
+ * d'affichage est désormais mémorisé d'une ouverture de NPF à l'autre.
  */
-let siaMapVrpVisible = true;
+const SIA_MAP_VRP_VISIBLE_PREF_KEY = 'npfSiaMapVrpVisible_v1';
+
+function loadSiaMapVrpVisiblePreference() {
+    try {
+        const stored = localStorage.getItem(SIA_MAP_VRP_VISIBLE_PREF_KEY);
+        if (stored === 'false') return false;
+        if (stored === 'true') return true;
+    } catch (_) {}
+    return true;
+}
+
+function saveSiaMapVrpVisiblePreference(visible) {
+    try {
+        localStorage.setItem(
+            SIA_MAP_VRP_VISIBLE_PREF_KEY,
+            visible === false ? 'false' : 'true'
+        );
+    } catch (_) {}
+}
+
+let siaMapVrpVisible = loadSiaMapVrpVisiblePreference();
 
 function updateQuickSiaVrpToggleButton() {
     const button = document.getElementById('quick-sia-vrp-toggle');
@@ -34447,6 +34504,7 @@ function updateQuickSiaVrpToggleButton() {
 
 function setSiaMapVrpVisible(visible) {
     const next = visible !== false;
+    saveSiaMapVrpVisiblePreference(next);
     if (siaMapVrpVisible === next) {
         updateQuickSiaVrpToggleButton();
         return;
