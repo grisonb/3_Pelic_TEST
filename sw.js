@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-97_bfg_storage_diagnostic';
-const APP_VERSION = 'v15.97';
+const SW_VERSION = 'sw-v15-98_display_prefs_update_fix';
+const APP_VERSION = 'v15.98';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
