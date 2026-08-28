@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v15-96_map_first_communes500_eye_state';
-const APP_VERSION = 'v15.96';
+const SW_VERSION = 'sw-v15-97_bfg_storage_diagnostic';
+const APP_VERSION = 'v15.97';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
