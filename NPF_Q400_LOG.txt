@@ -1,3 +1,49 @@
+VERSION TEST v16.00 — BOUTON BFG / COULEURS GLR / ICÔNE HÉLICOPTÈRE
+Date : 28/08/2026
+Base : TEST v15.99
+
+OBJECTIFS
+- Rendre l’association initiale BFG ↔ NPF accessible même lorsque NPF est déjà autorisé.
+- Aligner la couleur complète des marqueurs GLR sur celle de leur étiquette.
+- Corriger / fiabiliser le choix de silhouette GLR avion / hélicoptère.
+
+1. FdS / GAAR — PETIT BOUTON BFG
+- Ajout d’un petit bouton « BFG » sous les choix FdS / GAAR.
+- Non associé : bouton gris « BFG ».
+- Associé : bouton vert « BFG ✓ ».
+- Un appui ouvre uniquement la saisie du code BFG à 8 chiffres, même si une session NPF par mot de passe est déjà active.
+- Cette action sert à la première association ou à une réassociation ; aucun code n’est demandé quotidiennement une fois l’association enregistrée.
+- Le flux normal FdS / GAAR par mot de passe et l’autorisation automatique BFG → NPF restent inchangés.
+
+2. GLR — COULEUR DU MARQUEUR IDENTIQUE À L’ÉTIQUETTE
+- Trafic actif : étiquette verte + icône verte + cercle vert.
+- Trafic Off / non actif : étiquette marron + icône marron + cercle marron.
+- Les connecteurs étaient déjà vert / marron et restent inchangés.
+- Suppression du jaune pour les symboles actifs et du gris pour les symboles Off.
+
+3. GLR — AVION / HÉLICOPTÈRE
+- Mapping nominal conservé : typePorteur 0 = hélicoptère ; 1 = avion.
+- Normalisation renforcée des valeurs numériques et texte avant sélection du SVG SafeSky correspondant.
+- Si typePorteur est absent, repli visuel limité aux indicatifs clairement hélicoptère DRAGON / DRAGO / PUMA / HÉLI ; les autres restent en avion par sécurité.
+- Orientation nord inchangée ; aucune route GLR n’est inventée.
+
+4. ÉLÉMENTS INCHANGÉS
+- Relais NAS GLR inchangé dans cette livraison.
+- BFG TEST v4.59 inchangé.
+- SIA / AIRAC strictement inchangé.
+- SafeSky, PÉLIC, Départements, communes, offline, VAC, GAAR et autres fonctions non concernées inchangés.
+
+5. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.00 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v15.99.
+- Vérification ciblée du petit bouton BFG et de son état associé / non associé.
+- Vérification ciblée GLR : actif = vert ; Off = marron pour étiquette / icône / cercle.
+- Vérification ciblée du mapping typePorteur 0 / 1 et du repli hélicoptère.
+
+
 VERSION TEST v15.99 — AUTORISATION NPF VIA BFG
 Date : 28/08/2026
 Base : TEST v15.98
