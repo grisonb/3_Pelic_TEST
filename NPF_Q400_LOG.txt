@@ -1,3 +1,66 @@
+VERSION TEST v16.05 — NOTAMS PÉLIC LOCAUX BFG / PROFIL X ROUGE
+Date : 29/08/2026
+Base : TEST v16.04
+
+OBJECTIFS
+- Ajouter un bouton NOTAMS uniquement aux pélicandromes.
+- Rendre les NOTAM issus de BFG consultables localement et hors ligne dans NPF, sans accès réseau au moment de l'ouverture de la fenêtre.
+- N'afficher les NOTAM que si le fichier BFG source date du jour en cours (heure Europe/Paris).
+- Reprendre les états BFG « garder » / « exclure » et le principe du bouton « Garder la sélection ».
+- Permettre à BFG de publier la copie locale destinée à NPF même lorsque NPF n'est pas ouvert, via un CacheStorage partagé de même origine.
+- Dans PROFIL ESPACES, mettre le bouton X de fermeture sur fond rouge avec X noire.
+
+1. PÉLIC — BOUTON NOTAMS
+- Le bouton NOTAMS est ajouté uniquement dans la fiche des pélicandromes permanents et des aérodromes explicitement activés comme PÉLIC.
+- Aucun bouton NOTAMS n'est ajouté aux aérodromes ordinaires.
+- La fenêtre NOTAMS est propre à l'OACI du PÉLIC sélectionné.
+
+2. NOTAMS — LOCAL / HORS LIGNE / FRAÎCHEUR
+- NPF ne lance aucune requête réseau pour ouvrir la fenêtre NOTAMS.
+- BFG publie localement le texte NOTAM complet, l'horodatage du PDF et l'état des cases dans le cache partagé `bfg-npf-shared-notams-v1`.
+- NPF lit cette copie locale même hors ligne.
+- Le fichier n'est accepté que si `timestampIso` du PDF BFG correspond à la date du jour en Europe/Paris.
+- Un fichier de la veille ou sans horodatage source valide n'affiche aucun NOTAM.
+- Si le fichier du jour ne contient aucun NOTAM pour l'OACI du PÉLIC, NPF l'indique explicitement.
+
+3. NOTAMS — PRÉSENTATION / SÉLECTION
+- Présentation inspirée de BFG : case verte « garder », case noire « exclure », états mutuellement exclusifs.
+- Les choix déjà effectués dans BFG sont repris à l'ouverture de NPF grâce aux identifiants/signatures compatibles BFG.
+- Les NOTAM exclus sont grisés ; les NOTAM gardés sont signalés en vert.
+- Bouton « Garder la sélection » : n'affiche plus que les NOTAM cochés en vert et non exclus.
+- Bouton « Tout afficher » : revient à la liste complète sans effacer les choix.
+- Les changements effectués dans NPF sont conservés dans la copie locale partagée jusqu'à la prochaine publication BFG.
+
+4. BFG — PUBLICATION LOCALE DESTINÉE À NPF
+- Trois fichiers compagnons BFG TEST v4.60 sont fournis avec cette livraison : Index, Manifest et Service Worker.
+- Après analyse/import des NOTAM, BFG publie automatiquement le snapshot NOTAM vers CacheStorage.
+- Toute modification des cases garder/exclure dans BFG republie le snapshot de manière différée et regroupée.
+- Un fallback localStorage est également écrit pour les contextes navigateur où le stockage est réellement partagé.
+- Aucun changement du flux NATS/NAS ni de l’authentification BFG/NPF.
+- Service Worker BFG porté en v4.60 : lors de l’activation, il ne supprime plus les caches étrangers à BFG ; le cache partagé `bfg-npf-shared-notams-v1` et les caches NPF sont explicitement préservés.
+
+5. PROFIL ESPACES
+- Le bouton de fermeture X du profil a désormais un fond rouge.
+- Le X est noir.
+- Aucun autre bouton de fermeture n'est modifié.
+
+6. ÉLÉMENTS INCHANGÉS
+- SafeSky / ADS-B / ADS-BI / MODE-S / GLR inchangés par rapport à v16.04.
+- Filtre ULM inchangé.
+- PÉLIC couleurs/états, VAC, PDF, routes, Communes, Départements, GAAR et moteur offline inchangés hors ajout du bouton NOTAMS.
+- SIA / AIRAC strictement inchangé.
+
+7. CONTRÔLES
+- `node --check` Script NPF.
+- `node --check` Service Worker NPF.
+- Validation syntaxique du JavaScript inline BFG modifié.
+- `node --check` Service Worker BFG v4.60.
+- Manifest NPF et Manifest BFG JSON parsés.
+- Cohérence v16.05 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.04.
+- Vérifications ciblées : bouton NOTAMS absent des aérodromes ordinaires ; présent sur PÉLIC permanents et personnalisés ; rejet des données NOTAM hors jour courant ; compatibilité des signatures/identifiants avec BFG ; publication CacheStorage BFG ; X PROFIL rouge/noire.
+
+
 VERSION TEST v16.04 — MODE-S FIXE
 Date : 29/08/2026
 Base : TEST v16.03
