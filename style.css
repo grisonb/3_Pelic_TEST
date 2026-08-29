@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.04 */
+/* NPF_STYLE_BUILD_VERSION: v16.05 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16898,3 +16898,245 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
     animation: npfTrafficNonAdsbBlink 1.4s steps(1, end) infinite;
 }
 
+
+
+/* ==========================================================================
+   v16.05 — PROFIL : X ROUGE / NOIRE
+   ========================================================================== */
+.sia-profile-close {
+    background: #dc2626 !important;
+    color: #000000 !important;
+    border-color: #991b1b !important;
+}
+
+/* ==========================================================================
+   v16.05 — NOTAMS LOCAUX DANS LES FICHES PÉLIC
+   ========================================================================== */
+.airport-popup .popup-notams-buttons {
+    margin-top: 6px;
+}
+.airport-popup .pelic-notams-btn {
+    width: 100%;
+    background: #1f618d;
+    color: #ffffff;
+    font-weight: 900;
+}
+
+body.pelic-notams-modal-open {
+    overflow: hidden;
+}
+
+.pelic-notams-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483620;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+    background: rgba(6,24,43,.68);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+.pelic-notams-modal[hidden] {
+    display: none !important;
+}
+.pelic-notams-modal-card {
+    width: min(96vw, 920px);
+    max-height: min(92dvh, 920px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+    border: 1px solid #9db7d7;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 12px 36px rgba(0,0,0,.32);
+}
+.pelic-notams-modal-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #9db7d7;
+    border-left: 8px solid #0b2f6b;
+    background: linear-gradient(90deg, #e7f1fb 0%, #f8fbff 100%);
+}
+.pelic-notams-modal-heading {
+    min-width: 0;
+}
+.pelic-notams-modal-title {
+    color: #0b2f6b;
+    font-size: 18px;
+    font-weight: 950;
+}
+.pelic-notams-modal-source {
+    margin-top: 2px;
+    color: #40556c;
+    font-size: 12px;
+    font-weight: 800;
+}
+.pelic-notams-modal-close {
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid #6b7280;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #111111;
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1;
+    touch-action: manipulation;
+}
+.pelic-notams-modal-status {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    color: #34495e;
+    font-size: 13px;
+    font-weight: 850;
+    text-align: center;
+    background: #f8fafc;
+    border-bottom: 1px solid #dde5ee;
+}
+.pelic-notams-modal-status-warning {
+    color: #856404;
+    background: #fff8df;
+}
+.pelic-notams-modal-controls {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid #dde5ee;
+    background: #ffffff;
+}
+.pelic-notams-modal-controls[hidden] {
+    display: none !important;
+}
+.pelic-notams-modal-controls button {
+    min-height: 40px;
+    padding: 8px 15px;
+    border: 0;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 900;
+    touch-action: manipulation;
+}
+.pelic-notams-keep-selection {
+    background: #28a745;
+}
+.pelic-notams-show-all {
+    background: #7f8c8d;
+}
+.pelic-notams-modal-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px;
+    -webkit-overflow-scrolling: touch;
+    background: #ffffff;
+}
+.pelic-notam-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 11px;
+    padding: 12px;
+    border-left: 5px solid #7fb3d5;
+    border-radius: 5px;
+    background: #f3f8fc;
+    transition: background-color .15s, border-left-color .15s;
+}
+.pelic-notam-item.pelic-notam-kept {
+    border-left-color: #28a745;
+    background: #f0fff4;
+}
+.pelic-notam-item.pelic-notam-excluded {
+    border-left-color: #111111;
+    background: #d9dde2;
+    color: #2f3439;
+}
+.pelic-notam-item.pelic-notam-filtered-hidden {
+    display: none !important;
+}
+.pelic-notam-checkbox-column {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    margin-top: 1px;
+}
+.pelic-notam-checkbox-ring {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 5px rgba(0,0,0,.12);
+}
+.pelic-notam-checkbox-ring-keep {
+    border: 3px solid #28a745;
+}
+.pelic-notam-checkbox-ring-exclude {
+    border: 3px solid #111111;
+    margin-top: 6px;
+}
+.pelic-notam-keep-checkbox,
+.pelic-notam-exclude-checkbox {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+}
+.pelic-notam-keep-checkbox {
+    accent-color: #28a745;
+}
+.pelic-notam-exclude-checkbox {
+    accent-color: #111111;
+}
+.pelic-notam-content-wrapper {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.pelic-notam-validity {
+    margin-bottom: 7px;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 900;
+}
+.pelic-notam-text {
+    color: inherit;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+    .pelic-notams-modal {
+        padding-left: 7px;
+        padding-right: 7px;
+    }
+    .pelic-notams-modal-card {
+        width: 100%;
+        max-height: calc(100dvh - max(14px, env(safe-area-inset-top)) - max(14px, env(safe-area-inset-bottom)));
+    }
+    .pelic-notams-modal-list {
+        padding: 7px;
+    }
+    .pelic-notam-item {
+        padding: 10px 8px;
+    }
+}
