@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-06_notams_nas_local';
-const APP_VERSION = 'v16.06';
+const SW_VERSION = 'sw-v16-08_traffic_alt_glr_gaar_zoom';
+const APP_VERSION = 'v16.08';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
