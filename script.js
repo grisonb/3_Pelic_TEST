@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.02';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.03';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -11931,7 +11931,7 @@ function ensureTrafficSettingsModal() {
                 <label class="traffic-settings-field traffic-settings-checkbox-field">
                     <div class="traffic-settings-check-row">
                         <input id="traffic-only-light-types-input" type="checkbox">
-                        <em>N'afficher que parapentes, deltaplanes, planeurs, etc.</em>
+                        <em>N'afficher que parapentes, deltaplanes, planeurs, ULM, etc.</em>
                     </div>
                 </label>
 
@@ -14459,7 +14459,6 @@ const TRAFFIC_LIGHT_TYPES_HIDDEN_VISUAL_TYPES = new Set([
     'turboprop',
     'light-single',
     'light-twin',
-    'ultralight',
     'helicopter',
     'military'
 ]);
@@ -14468,6 +14467,21 @@ function isTrafficAircraftHiddenByLightTypesFilter(aircraft) {
     return TRAFFIC_LIGHT_TYPES_HIDDEN_VISUAL_TYPES.has(
         resolveTrafficVisualType(aircraft)
     );
+}
+
+/*
+ * v16.03 — signal visuel de provenance SafeSky pour les trafics hors liste.
+ * ADS-B reste fixe. Une source connue différente de l'ADS-B clignote.
+ * Une source absente reste fixe afin de ne pas attribuer une provenance par défaut.
+ */
+function shouldBlinkTrafficAircraftSource(aircraft) {
+    const source = String(aircraft?.source || '')
+        .trim()
+        .toUpperCase();
+    if (!source) return false;
+
+    const compactSource = source.replace(/[^A-Z0-9]/g, '');
+    return compactSource !== 'ADSB';
 }
 
 function getTrafficTypeDisplayLabel(aircraft) {
@@ -15899,6 +15913,10 @@ function buildTrafficMarkerIcon(aircraft) {
     const altitudeState = getTrafficRelativeAltitudeState(aircraft);
     const visual = getTrafficAircraftVisualDefinition(aircraft);
     const isTrackedAircraft = isTrafficAircraftTracked(aircraft);
+    const shouldBlinkSource = (
+        !isTrackedAircraft
+        && shouldBlinkTrafficAircraftSource(aircraft)
+    );
     const symbolRotation = visual.directional && hasTrack ? track : 0;
     const vectorLengthPx = hasTrack
         ? getTrafficSpeedVectorLengthPx(aircraft)
@@ -16004,7 +16022,7 @@ function buildTrafficMarkerIcon(aircraft) {
 
     return L.divIcon({
         className: 'traffic-aircraft-icon',
-        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} ${aircraft.isGrounded ? 'traffic-status-grounded' : 'traffic-status-airborne'} traffic-type-${visual.className}${isTrackedAircraft ? ' traffic-aircraft-tracked' : ''}">${vectorHtml}<span class="traffic-aircraft-arrow" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
+        html: `<span class="traffic-aircraft-symbol-wrap ${altitudeState.className} ${aircraft.isGrounded ? 'traffic-status-grounded' : 'traffic-status-airborne'} traffic-type-${visual.className}${isTrackedAircraft ? ' traffic-aircraft-tracked' : ''}">${vectorHtml}<span class="traffic-aircraft-arrow${shouldBlinkSource ? ' traffic-aircraft-source-blink' : ''}" aria-label="${escapeHtml(visual.label)}" style="transform: translate(-50%, -50%) rotate(${symbolRotation}deg);">${symbolSvg}</span>${altitudeHtml}</span>`,
         iconSize: [42, 42],
         iconAnchor: [21, 21],
         popupAnchor: [0, -13]
