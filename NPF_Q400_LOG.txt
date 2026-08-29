@@ -1,3 +1,56 @@
+VERSION TEST v16.06 — NOTAMS PÉLIC VIA NAS / SYNCHRO LOCALE FIABLE
+Date : 29/08/2026
+Base : TEST v16.05
+
+OBJECTIFS
+- Corriger l'absence de copie NOTAM BFG visible dans NPF sur iPad lorsque les deux PWA isolent leur stockage.
+- Déplacer le bouton NOTAMS sous le bouton VAC dans la fiche des pélicandromes.
+- Synchroniser automatiquement le snapshot NOTAM depuis le NAS vers le stockage local propre à NPF.
+- Conserver l'accès hors ligne et la règle stricte « fichier NOTAM du jour uniquement ».
+
+1. PÉLIC — POSITION DU BOUTON NOTAMS
+- Le bouton NOTAMS reste exclusivement présent sur les pélicandromes permanents et personnalisés.
+- Il est désormais placé immédiatement sous le bouton VAC.
+- Aucun bouton NOTAMS n'est ajouté aux aérodromes ordinaires.
+
+2. CORRECTION iPad — BFG ET NPF NE DÉPENDENT PLUS D'UN CACHE PARTAGÉ
+- Le partage direct CacheStorage/localStorage de v16.05 n'est plus le canal principal.
+- BFG v4.61 publie le snapshot NOTAM sur le NAS via `npf-docs-api.php?action=notams-publish`.
+- NPF récupère silencieusement ce snapshot via `action=notams-snapshot` dès qu'il est ouvert avec réseau et qu'une session BFG/NPF valide peut être obtenue.
+- Le snapshot est alors stocké dans l'IndexedDB propre à NPF (`NpfBfgNotamsDB`).
+- L'ouverture de la fenêtre NOTAMS lit ensuite uniquement la copie locale NPF ; elle reste utilisable hors ligne.
+- L'ancien cache partagé v16.05 est conservé uniquement comme chemin de migration éventuel.
+
+3. SYNCHRONISATION AUTOMATIQUE NPF
+- Synchronisation silencieuse au démarrage après l'autorisation BFG -> NPF.
+- Nouvelle tentative au retour au premier plan, sur `pageshow` et au retour du réseau.
+- Un appui sur NOTAMS tente également une synchronisation silencieuse si la copie locale est absente ou périmée et que le réseau est disponible.
+- Un snapshot NAS ancien ne remplace jamais une copie locale issue d'une publication BFG plus récente.
+
+4. FRAÎCHEUR / AFFICHAGE / SÉLECTION
+- La règle reste stricte : `timestampIso` du PDF BFG doit correspondre au jour courant en Europe/Paris.
+- Les cases BFG « garder » et « exclure » sont reprises comme état initial lorsque BFG publie une nouvelle révision.
+- Les modifications réalisées dans NPF sont stockées dans l'IndexedDB NPF et restent locales.
+- « Garder la sélection » / « Tout afficher » et la présentation v16.05 sont conservés.
+
+5. BFG / NAS NÉCESSAIRES
+- BFG TEST v4.61 accompagne cette version et publie le snapshot NOTAM vers le NAS.
+- `npf-docs-api.php` doit être remplacé par la version fournie avec cette livraison pour exposer `notams-publish` et `notams-snapshot`.
+
+6. ÉLÉMENTS INCHANGÉS
+- PROFIL : X sur fond rouge avec X noire conservée.
+- SafeSky, ADS-B, ADS-BI, MODE-S, GLR, filtre ULM, PÉLIC couleurs/états, VAC, PDF, routes, Communes, Départements, GAAR et moteur offline inchangés hors points explicitement listés ci-dessus.
+- SIA / AIRAC strictement inchangé.
+
+7. CONTRÔLES
+- `node --check` Script NPF.
+- `node --check` Service Worker NPF.
+- Manifest NPF JSON parsé.
+- Cohérence v16.06 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.05.
+- Vérifications ciblées : ordre VAC -> NOTAMS sur PÉLIC ; absence de NOTAMS sur aérodromes ordinaires ; IndexedDB NPF ; synchronisation NAS ; rejet des snapshots hors jour courant.
+
+
 VERSION TEST v16.05 — NOTAMS PÉLIC LOCAUX BFG / PROFIL X ROUGE
 Date : 29/08/2026
 Base : TEST v16.04
