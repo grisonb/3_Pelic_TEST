@@ -1,3 +1,32 @@
+VERSION TEST v16.04 — MODE-S FIXE
+Date : 29/08/2026
+Base : TEST v16.03
+
+OBJECTIF
+- Ne pas faire clignoter les trafics SafeSky MODE-S.
+- Ne modifier aucun autre comportement.
+
+1. SAFESKY — CLIGNOTEMENT SELON LA SOURCE
+- Hors liste suivie, ADS-B reste fixe.
+- Hors liste suivie, MODE-S reste désormais fixe.
+- Hors liste suivie, ADS-BI / FLARM / OGN et les autres sources non ADS-B déjà concernées continuent de clignoter.
+- Les trafics de la liste suivie restent totalement inchangés et ne reçoivent jamais ce clignotement.
+
+2. ÉLÉMENTS INCHANGÉS
+- Filtre « parapentes, deltaplanes, planeurs, ULM, etc. » inchangé.
+- Optimisations carte / SafeSky v16.02 conservées.
+- GLR, BFG, anti-veille iPad, PÉLIC, Communes, Départements, offline, VAC, GAAR inchangés.
+- SIA / AIRAC strictement inchangé.
+
+3. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.04 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.03.
+- Vérification ciblée : ADS-B fixe ; MODE-S fixe ; ADS-BI / FLARM / OGN clignotants hors liste ; liste suivie sans clignotement.
+
+
 VERSION TEST v16.03 — ULM DANS LE FILTRE / CLIGNOTEMENT SOURCES NON ADS-B
 Date : 29/08/2026
 Base : TEST v16.02
