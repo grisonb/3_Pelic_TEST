@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.06 */
+/* NPF_STYLE_BUILD_VERSION: v16.08 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16984,10 +16984,10 @@ body.pelic-notams-modal-open {
     width: 38px;
     height: 38px;
     padding: 0;
-    border: 1px solid #6b7280;
+    border: 1px solid #991b1b;
     border-radius: 8px;
-    background: #ffffff;
-    color: #111111;
+    background: #dc2626;
+    color: #000000;
     font-size: 28px;
     font-weight: 900;
     line-height: 1;
@@ -17007,6 +17007,86 @@ body.pelic-notams-modal-open {
     color: #856404;
     background: #fff8df;
 }
+.pelic-notams-modal-prefilters {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    padding: 9px 12px;
+    border-bottom: 1px solid #dde5ee;
+    background: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+}
+.pelic-notams-modal-prefilters[hidden] {
+    display: none !important;
+}
+.pelic-notams-date-filter-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+}
+.pelic-notams-date-filter-label input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+.pelic-notams-filter-dropdown {
+    position: relative;
+}
+#pelic-notams-keyword-filter-toggle {
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid #8ca2b7;
+    border-radius: 6px;
+    background: #eef4fa;
+    color: #20374f;
+    font-size: 13px;
+    font-weight: 900;
+    touch-action: manipulation;
+}
+.pelic-notams-filter-list {
+    position: absolute;
+    z-index: 4;
+    top: calc(100% + 4px);
+    right: 0;
+    width: min(76vw, 330px);
+    max-height: min(52vh, 430px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 8px;
+    border: 1px solid #8ca2b7;
+    border-radius: 7px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(0,0,0,.24);
+    -webkit-overflow-scrolling: touch;
+}
+.pelic-notams-filter-list[hidden] {
+    display: none !important;
+}
+.pelic-notams-filter-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.pelic-notams-filter-list label:hover {
+    background: #eef4fa;
+}
+.pelic-notams-filter-list input {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
 .pelic-notams-modal-controls {
     flex: 0 0 auto;
     display: flex;
@@ -17063,7 +17143,8 @@ body.pelic-notams-modal-open {
     background: #d9dde2;
     color: #2f3439;
 }
-.pelic-notam-item.pelic-notam-filtered-hidden {
+.pelic-notam-item.pelic-notam-filtered-hidden,
+.pelic-notam-item.pelic-notam-prefilter-hidden {
     display: none !important;
 }
 .pelic-notam-checkbox-column {
@@ -17133,10 +17214,60 @@ body.pelic-notams-modal-open {
         width: 100%;
         max-height: calc(100dvh - max(14px, env(safe-area-inset-top)) - max(14px, env(safe-area-inset-bottom)));
     }
+    .pelic-notams-modal-prefilters {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .pelic-notams-filter-dropdown,
+    #pelic-notams-keyword-filter-toggle {
+        width: 100%;
+    }
+    .pelic-notams-filter-list {
+        left: 0;
+        right: auto;
+        width: 100%;
+    }
     .pelic-notams-modal-list {
         padding: 7px;
     }
     .pelic-notam-item {
         padding: 10px 8px;
     }
+}
+
+
+/* ==========================================================================
+   v16.08 — ALTITUDES TRAFICS / GLR + LÉGER DÉZOOM GAAR NPF
+   ========================================================================== */
+
+/* SafeSky : agrandir uniquement la valeur d'altitude, pas la tendance verticale. */
+.traffic-label-line-secondary .traffic-label-altitude-value {
+    font-size: 12.5px !important;
+    line-height: 15px !important;
+    font-weight: 950 !important;
+}
+
+/* GLR : étiquette sur deux lignes lorsqu'une altitude est disponible. */
+.global-link-aircraft-label-marker .global-link-aircraft-label.glr-with-altitude {
+    flex-direction: column !important;
+    gap: 2px !important;
+    line-height: 1.02 !important;
+}
+
+.global-link-aircraft-label .glr-label-altitude {
+    display: block !important;
+    font-size: 13px !important;
+    line-height: 1.02 !important;
+    font-weight: 950 !important;
+    opacity: .92 !important;
+}
+
+/* GAAR NPF : léger dézoom par rapport au grossissement 1,45 de v15.75. */
+.briefing-doc-viewer-modal.briefing-doc-viewer-gaar-zoom .briefing-doc-viewer-stage .briefing-doc-viewer-frame {
+    width: 71.43% !important;
+    height: 71.43% !important;
+    min-width: 71.43% !important;
+    min-height: 71.43% !important;
+    transform: scale(1.40) !important;
 }
