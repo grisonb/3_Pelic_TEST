@@ -1,3 +1,41 @@
+VERSION TEST v16.03 — ULM DANS LE FILTRE / CLIGNOTEMENT SOURCES NON ADS-B
+Date : 29/08/2026
+Base : TEST v16.02
+
+OBJECTIFS
+- Inclure les ULM dans le filtre « N'afficher que parapentes, deltaplanes, planeurs, ULM, etc. ».
+- Faire clignoter l'icône des trafics SafeSky hors liste suivie dont la source connue n'est pas ADS-B.
+- Ne modifier aucun comportement des trafics de la liste suivie.
+
+1. SAFESKY — FILTRE TYPES LÉGERS
+- Le libellé devient « N'afficher que parapentes, deltaplanes, planeurs, ULM, etc. ».
+- Les ULM SafeSky THREE_AXES_LIGHT_PLANE et les trafics classés visuellement « ultralight » restent visibles lorsque ce filtre est activé.
+- Planeurs, parapentes, deltaplanes, pendulaires, paramoteurs, autogires et autres catégories déjà conservées restent inchangés.
+- Les trafics de la liste suivie restent prioritaires et ne sont jamais masqués par ce filtre.
+
+2. SAFESKY — CLIGNOTEMENT SELON LA SOURCE
+- Hors liste suivie, une source ADS-B reste fixe.
+- Hors liste suivie, les sources connues différentes de l'ADS-B (notamment ADS-BI, FLARM, OGN, MODE-S, etc.) font clignoter uniquement le pictogramme aéronef.
+- Une source absente / inconnue n'est pas forcée en clignotement.
+- Le libellé, l'altitude, le vecteur et le connecteur ne clignotent pas.
+- Les trafics de la liste suivie ne reçoivent jamais ce clignotement, quelle que soit leur source.
+
+3. ÉLÉMENTS INCHANGÉS
+- Optimisations carte / SafeSky v16.02 conservées.
+- Fréquence réseau SafeSky et GLR inchangée.
+- GLR, BFG, anti-veille iPad, PÉLIC, Communes, Départements, offline, VAC, GAAR inchangés.
+- SIA / AIRAC strictement inchangé.
+
+4. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.03 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.02.
+- Vérification ciblée : « ultralight » n'est plus masqué par le filtre types légers.
+- Vérification ciblée : ADS-B fixe ; ADS-BI / FLARM / OGN / MODE-S clignotants hors liste ; liste suivie sans clignotement.
+
+
 VERSION TEST v16.02 — PERFORMANCE CARTE / LISTE SUIVIE PRIORITAIRE
 Date : 29/08/2026
 Base : TEST v16.01
