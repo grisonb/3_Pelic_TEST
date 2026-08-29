@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-02_perf_ss_tracked_filter';
-const APP_VERSION = 'v16.04';
+const SW_VERSION = 'sw-v16-05_pelic_notams_profile';
+const APP_VERSION = 'v16.05';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
