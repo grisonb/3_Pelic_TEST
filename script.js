@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.03';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.04';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -14470,9 +14470,10 @@ function isTrafficAircraftHiddenByLightTypesFilter(aircraft) {
 }
 
 /*
- * v16.03 — signal visuel de provenance SafeSky pour les trafics hors liste.
- * ADS-B reste fixe. Une source connue différente de l'ADS-B clignote.
- * Une source absente reste fixe afin de ne pas attribuer une provenance par défaut.
+ * v16.04 — signal visuel de provenance SafeSky pour les trafics hors liste.
+ * ADS-B et MODE-S restent fixes. Les autres sources non ADS-B déjà concernées
+ * continuent de clignoter. Une source absente reste fixe afin de ne pas attribuer
+ * une provenance par défaut.
  */
 function shouldBlinkTrafficAircraftSource(aircraft) {
     const source = String(aircraft?.source || '')
@@ -14481,7 +14482,7 @@ function shouldBlinkTrafficAircraftSource(aircraft) {
     if (!source) return false;
 
     const compactSource = source.replace(/[^A-Z0-9]/g, '');
-    return compactSource !== 'ADSB';
+    return !['ADSB', 'MODES'].includes(compactSource);
 }
 
 function getTrafficTypeDisplayLabel(aircraft) {
