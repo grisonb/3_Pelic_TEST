@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.05';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.06';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -3745,9 +3745,20 @@ async function initializeApp() {
      */
     setTimeout(() => {
         tryAuthorizeBriefingDocsFromBfgBridge({ silent: true })
-            .then(() => refreshBriefingDocMapButtons().catch(() => {}))
+            .then(async () => {
+                await refreshBriefingDocMapButtons().catch(() => {});
+                await syncNpfBfgNotamsFromNas({ silent: true }).catch(() => false);
+            })
             .catch(() => {});
     }, 2200);
+
+    // v16.06 — si BFG a été utilisé pendant que NPF était en arrière-plan,
+    // le retour au premier plan récupère automatiquement le snapshot NAS.
+    window.addEventListener('online', () => scheduleNpfBfgNotamsBackgroundSync(350));
+    window.addEventListener('pageshow', () => scheduleNpfBfgNotamsBackgroundSync(700));
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') scheduleNpfBfgNotamsBackgroundSync(500);
+    });
 
     /*
      * VAC : contrôle différé et non bloquant.
@@ -21755,16 +21766,24 @@ function buildPelicanMapIconClass(airport, isDisabled, isWater) {
 }
 
 /* ========================================================================== 
-   v16.05 — NOTAMS PÉLIC LOCAUX DEPUIS BFG
+   v16.06 — NOTAMS PÉLIC : SNAPSHOT NAS -> STOCKAGE LOCAL NPF
    --------------------------------------------------------------------------
-   BFG et NPF restent deux PWA distinctes sur iPad. On n'utilise donc pas le
-   localStorage/IndexedDB BFG comme dépendance principale. BFG v4.60 publie un
-   snapshot NOTAM dans CacheStorage sous une clé de même origine ; NPF ne fait
-   ici qu'une lecture locale, utilisable hors ligne.
+   Les PWA BFG et NPF installées sur iPad peuvent être isolées par WebKit.
+   BFG v4.61 publie donc le snapshot NOTAM sur le NAS. NPF le récupère
+   silencieusement lorsqu'il dispose du réseau et de l'autorisation BFG/NPF,
+   puis l'enregistre dans son propre IndexedDB. L'ouverture de la fenêtre NOTAMS
+   reste ensuite 100 % locale et hors ligne.
    ========================================================================== */
+const NPF_BFG_NOTAMS_DB_NAME = 'NpfBfgNotamsDB';
+const NPF_BFG_NOTAMS_DB_VERSION = 1;
+const NPF_BFG_NOTAMS_STORE_NAME = 'snapshots';
+const NPF_BFG_NOTAMS_RECORD_ID = 'current';
+// Ancien canal v16.05 conservé uniquement comme migration éventuelle.
 const NPF_BFG_NOTAMS_SHARED_CACHE_NAME = 'bfg-npf-shared-notams-v1';
 const NPF_BFG_NOTAMS_SHARED_LOCAL_KEY = 'bfgNpfSharedNotamsV1';
 const NPF_BFG_NOTAMS_SHARED_URL_PATH = '/__bfg_npf_shared__/notams-v1.json';
+let npfBfgNotamsDb = null;
+let npfBfgNotamsSyncPromise = null;
 let npfPelicNotamsCurrentPayload = null;
 let npfPelicNotamsCurrentOaci = '';
 let npfPelicNotamsViewMode = 'all';
@@ -21775,6 +21794,59 @@ function getNpfBfgNotamsSharedUrl() {
     } catch (_) {
         return NPF_BFG_NOTAMS_SHARED_URL_PATH;
     }
+}
+
+function initNpfBfgNotamsDb() {
+    if (npfBfgNotamsDb) return Promise.resolve(npfBfgNotamsDb);
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) { reject(new Error('IndexedDB indisponible')); return; }
+        const request = indexedDB.open(NPF_BFG_NOTAMS_DB_NAME, NPF_BFG_NOTAMS_DB_VERSION);
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(NPF_BFG_NOTAMS_STORE_NAME)) {
+                db.createObjectStore(NPF_BFG_NOTAMS_STORE_NAME, { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = () => {
+            npfBfgNotamsDb = request.result;
+            npfBfgNotamsDb.onversionchange = () => {
+                try { npfBfgNotamsDb.close(); } catch (_) {}
+                npfBfgNotamsDb = null;
+            };
+            resolve(npfBfgNotamsDb);
+        };
+        request.onerror = () => reject(request.error || new Error('Base NOTAM NPF indisponible'));
+        request.onblocked = () => reject(new Error('Base NOTAM NPF bloquée'));
+    });
+}
+
+async function getNpfBfgNotamsLocalRecord() {
+    const db = await initNpfBfgNotamsDb();
+    return await new Promise((resolve, reject) => {
+        const tx = db.transaction(NPF_BFG_NOTAMS_STORE_NAME, 'readonly');
+        const request = tx.objectStore(NPF_BFG_NOTAMS_STORE_NAME).get(NPF_BFG_NOTAMS_RECORD_ID);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error || new Error('Lecture NOTAM locale impossible'));
+    });
+}
+
+async function putNpfBfgNotamsLocalPayload(payload, options = {}) {
+    if (!payload || payload.version !== 'bfgNpfNotamsV1') return false;
+    const db = await initNpfBfgNotamsDb();
+    const record = {
+        id: NPF_BFG_NOTAMS_RECORD_ID,
+        payload,
+        remotePublishedAt: String(options.remotePublishedAt || payload.remotePublishedAt || payload.publishedAt || ''),
+        cachedAt: new Date().toISOString()
+    };
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(NPF_BFG_NOTAMS_STORE_NAME, 'readwrite');
+        tx.objectStore(NPF_BFG_NOTAMS_STORE_NAME).put(record);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error || new Error('Enregistrement NOTAM local impossible'));
+        tx.onabort = () => reject(tx.error || new Error('Enregistrement NOTAM local interrompu'));
+    });
+    return true;
 }
 
 function npfPelicNotamsParisDateKey(value = new Date()) {
@@ -21891,60 +21963,114 @@ function parseNpfBfgNotamValidity(notamBlock) {
 }
 
 async function readNpfBfgNotamsSharedPayload() {
+    try {
+        const record = await getNpfBfgNotamsLocalRecord();
+        const payload = record?.payload;
+        if (payload && payload.version === 'bfgNpfNotamsV1') return payload;
+    } catch (error) {
+        console.warn('NPF NOTAMS : lecture IndexedDB locale impossible.', error);
+    }
+
+    // Migration v16.05 : si une ancienne copie est exceptionnellement visible,
+    // on la rapatrie une seule fois dans l'IndexedDB propre à NPF.
+    let legacyPayload = null;
     if ('caches' in window) {
         try {
             const cache = await caches.open(NPF_BFG_NOTAMS_SHARED_CACHE_NAME);
             const response = await cache.match(getNpfBfgNotamsSharedUrl());
             if (response) {
                 const payload = await response.json();
-                if (payload && payload.version === 'bfgNpfNotamsV1') return payload;
+                if (payload && payload.version === 'bfgNpfNotamsV1') legacyPayload = payload;
             }
-        } catch (error) {
-            console.warn('NPF NOTAMS : lecture CacheStorage BFG impossible.', error);
-        }
+        } catch (_) {}
     }
-
-    try {
-        const raw = localStorage.getItem(NPF_BFG_NOTAMS_SHARED_LOCAL_KEY);
-        if (raw) {
-            const payload = JSON.parse(raw);
-            if (payload && payload.version === 'bfgNpfNotamsV1') return payload;
-        }
-    } catch (error) {
-        console.warn('NPF NOTAMS : fallback localStorage BFG impossible.', error);
+    if (!legacyPayload) {
+        try {
+            const raw = localStorage.getItem(NPF_BFG_NOTAMS_SHARED_LOCAL_KEY);
+            const payload = raw ? JSON.parse(raw) : null;
+            if (payload && payload.version === 'bfgNpfNotamsV1') legacyPayload = payload;
+        } catch (_) {}
     }
-
+    if (legacyPayload) {
+        try { await putNpfBfgNotamsLocalPayload(legacyPayload); } catch (_) {}
+        return legacyPayload;
+    }
     return null;
 }
 
 async function writeNpfBfgNotamsSharedPayload(payload) {
     if (!payload || payload.version !== 'bfgNpfNotamsV1') return false;
-    const serialized = JSON.stringify(payload);
-    let written = false;
-
-    if ('caches' in window) {
-        try {
-            const cache = await caches.open(NPF_BFG_NOTAMS_SHARED_CACHE_NAME);
-            await cache.put(
-                getNpfBfgNotamsSharedUrl(),
-                new Response(serialized, {
-                    headers: {
-                        'Content-Type': 'application/json; charset=utf-8',
-                        'Cache-Control': 'no-store'
-                    }
-                })
-            );
-            written = true;
-        } catch (error) {
-            console.warn('NPF NOTAMS : écriture CacheStorage locale impossible.', error);
-        }
+    try {
+        const current = await getNpfBfgNotamsLocalRecord().catch(() => null);
+        return await putNpfBfgNotamsLocalPayload(payload, {
+            remotePublishedAt: current?.remotePublishedAt || payload.remotePublishedAt || payload.publishedAt || ''
+        });
+    } catch (error) {
+        console.warn('NPF NOTAMS : écriture IndexedDB locale impossible.', error);
+        return false;
     }
+}
+
+async function syncNpfBfgNotamsFromNas(options = {}) {
+    if (npfBfgNotamsSyncPromise) return npfBfgNotamsSyncPromise;
+    if (!navigator.onLine) return false;
+
+    npfBfgNotamsSyncPromise = (async () => {
+        let session = getStoredBriefingDocsSession();
+        if (!session) session = await tryAuthorizeBriefingDocsFromBfgBridge({ silent: true });
+        if (!session) return false;
+
+        const response = await fetchBriefingDocsNas(
+            `${NPF_BRIEFING_DOCS_API_URL}?action=notams-snapshot&t=${Date.now()}`,
+            { method: 'GET', headers: briefingDocsAuthHeaders(session) },
+            12000
+        );
+        if (response.status === 404) return false;
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload || payload.version !== 'bfgNpfNotamsV1') {
+            if (!options.silent) {
+                throw new Error(payload?.message || payload?.error || `Snapshot NOTAM indisponible (${response.status})`);
+            }
+            return false;
+        }
+
+        // Un snapshot ancien n'écrase jamais une éventuelle copie locale plus récente.
+        if (!isNpfPelicNotamsPayloadCurrentToday(payload)) return false;
+
+        const localRecord = await getNpfBfgNotamsLocalRecord().catch(() => null);
+        const localRemotePublishedAt = String(localRecord?.remotePublishedAt || localRecord?.payload?.remotePublishedAt || localRecord?.payload?.publishedAt || '');
+        const remotePublishedAt = String(payload.publishedAt || '');
+        const localTs = Date.parse(localRemotePublishedAt);
+        const remoteTs = Date.parse(remotePublishedAt);
+        if (localRecord?.payload && Number.isFinite(localTs) && Number.isFinite(remoteTs) && remoteTs <= localTs) {
+            return false;
+        }
+
+        const localPayload = {
+            ...payload,
+            remotePublishedAt,
+            npfCachedAt: new Date().toISOString()
+        };
+        await putNpfBfgNotamsLocalPayload(localPayload, { remotePublishedAt });
+        return true;
+    })();
 
     try {
-        localStorage.setItem(NPF_BFG_NOTAMS_SHARED_LOCAL_KEY, serialized);
-        written = true;
-    } catch (_) {}
-    return written;
+        return await npfBfgNotamsSyncPromise;
+    } catch (error) {
+        if (!options.silent) throw error;
+        console.info('[NPF NOTAMS] Synchronisation NAS ignorée:', error?.message || error);
+        return false;
+    } finally {
+        npfBfgNotamsSyncPromise = null;
+    }
+}
+
+function scheduleNpfBfgNotamsBackgroundSync(delayMs = 0) {
+    setTimeout(() => {
+        if (document.visibilityState === 'hidden' || !navigator.onLine) return;
+        syncNpfBfgNotamsFromNas({ silent: true }).catch(() => {});
+    }, Math.max(0, Number(delayMs) || 0));
 }
 
 function ensureNpfPelicNotamsModal() {
@@ -22184,12 +22310,18 @@ async function openNpfPelicNotams(oaci) {
     if (controls) controls.hidden = true;
     if (list) list.innerHTML = '';
 
-    const payload = await readNpfBfgNotamsSharedPayload();
+    let payload = await readNpfBfgNotamsSharedPayload();
+    if ((!payload || !isNpfPelicNotamsPayloadCurrentToday(payload)) && navigator.onLine) {
+        await syncNpfBfgNotamsFromNas({ silent: true }).catch(() => false);
+        payload = await readNpfBfgNotamsSharedPayload();
+    }
     if (!payload) {
         npfPelicNotamsCurrentPayload = null;
-        if (source) source.textContent = 'Source locale BFG';
+        if (source) source.textContent = 'Source locale NPF';
         if (status) {
-            status.textContent = 'Aucune copie locale NOTAM BFG disponible sur cet appareil.';
+            status.textContent = navigator.onLine
+                ? 'Aucun snapshot NOTAM BFG disponible sur le NAS ou dans NPF.'
+                : 'Aucune copie locale NOTAM BFG disponible sur cet appareil.';
             status.classList.add('pelic-notams-modal-status-warning');
         }
         return;
@@ -22246,7 +22378,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicNotamsButtonHtml(airport.oaci)}${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
+            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
@@ -22304,7 +22436,7 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicNotamsButtonHtml(airport.oaci)}${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
         marker.bindPopup(popupHtml);
         marker.addTo(permanentAirportLayer);
         addAirportTouchHitbox(airport, popupHtml);
