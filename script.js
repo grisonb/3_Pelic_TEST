@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.04';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.05';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -21754,6 +21754,460 @@ function buildPelicanMapIconClass(airport, isDisabled, isWater) {
     return classes.join(' ');
 }
 
+/* ========================================================================== 
+   v16.05 — NOTAMS PÉLIC LOCAUX DEPUIS BFG
+   --------------------------------------------------------------------------
+   BFG et NPF restent deux PWA distinctes sur iPad. On n'utilise donc pas le
+   localStorage/IndexedDB BFG comme dépendance principale. BFG v4.60 publie un
+   snapshot NOTAM dans CacheStorage sous une clé de même origine ; NPF ne fait
+   ici qu'une lecture locale, utilisable hors ligne.
+   ========================================================================== */
+const NPF_BFG_NOTAMS_SHARED_CACHE_NAME = 'bfg-npf-shared-notams-v1';
+const NPF_BFG_NOTAMS_SHARED_LOCAL_KEY = 'bfgNpfSharedNotamsV1';
+const NPF_BFG_NOTAMS_SHARED_URL_PATH = '/__bfg_npf_shared__/notams-v1.json';
+let npfPelicNotamsCurrentPayload = null;
+let npfPelicNotamsCurrentOaci = '';
+let npfPelicNotamsViewMode = 'all';
+
+function getNpfBfgNotamsSharedUrl() {
+    try {
+        return new URL(NPF_BFG_NOTAMS_SHARED_URL_PATH, window.location.origin).toString();
+    } catch (_) {
+        return NPF_BFG_NOTAMS_SHARED_URL_PATH;
+    }
+}
+
+function npfPelicNotamsParisDateKey(value = new Date()) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    try {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Europe/Paris',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        }).formatToParts(date);
+        const byType = Object.fromEntries(parts.map(part => [part.type, part.value]));
+        return `${byType.year || ''}-${byType.month || ''}-${byType.day || ''}`;
+    } catch (_) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+}
+
+function isNpfPelicNotamsPayloadCurrentToday(payload) {
+    const timestampIso = String(payload?.notamsAutoPdfStatus?.timestampIso || '').trim();
+    if (!timestampIso) return false;
+    const sourceDay = npfPelicNotamsParisDateKey(timestampIso);
+    const today = npfPelicNotamsParisDateKey(new Date());
+    return Boolean(sourceDay && today && sourceDay === today);
+}
+
+function normalizeNpfBfgNotamTextForState(text) {
+    return String(text || '')
+        .replace(/\r/g, '\n')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+}
+
+function hashNpfBfgNotamTextForState(text) {
+    const input = normalizeNpfBfgNotamTextForState(text);
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+}
+
+function createNpfBfgNotamRecord(notamText, icao) {
+    const normalizedOaci = String(icao || '').trim().toUpperCase();
+    const text = String(notamText || '').trim();
+    const signature = hashNpfBfgNotamTextForState(text);
+    const firstLine = text.split('\n')[0] || '';
+    const notamNumberMatch = firstLine.match(/([A-Z]\d{4}\/\d{2})$/);
+    const notamNumber = notamNumberMatch ? notamNumberMatch[1].replace('/', '-') : null;
+    let id = '';
+
+    if (notamNumber) {
+        id = `${normalizedOaci}-${notamNumber}`;
+    } else {
+        const bMatch = text.match(/B\)\s*(\d{10})/);
+        const cMatch = text.match(/C\)\s*(\d{10}|PERM)/);
+        if (bMatch && cMatch) id = `${normalizedOaci}-${bMatch[1]}-${cMatch[1]}`;
+    }
+
+    if (!id) id = `${normalizedOaci}-SIG-${signature}`;
+    return { id, signature, text };
+}
+
+function extractNpfBfgNotamsForOaci(rawText, targetOaci) {
+    const normalizedOaci = String(targetOaci || '').trim().toUpperCase();
+    if (!normalizedOaci) return [];
+
+    const airportSections = String(rawText || '').split(/\n\s*(?=LF[A-Z]{2}\s+-\s+)/);
+    let matchingSection = null;
+
+    for (const section of airportSections) {
+        const lines = String(section || '').trim().split('\n');
+        const header = lines.shift() || '';
+        if (!header.match(/^LF[A-Z]{2}\s+-\s+/)) continue;
+        if (header.split(' ')[0].toUpperCase() !== normalizedOaci) continue;
+        matchingSection = { header, lines };
+        break;
+    }
+
+    if (!matchingSection) return [];
+    if (matchingSection.header.includes('No information received')) return [];
+
+    const content = matchingSection.lines.join('\n').replace(/Page \d+ of \d+\s*\n?/gi, '');
+    let currentNotamNumber = '';
+    const processedBlocks = [];
+
+    content.split('\n').forEach(line => {
+        const notamNumberMatch = line.match(/([A-Z]\d{4}\/\d{2})$/);
+        if (notamNumberMatch) currentNotamNumber = notamNumberMatch[1];
+        if (line.startsWith('Q)')) {
+            processedBlocks.push(line.trim() + ' ' + currentNotamNumber);
+        } else if (processedBlocks.length > 0) {
+            processedBlocks[processedBlocks.length - 1] += '\n' + line;
+        }
+    });
+
+    return processedBlocks
+        .map(blockText => createNpfBfgNotamRecord(blockText, normalizedOaci))
+        .filter(record => record.text);
+}
+
+function parseNpfBfgNotamValidity(notamBlock) {
+    const bMatch = String(notamBlock || '').match(/B\)\s*(\d{10})/);
+    const cMatch = String(notamBlock || '').match(/C\)\s*(\d{10}|PERM)/);
+    if (!bMatch || !cMatch) return '';
+    const s = bMatch[1];
+    const e = cMatch[1];
+    return `VALIDE DU ${s.substring(4,6)}/${s.substring(2,4)}/20${s.substring(0,2)} à ${s.substring(6,8)}h${s.substring(8,10)} AU ${e === 'PERM' ? 'PERMANENT' : `${e.substring(4,6)}/${e.substring(2,4)}/20${e.substring(0,2)} à ${e.substring(6,8)}h${e.substring(8,10)}`}`;
+}
+
+async function readNpfBfgNotamsSharedPayload() {
+    if ('caches' in window) {
+        try {
+            const cache = await caches.open(NPF_BFG_NOTAMS_SHARED_CACHE_NAME);
+            const response = await cache.match(getNpfBfgNotamsSharedUrl());
+            if (response) {
+                const payload = await response.json();
+                if (payload && payload.version === 'bfgNpfNotamsV1') return payload;
+            }
+        } catch (error) {
+            console.warn('NPF NOTAMS : lecture CacheStorage BFG impossible.', error);
+        }
+    }
+
+    try {
+        const raw = localStorage.getItem(NPF_BFG_NOTAMS_SHARED_LOCAL_KEY);
+        if (raw) {
+            const payload = JSON.parse(raw);
+            if (payload && payload.version === 'bfgNpfNotamsV1') return payload;
+        }
+    } catch (error) {
+        console.warn('NPF NOTAMS : fallback localStorage BFG impossible.', error);
+    }
+
+    return null;
+}
+
+async function writeNpfBfgNotamsSharedPayload(payload) {
+    if (!payload || payload.version !== 'bfgNpfNotamsV1') return false;
+    const serialized = JSON.stringify(payload);
+    let written = false;
+
+    if ('caches' in window) {
+        try {
+            const cache = await caches.open(NPF_BFG_NOTAMS_SHARED_CACHE_NAME);
+            await cache.put(
+                getNpfBfgNotamsSharedUrl(),
+                new Response(serialized, {
+                    headers: {
+                        'Content-Type': 'application/json; charset=utf-8',
+                        'Cache-Control': 'no-store'
+                    }
+                })
+            );
+            written = true;
+        } catch (error) {
+            console.warn('NPF NOTAMS : écriture CacheStorage locale impossible.', error);
+        }
+    }
+
+    try {
+        localStorage.setItem(NPF_BFG_NOTAMS_SHARED_LOCAL_KEY, serialized);
+        written = true;
+    } catch (_) {}
+    return written;
+}
+
+function ensureNpfPelicNotamsModal() {
+    let modal = document.getElementById('pelic-notams-modal');
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = 'pelic-notams-modal';
+    modal.className = 'pelic-notams-modal';
+    modal.hidden = true;
+    modal.innerHTML = `
+        <div class="pelic-notams-modal-card" role="dialog" aria-modal="true" aria-labelledby="pelic-notams-modal-title">
+            <div class="pelic-notams-modal-header">
+                <div class="pelic-notams-modal-heading">
+                    <div id="pelic-notams-modal-title" class="pelic-notams-modal-title">NOTAMS</div>
+                    <div id="pelic-notams-modal-source" class="pelic-notams-modal-source"></div>
+                </div>
+                <button type="button" class="pelic-notams-modal-close" aria-label="Fermer">×</button>
+            </div>
+            <div id="pelic-notams-modal-status" class="pelic-notams-modal-status"></div>
+            <div id="pelic-notams-modal-controls" class="pelic-notams-modal-controls" hidden>
+                <button type="button" class="pelic-notams-keep-selection">Garder la sélection</button>
+                <button type="button" class="pelic-notams-show-all" hidden>Tout afficher</button>
+            </div>
+            <div id="pelic-notams-modal-list" class="pelic-notams-modal-list"></div>
+        </div>`;
+    document.body.appendChild(modal);
+
+    const close = () => {
+        modal.hidden = true;
+        document.body.classList.remove('pelic-notams-modal-open');
+    };
+    modal.querySelector('.pelic-notams-modal-close')?.addEventListener('click', close);
+    modal.addEventListener('click', event => {
+        if (event.target === modal) close();
+    });
+    modal.querySelector('.pelic-notams-keep-selection')?.addEventListener('click', () => {
+        npfPelicNotamsViewMode = 'selection';
+        applyNpfPelicNotamsViewMode();
+    });
+    modal.querySelector('.pelic-notams-show-all')?.addEventListener('click', () => {
+        npfPelicNotamsViewMode = 'all';
+        applyNpfPelicNotamsViewMode();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !modal.hidden) close();
+    });
+    return modal;
+}
+
+function getNpfPelicNotamStateEntry(payload, record) {
+    const byId = payload?.state?.byId || {};
+    const entry = byId[record.id];
+    if (!entry || typeof entry !== 'object') return null;
+    const expected = String(entry.textSignature || entry.signature || '').trim();
+    if (expected && expected !== record.signature) return null;
+    return entry;
+}
+
+function updateNpfPelicNotamSharedState(record, checked, hiddenUntilChanged) {
+    if (!npfPelicNotamsCurrentPayload || !record?.id) return;
+    const payload = npfPelicNotamsCurrentPayload;
+    if (!payload.state || typeof payload.state !== 'object') {
+        payload.state = { version: 'persistentNotamStateV1', updatedAt: new Date().toISOString(), byId: {} };
+    }
+    if (!payload.state.byId || typeof payload.state.byId !== 'object') payload.state.byId = {};
+
+    const previous = payload.state.byId[record.id] && typeof payload.state.byId[record.id] === 'object'
+        ? { ...payload.state.byId[record.id] }
+        : {};
+    const next = {
+        ...previous,
+        checked: Boolean(checked),
+        hiddenUntilChanged: Boolean(hiddenUntilChanged),
+        textSignature: record.signature
+    };
+    const hasOtherPersistentData = Boolean(next.highlightHtml || next.validityHighlightHtml);
+
+    if (!next.checked && !next.hiddenUntilChanged && !hasOtherPersistentData) {
+        delete payload.state.byId[record.id];
+    } else {
+        payload.state.byId[record.id] = next;
+    }
+    payload.state.updatedAt = new Date().toISOString();
+    payload.npfSelectionUpdatedAt = payload.state.updatedAt;
+    void writeNpfBfgNotamsSharedPayload(payload);
+}
+
+function applyNpfPelicNotamsViewMode() {
+    const modal = document.getElementById('pelic-notams-modal');
+    if (!modal) return;
+    const selectionOnly = npfPelicNotamsViewMode === 'selection';
+    modal.querySelectorAll('.pelic-notam-item').forEach(item => {
+        const keep = Boolean(item.querySelector('.pelic-notam-keep-checkbox')?.checked);
+        const exclude = Boolean(item.querySelector('.pelic-notam-exclude-checkbox')?.checked);
+        item.classList.toggle('pelic-notam-filtered-hidden', selectionOnly && (!keep || exclude));
+    });
+    const keepButton = modal.querySelector('.pelic-notams-keep-selection');
+    const showAllButton = modal.querySelector('.pelic-notams-show-all');
+    if (keepButton) keepButton.hidden = selectionOnly;
+    if (showAllButton) showAllButton.hidden = !selectionOnly;
+}
+
+function refreshNpfPelicNotamItemState(item) {
+    if (!item) return;
+    const keep = Boolean(item.querySelector('.pelic-notam-keep-checkbox')?.checked);
+    const exclude = Boolean(item.querySelector('.pelic-notam-exclude-checkbox')?.checked);
+    item.classList.toggle('pelic-notam-kept', keep && !exclude);
+    item.classList.toggle('pelic-notam-excluded', exclude);
+}
+
+function renderNpfPelicNotams(payload, oaci) {
+    const modal = ensureNpfPelicNotamsModal();
+    const title = modal.querySelector('#pelic-notams-modal-title');
+    const source = modal.querySelector('#pelic-notams-modal-source');
+    const status = modal.querySelector('#pelic-notams-modal-status');
+    const controls = modal.querySelector('#pelic-notams-modal-controls');
+    const list = modal.querySelector('#pelic-notams-modal-list');
+
+    if (title) title.textContent = `NOTAMS ${oaci}`;
+    if (source) source.textContent = String(payload?.notamsAutoPdfStatus?.timestampText || 'Source locale BFG');
+    if (status) status.textContent = '';
+    if (list) list.innerHTML = '';
+    if (controls) controls.hidden = true;
+
+    if (!isNpfPelicNotamsPayloadCurrentToday(payload)) {
+        if (status) {
+            const last = String(payload?.notamsAutoPdfStatus?.timestampText || '').trim();
+            status.textContent = last
+                ? `Aucun fichier NOTAM du jour disponible. ${last}`
+                : 'Aucun fichier NOTAM du jour disponible.';
+            status.classList.add('pelic-notams-modal-status-warning');
+        }
+        return;
+    }
+
+    if (status) status.classList.remove('pelic-notams-modal-status-warning');
+    const records = extractNpfBfgNotamsForOaci(payload.notamText || '', oaci);
+    if (!records.length) {
+        if (status) status.textContent = `Aucun NOTAM ${oaci} dans le fichier BFG du jour.`;
+        return;
+    }
+
+    if (status) status.textContent = `${records.length} NOTAM(s) — copie locale BFG du jour.`;
+    if (controls) controls.hidden = false;
+
+    records.forEach(record => {
+        const entry = getNpfPelicNotamStateEntry(payload, record);
+        const item = document.createElement('div');
+        item.className = 'pelic-notam-item';
+        item.dataset.notamId = record.id;
+        item.dataset.notamSignature = record.signature;
+
+        const checkboxColumn = document.createElement('div');
+        checkboxColumn.className = 'pelic-notam-checkbox-column';
+
+        const keepLabel = document.createElement('label');
+        keepLabel.className = 'pelic-notam-checkbox-ring pelic-notam-checkbox-ring-keep';
+        keepLabel.title = 'Garder ce NOTAM dans la sélection';
+        const keepCheckbox = document.createElement('input');
+        keepCheckbox.type = 'checkbox';
+        keepCheckbox.className = 'pelic-notam-keep-checkbox';
+        keepCheckbox.setAttribute('aria-label', 'Garder ce NOTAM dans la sélection');
+        keepCheckbox.checked = Boolean(entry?.checked);
+        keepLabel.appendChild(keepCheckbox);
+
+        const excludeLabel = document.createElement('label');
+        excludeLabel.className = 'pelic-notam-checkbox-ring pelic-notam-checkbox-ring-exclude';
+        excludeLabel.title = 'Exclure ce NOTAM tant qu’il ne change pas';
+        const excludeCheckbox = document.createElement('input');
+        excludeCheckbox.type = 'checkbox';
+        excludeCheckbox.className = 'pelic-notam-exclude-checkbox';
+        excludeCheckbox.setAttribute('aria-label', 'Exclure ce NOTAM tant qu’il ne change pas');
+        excludeCheckbox.checked = Boolean(entry?.hiddenUntilChanged);
+        excludeLabel.appendChild(excludeCheckbox);
+
+        checkboxColumn.appendChild(keepLabel);
+        checkboxColumn.appendChild(excludeLabel);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pelic-notam-content-wrapper';
+        const validityText = parseNpfBfgNotamValidity(record.text);
+        if (validityText) {
+            const validity = document.createElement('div');
+            validity.className = 'pelic-notam-validity';
+            validity.textContent = validityText;
+            wrapper.appendChild(validity);
+        }
+        const text = document.createElement('div');
+        text.className = 'pelic-notam-text';
+        text.textContent = record.text;
+        wrapper.appendChild(text);
+
+        item.appendChild(checkboxColumn);
+        item.appendChild(wrapper);
+        list.appendChild(item);
+        refreshNpfPelicNotamItemState(item);
+
+        keepCheckbox.addEventListener('change', () => {
+            if (keepCheckbox.checked) excludeCheckbox.checked = false;
+            refreshNpfPelicNotamItemState(item);
+            updateNpfPelicNotamSharedState(record, keepCheckbox.checked, excludeCheckbox.checked);
+            applyNpfPelicNotamsViewMode();
+        });
+        excludeCheckbox.addEventListener('change', () => {
+            if (excludeCheckbox.checked) keepCheckbox.checked = false;
+            refreshNpfPelicNotamItemState(item);
+            updateNpfPelicNotamSharedState(record, keepCheckbox.checked, excludeCheckbox.checked);
+            applyNpfPelicNotamsViewMode();
+        });
+    });
+
+    applyNpfPelicNotamsViewMode();
+}
+
+async function openNpfPelicNotams(oaci) {
+    const normalizedOaci = String(oaci || '').trim().toUpperCase();
+    if (!normalizedOaci) return;
+    const modal = ensureNpfPelicNotamsModal();
+    npfPelicNotamsCurrentOaci = normalizedOaci;
+    npfPelicNotamsViewMode = 'all';
+    modal.hidden = false;
+    document.body.classList.add('pelic-notams-modal-open');
+    try { map?.closePopup?.(); } catch (_) {}
+
+    const title = modal.querySelector('#pelic-notams-modal-title');
+    const source = modal.querySelector('#pelic-notams-modal-source');
+    const status = modal.querySelector('#pelic-notams-modal-status');
+    const controls = modal.querySelector('#pelic-notams-modal-controls');
+    const list = modal.querySelector('#pelic-notams-modal-list');
+    if (title) title.textContent = `NOTAMS ${normalizedOaci}`;
+    if (source) source.textContent = 'Lecture locale BFG…';
+    if (status) {
+        status.classList.remove('pelic-notams-modal-status-warning');
+        status.textContent = 'Chargement des NOTAM locaux…';
+    }
+    if (controls) controls.hidden = true;
+    if (list) list.innerHTML = '';
+
+    const payload = await readNpfBfgNotamsSharedPayload();
+    if (!payload) {
+        npfPelicNotamsCurrentPayload = null;
+        if (source) source.textContent = 'Source locale BFG';
+        if (status) {
+            status.textContent = 'Aucune copie locale NOTAM BFG disponible sur cet appareil.';
+            status.classList.add('pelic-notams-modal-status-warning');
+        }
+        return;
+    }
+
+    npfPelicNotamsCurrentPayload = payload;
+    renderNpfPelicNotams(payload, normalizedOaci);
+}
+
+function buildPelicNotamsButtonHtml(oaci) {
+    const normalizedOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!normalizedOaci) return '';
+    return `<div class="popup-notams-buttons"><button type="button" class="pelic-notams-btn" onclick="window.openPelicNotams('${normalizedOaci}')">NOTAMS</button></div>`;
+}
+
+window.openPelicNotams = openNpfPelicNotams;
+
+
 function drawPermanentAirportMarkers() {
     permanentAirportLayer.clearLayers();
 
@@ -21792,7 +22246,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
+            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicNotamsButtonHtml(airport.oaci)}${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
@@ -21850,7 +22304,7 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicNotamsButtonHtml(airport.oaci)}${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}</div>`;
         marker.bindPopup(popupHtml);
         marker.addTo(permanentAirportLayer);
         addAirportTouchHitbox(airport, popupHtml);
