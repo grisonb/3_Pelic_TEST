@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.02 */
+/* NPF_STYLE_BUILD_VERSION: v16.03 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -16885,5 +16885,16 @@ body.simulation-mode-active #ops-frequencies-pdf-button {
         border-width: 2px;
         font-size: 14px;
     }
+}
+
+/* v16.03 — source SafeSky non ADS-B hors liste suivie : pictogramme seul. */
+@keyframes npfTrafficNonAdsbBlink {
+    0%, 44% { opacity: 1; }
+    50%, 94% { opacity: 0.18; }
+    100% { opacity: 1; }
+}
+
+.traffic-aircraft-arrow.traffic-aircraft-source-blink {
+    animation: npfTrafficNonAdsbBlink 1.4s steps(1, end) infinite;
 }
 
