@@ -1,3 +1,68 @@
+VERSION TEST v16.02 — PERFORMANCE CARTE / LISTE SUIVIE PRIORITAIRE
+Date : 29/08/2026
+Base : TEST v16.01
+
+OBJECTIFS
+- Corriger le nouveau filtre SafeSky afin qu'il ne masque jamais les trafics de la liste suivie.
+- Réduire la charge CPU / DOM de la carte, en particulier sur iPad lors d'une utilisation prolongée, sans modifier la fréquence opérationnelle des données SafeSky ou GLR.
+- Éviter le pic de charge juste après l'affichage initial carte -> recherche/alias -> PÉLIC.
+
+1. SAFESKY — LISTE SUIVIE PRIORITAIRE
+- Le filtre « N'afficher que parapentes, deltaplanes, planeurs, etc. » continue de masquer avions et hélicoptères hors liste suivie.
+- Un trafic appartenant à la liste suivie n'est jamais masqué par CE nouveau filtre, quel que soit son type.
+- Les autres filtres SafeSky existants (altitude, trafic au sol, âge de position, etc.) restent inchangés.
+- Aucun clignotement selon la source ADS-B / ADS-BI / FLARM / OGN / MODE-S n'est ajouté dans cette version.
+
+2. SAFESKY — OPTIMISATION DU DÉPLACEMENT FLUIDE
+- Le déplacement extrapolé fluide des plots est conservé.
+- Suppression du recalcul du connecteur d'étiquette à chaque frame d'animation.
+- Le connecteur est recalculé lors de la réception / reconstruction du plot et après stabilisation d'un zoom ou déplacement de carte.
+- La passe globale de recalcul des connecteurs après mouvement carte est temporisée et dédupliquée.
+- Suppression de la double passe requestAnimationFrame utilisée auparavant pour chaque connecteur lors d'une mise à jour de plot.
+
+3. CARTE — RAFRAÎCHISSEMENTS POST-GESTE ÉCHELONNÉS
+- Communes : recalcul visible différé de 260 ms après zoom / déplacement, avec déduplication.
+- Connecteurs SafeSky : recalcul différé de 220 ms après stabilisation de la vue.
+- GLR : relayout des étiquettes différé de 180 ms au lieu de 70 ms.
+- Le calque routier conserve son délai propre de 1050 ms et le SIA conserve son mécanisme d'attente des tuiles de fond.
+- Fréquence réseau SafeSky 5 s et fréquence GLR inchangées.
+
+4. BANDEAU COMMUNE — FIN DE L'OBSERVATION GLOBALE DU DOM
+- Suppression du MutationObserver qui surveillait tout document.documentElement en permanence.
+- La persistance du bandeau est maintenue par le contrôle 5 s lorsqu'une page est visible, plus pageshow et retour au premier plan.
+- Cela évite de réveiller le traitement du bandeau à chaque mutation de marqueur / étiquette / calque Leaflet.
+
+5. DÉMARRAGE — ENRICHISSEMENTS POST-CORE ÉTALÉS
+- Ordre prioritaire inchangé : carte -> recherche communes/alias -> PÉLIC.
+- Runways / historique feux / GAAR : 180 ms après le core.
+- Planification des calques auxiliaires : 420 ms.
+- Chat : 700 ms.
+- Initialisation SIA : 900 ms.
+- Les délais internes existants des calques auxiliaires sont conservés.
+
+6. DIAGNOSTIC PERFORMANCE
+- Ajout d'un diagnostic console à la demande : getNpfPerformanceDiagnostics().
+- Il expose uniquement l'état courant (nombre de marqueurs / couches et timers actifs) et ne conserve aucun historique en mémoire.
+- Aucun élément ou compteur supplémentaire n'est affiché sur la carte.
+
+7. ÉLÉMENTS INCHANGÉS
+- BFG / pont d'autorisation BFG -> NPF inchangés.
+- Rapprochement GLR groupé v16.01 inchangé.
+- Anti-veille iPad v16.01 inchangé.
+- SIA / AIRAC strictement inchangé.
+- PÉLIC, Départements, offline, VAC, GAAR et fonctions non concernées inchangés.
+
+8. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.02 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.01.
+- Vérification ciblée : trafic suivi exempt du nouveau filtre de types.
+- Vérification ciblée : plus de recalcul de connecteur dans la boucle d'animation SafeSky.
+- Vérification ciblée : MutationObserver global du bandeau commune supprimé.
+
+
 VERSION TEST v16.01 — RAPPROCHEMENT GLR GROUPÉ / FILTRE SAFESKY / ANTI-VEILLE IPAD
 Date : 29/08/2026
 Base : TEST v16.00
