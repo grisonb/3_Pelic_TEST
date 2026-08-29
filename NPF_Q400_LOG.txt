@@ -1,3 +1,92 @@
+VERSION TEST v16.08 — ALTITUDES TRAFICS / GLR + DÉZOOM GAAR NPF
+Date : 29/08/2026
+Base : TEST v16.07
+
+OBJECTIFS
+- Dézoomer légèrement le PDF du diagramme GAAR dans NPF uniquement.
+- Formater les altitudes des étiquettes trafic avec séparation des milliers à partir de 10 000 ft : « 5000 ft », « 12 000 ft ».
+- Réafficher l'altitude dans les étiquettes Global Link Rescue (GLR).
+- Augmenter la taille de police des altitudes dans les étiquettes SafeSky et GLR.
+- Ne modifier aucun fichier BFG : la correction BFG v4.62 n'est pas requise pour cette demande.
+
+1. NPF — DIAGRAMME GAAR
+- Le grossissement CSS du lecteur GAAR passe de 1,45 à 1,40.
+- Le cadre PDF associé passe de 68,97 % à 71,43 % afin de conserver le cadrage avec ce léger dézoom.
+- La FdS et les autres lecteurs PDF sont inchangés.
+
+2. SAFESKY — FORMAT D'ALTITUDE DANS LES ÉTIQUETTES
+- Ajout d'un formatage dédié aux étiquettes :
+  - 5000 ft -> « 5000 ft » ;
+  - 12000 ft -> « 12 000 ft » ;
+  - même séparation par groupes de trois chiffres au-delà.
+- Le formatage utilise l'altitude numérique en pieds déjà normalisée ; filtres altitude, calculs et données SafeSky sont inchangés.
+
+3. GLR — ALTITUDE À NOUVEAU VISIBLE
+- Réactivation de l'altitude GLR dans la deuxième ligne de l'étiquette, lorsqu'elle est disponible.
+- Conversion conservée selon la donnée GLR existante : valeur brute en centimètres -> pieds, arrondie à la centaine de pieds.
+- L'anticollision GLR tient à nouveau compte de la hauteur et de la largeur de l'étiquette sur deux lignes.
+- L'altitude GLR n'est pas utilisée pour la déduplication avec SafeSky.
+
+4. TAILLE DES ALTITUDES
+- SafeSky : altitude de la deuxième ligne portée à 12,5 px, sans grossir la flèche de tendance verticale.
+- GLR : altitude portée à 13 px.
+- Les indicatifs et pictogrammes restent inchangés.
+
+5. ÉLÉMENTS INCHANGÉS
+- NOTAMS PÉLIC v16.07, synchronisation NAS/IndexedDB, filtres BFG et message de sélection vide inchangés.
+- PÉLIC, VAC, Communes, Départements, SIA, moteur offline et logique SafeSky/GLR hors affichage altitude inchangés.
+- SIA / AIRAC strictement inchangé.
+- Aucun fichier BFG n'est livré avec v16.08.
+
+6. CONTRÔLES
+- `node --check` Script NPF.
+- `node --check` Service Worker NPF.
+- Manifest NPF JSON parsé.
+- Cohérence v16.08 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.07.
+- Vérifications ciblées : 5000 ft / 12 000 ft ; altitude GLR visible ; tailles altitude SS/GLR ; zoom GAAR 1,40.
+
+
+VERSION TEST v16.07 — NOTAMS PÉLIC : FILTRES BFG / FERMETURE ROUGE
+Date : 29/08/2026
+Base : TEST v16.06
+
+OBJECTIFS
+- Mettre la croix de fermeture de la fenêtre NOTAMS en noir sur fond rouge.
+- Reprendre dans NPF les mêmes filtres d'exclusion NOTAM que BFG.
+- Afficher explicitement « Aucun NOTAM sélectionné » lorsque le mode « Garder la sélection » ne contient aucun NOTAM.
+- Conserver intégralement la synchronisation NAS -> IndexedDB NPF et la règle « fichier du jour uniquement » de v16.06.
+
+1. NOTAMS PÉLIC — CROIX DE FERMETURE
+- Le bouton X de la fenêtre NOTAMS passe sur fond rouge avec X noire.
+- Aucun autre bouton de fermeture n'est modifié.
+
+2. NOTAMS PÉLIC — FILTRES D'EXCLUSION IDENTIQUES À BFG
+- Ajout du filtre « Afficher uniquement les NOTAMs valides aujourd'hui », activé par défaut.
+- Ajout du menu « Filtres par Mots-Clés » avec exactement la liste BFG : ADMINISTRATION, AERODROME ADMINISTRATION, AIR START, ALTITUDE, ANIMAL, AVGAS 100LL, CONSTRUCTION, CRANE, DME, DRILL, FATO, GRF, HANDLING, LIGHTS, MODEL FLYING, NACELLE, NIGHT PARACHUTING, OBST, OBSTACLE, OBSTACLES, PAPI, POLICE, RADAR, RFFS, SECURITY, TELESCOPIC, TREES, UL, UNPAVED, VDF, VOR, WIG WAG.
+- Comme dans BFG, les cases mots-clés sont cochées par défaut et un NOTAM contenant un mot-clé coché est masqué.
+- Les filtres s'appliquent à la liste complète comme au mode « Garder la sélection » sans modifier les états garder/exclure.
+
+3. NOTAMS PÉLIC — MESSAGE SÉLECTION VIDE
+- Après appui sur « Garder la sélection », si aucun NOTAM n'est coché en vert, la fenêtre affiche exactement : « Aucun NOTAM sélectionné ».
+- Si des NOTAM sont sélectionnés mais tous masqués par les filtres d'exclusion, le message distingue ce cas par « Aucun NOTAM avec les filtres actifs. ».
+
+4. ÉLÉMENTS INCHANGÉS
+- Bouton NOTAMS toujours exclusivement sur les pélicandromes et placé sous VAC.
+- Snapshot BFG/NAS, récupération automatique, IndexedDB NPF, consultation hors ligne et contrôle du jour courant inchangés.
+- Sélections BFG garder/exclure reprises comme auparavant.
+- PROFIL, SafeSky, GLR, VAC, PÉLIC, Communes, Départements, moteur offline et SIA inchangés.
+- SIA / AIRAC strictement inchangé.
+
+5. CONTRÔLES
+- `node --check` Script NPF.
+- `node --check` Service Worker NPF.
+- Manifest NPF JSON parsé.
+- Cohérence v16.07 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.06.
+- Vérifications ciblées : X NOTAMS rouge/noire ; liste de 32 filtres BFG ; filtre date ; message « Aucun NOTAM sélectionné » ; ordre VAC -> NOTAMS conservé.
+
+
 VERSION TEST v16.06 — NOTAMS PÉLIC VIA NAS / SYNCHRO LOCALE FIABLE
 Date : 29/08/2026
 Base : TEST v16.05
