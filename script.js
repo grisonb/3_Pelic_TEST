@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.00';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.01';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -259,6 +259,81 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => scheduleApply(), { passive: true });
         window.visualViewport.addEventListener('scroll', () => scheduleApply(), { passive: true });
+    }
+})();
+
+// =========================================================================
+// v16.01 — IPAD : EMPÊCHER LA MISE EN VEILLE TANT QUE NPF EST AU PREMIER PLAN
+// =========================================================================
+(function setupNpfIpadScreenWakeLock() {
+    if (window.__npfIpadScreenWakeLockInstalled) return;
+    window.__npfIpadScreenWakeLockInstalled = true;
+
+    const ua = String(navigator.userAgent || '');
+    const isIpad = (
+        /iPad/i.test(ua)
+        || (/Macintosh/i.test(ua) && Number(navigator.maxTouchPoints || 0) > 1)
+    );
+    if (!isIpad) return;
+
+    let wakeLockSentinel = null;
+    let requestInProgress = false;
+
+    const releaseWakeLock = async () => {
+        const sentinel = wakeLockSentinel;
+        wakeLockSentinel = null;
+        if (!sentinel) return;
+        try {
+            await sentinel.release();
+        } catch (_) {}
+    };
+
+    const requestWakeLock = async () => {
+        if (document.hidden || document.visibilityState !== 'visible') return false;
+        if (wakeLockSentinel && !wakeLockSentinel.released) return true;
+        if (requestInProgress) return false;
+        if (!navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') return false;
+
+        requestInProgress = true;
+        try {
+            const sentinel = await navigator.wakeLock.request('screen');
+            wakeLockSentinel = sentinel;
+            sentinel.addEventListener('release', () => {
+                if (wakeLockSentinel === sentinel) wakeLockSentinel = null;
+            }, { once: true });
+            return true;
+        } catch (error) {
+            // iPadOS peut refuser temporairement (économie d'énergie, état système...).
+            // NPF reste pleinement fonctionnel et réessaiera au prochain retour / geste.
+            console.info('[NPF] Screen Wake Lock iPad indisponible:', error?.name || error);
+            return false;
+        } finally {
+            requestInProgress = false;
+        }
+    };
+
+    const handleVisibility = () => {
+        if (document.hidden || document.visibilityState !== 'visible') {
+            releaseWakeLock();
+            return;
+        }
+        requestWakeLock();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
+    window.addEventListener('pageshow', () => requestWakeLock(), { passive: true });
+    window.addEventListener('pagehide', () => releaseWakeLock(), { passive: true });
+
+    // Si une première demande a été refusée avant interaction, le premier geste
+    // suivant permet une nouvelle tentative sans ajouter de contrôle à l'interface.
+    document.addEventListener('pointerdown', () => {
+        if (!wakeLockSentinel) requestWakeLock();
+    }, { passive: true });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => requestWakeLock(), { once: true });
+    } else {
+        requestWakeLock();
     }
 })();
 
@@ -1011,6 +1086,8 @@ const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
     showGroundTraffic: false,
     showDroneAdvisories: false,
     onlyTrackedIdentifiers: false,
+    // v16.01 — masque les familles avion / hélicoptère sans masquer les planeurs.
+    onlyNonAirplaneHelicopterTraffic: false,
     publishOwnPosition: false,
     publicationCallsign: '',
     publicationBeaconType: 'MOTORPLANE'
@@ -10591,6 +10668,10 @@ function sanitizeTrafficSettings(candidate = {}) {
         candidate.onlyTrackedIdentifiers,
         fallback.onlyTrackedIdentifiers
     );
+    const onlyNonAirplaneHelicopterTraffic = asBool(
+        candidate.onlyNonAirplaneHelicopterTraffic,
+        fallback.onlyNonAirplaneHelicopterTraffic
+    );
     /*
      * v14.41 — publication NPF vers SafeSky supprimée.
      * Les anciennes valeurs mémorisées sont ignorées et neutralisées.
@@ -10617,6 +10698,7 @@ function sanitizeTrafficSettings(candidate = {}) {
         showGroundTraffic,
         showDroneAdvisories,
         onlyTrackedIdentifiers,
+        onlyNonAirplaneHelicopterTraffic,
         publishOwnPosition,
         publicationCallsign,
         publicationBeaconType
@@ -11722,8 +11804,11 @@ function getTrafficSettingsSummary() {
     const advisoryLabel = settings.showDroneAdvisories
         ? 'zones drone ON'
         : 'zones drone OFF';
+    const typeFilterLabel = settings.onlyNonAirplaneHelicopterTraffic
+        ? 'avions/hélicos masqués'
+        : 'tous types';
 
-    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${groundLabel} · ${trackedLabel} · ${advisoryLabel}`;
+    return `Rayon ${settings.radiusNm} Nm · ${altitudeFilterLabel} · ${altitudeLabel} · ${referenceLabel} · ${groundLabel} · ${trackedLabel} · ${typeFilterLabel} · ${advisoryLabel}`;
 }
 
 function ensureTrafficSettingsModal() {
@@ -11808,6 +11893,13 @@ function ensureTrafficSettingsModal() {
                     <div class="traffic-settings-check-row">
                         <input id="traffic-only-tracked-input" type="checkbox">
                         <em>Afficher uniquement la liste suivie</em>
+                    </div>
+                </label>
+
+                <label class="traffic-settings-field traffic-settings-checkbox-field">
+                    <div class="traffic-settings-check-row">
+                        <input id="traffic-only-light-types-input" type="checkbox">
+                        <em>N'afficher que parapentes, deltaplanes, planeurs, etc.</em>
                     </div>
                 </label>
 
@@ -11962,6 +12054,7 @@ function ensureTrafficSettingsModal() {
         modal.querySelector('#traffic-altitude-label-input').checked = !!defaults.showAltitudeLabel;
         modal.querySelector('#traffic-drone-advisories-input').checked = !!defaults.showDroneAdvisories;
         modal.querySelector('#traffic-only-tracked-input').checked = !!defaults.onlyTrackedIdentifiers;
+        modal.querySelector('#traffic-only-light-types-input').checked = !!defaults.onlyNonAirplaneHelicopterTraffic;
         updateAltitudeModeUi();
     };
 
@@ -12041,6 +12134,7 @@ function ensureTrafficSettingsModal() {
         const altitudeLabelInput = modal.querySelector('#traffic-altitude-label-input');
         const droneAdvisoriesInput = modal.querySelector('#traffic-drone-advisories-input');
         const onlyTrackedInput = modal.querySelector('#traffic-only-tracked-input');
+        const onlyLightTypesInput = modal.querySelector('#traffic-only-light-types-input');
         saveTrafficSettings({
             radiusNm: radiusInput.value,
             minAltitudeFt: minAltitudeInput.value,
@@ -12053,7 +12147,8 @@ function ensureTrafficSettingsModal() {
             groundToAboveBandFt: groundBandInput.value,
             showAltitudeLabel: !!altitudeLabelInput.checked,
             showDroneAdvisories: !!droneAdvisoriesInput.checked,
-            onlyTrackedIdentifiers: !!onlyTrackedInput.checked
+            onlyTrackedIdentifiers: !!onlyTrackedInput.checked,
+            onlyNonAirplaneHelicopterTraffic: !!onlyLightTypesInput.checked
         });
 
         refreshTrafficButtonState(lastTrafficDisplayedCount);
@@ -12086,6 +12181,7 @@ function openTrafficSettingsDialog() {
     modal.querySelector('#traffic-altitude-label-input').checked = !!current.showAltitudeLabel;
     modal.querySelector('#traffic-drone-advisories-input').checked = !!current.showDroneAdvisories;
     modal.querySelector('#traffic-only-tracked-input').checked = !!current.onlyTrackedIdentifiers;
+    modal.querySelector('#traffic-only-light-types-input').checked = !!current.onlyNonAirplaneHelicopterTraffic;
 
     const ownAircraft = getOwnTrafficAircraftSession();
     const manualOwnInput = modal.querySelector('#traffic-own-aircraft-manual-input');
@@ -14317,6 +14413,31 @@ function resolveTrafficVisualType(aircraft) {
     return 'airplane';
 }
 
+/*
+ * v16.01 — filtre « N'afficher que parapentes, deltaplanes, planeurs, etc. ».
+ * On filtre sur la famille visuelle déjà normalisée afin de couvrir à la fois
+ * les catégories SafeSky, les catégories ADS-B et les désignateurs ICAO de repli.
+ */
+const TRAFFIC_LIGHT_TYPES_HIDDEN_VISUAL_TYPES = new Set([
+    'airplane',
+    'jet',
+    'widebody-jet',
+    'narrowbody-jet',
+    'regional-jet',
+    'turboprop',
+    'light-single',
+    'light-twin',
+    'ultralight',
+    'helicopter',
+    'military'
+]);
+
+function isTrafficAircraftHiddenByLightTypesFilter(aircraft) {
+    return TRAFFIC_LIGHT_TYPES_HIDDEN_VISUAL_TYPES.has(
+        resolveTrafficVisualType(aircraft)
+    );
+}
+
 function getTrafficTypeDisplayLabel(aircraft) {
     const safeSkyType = String(
         aircraft?.beaconType
@@ -16330,6 +16451,11 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             return ac;
         })
         .filter(ac => !isOwnTrafficAircraft(ac))
+        .filter(ac => (
+            ac.forceDisplay
+            || !settings.onlyNonAirplaneHelicopterTraffic
+            || !isTrafficAircraftHiddenByLightTypesFilter(ac)
+        ))
         .filter(ac => (
             ac.forceGroundDisplay
             || settings.showGroundTraffic
@@ -19942,6 +20068,77 @@ function trafficCallsignCommonPrefixLength(left, right) {
     return index;
 }
 
+/*
+ * v16.01 — certains groupes GLR condensent plusieurs appareils dans un seul
+ * libellé, par exemple « TRACT C F ». SafeSky publie alors les indicatifs
+ * individuels « TRACTC » et « TRACTF ». On produit uniquement des variantes
+ * lorsque le premier token est une base d'au moins 3 caractères et que tous
+ * les tokens suivants sont des suffixes unitaires alphanumériques.
+ */
+function buildGlobalLinkGroupedCallsignCandidates(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return [];
+
+    let normalizedText = raw.toUpperCase();
+    try {
+        normalizedText = normalizedText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (_) {}
+
+    const tokens = normalizedText.match(/[A-Z0-9]+/g) || [];
+    const candidates = [raw];
+    if (
+        tokens.length >= 3
+        && tokens[0].length >= 3
+        && tokens.slice(1).every(token => /^[A-Z0-9]$/.test(token))
+    ) {
+        tokens.slice(1).forEach(suffix => {
+            candidates.push(`${tokens[0]}${suffix}`);
+        });
+    }
+
+    const seen = new Set();
+    return candidates.filter(candidate => {
+        const key = normalizeTrafficSourceCallsign(candidate);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function compareGlobalLinkNameToSafeSkyIdentifier(glrName, safeSkyIdentifier) {
+    const candidates = buildGlobalLinkGroupedCallsignCandidates(glrName);
+    let best = null;
+
+    candidates.forEach((candidate, index) => {
+        const comparison = compareTrafficSourceCallsigns(candidate, safeSkyIdentifier);
+        if (!comparison.match) return;
+
+        const groupedMember = index > 0;
+        const result = {
+            ...comparison,
+            groupedMember,
+            groupedCandidate: groupedMember
+                ? normalizeTrafficSourceCallsign(candidate)
+                : '',
+            // Un membre extrait d'un groupe doit toujours être confirmé par proximité.
+            fuzzy: comparison.fuzzy || groupedMember,
+            mode: groupedMember
+                ? `group-member-${comparison.mode || 'match'}`
+                : comparison.mode
+        };
+
+        const modeScore = result.mode === 'exact-normalized'
+            ? 0
+            : (result.mode.includes('group-member-exact-normalized') ? 1 : 2);
+        const score = modeScore * 100 + (1 - Number(result.similarity || 0)) * 10;
+        if (!best || score < best.score) best = { ...result, score };
+    });
+
+    if (!best) return { match: false, mode: '', fuzzy: false, similarity: 0 };
+    const { score: _score, ...result } = best;
+    return result;
+}
+
 function compareTrafficSourceCallsigns(glrName, safeSkyIdentifier) {
     const glr = splitTrafficComparableCallsign(glrName);
     const ss = splitTrafficComparableCallsign(safeSkyIdentifier);
@@ -20111,7 +20308,7 @@ function findSafeSkyMatchForGlobalLinkItem(item, safeSkyTraffic) {
             : [candidate.callsign, candidate.registration].filter(Boolean);
 
         identifiers.forEach(identifier => {
-            const comparison = compareTrafficSourceCallsigns(glrName, identifier);
+            const comparison = compareGlobalLinkNameToSafeSkyIdentifier(glrName, identifier);
             if (!comparison.match) return;
 
             /*
@@ -20146,6 +20343,7 @@ function findSafeSkyMatchForGlobalLinkItem(item, safeSkyTraffic) {
                     safeSkyCallsign: candidate.callsign,
                     safeSkyRegistration: candidate.registration,
                     safeSkyMatchedIdentifier: identifier,
+                    groupedCandidate: comparison.groupedCandidate || '',
                     safeSkyAircraftKey: candidate.aircraftKey,
                     distanceNm: Number.isFinite(distanceNm) ? distanceNm : null
                 };
