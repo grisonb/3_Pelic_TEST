@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.06';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.08';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -15918,6 +15918,20 @@ function ensureTrafficLabelConnectorMapEvents() {
     });
 }
 
+/* v16.08 — format opérationnel commun des altitudes affichées dans les étiquettes.
+ * Pas de séparateur sur 4 chiffres ; séparation par milliers à partir de 10 000 ft. */
+function formatNpfAltitudeFeetLabel(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return '';
+    const rounded = Math.round(numeric);
+    const sign = rounded < 0 ? '-' : '';
+    const digits = String(Math.abs(rounded));
+    const grouped = digits.length >= 5
+        ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+        : digits;
+    return `${sign}${grouped} ft`;
+}
+
 function buildTrafficMarkerIcon(aircraft) {
     const hasTrack = Number.isFinite(aircraft.track);
     const track = hasTrack ? aircraft.track : 0;
@@ -15984,10 +15998,9 @@ function buildTrafficMarkerIcon(aircraft) {
             getTrafficPermanentType(aircraft),
             18
         );
-    const permanentAltitude = (
-        aircraft.altitude
-        && aircraft.altitude !== '--'
-    ) ? aircraft.altitude : '';
+    const permanentAltitude = Number.isFinite(Number(aircraft.altitudeFeet))
+        ? formatNpfAltitudeFeetLabel(aircraft.altitudeFeet)
+        : ((aircraft.altitude && aircraft.altitude !== '--') ? aircraft.altitude : '');
     const verticalTrend = getTrafficVerticalTrend(aircraft);
 
     const firstLineParts = [
@@ -16013,7 +16026,7 @@ function buildTrafficMarkerIcon(aircraft) {
             ` : ''}
             ${secondLineParts.length ? `
                 <span class="traffic-label-line traffic-label-line-secondary">
-                    ${permanentAltitude ? `<span>${escapeHtml(permanentAltitude)}</span>` : ''}
+                    ${permanentAltitude ? `<span class="traffic-label-altitude-value">${escapeHtml(permanentAltitude)}</span>` : ''}
                     ${verticalTrend.symbol ? `<span class="traffic-vertical-trend ${verticalTrend.className}" aria-label="${escapeHtml(verticalTrend.label)}">${escapeHtml(verticalTrend.symbol)}</span>` : ''}
                 </span>
             ` : ''}
@@ -20609,6 +20622,25 @@ function getGlobalLinkVisualDefinition(item) {
     return getTrafficAircraftVisualDefinition({ beaconType });
 }
 
+/* v16.08 — altitude GLR à nouveau affichée dans les étiquettes.
+ * Le relais GLR fournit la valeur `alt` en centimètres. */
+const NPF_GLOBAL_LINK_ALTITUDE_RAW_TO_FEET = 0.03280839895;
+
+function getGlobalLinkAltitudeFeet(rawAltitude) {
+    if (rawAltitude === null || rawAltitude === undefined || rawAltitude === '') return null;
+    const raw = Number(rawAltitude);
+    if (!Number.isFinite(raw)) return null;
+    const feet = raw * NPF_GLOBAL_LINK_ALTITUDE_RAW_TO_FEET;
+    return Number.isFinite(feet) ? feet : null;
+}
+
+function formatGlobalLinkAltitudeFeet(rawAltitude) {
+    const feet = getGlobalLinkAltitudeFeet(rawAltitude);
+    if (!Number.isFinite(feet)) return '';
+    const roundedFeet = Math.round(feet / 100) * 100;
+    return formatNpfAltitudeFeetLabel(roundedFeet);
+}
+
 function buildGlobalLinkLabelLayout(items) {
     const placements = new Map();
     if (!map?.latLngToContainerPoint || !map?.getSize) return placements;
@@ -20636,8 +20668,13 @@ function buildGlobalLinkLabelLayout(items) {
 
     items.forEach((item, index) => {
         const p = map.latLngToContainerPoint([item.lat, item.lon]);
-        const width = Math.max(68, Math.min(178, 20 + String(item.name || '').length * 8.4));
-        const height = 25;
+        const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
+        const longestLabelLength = Math.max(
+            String(item.name || '').length,
+            altitudeLabel.length
+        );
+        const width = Math.max(68, Math.min(178, 20 + longestLabelLength * 8.4));
+        const height = altitudeLabel ? 42 : 25;
         const hGap = 27 + width / 2;
         const vGap = 27 + height / 2;
         const shifts = [0, -30, 30, -60, 60, -90, 90, -120, 120];
@@ -20883,9 +20920,13 @@ function renderGlobalLinkPositions(positions) {
         marker.addTo(layer);
 
         if (placement && labelLatLng) {
+            const altitudeLabel = formatGlobalLinkAltitudeFeet(item.altitude);
+            const safeAltitudeLabel = altitudeLabel
+                ? escapeGlobalLinkHtml(altitudeLabel)
+                : '';
             const labelIcon = L.divIcon({
                 className: 'global-link-aircraft-label-marker',
-                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}"><span class="glr-label-name">${safeName}</span></div>`,
+                html: `<div class="global-link-aircraft-label${item.stale ? ' stale' : ''}${safeAltitudeLabel ? ' glr-with-altitude' : ''}"><span class="glr-label-name">${safeName}</span>${safeAltitudeLabel ? `<span class="glr-label-altitude">${safeAltitudeLabel}</span>` : ''}</div>`,
                 iconSize: [placement.width, placement.height],
                 iconAnchor: [placement.width / 2, placement.height / 2]
             });
@@ -21766,7 +21807,7 @@ function buildPelicanMapIconClass(airport, isDisabled, isWater) {
 }
 
 /* ========================================================================== 
-   v16.06 — NOTAMS PÉLIC : SNAPSHOT NAS -> STOCKAGE LOCAL NPF
+   v16.07 — NOTAMS PÉLIC : SNAPSHOT NAS / FILTRES BFG
    --------------------------------------------------------------------------
    Les PWA BFG et NPF installées sur iPad peuvent être isolées par WebKit.
    BFG v4.61 publie donc le snapshot NOTAM sur le NAS. NPF le récupère
@@ -21787,6 +21828,40 @@ let npfBfgNotamsSyncPromise = null;
 let npfPelicNotamsCurrentPayload = null;
 let npfPelicNotamsCurrentOaci = '';
 let npfPelicNotamsViewMode = 'all';
+const NPF_PELIC_NOTAMS_KEYWORDS_TO_FILTER = Object.freeze([
+    'administration',
+    'aerodrome administration',
+    'air start',
+    'altitude',
+    'animal',
+    'avgas 100ll',
+    'construction',
+    'crane',
+    'dme',
+    'drill',
+    'fato',
+    'grf',
+    'handling',
+    'lights',
+    'model flying',
+    'nacelle',
+    'night parachuting',
+    'obst',
+    'obstacle',
+    'obstacles',
+    'papi',
+    'police',
+    'radar',
+    'rffs',
+    'security',
+    'telescopic',
+    'trees',
+    'ul',
+    'unpaved',
+    'vdf',
+    'vor',
+    'wig wag'
+]);
 
 function getNpfBfgNotamsSharedUrl() {
     try {
@@ -21953,13 +22028,34 @@ function extractNpfBfgNotamsForOaci(rawText, targetOaci) {
         .filter(record => record.text);
 }
 
-function parseNpfBfgNotamValidity(notamBlock) {
+function getNpfBfgNotamValidityInfo(notamBlock) {
     const bMatch = String(notamBlock || '').match(/B\)\s*(\d{10})/);
     const cMatch = String(notamBlock || '').match(/C\)\s*(\d{10}|PERM)/);
-    if (!bMatch || !cMatch) return '';
+    if (!bMatch || !cMatch) return { text: '', start: null, end: null };
     const s = bMatch[1];
     const e = cMatch[1];
-    return `VALIDE DU ${s.substring(4,6)}/${s.substring(2,4)}/20${s.substring(0,2)} à ${s.substring(6,8)}h${s.substring(8,10)} AU ${e === 'PERM' ? 'PERMANENT' : `${e.substring(4,6)}/${e.substring(2,4)}/20${e.substring(0,2)} à ${e.substring(6,8)}h${e.substring(8,10)}`}`;
+    const start = new Date(Date.UTC(
+        parseInt(`20${s.substring(0, 2)}`),
+        parseInt(s.substring(2, 4)) - 1,
+        parseInt(s.substring(4, 6)),
+        parseInt(s.substring(6, 8)),
+        parseInt(s.substring(8, 10))
+    ));
+    const end = e === 'PERM'
+        ? new Date('2099-12-31T23:59:59Z')
+        : new Date(Date.UTC(
+            parseInt(`20${e.substring(0, 2)}`),
+            parseInt(e.substring(2, 4)) - 1,
+            parseInt(e.substring(4, 6)),
+            parseInt(e.substring(6, 8)),
+            parseInt(e.substring(8, 10))
+        ));
+    const text = `VALIDE DU ${s.substring(4,6)}/${s.substring(2,4)}/20${s.substring(0,2)} à ${s.substring(6,8)}h${s.substring(8,10)} AU ${e === 'PERM' ? 'PERMANENT' : `${e.substring(4,6)}/${e.substring(2,4)}/20${e.substring(0,2)} à ${e.substring(6,8)}h${e.substring(8,10)}`}`;
+    return { text, start, end };
+}
+
+function parseNpfBfgNotamValidity(notamBlock) {
+    return getNpfBfgNotamValidityInfo(notamBlock).text;
 }
 
 async function readNpfBfgNotamsSharedPayload() {
@@ -22091,6 +22187,16 @@ function ensureNpfPelicNotamsModal() {
                 <button type="button" class="pelic-notams-modal-close" aria-label="Fermer">×</button>
             </div>
             <div id="pelic-notams-modal-status" class="pelic-notams-modal-status"></div>
+            <div id="pelic-notams-modal-prefilters" class="pelic-notams-modal-prefilters" hidden>
+                <label class="pelic-notams-date-filter-label" for="pelic-notams-date-filter-cb">
+                    <input type="checkbox" id="pelic-notams-date-filter-cb" checked>
+                    <span>Afficher uniquement les NOTAMs valides aujourd'hui</span>
+                </label>
+                <div class="pelic-notams-filter-dropdown">
+                    <button type="button" id="pelic-notams-keyword-filter-toggle">Filtres par Mots-Clés</button>
+                    <div id="pelic-notams-keyword-filter-list" class="pelic-notams-filter-list" hidden></div>
+                </div>
+            </div>
             <div id="pelic-notams-modal-controls" class="pelic-notams-modal-controls" hidden>
                 <button type="button" class="pelic-notams-keep-selection">Garder la sélection</button>
                 <button type="button" class="pelic-notams-show-all" hidden>Tout afficher</button>
@@ -22099,13 +22205,42 @@ function ensureNpfPelicNotamsModal() {
         </div>`;
     document.body.appendChild(modal);
 
+    const keywordList = modal.querySelector('#pelic-notams-keyword-filter-list');
+    if (keywordList) {
+        NPF_PELIC_NOTAMS_KEYWORDS_TO_FILTER.forEach(keyword => {
+            const label = document.createElement('label');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.dataset.keyword = keyword;
+            checkbox.checked = true;
+            checkbox.addEventListener('change', applyNpfPelicNotamsViewMode);
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(keyword.toUpperCase()));
+            keywordList.appendChild(label);
+        });
+    }
+
+    modal.querySelector('#pelic-notams-date-filter-cb')?.addEventListener('change', applyNpfPelicNotamsViewMode);
+    const keywordToggle = modal.querySelector('#pelic-notams-keyword-filter-toggle');
+    keywordToggle?.addEventListener('click', event => {
+        event.stopPropagation();
+        const list = modal.querySelector('#pelic-notams-keyword-filter-list');
+        if (list) list.hidden = !list.hidden;
+    });
+
     const close = () => {
         modal.hidden = true;
         document.body.classList.remove('pelic-notams-modal-open');
+        const list = modal.querySelector('#pelic-notams-keyword-filter-list');
+        if (list) list.hidden = true;
     };
     modal.querySelector('.pelic-notams-modal-close')?.addEventListener('click', close);
     modal.addEventListener('click', event => {
         if (event.target === modal) close();
+        if (!event.target.closest('.pelic-notams-filter-dropdown')) {
+            const list = modal.querySelector('#pelic-notams-keyword-filter-list');
+            if (list) list.hidden = true;
+        }
     });
     modal.querySelector('.pelic-notams-keep-selection')?.addEventListener('click', () => {
         npfPelicNotamsViewMode = 'selection';
@@ -22159,6 +22294,67 @@ function updateNpfPelicNotamSharedState(record, checked, hiddenUntilChanged) {
     void writeNpfBfgNotamsSharedPayload(payload);
 }
 
+function applyNpfPelicNotamsLiveFilters() {
+    const modal = document.getElementById('pelic-notams-modal');
+    if (!modal) return;
+    const dateFilterActive = Boolean(modal.querySelector('#pelic-notams-date-filter-cb')?.checked);
+    const activeKeywords = Array.from(modal.querySelectorAll('#pelic-notams-keyword-filter-list input:checked'))
+        .map(input => String(input.dataset.keyword || '').trim())
+        .filter(Boolean);
+
+    const today = new Date();
+    const todayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 0, 0, 0));
+    const todayEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate(), 23, 59, 59));
+
+    modal.querySelectorAll('.pelic-notam-item').forEach(item => {
+        let shouldBeHidden = false;
+        if (dateFilterActive) {
+            const start = item.dataset.startDate ? new Date(item.dataset.startDate) : null;
+            const end = item.dataset.endDate ? new Date(item.dataset.endDate) : null;
+            if (start && end && !(start <= todayEnd && end >= todayStart)) shouldBeHidden = true;
+        }
+        if (activeKeywords.length > 0 && !shouldBeHidden) {
+            const itemText = String(item.querySelector('.pelic-notam-text')?.textContent || '');
+            if (activeKeywords.some(keyword => {
+                const regex = new RegExp(`\\b${keyword.replace(/ /g, '\\s')}\\b`, 'i');
+                return regex.test(itemText);
+            })) shouldBeHidden = true;
+        }
+        item.classList.toggle('pelic-notam-prefilter-hidden', shouldBeHidden);
+    });
+}
+
+function updateNpfPelicNotamsStatusForView() {
+    const modal = document.getElementById('pelic-notams-modal');
+    const status = modal?.querySelector('#pelic-notams-modal-status');
+    if (!modal || !status || !npfPelicNotamsCurrentPayload) return;
+    const items = Array.from(modal.querySelectorAll('.pelic-notam-item'));
+    if (!items.length) return;
+
+    const selectedCount = items.filter(item => {
+        const keep = Boolean(item.querySelector('.pelic-notam-keep-checkbox')?.checked);
+        const exclude = Boolean(item.querySelector('.pelic-notam-exclude-checkbox')?.checked);
+        return keep && !exclude;
+    }).length;
+    const visibleCount = items.filter(item => (
+        !item.classList.contains('pelic-notam-filtered-hidden')
+        && !item.classList.contains('pelic-notam-prefilter-hidden')
+    )).length;
+
+    status.classList.remove('pelic-notams-modal-status-warning');
+    if (npfPelicNotamsViewMode === 'selection' && selectedCount === 0) {
+        status.textContent = 'Aucun NOTAM sélectionné';
+        status.classList.add('pelic-notams-modal-status-warning');
+        return;
+    }
+    if (visibleCount === 0) {
+        status.textContent = 'Aucun NOTAM avec les filtres actifs.';
+        status.classList.add('pelic-notams-modal-status-warning');
+        return;
+    }
+    status.textContent = `${visibleCount} NOTAM(s) affiché(s) — copie locale BFG du jour.`;
+}
+
 function applyNpfPelicNotamsViewMode() {
     const modal = document.getElementById('pelic-notams-modal');
     if (!modal) return;
@@ -22172,6 +22368,8 @@ function applyNpfPelicNotamsViewMode() {
     const showAllButton = modal.querySelector('.pelic-notams-show-all');
     if (keepButton) keepButton.hidden = selectionOnly;
     if (showAllButton) showAllButton.hidden = !selectionOnly;
+    applyNpfPelicNotamsLiveFilters();
+    updateNpfPelicNotamsStatusForView();
 }
 
 function refreshNpfPelicNotamItemState(item) {
@@ -22187,6 +22385,7 @@ function renderNpfPelicNotams(payload, oaci) {
     const title = modal.querySelector('#pelic-notams-modal-title');
     const source = modal.querySelector('#pelic-notams-modal-source');
     const status = modal.querySelector('#pelic-notams-modal-status');
+    const prefilters = modal.querySelector('#pelic-notams-modal-prefilters');
     const controls = modal.querySelector('#pelic-notams-modal-controls');
     const list = modal.querySelector('#pelic-notams-modal-list');
 
@@ -22194,6 +22393,7 @@ function renderNpfPelicNotams(payload, oaci) {
     if (source) source.textContent = String(payload?.notamsAutoPdfStatus?.timestampText || 'Source locale BFG');
     if (status) status.textContent = '';
     if (list) list.innerHTML = '';
+    if (prefilters) prefilters.hidden = true;
     if (controls) controls.hidden = true;
 
     if (!isNpfPelicNotamsPayloadCurrentToday(payload)) {
@@ -22215,6 +22415,7 @@ function renderNpfPelicNotams(payload, oaci) {
     }
 
     if (status) status.textContent = `${records.length} NOTAM(s) — copie locale BFG du jour.`;
+    if (prefilters) prefilters.hidden = false;
     if (controls) controls.hidden = false;
 
     records.forEach(record => {
@@ -22252,11 +22453,13 @@ function renderNpfPelicNotams(payload, oaci) {
 
         const wrapper = document.createElement('div');
         wrapper.className = 'pelic-notam-content-wrapper';
-        const validityText = parseNpfBfgNotamValidity(record.text);
-        if (validityText) {
+        const validityInfo = getNpfBfgNotamValidityInfo(record.text);
+        if (validityInfo.start) item.dataset.startDate = validityInfo.start.toISOString();
+        if (validityInfo.end) item.dataset.endDate = validityInfo.end.toISOString();
+        if (validityInfo.text) {
             const validity = document.createElement('div');
             validity.className = 'pelic-notam-validity';
-            validity.textContent = validityText;
+            validity.textContent = validityInfo.text;
             wrapper.appendChild(validity);
         }
         const text = document.createElement('div');
@@ -22299,6 +22502,7 @@ async function openNpfPelicNotams(oaci) {
     const title = modal.querySelector('#pelic-notams-modal-title');
     const source = modal.querySelector('#pelic-notams-modal-source');
     const status = modal.querySelector('#pelic-notams-modal-status');
+    const prefilters = modal.querySelector('#pelic-notams-modal-prefilters');
     const controls = modal.querySelector('#pelic-notams-modal-controls');
     const list = modal.querySelector('#pelic-notams-modal-list');
     if (title) title.textContent = `NOTAMS ${normalizedOaci}`;
@@ -22307,6 +22511,7 @@ async function openNpfPelicNotams(oaci) {
         status.classList.remove('pelic-notams-modal-status-warning');
         status.textContent = 'Chargement des NOTAM locaux…';
     }
+    if (prefilters) prefilters.hidden = true;
     if (controls) controls.hidden = true;
     if (list) list.innerHTML = '';
 
