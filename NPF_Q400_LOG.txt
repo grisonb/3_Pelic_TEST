@@ -1,3 +1,53 @@
+VERSION TEST v16.01 — RAPPROCHEMENT GLR GROUPÉ / FILTRE SAFESKY / ANTI-VEILLE IPAD
+Date : 29/08/2026
+Base : TEST v16.00
+
+OBJECTIFS
+- Reconnaître les indicatifs GLR groupés du type « TRACT C F » et les rapprocher des indicatifs SafeSky individuels « TRACTC » / « TRACTF ».
+- Ajouter un filtre SafeSky permettant de masquer avions et hélicoptères tout en conservant planeurs, parapentes, deltaplanes et autres catégories non avion/hélicoptère.
+- Empêcher la mise en veille automatique de l’iPad tant que NPF est visible au premier plan.
+
+1. GLR ↔ SAFESKY — INDICATIFS GROUPÉS
+- Détection des libellés GLR composés d’une base suivie de plusieurs suffixes unitaires, par exemple « TRACT C F » ou « TRACT A B ».
+- « TRACT C F » produit les candidats « TRACTC » et « TRACTF » pour le rapprochement avec SafeSky.
+- Le moteur de rapprochement existant reste prioritaire pour les indicatifs simples.
+- Un rapprochement issu d’un groupe est toujours considéré comme géographiquement contraint : validation uniquement si le plot SafeSky correspondant est à 3 Nm maximum du plot GLR.
+- En présence de plusieurs candidats, le meilleur rapprochement reste choisi par score puis proximité.
+
+2. SAFESKY — FILTRE DE TYPES
+- Ajout dans « Filtres trafic » de la case « N'afficher que parapentes, deltaplanes, planeurs, etc. ».
+- Filtre désactivé par défaut et mémorisé avec les autres réglages SafeSky.
+- Lorsqu’il est activé, les familles avion et hélicoptère sont masquées, y compris jets, turbopropulseurs, avions légers, ULM 3 axes et catégorie militaire générique.
+- Restent affichés : planeurs, parapentes, deltaplanes, paramoteurs, pendulaires, autogires, ballons, dirigeables, parachutistes, drones, PAV et objets statiques.
+- Une sélection temporaire explicite « Afficher » conserve le comportement de forçage existant.
+- Les compteurs SafeSky sont recalculés après application de ce filtre, comme pour les autres filtres courants.
+
+3. IPAD — ANTI-VEILLE AU PREMIER PLAN
+- Utilisation de l’API Screen Wake Lock lorsque NPF tourne sur iPad/iPadOS et que la PWA est visible.
+- La demande anti-veille est relâchée dès que NPF passe en arrière-plan / page masquée.
+- La demande est reprise au retour au premier plan ; une interaction utilisateur peut également relancer la demande si iPadOS l’avait refusée ou relâchée.
+- Aucun Wake Lock n’est demandé sur PC ou sur les appareils non identifiés comme iPad/iPadOS.
+- Si l’API Screen Wake Lock n’est pas disponible ou est refusée par iPadOS, NPF continue normalement sans blocage.
+
+4. ÉLÉMENTS INCHANGÉS
+- Pont d’autorisation BFG ↔ NPF inchangé.
+- BFG TEST v4.59 inchangé.
+- GLR couleurs / silhouettes v16.00 inchangées hors nouveau rapprochement des indicatifs groupés.
+- SafeSky direct PC inchangé.
+- SIA / AIRAC strictement inchangé.
+- PÉLIC, Départements, communes, offline, VAC, GAAR et autres fonctions non concernées inchangés.
+
+5. CONTRÔLES
+- `node --check` Script.
+- `node --check` Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.01 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.00.
+- Vérification ciblée : « TRACT C F » => candidats « TRACTC » / « TRACTF » avec contrainte 3 Nm.
+- Vérification ciblée du nouveau filtre SafeSky et de sa persistance.
+- Vérification ciblée de la logique Screen Wake Lock iPad premier plan / arrière-plan.
+
+
 VERSION TEST v16.00 — BOUTON BFG / COULEURS GLR / ICÔNE HÉLICOPTÈRE
 Date : 28/08/2026
 Base : TEST v15.99
