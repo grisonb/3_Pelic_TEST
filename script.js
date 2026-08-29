@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.01';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.02';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -1065,6 +1065,27 @@ let safeSkyOwnPublishInProgress = false;
 let lastSafeSkyOwnPublishAt = 0;
 let lastSafeSkyOwnPublishError = '';
 let ownPublicationMotionState = null;
+
+/*
+ * v16.02 — diagnostic performance à la demande, sans journal ni historique
+ * conservé en mémoire. Utile pour vérifier qu'aucun registre Leaflet ne grossit
+ * au fil des heures. Appel console : getNpfPerformanceDiagnostics().
+ */
+window.getNpfPerformanceDiagnostics = () => ({
+    at: new Date().toISOString(),
+    visibility: document.visibilityState,
+    trafficMarkers: trafficMarkerRegistry.size,
+    trafficLeafletLayers: Number(trafficLayer?.getLayers?.().length || 0),
+    globalLinkLeafletLayers: Number(npfGlobalLinkLayer?.getLayers?.().length || 0),
+    communesLeafletLayers: Number(communesLayerGroup?.getLayers?.().length || 0),
+    communeLabelLayers: Number(communesLabelsLayer?.getLayers?.().length || 0),
+    roadCasingLayers: Number(roadOverlayCasingLayer?.getLayers?.().length || 0),
+    roadLineLayers: Number(roadOverlayLineLayer?.getLayers?.().length || 0),
+    roadLabelLayers: Number(roadOverlayLabelsLayer?.getLayers?.().length || 0),
+    trafficSmoothAnimationActive: Boolean(trafficSmoothAnimationFrame),
+    trafficRefreshTimerActive: Boolean(trafficRefreshTimer),
+    globalLinkRefreshTimerActive: Boolean(npfGlobalLinkRefreshTimer)
+});
 
 const TRAFFIC_SETTINGS_STORAGE_KEY = 'trafficLayerSettingsV1';
 const DEFAULT_TRAFFIC_SETTINGS = Object.freeze({
@@ -3689,20 +3710,31 @@ async function initializeApp() {
         try { drawNpfRunwayMapLayer(); } catch (_) {}
         try { drawFireHistoryMarkers(); } catch (_) {}
         try { redrawGaarCircuits(); } catch (_) {}
-        try { scheduleStartupAuxiliaryLayers(); } catch (_) {}
+    }, 180);
 
+    /*
+     * v16.02 — étaler les enrichissements post-core au lieu de lancer calques,
+     * chat et SIA dans la même tranche CPU juste après l'affichage PÉLIC.
+     */
+    setTimeout(() => {
+        try { scheduleStartupAuxiliaryLayers(); } catch (_) {}
+    }, 420);
+
+    setTimeout(() => {
         try {
             initializeTeamChat();
         } catch (chatInitError) {
             console.warn('Initialisation chat différée:', chatInitError);
         }
+    }, 700);
 
+    setTimeout(() => {
         try {
             initializeSiaSystem();
         } catch (siaInitError) {
             console.error('[SIA] Erreur initialisation système:', siaInitError);
         }
-    }, 180);
+    }, 900);
 
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
     setTimeout(showUpdateReminderIfDue, 1700);
@@ -7645,8 +7677,8 @@ function setupEventListeners() {
 
         if (map && map._communesZoomStyleBound !== true) {
             map._communesZoomStyleBound = true;
- // v12.62 — performance iPad : recalcul du calque Communes uniquement en fin de déplacement/zoom.
-            map.on('zoomend moveend', updateCommunesLayerAppearance);
+ // v16.02 — recalcul Communes différé après stabilisation de la vue pour ne pas concurrencer SS / GLR / SIA.
+            map.on('zoomend moveend', () => scheduleCommunesLayerAppearanceRefresh(260));
         }
     }
 
@@ -15535,6 +15567,10 @@ function removeTrafficMarkerEntry(key, entry) {
 
 function clearTrafficDisplay() {
     stopTrafficSmoothAnimation();
+    if (trafficLabelConnectorRefreshTimer) {
+        clearTimeout(trafficLabelConnectorRefreshTimer);
+        trafficLabelConnectorRefreshTimer = null;
+    }
 
     Array.from(trafficMarkerRegistry.entries())
         .forEach(([key, entry]) => {
@@ -15653,7 +15689,12 @@ function updateTrafficSmoothPositions(timestamp) {
                     marker,
                     rendered.track
                 );
-                updateTrafficMarkerLabelConnector(marker);
+                /*
+                 * v16.02 — ne pas recalculer le connecteur d'étiquette à chaque
+                 * frame. Le déplacement du marker translate l'ensemble icône +
+                 * étiquette ; le connecteur est recalculé à la réception SS et
+                 * après les changements de vue carte.
+                 */
             } catch (_) {}
         });
     }
@@ -15810,10 +15851,7 @@ function scheduleTrafficMarkerLabelConnector(marker) {
         updateTrafficMarkerLabelConnector(marker);
     };
 
-    requestAnimationFrame(() => {
-        updateIfStillActive();
-        requestAnimationFrame(updateIfStillActive);
-    });
+    requestAnimationFrame(updateIfStillActive);
 }
 
 function refreshAllTrafficLabelConnectors() {
@@ -15826,16 +15864,31 @@ function refreshAllTrafficLabelConnectors() {
 }
 
 let trafficLabelConnectorMapEventsInstalled = false;
+let trafficLabelConnectorRefreshTimer = null;
+
+function scheduleAllTrafficLabelConnectors(delayMs = 220) {
+    if (!showTrafficLayer) return;
+    if (trafficLabelConnectorRefreshTimer) {
+        clearTimeout(trafficLabelConnectorRefreshTimer);
+    }
+    trafficLabelConnectorRefreshTimer = setTimeout(() => {
+        trafficLabelConnectorRefreshTimer = null;
+        requestAnimationFrame(() => {
+            refreshAllTrafficLabelConnectors();
+        });
+    }, Math.max(0, Number(delayMs) || 0));
+}
 
 function ensureTrafficLabelConnectorMapEvents() {
     if (trafficLabelConnectorMapEventsInstalled || !map?.on) return;
 
     trafficLabelConnectorMapEventsInstalled = true;
+    /*
+     * v16.02 — une seule passe connecteurs après stabilisation de la vue,
+     * au lieu d'un recalcul immédiat en concurrence avec les autres calques.
+     */
     map.on('zoomend moveend resize', () => {
-        if (!showTrafficLayer) return;
-        requestAnimationFrame(() => {
-            refreshAllTrafficLabelConnectors();
-        });
+        scheduleAllTrafficLabelConnectors(220);
     });
 }
 
@@ -16451,11 +16504,23 @@ function renderTrafficAircraft(aircraftList, meta = {}) {
             return ac;
         })
         .filter(ac => !isOwnTrafficAircraft(ac))
-        .filter(ac => (
-            ac.forceDisplay
-            || !settings.onlyNonAirplaneHelicopterTraffic
-            || !isTrafficAircraftHiddenByLightTypesFilter(ac)
-        ))
+        .filter(ac => {
+            /*
+             * v16.02 — le filtre « parapentes / deltaplanes / planeurs… »
+             * ne masque jamais un trafic de la liste suivie. Les autres filtres
+             * (altitude, sol, âge) conservent strictement leur comportement.
+             */
+            const isTracked = (
+                trackedIdentifierSet.has(String(ac.hex || '').toUpperCase())
+                || isTrafficAircraftTracked(ac)
+            );
+            return (
+                ac.forceDisplay
+                || isTracked
+                || !settings.onlyNonAirplaneHelicopterTraffic
+                || !isTrafficAircraftHiddenByLightTypesFilter(ac)
+            );
+        })
         .filter(ac => (
             ac.forceGroundDisplay
             || settings.showGroundTraffic
@@ -19968,7 +20033,7 @@ function scheduleGlobalLinkLabelRelayout() {
     npfGlobalLinkRelayoutTimer = setTimeout(() => {
         npfGlobalLinkRelayoutTimer = null;
         renderGlobalLinkPositions(npfGlobalLinkLastPositions);
-    }, 70);
+    }, 180); // v16.02 — laisse d'abord finir le rendu Leaflet / tuiles.
 }
 
 function ensureGlobalLinkLayer() {
@@ -22129,6 +22194,18 @@ function buildCommuneNameIcon(communeName) {
     });
 }
 
+let communesLayerAppearanceRefreshTimer = null;
+
+function scheduleCommunesLayerAppearanceRefresh(delayMs = 260) {
+    if (communesLayerAppearanceRefreshTimer) {
+        clearTimeout(communesLayerAppearanceRefreshTimer);
+    }
+    communesLayerAppearanceRefreshTimer = setTimeout(() => {
+        communesLayerAppearanceRefreshTimer = null;
+        updateCommunesLayerAppearance();
+    }, Math.max(0, Number(delayMs) || 0));
+}
+
 function updateCommunesLayerAppearance() {
     if (!map || !hasLoadedCommunes) return;
 
@@ -24004,19 +24081,20 @@ function ensureNearestCommuneDisplayBootstrapped() {
         run();
     }
     [100, 700, 2000, 5000].forEach(delay => setTimeout(run, delay));
-    setInterval(run, 5000);
+    setInterval(() => {
+        if (document.visibilityState === 'visible') run();
+    }, 5000);
 
-    try {
-        const observer = new MutationObserver(() => {
-            const display = getOrCreateNearestCommuneDisplay();
-            if (!display) return;
-            forceNearestCommuneHudVisible(display);
-            if (!display.textContent || !display.textContent.trim()) {
-                display.innerHTML = '📍 Survolée: <b>GPS en attente</b>';
-            }
-        });
-        if (document.documentElement) observer.observe(document.documentElement, { childList: true, subtree: true });
-    } catch (_) {}
+    /*
+     * v16.02 — suppression du MutationObserver global sur tout le document.
+     * Il se réveillait à chaque mutation de la carte (trafics, labels, calques)
+     * pendant toute la session. Les événements de cycle de vie + contrôle 5 s
+     * suffisent à garantir la persistance du HUD sans observer tout le DOM.
+     */
+    window.addEventListener('pageshow', run, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) run();
+    }, { passive: true });
 })();
 
 
