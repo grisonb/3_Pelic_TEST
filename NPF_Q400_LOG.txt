@@ -1,3 +1,83 @@
+VERSION TEST v16.09 — ROUTE WP / UI PÉLIC / PROFIL / DÉZOOM GAAR
+Date : 31/08/2026
+Base : TEST v16.08
+
+OBJECTIFS
+- Mettre en place une création de route par waypoints (WP) depuis aéroports, points VFR/VRP, pélicandromes et appui long carte.
+- Conserver la route, l’ordre des WP, le WP actif et l’état GoTo après fermeture/rechargement.
+- Automatiser le passage au WP suivant dans un cercle de 1 NM lorsque le GoTo est actif.
+- Conserver la route affichée lorsque le GoTo est désactivé.
+- Ajouter les informations WP / WP Final dans le bandeau GoTo et les commandes de suppression de route.
+- Afficher un trait entre chaque WP avec une bulle Route / Distance / Tps juste après le WP de départ.
+- Harmoniser VAC / NOTAMS / Go To dans les fiches PÉLIC, agrandir la poignée Profil et dézoomer encore légèrement le diagramme GAAR.
+
+1. CRÉATION DE ROUTE / AJOUT WP
+- Bouton « Ajout WP » ajouté aux fiches aéroport et pélicandrome.
+- Bouton « Ajout WP » ajouté aux popups des points VFR / VRP.
+- Bouton « Ajout WP » ajouté au menu d’appui long carte, sans supprimer « Créer Feu » ni « Sélection Zone ».
+- Le premier WP créé devient automatiquement le WP actif et active le GoTo.
+- Les WP suivants sont ajoutés à la route sans modifier la cible active.
+- Icône WP dédiée : losange noir à contour blanc avec WP1, WP2, etc. ; WP actif en vert.
+
+2. ROUTE PERSISTANTE / PROGRESSION
+- Rayon d’acquisition du WP actif : 1 NM.
+- Lorsqu’une position GPS fraîche entre dans le cercle de 1 NM, le WP suivant devient actif automatiquement.
+- Aucune progression automatique lorsque le GoTo route est désactivé.
+- Une position GPS simplement restaurée du stockage ne déclenche jamais le passage au WP suivant.
+- Si le WP actif est supprimé, le WP suivant devient actif ; s’il n’existe pas, le précédent restant devient actif.
+- Route, ordre, WP actif et état GoTo stockés localement et restaurés au redémarrage.
+
+3. ACTIONS SUR UN WP EXISTANT
+- Appui sur un WP : GoTo / Supprimer / Modifier / Déplacer / Supp. Route.
+- GoTo réactive la navigation vers le WP choisi et réaffiche le bandeau supérieur.
+- Modifier ouvre une recherche de commune fondée sur le même moteur que l’édition des points GAAR ; la commune choisie repositionne le WP.
+- Déplacer active le glisser-déposer du losange : maintien, déplacement, relâchement = nouvelle position enregistrée.
+- Supp. Route est disponible depuis chaque WP et demande confirmation.
+- La suppression complète de route est également disponible depuis le bandeau.
+
+4. BANDEAU ROUTE / DÉSACTIVATION GOTO
+- GoTo actif : bandeau supérieur affiché.
+- Deux informations :
+  - WPn — Route / Distance / Temps vers le WP actif ;
+  - WP Final — Route / Distance / Temps directs vers le dernier WP.
+- Bouton « Désact. GoTo » : désactive le GoTo et ferme le bandeau sans supprimer ni masquer la route.
+- Pour réactiver : appui sur un WP puis bouton GoTo.
+- Bouton « Supp. Route » rouge avec confirmation.
+
+5. TRAÇAGE DES SEGMENTS
+- Trait bleu bordé de blanc entre chaque WP successif.
+- Bulle de segment placée juste après le WP de départ, dans le sens de la route.
+- Format : Route magnétique / Distance NM / Temps.
+- Le temps de chaque segment est recalculé avec la vitesse sol GPS actuelle ; si elle n’est pas exploitable, « -- min » est affiché.
+- Un cercle vert pointillé de 1 NM entoure le WP actif lorsque le GoTo est actif.
+- La route et les bulles restent affichées quand le GoTo est désactivé.
+
+6. UI PÉLIC / PROFIL
+- VAC, NOTAMS et Go To : mêmes dimensions et même taille de police.
+- Couleurs différenciées : VAC bleu, NOTAMS orange, Go To vert ; Ajout WP violet.
+- Poignée « glisser vers le haut » du Profil agrandie pour une meilleure prise tactile.
+
+7. DIAGRAMME GAAR NPF
+- Nouveau léger dézoom : facteur 1,40 -> 1,35.
+- Cadre associé ajusté à 74,08 %.
+- Aucun fichier BFG n’est modifié.
+
+8. ÉLÉMENTS INCHANGÉS
+- NOTAMS v16.07/v16.08, synchronisation NAS/IndexedDB et filtres BFG inchangés.
+- Altitudes SafeSky / GLR v16.08 inchangées.
+- PÉLIC couleurs opérationnelles : Vert=RETARDANT, Bleu=EAU, Rouge=DÉSACTIVÉ, croix rouge centrée sur PÉLIC désactivé inchangées.
+- SIA / AIRAC strictement inchangé.
+- Production v2026.67 inchangée.
+
+9. CONTRÔLES
+- `node --check` Script NPF.
+- `node --check` Service Worker NPF.
+- Manifest JSON parsé.
+- Cohérence v16.09 Index / Manifest / Script / SW.
+- SIA comparé bit-à-bit avec v16.08.
+- Vérifications ciblées : Ajout WP sur les 4 sources ; cercle 1 NM ; progression conditionnée par GoTo ; persistance ; actions WP ; bandeau ; suppression confirmée ; segment/bulle après WP ; zoom GAAR 1,35 ; boutons PÉLIC harmonisés ; poignée Profil agrandie.
+
+
 VERSION TEST v16.08 — ALTITUDES TRAFICS / GLR + DÉZOOM GAAR NPF
 Date : 29/08/2026
 Base : TEST v16.07
