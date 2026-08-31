@@ -17271,3 +17271,287 @@ body.pelic-notams-modal-open {
     min-height: 71.43% !important;
     transform: scale(1.40) !important;
 }
+/* ==========================================================================
+   v16.09 — AJUSTEMENTS UI + ROUTE WP
+   ========================================================================== */
+
+/* GAAR NPF : second léger dézoom demandé (1,40 -> 1,35). */
+.briefing-doc-viewer-modal.briefing-doc-viewer-gaar-zoom .briefing-doc-viewer-stage .briefing-doc-viewer-frame {
+    width: 74.08% !important;
+    height: 74.08% !important;
+    min-width: 74.08% !important;
+    min-height: 74.08% !important;
+    transform: scale(1.35) !important;
+}
+
+/* Fiche PÉLIC : VAC / NOTAMS / Go To de même gabarit, couleurs distinctes. */
+.airport-popup .popup-vac-buttons,
+.airport-popup .popup-notams-buttons,
+.airport-popup .popup-goto-buttons,
+.airport-popup .popup-add-wp-buttons {
+    display: flex !important;
+    width: 100% !important;
+    margin-top: 7px !important;
+}
+
+.airport-popup .vac-btn,
+.airport-popup .pelic-notams-btn,
+.airport-popup .goto-btn,
+.airport-popup .add-wp-btn {
+    width: 100% !important;
+    min-height: 42px !important;
+    padding: 7px 12px !important;
+    border-radius: 8px !important;
+    color: #ffffff !important;
+    font-size: 15px !important;
+    line-height: 1.1 !important;
+    font-weight: 950 !important;
+    touch-action: manipulation;
+}
+
+.airport-popup .vac-btn {
+    background: #2563eb !important;
+    border: 1px solid #1d4ed8 !important;
+}
+.airport-popup .pelic-notams-btn {
+    background: #d97706 !important;
+    border: 1px solid #b45309 !important;
+}
+.airport-popup .goto-btn {
+    background: #16a34a !important;
+    border: 1px solid #15803d !important;
+}
+.airport-popup .add-wp-btn {
+    background: #7c3aed !important;
+    border: 1px solid #6d28d9 !important;
+}
+
+/* Poignée du profil agrandie pour la prise au doigt sur iPad. */
+.sia-profile-swipe-handle {
+    width: 160px !important;
+    height: 42px !important;
+    border-radius: 21px !important;
+}
+.sia-profile-swipe-handle span {
+    width: 96px !important;
+    height: 7px !important;
+}
+
+/* Ajout WP depuis appui long / VRP. */
+.npf-map-longpress-wp {
+    background: #7c3aed !important;
+    color: #ffffff !important;
+    border-color: #6d28d9 !important;
+}
+.sia-vrp-popup-actions {
+    display: flex;
+    margin-top: 10px;
+}
+.sia-vrp-add-wp-btn {
+    width: 100%;
+    min-height: 40px;
+    padding: 7px 12px;
+    border: 1px solid #6d28d9;
+    border-radius: 8px;
+    background: #7c3aed;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 950;
+    touch-action: manipulation;
+}
+
+/* Icônes WP : losange noir / contour blanc ; WP actif vert. */
+.npf-waypoint-marker {
+    background: transparent !important;
+    border: 0 !important;
+}
+.npf-waypoint-diamond {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    transform: rotate(45deg);
+    border: 3px solid #ffffff;
+    border-radius: 4px;
+    background: #111827;
+    box-shadow: 0 0 0 2px #111827, 0 2px 7px rgba(0,0,0,.35);
+}
+.npf-waypoint-marker-active .npf-waypoint-diamond {
+    background: #16a34a;
+    box-shadow: 0 0 0 2px #166534, 0 2px 8px rgba(0,0,0,.38);
+}
+.npf-waypoint-diamond-label {
+    display: block;
+    transform: rotate(-45deg);
+    color: #ffffff;
+    font-size: 10px;
+    line-height: 1;
+    font-weight: 950;
+    letter-spacing: -.03em;
+    white-space: nowrap;
+}
+.npf-waypoint-dragging .npf-waypoint-diamond {
+    background: #f59e0b !important;
+    box-shadow: 0 0 0 3px #92400e, 0 3px 12px rgba(0,0,0,.45) !important;
+}
+
+/* Bulle de segment placée immédiatement après le WP de départ. */
+.npf-waypoint-segment-tooltip {
+    padding: 4px 7px !important;
+    border: 2px solid #1d4ed8 !important;
+    border-radius: 8px !important;
+    background: rgba(255,255,255,.96) !important;
+    color: #172554 !important;
+    box-shadow: 0 2px 7px rgba(0,0,0,.24) !important;
+    font-size: 12px !important;
+    line-height: 1.05 !important;
+    font-weight: 950 !important;
+    white-space: nowrap !important;
+}
+.npf-waypoint-segment-tooltip::before {
+    display: none !important;
+}
+.npf-waypoint-move-hint {
+    border: 2px solid #f59e0b !important;
+    background: #fff7ed !important;
+    color: #78350f !important;
+    font-weight: 900 !important;
+}
+
+/* Popup d'un WP existant. */
+.npf-waypoint-popup {
+    min-width: 245px;
+}
+.npf-waypoint-popup-title {
+    color: #0f172a;
+    font-size: 17px;
+    font-weight: 950;
+}
+.npf-waypoint-popup-name {
+    margin-top: 3px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 750;
+}
+.npf-waypoint-popup-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-top: 10px;
+}
+.npf-waypoint-action {
+    min-height: 40px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 950;
+    touch-action: manipulation;
+}
+.npf-waypoint-goto { background: #16a34a; border: 1px solid #15803d; }
+.npf-waypoint-delete { background: #dc2626; border: 1px solid #b91c1c; }
+.npf-waypoint-edit { background: #2563eb; border: 1px solid #1d4ed8; }
+.npf-waypoint-move { background: #d97706; border: 1px solid #b45309; }
+.npf-waypoint-delete-route {
+    grid-column: 1 / -1;
+    background: #991b1b;
+    border: 1px solid #7f1d1d;
+}
+
+/* Bandeau supérieur du mode route. */
+#commune-info-display.wp-route-navigation-active {
+    top: calc(var(--safe-area-top) + 4px) !important;
+    left: 50% !important;
+    right: auto !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    min-height: 56px !important;
+    height: auto !important;
+    padding: 7px 10px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 7px !important;
+    border: 2px solid #2563eb !important;
+    border-radius: 15px !important;
+    background: rgba(255,255,255,.97) !important;
+    overflow: visible !important;
+}
+.wp-route-band-metric {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 38px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+    border: 1px solid #bfdbfe;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #0f172a;
+    font-size: 14px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+.wp-route-band-final {
+    border-color: #c4b5fd;
+    background: #f5f3ff;
+}
+.wp-route-band-label {
+    color: #1d4ed8;
+    font-weight: 950;
+}
+.wp-route-band-final .wp-route-band-label {
+    color: #6d28d9;
+}
+.wp-route-band-button {
+    min-height: 38px;
+    padding: 5px 9px;
+    border-radius: 9px;
+    color: #ffffff;
+    font-size: 13px;
+    line-height: 1.05;
+    font-weight: 950;
+    touch-action: manipulation;
+}
+.wp-route-disable-goto {
+    background: #64748b;
+    border: 1px solid #475569;
+}
+.wp-route-delete-all {
+    background: #dc2626;
+    border: 1px solid #b91c1c;
+}
+
+@media (max-width: 760px) {
+    #commune-info-display.wp-route-navigation-active {
+        left: 6px !important;
+        right: 6px !important;
+        transform: none !important;
+        max-width: none !important;
+        padding: 5px 6px !important;
+        gap: 5px !important;
+    }
+    .wp-route-band-metric {
+        min-height: 34px;
+        padding: 3px 6px;
+        font-size: 12px;
+    }
+    .wp-route-band-button {
+        min-height: 34px;
+        padding: 4px 7px;
+        font-size: 11px;
+    }
+}
+
+/* Recherche de modification WP réutilisant le moteur communes GAAR. */
+body.npf-waypoint-search-open {
+    overflow: hidden;
+}
+.npf-waypoint-search-panel .gaar-point-search-title b {
+    color: #7c3aed;
+}
