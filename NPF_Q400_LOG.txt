@@ -1,3 +1,51 @@
+VERSION TEST v16.10 — CORRECTIONS ROUTE WP / BANDEAU INDÉPENDANT
+Date : 31/08/2026
+Base : TEST v16.09 corrigée
+
+OBJECTIFS
+- Lorsqu’un point VFR/VRP, aéroport ou PÉLIC déjà présent dans la route est touché, afficher les actions du WP existant au lieu de « Ajout WP ».
+- Empêcher l’ajout en double d’un même point source lorsqu’il correspond déjà à un WP de la route.
+- Replacer automatiquement les bulles Route / Distance / Tps afin qu’elles ne recouvrent aucun WP.
+- Agrandir les libellés « WPn » et « WP Final » du bandeau de navigation.
+- Séparer le bandeau Route du bandeau Feu afin que Route, BINGO et Feu puissent rester visibles simultanément sans recouvrement.
+
+1. POINTS SOURCE DÉJÀ PRÉSENTS DANS LA ROUTE
+- Détection d’un WP existant par type de source, identité et proximité géographique.
+- Point VFR/VRP déjà utilisé : popup avec GoTo / Supprimer / Modifier / Déplacer / Supp. Route.
+- Aéroport ou PÉLIC déjà utilisé : mêmes actions WP à la place de « Ajout WP ».
+- Protection anti-doublon également appliquée au clic d’ajout si un popup ancien est encore ouvert.
+- Compatibilité avec les routes v16.09 déjà enregistrées, même si elles ne contiennent pas encore la nouvelle clé d’identité de source.
+
+2. BULLES DES SEGMENTS
+- La bulle reste liée au segment et placée en priorité juste après le WP de départ.
+- Le placement est calculé en pixels selon le zoom, la taille réelle de la bulle et la direction du segment.
+- Une zone de sécurité est conservée autour de tous les losanges WP.
+- Si le segment est trop court, la bulle est décalée latéralement au trait plutôt que superposée à un WP.
+- Recalcul automatique au changement de zoom.
+
+3. BANDEAU ROUTE
+- Le bandeau Route n’utilise plus #commune-info-display : un bandeau indépendant #npf-waypoint-route-banner est créé.
+- BINGO et le bandeau Feu restent affichés normalement lorsqu’un feu est sélectionné.
+- Le bandeau Route se place automatiquement sous les bandeaux visibles, avec une marge de sécurité.
+- « WPn » et « WP Final » passent à 18 px gras ; les valeurs Route / Distance / Temps conservent une taille plus compacte.
+- « Désact. GoTo » continue de fermer uniquement le bandeau Route, sans supprimer la route.
+
+4. ÉLÉMENTS INCHANGÉS
+- Cercle d’acquisition 1 NM, progression automatique conditionnée par GoTo, persistance route et suppression confirmée inchangés.
+- UI PÉLIC v16.09 (VAC / NOTAMS / Go To), poignée Profil et dézoom GAAR 1,35 inchangés.
+- PÉLIC : Vert=RETARDANT, Bleu=EAU, Rouge=DÉSACTIVÉ + croix rouge centrée inchangés.
+- SIA / AIRAC strictement inchangé.
+- BFG et production inchangés.
+
+5. CONTRÔLES
+- node --check Script NPF.
+- node --check Service Worker NPF.
+- Manifest JSON parsé.
+- Cohérence v16.10 Index / Manifest / Script / Style / SW.
+- SIA comparé bit-à-bit avec v16.09.
+- Vérifications ciblées : popup VFR existant, popup aéroport/PÉLIC existant, anti-doublon, collision bulles/WP, bandeau indépendant, libellés WP agrandis.
+
+
 VERSION TEST v16.09 — ROUTE WP / UI PÉLIC / PROFIL / DÉZOOM GAAR
 Date : 31/08/2026
 Base : TEST v16.08
