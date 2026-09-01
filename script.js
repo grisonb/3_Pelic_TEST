@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.20';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.22';
 
 
 /*
@@ -149,6 +149,118 @@ function getNpfStartupDiagnosticRuntimeInfo() {
     };
 }
 
+function buildNpfStartupDiagnosticExportText() {
+    const diag = NPF_STARTUP_DIAGNOSTIC.state;
+    const runtime = getNpfStartupDiagnosticRuntimeInfo();
+    const marks = diag.marks.slice().sort((a, b) => a.t - b.t);
+    let previous = 0;
+    const lines = [];
+    const generatedAt = new Date();
+
+    lines.push('NPF-Q400 — Diagnostic démarrage');
+    lines.push('Date : ' + generatedAt.toLocaleString('fr-FR'));
+    lines.push('Build : ' + String(window.NPF_SCRIPT_BUILD_VERSION || NPF_SCRIPT_BUILD_VERSION || '—'));
+    lines.push('Carte : ' + runtime.source + ' | Zoom : ' + runtime.zoom);
+    if (runtime.pack) lines.push('Packs : ' + runtime.pack);
+    if (runtime.directHits !== null) {
+        lines.push('Tuiles IDB : ' + runtime.directHits + ' trouvées / ' + runtime.directMisses + ' absentes');
+    }
+    lines.push('');
+    lines.push('ÉTAPES');
+    lines.push('Étape | Depuis ouverture | Delta | Détail');
+
+    marks.forEach(entry => {
+        const delta = Math.max(0, entry.t - previous);
+        previous = entry.t;
+        lines.push([
+            entry.label,
+            (entry.t / 1000).toFixed(2) + ' s',
+            (delta / 1000).toFixed(2) + ' s',
+            entry.detail || ''
+        ].join(' | '));
+    });
+
+    const stalls = diag.stalls.slice().sort((a, b) => b.delay - a.delay);
+    lines.push('');
+    lines.push('BLOCAGES JAVASCRIPT');
+    if (stalls.length) {
+        lines.push('Nombre : ' + stalls.length + ' | Maximum : ' + Math.round(stalls[0].delay) + ' ms');
+        stalls.forEach(item => {
+            lines.push('+ ' + (item.t / 1000).toFixed(2) + ' s : ≈ ' + Math.round(item.delay) + ' ms');
+        });
+    } else {
+        lines.push('Aucun blocage > 120 ms détecté.');
+    }
+
+    const longTasks = diag.longTasks.slice().sort((a, b) => b.duration - a.duration);
+    lines.push('');
+    lines.push('LONGTASK API');
+    if (!diag.longTaskObserverSupported) {
+        lines.push('Indisponible sur ce Safari — mesure par retard de boucle utilisée.');
+    } else if (!longTasks.length) {
+        lines.push('Aucune LongTask détectée.');
+    } else {
+        lines.push('Nombre : ' + longTasks.length);
+        longTasks.forEach(item => {
+            lines.push('+ ' + (item.t / 1000).toFixed(2) + ' s : ' + Math.round(item.duration) + ' ms');
+        });
+    }
+
+    lines.push('');
+    lines.push('Mesures enregistrées automatiquement depuis l’ouverture de NPF.');
+    return lines.join('\n');
+}
+
+async function exportNpfStartupDiagnostic() {
+    const text = buildNpfStartupDiagnosticExportText();
+    const date = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const filename = `NPF_DIAG_${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}.txt`;
+    const title = 'NPF-Q400 — Diagnostic démarrage';
+
+    try {
+        if (typeof File === 'function' && navigator.share) {
+            const file = new File([text], filename, { type: 'text/plain;charset=utf-8' });
+            const shareData = { title, text: 'Diagnostic de démarrage NPF-Q400 en pièce jointe.', files: [file] };
+            if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+                await navigator.share(shareData);
+                return;
+            }
+        }
+        if (navigator.share) {
+            await navigator.share({ title, text });
+            return;
+        }
+    } catch (error) {
+        if (error && error.name === 'AbortError') return;
+        console.warn('[NPF DIAG] Partage direct indisponible :', error);
+    }
+
+    try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(text);
+            alert('Diagnostic copié. Tu peux le coller directement dans un mail.');
+            return;
+        }
+    } catch (_) {}
+
+    try {
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        alert('Le diagnostic a été exporté en fichier texte.');
+    } catch (_) {
+        alert('Export impossible sur cet appareil.');
+    }
+}
+window.exportNpfStartupDiagnostic = exportNpfStartupDiagnostic;
+
 function renderNpfStartupDiagnosticPanel() {
     const panel = document.getElementById('npf-startup-diag-panel');
     const body = document.getElementById('npf-startup-diag-body');
@@ -158,52 +270,79 @@ function renderNpfStartupDiagnosticPanel() {
     const runtime = getNpfStartupDiagnosticRuntimeInfo();
     const marks = diag.marks.slice().sort((a, b) => a.t - b.t);
     let previous = 0;
-    const rows = marks.map(entry => {
+    const timedMarks = marks.map(entry => {
         const delta = Math.max(0, entry.t - previous);
         previous = entry.t;
-        return `<tr>
+        return { ...entry, delta };
+    });
+
+    const coreReady = timedMarks.find(entry => entry.key === 'core_ready');
+    const coreReadyTime = coreReady ? coreReady.t : Infinity;
+    const page = panel.dataset.diagPage === '2' ? 2 : 1;
+    const pageMarks = page === 1
+        ? timedMarks.filter(entry => entry.t <= coreReadyTime)
+        : timedMarks.filter(entry => entry.t > coreReadyTime);
+
+    const rows = pageMarks.map(entry => `<tr>
             <td>${escapeNpfStartupDiagnosticHtml(entry.label)}</td>
             <td>${(entry.t / 1000).toFixed(2)} s</td>
-            <td>${(delta / 1000).toFixed(2)} s</td>
+            <td>${(entry.delta / 1000).toFixed(2)} s</td>
             <td>${escapeNpfStartupDiagnosticHtml(entry.detail)}</td>
-        </tr>`;
-    }).join('');
+        </tr>`).join('');
 
     const stalls = diag.stalls.slice().sort((a, b) => b.delay - a.delay);
     const maxStall = stalls.length ? stalls[0].delay : 0;
     const stallRows = stalls.slice(0, 8).map(item => (
-        `<li>+${(item.t / 1000).toFixed(2)} s : blocage ≈ ${Math.round(item.delay)} ms</li>`
+        `<li>+${(item.t / 1000).toFixed(2)} s : ≈ ${Math.round(item.delay)} ms</li>`
     )).join('');
 
     const longTasks = diag.longTasks.slice().sort((a, b) => b.duration - a.duration);
     const longTaskRows = longTasks.slice(0, 5).map(item => (
-        `<li>+${(item.t / 1000).toFixed(2)} s : LongTask ${Math.round(item.duration)} ms</li>`
+        `<li>+${(item.t / 1000).toFixed(2)} s : ${Math.round(item.duration)} ms</li>`
     )).join('');
 
     const offlineCounters = runtime.directHits === null
         ? ''
-        : `<span>Tuiles IDB : ${runtime.directHits} trouvées / ${runtime.directMisses} absentes</span>`;
+        : `<span>Tuiles IDB : <b>${runtime.directHits}</b> trouvées / <b>${runtime.directMisses}</b> absentes</span>`;
 
-    body.innerHTML = `
-        <div class="npf-startup-diag-meta">
-            <span>Carte : <b>${escapeNpfStartupDiagnosticHtml(runtime.source)}</b></span>
-            <span>Zoom : <b>${escapeNpfStartupDiagnosticHtml(runtime.zoom)}</b></span>
-            ${runtime.pack ? `<span>Pack : <b>${escapeNpfStartupDiagnosticHtml(runtime.pack)}</b></span>` : ''}
-            ${offlineCounters}
-        </div>
-        <table class="npf-startup-diag-table">
-            <thead><tr><th>Étape</th><th>Depuis ouverture</th><th>Δ</th><th>Détail</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="4">Aucune mesure.</td></tr>'}</tbody>
-        </table>
-        <div class="npf-startup-diag-stalls">
-            <b>Blocages JS détectés : ${diag.stalls.length}</b>
-            ${diag.stalls.length ? ` — maximum ≈ ${Math.round(maxStall)} ms` : ''}
-            ${stallRows ? `<ul>${stallRows}</ul>` : '<div>Aucun blocage supérieur à 120 ms détecté.</div>'}
-            ${diag.longTaskObserverSupported
-                ? `<div><b>LongTask API :</b> ${longTasks.length}${longTaskRows ? `<ul>${longTaskRows}</ul>` : ''}</div>`
-                : '<div>LongTask API Safari indisponible : mesure par retard de boucle utilisée.</div>'}
-        </div>
-        <div class="npf-startup-diag-help">Fais une capture de ce panneau quand le chargement te paraît lent.</div>`;
+    const table = `<table class="npf-startup-diag-table">
+        <thead><tr><th>Étape</th><th>Depuis ouv.</th><th>Δ</th><th>Détail</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4">Aucune mesure sur cette page.</td></tr>'}</tbody>
+    </table>`;
+
+    if (page === 1) {
+        body.innerHTML = `
+            <div class="npf-startup-diag-page-title">1/2 — CARTE ET DÉMARRAGE PRINCIPAL</div>
+            <div class="npf-startup-diag-meta npf-startup-diag-meta-compact">
+                <span>Carte : <b>${escapeNpfStartupDiagnosticHtml(runtime.source)}</b></span>
+                <span>Zoom : <b>${escapeNpfStartupDiagnosticHtml(runtime.zoom)}</b></span>
+                ${offlineCounters}
+                ${runtime.pack ? `<span class="npf-startup-diag-pack">Packs : <b>${escapeNpfStartupDiagnosticHtml(runtime.pack)}</b></span>` : ''}
+            </div>
+            ${table}
+            <div class="npf-startup-diag-shot-hint">Capture 1/2 · puis touche « 2/2 Suite ».</div>`;
+    } else {
+        body.innerHTML = `
+            <div class="npf-startup-diag-page-title">2/2 — COUCHES ANNEXES ET BLOCAGES</div>
+            <div class="npf-startup-diag-page2-grid">
+                <div class="npf-startup-diag-page2-table">${table}</div>
+                <div class="npf-startup-diag-stalls">
+                    <div><b>Blocages JS : ${diag.stalls.length}</b>${diag.stalls.length ? ` · max ≈ ${Math.round(maxStall)} ms` : ''}</div>
+                    ${stallRows ? `<ul>${stallRows}</ul>` : '<div>Aucun blocage &gt; 120 ms.</div>'}
+                    ${diag.longTaskObserverSupported
+                        ? `<div class="npf-startup-diag-longtasks"><b>LongTask API : ${longTasks.length}</b>${longTaskRows ? `<ul>${longTaskRows}</ul>` : ''}</div>`
+                        : '<div class="npf-startup-diag-longtasks">LongTask API Safari indisponible : mesure par retard de boucle.</div>'}
+                    <div class="npf-startup-diag-monitor">Mesure automatique dès l’ouverture, même panneau fermé.</div>
+                </div>
+            </div>
+            <div class="npf-startup-diag-shot-hint">Capture 2/2 · ces deux captures contiennent tout le diagnostic affiché.</div>`;
+    }
+
+    panel.querySelectorAll('.npf-startup-diag-page-button').forEach(button => {
+        const buttonPage = Number(button.dataset.diagPage || 1);
+        button.classList.toggle('active', buttonPage === page);
+        button.setAttribute('aria-pressed', buttonPage === page ? 'true' : 'false');
+    });
 }
 window.renderNpfStartupDiagnosticPanel = renderNpfStartupDiagnosticPanel;
 
@@ -223,6 +362,11 @@ function ensureNpfStartupDiagnosticUi() {
             <div class="npf-startup-diag-card">
                 <div class="npf-startup-diag-header">
                     <strong>Diagnostic démarrage</strong>
+                    <div class="npf-startup-diag-page-nav" aria-label="Pages du diagnostic">
+                        <button type="button" class="npf-startup-diag-page-button active" data-diag-page="1" aria-pressed="true">1/2 Démarrage</button>
+                        <button type="button" class="npf-startup-diag-page-button" data-diag-page="2" aria-pressed="false">2/2 Suite</button>
+                    </div>
+                    <button type="button" id="npf-startup-diag-export" aria-label="Exporter le diagnostic">Exporter</button>
                     <button type="button" id="npf-startup-diag-close" aria-label="Fermer">×</button>
                 </div>
                 <div id="npf-startup-diag-body" class="npf-startup-diag-body"></div>
@@ -235,6 +379,7 @@ function ensureNpfStartupDiagnosticUi() {
         panel.setAttribute('aria-hidden', 'true');
     };
     const open = () => {
+        panel.dataset.diagPage = '1';
         renderNpfStartupDiagnosticPanel();
         panel.hidden = false;
         panel.setAttribute('aria-hidden', 'false');
@@ -246,6 +391,19 @@ function ensureNpfStartupDiagnosticUi() {
         open();
     });
     panel.querySelector('#npf-startup-diag-close')?.addEventListener('click', close);
+    panel.querySelector('#npf-startup-diag-export')?.addEventListener('click', async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        await exportNpfStartupDiagnostic();
+    });
+    panel.querySelectorAll('.npf-startup-diag-page-button').forEach(pageButton => {
+        pageButton.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            panel.dataset.diagPage = String(pageButton.dataset.diagPage || '1');
+            renderNpfStartupDiagnosticPanel();
+        });
+    });
     panel.addEventListener('click', event => {
         if (event.target === panel) close();
     });
