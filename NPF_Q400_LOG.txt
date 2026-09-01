@@ -1,3 +1,80 @@
+VERSION TEST v16.17 — DIAGNOSTIC PASSIF DU DÉMARRAGE
+Date : 01/09/2026
+Base : TEST v16.16, avec retour du moteur de démarrage au comportement v16.15
+
+OBJECTIFS
+- Mesurer la cause réelle des lenteurs de chargement sur iPad sans modifier le comportement opérationnel.
+- Conserver la correction GoTo Feu introduite dans la TEST précédente.
+- Retirer les deux optimisations expérimentales de démarrage ajoutées précédemment afin que le diagnostic mesure le moteur déjà validé.
+
+1. DIAGNOSTIC DE DÉMARRAGE
+- Ajout d'un bouton DIAG réservé à la TEST.
+- Le panneau affiche les temps cumulés et les écarts entre étapes : DOM, état local, carte Leaflet, fond de carte, première tuile, IndexedDB, communes, alias, PÉLIC, SIA et couches annexes.
+- En mode Offline, affichage des compteurs de tuiles IndexedDB trouvées/absentes.
+- Détection passive des blocages de la boucle JavaScript supérieurs à environ 120 ms pendant les 18 premières secondes.
+- Utilisation de PerformanceObserver/LongTask lorsque Safari le permet, avec repli sur la mesure de retard de boucle.
+- Aucune donnée n'est transmise ; le diagnostic reste local à la PWA.
+
+2. RETOUR AU DÉMARRAGE DÉJÀ VALIDÉ
+- Restauration des preloads communes_aliases.json et localités France présents auparavant.
+- Suppression de l'attente expérimentale de première tuile avant l'index communes.
+- Retour à l'indexation communes en une passe, identique au comportement antérieur.
+- Aucun changement d'ordre supplémentaire n'est appliqué : le diagnostic doit mesurer la situation réelle avant optimisation.
+
+3. GOTO FEU
+- La correction permettant de reprendre un GoTo vers un feu après navigation vers un WP ou un PÉLIC est conservée.
+
+4. ÉLÉMENTS INCHANGÉS
+- Bandeaux Route/Feu, loupe, fiche PÉLIC sur WP, snap/priorité tactile WP, route persistante et SIA/AIRAC inchangés hors instrumentation de temps.
+- Moteur Offline et données cartographiques inchangés.
+
+5. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.17 Index / Manifest / Script / Style / SW.
+- sia.js inchangé bit-à-bit.
+- Contrôle différentiel : seules la correction GoTo Feu et l'instrumentation diagnostic s'ajoutent au comportement de démarrage v16.15.
+
+
+VERSION TEST v16.16 — GOTO FEU RÉACTIVABLE / CHARGEMENT CARTE PRIORITAIRE
+Date : 01/09/2026
+Base : TEST v16.15
+
+OBJECTIFS
+- Conserver un feu sélectionné lorsqu'un GoTo WP ou aéroport/PÉLIC prend temporairement la priorité.
+- Permettre de reprendre immédiatement le GoTo vers ce feu en recliquant sur sa flamme.
+- Réduire les blocages ressentis au chargement de la carte NPF sur iPad sans supprimer de données ni modifier le moteur offline.
+
+1. GOTO FEU APRÈS WP OU PÉLIC
+- Le feu actif reste sélectionné lorsque la navigation passe sur un WP ou sur un aéroport/PÉLIC.
+- Si la cible GoTo courante n'est plus le feu, la popup de la flamme active affiche un bouton GoTo.
+- Ce bouton désactive le GoTo WP sans supprimer la route et efface uniquement la destination aéroport/PÉLIC temporaire.
+- La route GPS revient immédiatement vers le feu sélectionné.
+- Lorsque le feu est déjà la cible active, aucun bouton GoTo redondant n'est ajouté.
+
+2. PRIORITÉ DE CHARGEMENT DU FOND DE CARTE
+- Suppression des préchargements HTML de communes_aliases.json et de l'archive nationale de localités, qui pouvaient concurrencer les premières tuiles dès le parsing de la page.
+- Après création de Leaflet, le démarrage attend désormais l'activité réelle des premières tuiles (avec délai de sécurité) avant de lancer l'indexation lourde des communes.
+- L'index de recherche des communes est construit par tranches avec restitution régulière d'une frame au navigateur.
+- Les données, critères de recherche, Soundex et alias restent identiques ; seule l'ordonnancement CPU/réseau du démarrage change.
+- IndexedDB, cartes Offline, SIA, PÉLIC, SafeSky, GLR et autres fonctions ne sont pas supprimés.
+
+3. ÉLÉMENTS INCHANGÉS
+- Bandeau Route sous les bandeaux Feu/BINGO inchangé.
+- Loupe devant le bandeau Route inchangée.
+- Fiche PÉLIC complète sur WP confondu inchangée.
+- Snap/priorité tactile WP, insertion intermédiaire, bulles adaptatives et correction Hyères/MultiPolygon inchangés.
+- SIA / AIRAC strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.16 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.15.
+- Contrôle ciblé : feu sélectionné -> GoTo WP/PÉLIC -> popup feu avec GoTo -> retour cible feu sans suppression de route.
+- Contrôle ciblé : absence des preloads lourds avant les premières tuiles et index communes construit par tranches.
+
+
 VERSION TEST v16.15 — BANDEAU ROUTE SOUS BANDEAUX FEU
 Date : 01/09/2026
 Base : TEST v16.14
