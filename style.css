@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.25 */
+/* NPF_STYLE_BUILD_VERSION: v16.26 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -5885,7 +5885,7 @@ body {
     background: #e3001b;
     color: #ffffff;
     border: 2px solid #ffffff;
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 900;
     line-height: 1.1;
     box-shadow: 0 1px 4px rgba(0,0,0,.28);
@@ -17374,10 +17374,10 @@ body.pelic-notams-modal-open {
 }
 .npf-waypoint-diamond {
     position: absolute;
-    left: 8px;
-    top: 8px;
-    width: 32px;
-    height: 32px;
+    left: 10px;
+    top: 10px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -17665,9 +17665,11 @@ body.npf-waypoint-search-open {
    ========================================================================== */
 .npf-startup-diag-button {
     position: fixed !important;
-    left: 124px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
+    left: var(--npf-diag-left, calc(env(safe-area-inset-left, 0px) + 265px)) !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0px) !important;
+    transform: none !important;
     z-index: 1800 !important;
     width: 64px !important;
     height: 46px !important;
@@ -17679,7 +17681,7 @@ body.npf-waypoint-search-open {
 }
 @media (max-width: 760px) {
     .npf-startup-diag-button {
-        left: 104px !important;
+        left: var(--npf-diag-left, calc(env(safe-area-inset-left, 0px) + 212px)) !important;
         width: 58px !important;
         height: 42px !important;
     }
@@ -17896,8 +17898,8 @@ body.npf-waypoint-search-open {
 .npf-waypoint-marker-source .npf-waypoint-diamond-source {
     left: 7px;
     top: 7px;
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     background: transparent !important;
     border-width: 3px;
     box-shadow: 0 0 0 2px #111827, 0 2px 7px rgba(0,0,0,.28);
@@ -17910,9 +17912,9 @@ body.npf-waypoint-search-open {
 }
 .npf-waypoint-marker-source .npf-waypoint-diamond-label {
     position: absolute;
-    right: -12px;
-    top: -10px;
-    min-width: 27px;
+    right: -11px;
+    top: -9px;
+    min-width: 25px;
     padding: 2px 4px;
     border-radius: 7px;
     background: #111827;
@@ -17925,4 +17927,27 @@ body.npf-waypoint-search-open {
 }
 .npf-waypoint-marker-source.npf-waypoint-marker-active .npf-waypoint-diamond-label {
     background: #16a34a;
+}
+
+
+/* PÉLIC / PÉLIC+WP : largeur confortable pour conserver les libellés complets. */
+.leaflet-popup.npf-pelic-leaflet-popup .leaflet-popup-content-wrapper {
+    width: min(390px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+}
+.leaflet-popup.npf-pelic-leaflet-popup .leaflet-popup-content {
+    width: auto !important;
+    max-width: none !important;
+    margin-left: 18px;
+    margin-right: 18px;
+}
+.leaflet-popup.npf-pelic-leaflet-popup .airport-popup {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+.leaflet-popup.npf-pelic-leaflet-popup .npf-pelic-waypoint-actions .npf-waypoint-action {
+    overflow: visible;
+    text-overflow: clip;
+    text-align: center;
 }
