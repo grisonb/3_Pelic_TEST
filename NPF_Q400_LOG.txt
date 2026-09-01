@@ -1,3 +1,20 @@
+VERSION TEST v16.18 — DIAGNOSTIC : BOUTON TOUJOURS VISIBLE
+Date : 01/09/2026
+Base : TEST v16.17
+
+OBJECTIF
+- Déplacer le bouton DIAG hors de la colonne verticale gauche afin qu'il ne soit plus masqué en bas de l'écran sur iPad.
+
+MODIFICATION
+- Le bouton DIAG est désormais un petit bouton flottant indépendant, placé juste à droite de la colonne gauche.
+- Le diagnostic lui-même est inchangé : il démarre automatiquement dès l'exécution du script, mémorise les étapes et blocages détectés pendant le démarrage et peut être consulté après coup tant que l'application n'a pas été rechargée.
+- Aucun changement de l'ordre de chargement ni du moteur de carte.
+
+ÉLÉMENTS INCHANGÉS
+- GoTo Feu / WP / PÉLIC de v16.17 inchangé.
+- SIA, Offline, communes, routes, SafeSky, GLR et autres fonctions opérationnelles inchangés.
+
+
 VERSION TEST v16.17 — DIAGNOSTIC PASSIF DU DÉMARRAGE
 Date : 01/09/2026
 Base : TEST v16.16, avec retour du moteur de démarrage au comportement v16.15
