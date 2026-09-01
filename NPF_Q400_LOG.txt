@@ -1,3 +1,79 @@
+VERSION TEST v16.25 — WP AUTOUR DES POINTS SOURCE / DÉDOUBLONNAGE BASE-PÉLIC
+Date : 01/09/2026
+Base : TEST v16.24
+
+OBJECTIFS
+- Lorsqu'un aéroport, un PÉLIC ou un point VFR/VRP est utilisé comme WP, conserver son icône d'origine visible au centre et dessiner le losange WP autour.
+- Lorsque le PÉLIC sélectionné est aussi la BASE, supprimer le doublon d'étiquette/route BASE et conserver uniquement l'indication BASE au-dessus du code OACI déjà portée par l'étiquette PÉLIC.
+
+1. WP SUR SOURCE AÉROPORT / PÉLIC / VFR
+- Le losange WP devient un encadrement creux plus large autour de l'icône métier.
+- Le libellé WPn est déplacé sur le bord du losange afin de ne pas masquer l'icône.
+- Le WP actif reste identifié en vert sans remplir le centre.
+- Le calque WP visuel ne capture pas le clic pour ces sources : la fiche d'origine du point reste prioritaire et conserve les actions WP intégrées.
+- Les WP créés librement sur la carte conservent le losange plein classique.
+
+2. BASE = PÉLIC
+- Si la base actuelle fait déjà partie des PÉLIC affichés autour du feu, la route BASE dédiée n'est pas redessinée en doublon.
+- L'étiquette PÉLIC existante conserve seule « BASE » au-dessus du code OACI.
+- La logique de sélection de base, les calculs BINGO et la navigation restent inchangés.
+
+3. ÉLÉMENTS INCHANGÉS
+- DIAG et export diagnostic inchangés.
+- Route WP, restauration, snap, bandeaux et navette Feu ↔ PÉLIC inchangés.
+- SIA strictement inchangé.
+
+4. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.25 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.24.
+
+
+VERSION TEST v16.24 — FENÊTRE PÉLIC TOUJOURS VISIBLE
+Date : 01/09/2026
+Base : TEST v16.23
+
+OBJECTIF
+- Éviter qu'une grande fiche PÉLIC soit coupée lorsqu'elle s'ouvre près du bord supérieur de la carte.
+
+1. POSITIONNEMENT FICHE PÉLIC
+- Les popups PÉLIC n'utilisent plus l'auto-pan Leaflet pour corriger ce cas.
+- Après ouverture et calcul de sa taille réelle, NPF vérifie la position de la fiche dans la carte.
+- Si son bord supérieur est hors de la zone visible, la fiche est automatiquement descendue.
+- Les bandeaux supérieurs visibles (BINGO, Feu/commune et Route) sont pris en compte lorsqu'ils chevauchent horizontalement la fiche.
+- La fiche peut donc être visuellement décalée de l'icône PÉLIC : l'icône reste la source sélectionnée, mais la lisibilité de la fenêtre est prioritaire.
+- La règle s'applique aussi lorsqu'un PÉLIC est simultanément un WP.
+
+2. ÉLÉMENTS INCHANGÉS
+- Contenu et boutons des fiches PÉLIC inchangés.
+- Route WP, GoTo, navette Feu ↔ PÉLIC, DIAG et chargement carte inchangés.
+- SIA inchangé.
+
+3. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence des versions applicatives.
+- SIA comparé bit-à-bit avec la base.
+
+
+VERSION TEST v16.23 — DISPOSITION BOUTONS PÉLIC + WP
+Date : 01/09/2026
+Base : TEST v16.22
+
+OBJECTIF
+- Clarifier la fiche d'un pélicandrome lorsqu'il est également utilisé comme waypoint de la route.
+
+1. ACTIONS WP DANS LA FICHE PÉLIC
+- Première ligne : GoTo / Modifier / Déplacer, trois boutons de largeur identique.
+- Dernière ligne : Supp. WP / Supp. Route, deux boutons côte à côte de largeur identique.
+- Le bouton « Supprimer » devient « Supp. WP » uniquement dans la fiche combinée PÉLIC + WP afin d'éviter toute ambiguïté avec la suppression de la route.
+
+2. ÉLÉMENTS INCHANGÉS
+- Boutons opérationnels PÉLIC (EAU/RETARDANT, Activer/Désactiver, BASE), PDF, VAC, Doc FDF et NOTAMS inchangés.
+- Un seul GoTo conservé lorsqu'un PÉLIC est aussi un WP.
+- Route, navette Feu ↔ PÉLIC, DIAG, Offline, SIA et moteur de chargement inchangés.
+
 VERSION TEST v16.22 — EXPORT DU DIAGNOSTIC
 Date : 01/09/2026
 Base : TEST v16.21
