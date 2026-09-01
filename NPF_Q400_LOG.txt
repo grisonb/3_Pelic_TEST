@@ -1,3 +1,45 @@
+VERSION TEST v16.26 — PRIORITÉ POINTS / LOSANGES / DIAG / FICHE PÉLIC
+Date : 01/09/2026
+Base : TEST v16.25
+
+OBJECTIFS
+- Afficher les points VFR/VRP, aéroports et PÉLIC devant les traits/bulles de la route WP.
+- Réduire la taille des losanges WP sans changer leur logique ni leur sélection.
+- Déplacer DIAG à droite de l’échelle nautique, en bas de l’écran.
+- Élargir la fiche PÉLIC/PÉLIC+WP pour conserver les libellés de boutons entiers et centrés.
+
+1. ORDRE D’AFFICHAGE ROUTE / POINTS
+- Pane des traits WP abaissé sous les points SIA/VFR et sous les marqueurs aéroports/PÉLIC.
+- Pane des bulles de segments également placé sous les points métier.
+- Pane des marqueurs WP conservé au-dessus pour les WP libres ; les WP liés à une source restent des encadrements transparents qui laissent l’icône métier visible et cliquable.
+
+2. LOSANGES WP
+- Losange WP libre réduit de 32 px à 28 px.
+- Encadrement WP autour d’une source réduit de 44 px à 38 px.
+- Conteneur source et ancrage recalés pour conserver le centrage exact sur le point d’origine.
+
+3. BOUTON DIAG
+- DIAG quitte la colonne gauche et se place en bas, immédiatement à droite de l’échelle nautique.
+- Sa position horizontale est recalculée après chaque mise à jour de l’échelle pour suivre sa largeur réelle.
+- Le diagnostic et son export restent strictement inchangés fonctionnellement.
+
+4. FICHE PÉLIC / PÉLIC + WP
+- Largeur portée jusqu’à 390 px sur iPad, avec adaptation à la largeur d’écran disponible.
+- Boutons WP conservés sur les lignes prévues, libellés non tronqués et centrés.
+- Repositionnement automatique vers le bas près du bord supérieur conservé.
+
+5. ÉLÉMENTS INCHANGÉS
+- Route WP, persistance, snap, restauration, GoTo et navette Feu ↔ PÉLIC inchangés.
+- DIAG passif et export inchangés hors déplacement visuel du bouton.
+- SIA strictement inchangé.
+
+6. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.26 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.25.
+
+
 VERSION TEST v16.25 — WP AUTOUR DES POINTS SOURCE / DÉDOUBLONNAGE BASE-PÉLIC
 Date : 01/09/2026
 Base : TEST v16.24
