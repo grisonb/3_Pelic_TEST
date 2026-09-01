@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.13';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.15';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -7984,6 +7984,7 @@ function setupEventListeners() {
         const communeDisplay = document.getElementById('commune-info-display');
         if (uiOverlay.style.display === 'none') {
             uiOverlay.style.display = 'block';
+            document.body?.classList.add('npf-main-search-open');
             communeDisplay.style.display = 'none';
             toggleSearchButton.classList.add('active');
             setTimeout(() => {
@@ -7996,6 +7997,7 @@ function setupEventListeners() {
             }, 80);
         } else {
             uiOverlay.style.display = 'none';
+            document.body?.classList.remove('npf-main-search-open');
             toggleSearchButton.classList.remove('active');
             if (communeDisplay.innerHTML.trim() !== '' && (currentCommune || selectedAirportDestination)) {
                 communeDisplay.style.display = 'flex';
@@ -8005,6 +8007,7 @@ function setupEventListeners() {
 
     const closeSearchAfterTargetSelection = () => {
         document.getElementById('ui-overlay').style.display = 'none';
+        document.body?.classList.remove('npf-main-search-open');
         document.getElementById('toggle-search-button').classList.remove('active');
         if (currentCommune || selectedAirportDestination) {
             document.getElementById('commune-info-display').style.display = 'flex';
@@ -17263,6 +17266,9 @@ function updateMapBingoDisplay() {
     const bingoDisplay = document.getElementById('bingo-map-display');
     if (!currentCommune) {
         bingoDisplay.style.display = 'none';
+        requestAnimationFrame(() => {
+            if (typeof positionNpfWaypointNavigationBanner === 'function') positionNpfWaypointNavigationBanner();
+        });
         return;
     }
 
@@ -17282,6 +17288,9 @@ function updateMapBingoDisplay() {
     }
 
     bingoDisplay.style.display = 'flex';
+    requestAnimationFrame(() => {
+        if (typeof positionNpfWaypointNavigationBanner === 'function') positionNpfWaypointNavigationBanner();
+    });
 }
 
 function displayCommuneDetails(commune, shouldFitBounds = true) {
@@ -22033,7 +22042,44 @@ function buildNpfWaypointActionsHtml(wp) {
     `;
 }
 
+function buildNpfWaypointPelicPopupHtml(wp) {
+    if (String(wp?.source || '').trim() !== 'airport') return '';
+
+    const oaci = normalizeOaciCodeInput(wp?.sourceRef);
+    if (!oaci || typeof isSelectablePelicanAirport !== 'function' || !isSelectablePelicanAirport(oaci)) return '';
+
+    const airport = getNpfAirportForWaypoint(oaci);
+    if (!airport) return '';
+
+    const isDisabled = disabledAirports.has(oaci);
+    const isWater = waterAirports.has(oaci);
+    const isBase = selectedBaseOACI === oaci;
+    const isCustomPelic = customPelicanAirports.has(oaci)
+        && !pelicanAirports.some(ap => normalizeOaciCodeInput(ap?.oaci) === oaci);
+
+    const waterButtonText = isWater ? 'RETARDANT' : 'EAU';
+    const waterButtonClass = isWater ? 'water-btn water-btn-retardant' : 'water-btn';
+    const disableButtonText = isDisabled ? 'Activer' : 'Désactiver';
+    const disableButtonClass = isDisabled ? 'enable-btn' : 'disable-btn';
+    const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
+    const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
+    const customPelicButton = isCustomPelic
+        ? `<button class="base-btn base-btn-active" onclick="window.toggleCustomPelican('${oaci}')">PÉLIC ✓</button>`
+        : '';
+
+    /*
+     * Un WP posé exactement sur un PÉLIC conserve la fiche opérationnelle
+     * complète du PÉLIC. buildAirportAddWpButtonHtml() détecte le WP existant
+     * et insère ses actions Route dans cette même fiche. buildAirportGoToButtonHtml()
+     * masque de son côté le Go To aéroport indépendant : un seul GoTo reste visible.
+     */
+    return `<div class="airport-popup"><b>${escapeHtml(oaci)}</b><br>${escapeHtml(String(airport.name || oaci))}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${oaci}')">${baseButtonText}</button>${customPelicButton}</div>${buildPelicPdfButtonsHtml(oaci)}${buildVacButtonHtml(oaci)}${buildPelicNotamsButtonHtml(oaci)}${buildAirportGoToButtonHtml(oaci)}${buildAirportAddWpButtonHtml(oaci)}</div>`;
+}
+
 function buildNpfWaypointPopupHtml(wp, index) {
+    const pelicPopupHtml = buildNpfWaypointPelicPopupHtml(wp);
+    if (pelicPopupHtml) return pelicPopupHtml;
+
     const number = index + 1;
     const active = wp?.id === npfWaypointRouteState.activeId;
     const safeName = escapeHtml(String(wp?.name || `WP ${number}`));
@@ -22582,7 +22628,14 @@ function positionNpfWaypointNavigationBanner() {
     const banner = document.getElementById('npf-waypoint-route-banner');
     if (!banner || banner.style.display === 'none') return;
 
-    let top = 8;
+    let safeAreaTop = 0;
+    try {
+        safeAreaTop = parseFloat(
+            window.getComputedStyle(document.documentElement).getPropertyValue('--safe-area-top')
+        ) || 0;
+    } catch (_) {}
+
+    let top = Math.max(8, safeAreaTop + 4);
     const blockers = [
         document.getElementById('bingo-map-display'),
         document.getElementById('commune-info-display')
@@ -22595,7 +22648,9 @@ function positionNpfWaypointNavigationBanner() {
         if (rect.width > 1 && rect.height > 1) top = Math.max(top, rect.bottom + 8);
     });
 
-    banner.style.top = `${Math.round(top)}px`;
+    /* Le CSS du bandeau utilise !important : on applique donc la position calculée
+       avec la même priorité pour que les bandeaux Feu/BINGO restent toujours visibles. */
+    banner.style.setProperty('top', `${Math.round(top)}px`, 'important');
 }
 
 function syncNpfWaypointNavigationBanner() {
