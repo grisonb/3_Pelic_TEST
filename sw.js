@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-22_diag_export_share';
-const APP_VERSION = 'v16.22';
+const SW_VERSION = 'sw-v16-25_wp_source_ring_base_dedup';
+const APP_VERSION = 'v16.25';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
