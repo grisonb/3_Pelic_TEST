@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v16.15" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v16.15">
-    <link rel="manifest" href="manifest.json?appv=v16.15">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v16.17" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v16.17">
+    <link rel="manifest" href="manifest.json?appv=v16.17">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v16.15';
+        const APP_VERSION = 'v16.17';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -472,6 +472,13 @@
             <span class="simulation-motion-glyph" aria-hidden="true">✈</span>
             <span id="simulation-motion-button-summary" class="simulation-motion-button-summary">0 kt · 000°</span>
         </button>
+        <button id="npf-startup-diag-button"
+                class="left-map-action-button npf-startup-diag-button"
+                type="button"
+                title="Diagnostic du chargement de la carte"
+                aria-label="Ouvrir le diagnostic du chargement">
+            <span class="npf-startup-diag-button-label">DIAG</span>
+        </button>
     </div>
     <div id="traffic-status-display" class="traffic-status-display" style="display: none;"></div>
 
@@ -871,7 +878,7 @@
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
     <script src="sia.js?siav=15.69"></script>
-    <script src="script.js?appv=v16.15"></script>
+    <script src="script.js?appv=v16.17"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
