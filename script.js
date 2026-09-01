@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.11';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.13';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -21638,6 +21638,18 @@ function buildAirportGoToButtonHtml(oaci) {
         .replace(/[^A-Z0-9]/g, '');
     if (!safeOaci) return '';
 
+    /*
+     * v16.13 — si l'aéroport/PÉLIC est déjà un WP de la route, le popup du
+     * point contient déjà l'action GoTo du WP. On masque alors le Go To
+     * aéroport indépendant afin de ne jamais afficher deux commandes GoTo.
+     * Le GoTo conservé est celui du WP : il active la route et son bandeau.
+     */
+    try {
+        if (typeof getNpfWaypointForAirport === 'function' && getNpfWaypointForAirport(safeOaci)) {
+            return '';
+        }
+    } catch (_) {}
+
     return `<div class="popup-buttons popup-goto-buttons"><button type="button" class="goto-btn" onclick="window.goToAirportDestinationByOaci('${safeOaci}')">Go To</button></div>`;
 }
 
@@ -21681,6 +21693,153 @@ let npfWaypointMarkerRegistry = new Map();
 let npfWaypointMoveHandle = null;
 let npfWaypointSearchOverlayState = null;
 let npfWaypointZoomListenerInstalled = false;
+
+/*
+ * v16.12 — interaction tactile et "snap" des WP.
+ *
+ * - La sélection d'un WP doit rester prioritaire sur les grandes hitbox
+ *   aéroport / VRP uniquement dans la zone réellement occupée par le losange.
+ * - Lors d'un déplacement, un relâchement à proximité immédiate d'un
+ *   aéroport/PÉLIC ou d'un VRP recale exactement le WP sur le point source.
+ */
+const NPF_WAYPOINT_SELECT_TOLERANCE_PX = 30;
+const NPF_WAYPOINT_SELECT_FALLBACK_NM = 0.08;
+const NPF_WAYPOINT_SNAP_MAX_DISTANCE_NM = 0.20;
+const NPF_WAYPOINT_SNAP_MAX_DISTANCE_PX = 36;
+
+function getNpfWaypointNearLatLng(latlng, tolerancePx = NPF_WAYPOINT_SELECT_TOLERANCE_PX) {
+    if (!latlng || !npfWaypointRouteState?.waypoints?.length) return null;
+
+    let pressPoint = null;
+    try {
+        if (map?.latLngToContainerPoint) pressPoint = map.latLngToContainerPoint(latlng);
+    } catch (_) {
+        pressPoint = null;
+    }
+
+    let best = null;
+    for (const wp of npfWaypointRouteState.waypoints) {
+        let distancePx = Infinity;
+        if (pressPoint && map?.latLngToContainerPoint) {
+            try {
+                const wpPoint = map.latLngToContainerPoint([Number(wp.lat), Number(wp.lon)]);
+                distancePx = wpPoint.distanceTo(pressPoint);
+            } catch (_) {}
+        }
+
+        const distanceNm = calculateDistanceInNm(
+            Number(latlng.lat),
+            Number(latlng.lng),
+            Number(wp.lat),
+            Number(wp.lon)
+        );
+
+        const hitByPixel = Number.isFinite(distancePx) && distancePx <= Number(tolerancePx);
+        const hitByFallback = !Number.isFinite(distancePx)
+            && Number.isFinite(distanceNm)
+            && distanceNm <= NPF_WAYPOINT_SELECT_FALLBACK_NM;
+        if (!hitByPixel && !hitByFallback) continue;
+
+        const score = Number.isFinite(distancePx) ? distancePx : distanceNm * 1000;
+        if (!best || score < best.score) best = { wp, score, distancePx, distanceNm };
+    }
+    return best?.wp || null;
+}
+
+function openNpfWaypointPopupNearLatLng(latlng, tolerancePx = NPF_WAYPOINT_SELECT_TOLERANCE_PX) {
+    const wp = getNpfWaypointNearLatLng(latlng, tolerancePx);
+    if (!wp) return false;
+
+    const marker = npfWaypointMarkerRegistry.get(wp.id);
+    if (!marker) return false;
+
+    try { map?.closePopup?.(); } catch (_) {}
+    try {
+        const index = getNpfWaypointIndexById(wp.id);
+        if (index >= 0) marker.setPopupContent(buildNpfWaypointPopupHtml(wp, index));
+        marker.openPopup();
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function getNpfWaypointSnapCandidate(latlng) {
+    const lat = Number(latlng?.lat);
+    const lon = Number(latlng?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+    let releasePoint = null;
+    try {
+        if (map?.latLngToContainerPoint) releasePoint = map.latLngToContainerPoint([lat, lon]);
+    } catch (_) {
+        releasePoint = null;
+    }
+
+    const candidates = [];
+    const airportSeen = new Set();
+
+    [...pelicanAirports, ...otherAirports, ...(Array.isArray(additionalAerodromes) ? additionalAerodromes : [])]
+        .forEach(airport => {
+            const airportLat = Number(airport?.lat);
+            const airportLon = Number(airport?.lon);
+            const oaci = normalizeOaciCodeInput(airport?.oaci);
+            if (!oaci || airportSeen.has(oaci) || !Number.isFinite(airportLat) || !Number.isFinite(airportLon)) return;
+            airportSeen.add(oaci);
+            candidates.push({
+                lat: airportLat,
+                lon: airportLon,
+                name: `${oaci} — ${String(airport?.name || oaci).trim()}`,
+                source: 'airport',
+                sourceRef: oaci
+            });
+        });
+
+    try {
+        const points = Array.isArray(siaDataset?.points) ? siaDataset.points : [];
+        points.forEach(item => {
+            if (item?.k !== 'dpn:VRP') return;
+            const vrpLat = Number(item?.x);
+            const vrpLon = Number(item?.y);
+            if (!Number.isFinite(vrpLat) || !Number.isFinite(vrpLon)) return;
+
+            const code = String(item?.d || item?.c || '').trim();
+            let airport = '';
+            try { airport = String(getSiaVrpAirportCode(item) || '').trim().toUpperCase(); } catch (_) {}
+            const title = airport ? `${code || 'VRP'}-${airport}` : (code || 'Point VFR');
+
+            candidates.push({
+                lat: vrpLat,
+                lon: vrpLon,
+                name: title,
+                source: 'vfr',
+                sourceRef: title
+            });
+        });
+    } catch (_) {}
+
+    let best = null;
+    for (const candidate of candidates) {
+        const distanceNm = calculateDistanceInNm(lat, lon, candidate.lat, candidate.lon);
+        if (!Number.isFinite(distanceNm) || distanceNm > NPF_WAYPOINT_SNAP_MAX_DISTANCE_NM) continue;
+
+        let distancePx = 0;
+        if (releasePoint && map?.latLngToContainerPoint) {
+            try {
+                const candidatePoint = map.latLngToContainerPoint([candidate.lat, candidate.lon]);
+                distancePx = candidatePoint.distanceTo(releasePoint);
+            } catch (_) {
+                distancePx = 0;
+            }
+            if (Number.isFinite(distancePx) && distancePx > NPF_WAYPOINT_SNAP_MAX_DISTANCE_PX) continue;
+        }
+
+        if (!best || distanceNm < best.distanceNm) {
+            best = { ...candidate, distanceNm, distancePx };
+        }
+    }
+    return best;
+}
 
 function ensureNpfWaypointRouteLayers() {
     if (!map || typeof L === 'undefined') return false;
@@ -22069,6 +22228,15 @@ function redrawNpfWaypointRoute() {
         marker.addTo(npfWaypointMarkerLayer);
         npfWaypointMarkerRegistry.set(wp.id, marker);
     });
+
+    /*
+     * v16.13 — le bandeau Route est resynchronisé à chaque redessin. Cela
+     * couvre notamment la restauration d'une route persistante après MAJ,
+     * sans dépendre du bandeau commune/feu pour le recréer.
+     */
+    if (window.__npfWaypointRouteReady === true) {
+        syncNpfWaypointNavigationBanner();
+    }
 }
 
 function ensureNpfWaypointGps() {
@@ -22289,10 +22457,27 @@ function buildAirportAddWpButtonHtml(oaci) {
 }
 
 function refreshAirportWaypointPopupHtml(popupHtml, oaci) {
-    const freshSection = buildAirportAddWpButtonHtml(oaci);
-    return String(popupHtml || '').replace(
+    const freshGotoSection = buildAirportGoToButtonHtml(oaci);
+    const freshWaypointSection = buildAirportAddWpButtonHtml(oaci);
+    let html = String(popupHtml || '');
+
+    /*
+     * v16.13 — le popup peut avoir été construit avant l'ajout/suppression du
+     * WP. On resynchronise donc les deux zones au clic :
+     * - Go To aéroport indépendant ;
+     * - actions du WP / bouton Ajout WP.
+     */
+    const gotoPattern = /<div class="popup-buttons popup-goto-buttons">[\s\S]*?<\/div>/;
+    if (gotoPattern.test(html)) {
+        html = html.replace(gotoPattern, freshGotoSection);
+    } else if (freshGotoSection) {
+        const waypointMarker = /<div class="(?:popup-buttons |npf-waypoint-popup-actions npf-source-waypoint-actions )?popup-add-wp-buttons">/;
+        html = html.replace(waypointMarker, `${freshGotoSection}$&`);
+    }
+
+    return html.replace(
         /<div class="(?:popup-buttons |npf-waypoint-popup-actions npf-source-waypoint-actions )?popup-add-wp-buttons">[\s\S]*?<\/div>/,
-        freshSection
+        freshWaypointSection
     );
 }
 
@@ -22677,8 +22862,33 @@ function startNpfWaypointMove(id) {
     };
 
     const finishMove = event => {
-        const latlng = event?.target?.getLatLng?.() || handle.getLatLng();
-        syncPosition(latlng);
+        const releasedLatLng = event?.target?.getLatLng?.() || handle.getLatLng();
+        const snap = getNpfWaypointSnapCandidate(releasedLatLng);
+        const finalLatLng = snap
+            ? L.latLng(Number(snap.lat), Number(snap.lon))
+            : releasedLatLng;
+
+        if (snap) {
+            /*
+             * v16.12 — un WP relâché à proximité immédiate d'un point connu
+             * adopte exactement ses coordonnées ET son identité de source.
+             * Ainsi, le popup du point sait aussi qu'il s'agit déjà d'un WP.
+             */
+            wp.source = snap.source;
+            wp.sourceRef = snap.sourceRef;
+            wp.name = snap.name;
+            try { handle.setLatLng(finalLatLng); } catch (_) {}
+        } else if (wp.source === 'airport' || wp.source === 'vfr') {
+            /*
+             * Un WP déplacé franchement hors de son point d'origine devient
+             * un WP libre. Le libellé est conservé, mais l'identité de source
+             * est libérée pour ne pas faire croire qu'il coïncide encore.
+             */
+            wp.source = 'map';
+            wp.sourceRef = '';
+        }
+
+        syncPosition(finalLatLng);
         persistNpfWaypointRouteState();
         try { handle.remove(); } catch (_) {}
         if (npfWaypointMoveHandle === handle) npfWaypointMoveHandle = null;
@@ -22837,6 +23047,20 @@ function addAirportTouchHitbox(airport, popupHtml) {
                 L.DomEvent.stopPropagation(event.originalEvent);
             }
         } catch (_) {}
+
+        /*
+         * v16.12 — la grande hitbox aéroport (64 px) ne doit plus voler le clic
+         * d'un losange WP situé dessus ou juste à côté. Seule la petite zone
+         * du WP (30 px autour de son centre) est prioritaire.
+         */
+        if (window.__npfWaypointRouteReady === true
+            && openNpfWaypointPopupNearLatLng(
+                event?.latlng || hitbox.getLatLng(),
+                NPF_WAYPOINT_SELECT_TOLERANCE_PX
+            )) {
+            return;
+        }
+
         try {
             hitbox.setPopupContent(refreshAirportWaypointPopupHtml(popupHtml, airport.oaci));
             hitbox.openPopup();
@@ -36579,6 +36803,16 @@ async function executeMapLongPressAction(latlng) {
     if (isDrawingMode) return;
     if (!latlng) return;
 
+    /*
+     * v16.12 — si l'appui tombe sur/au voisinage immédiat d'un losange WP,
+     * le WP est prioritaire. On n'ouvre donc jamais à cet endroit le menu
+     * Créer Feu / Ajout WP / Sélection Zone.
+     */
+    if (window.__npfWaypointRouteReady === true
+        && openNpfWaypointPopupNearLatLng(latlng, NPF_WAYPOINT_SELECT_TOLERANCE_PX)) {
+        return;
+    }
+
     if (isSimulationMode) {
         simulationSuppressNextClickUntil = Date.now() + 900;
     }
@@ -39927,6 +40161,19 @@ function addSiaTouchHitbox(latlng, popupHtml, popupFactory = null) {
                 L.DomEvent.stopPropagation(event.originalEvent);
             }
         } catch (_) {}
+
+        /*
+         * v16.12 — même arbitrage pour les VRP/SIA : si le doigt est réellement
+         * sur le losange WP, ouvrir le WP ; sinon la fiche SIA reste accessible.
+         */
+        if (window.__npfWaypointRouteReady === true
+            && openNpfWaypointPopupNearLatLng(
+                event?.latlng || hitbox.getLatLng(),
+                NPF_WAYPOINT_SELECT_TOLERANCE_PX
+            )) {
+            return;
+        }
+
         try {
             if (typeof popupFactory === 'function') {
                 hitbox.setPopupContent(popupFactory());
