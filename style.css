@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.10 */
+/* NPF_STYLE_BUILD_VERSION: v16.11 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -8686,7 +8686,9 @@ body.gaar-point-search-open .gaar-editing-banner {
 /* Bandeau BINGO : positionné au plus haut sur la carte, plus compact en
    hauteur sans réduire la taille des polices. */
 #bingo-map-display {
-    top: calc(var(--safe-area-top) + 4px) !important;
+    position: fixed !important;
+    top: 8px;
+    z-index: 1002 !important;
     min-height: 56px !important;
     height: auto !important;
     padding: 8px 22px !important;
@@ -17400,18 +17402,66 @@ body.pelic-notams-modal-open {
     box-shadow: 0 0 0 3px #92400e, 0 3px 12px rgba(0,0,0,.45) !important;
 }
 
-/* Bulle de segment placée immédiatement après le WP de départ. */
+/* v16.11 — poignée tactile temporaire, affichée uniquement en mode Déplacer. */
+.npf-waypoint-move-handle {
+    background: transparent !important;
+    border: 0 !important;
+    touch-action: none !important;
+}
+.npf-waypoint-move-handle-ring {
+    width: 62px;
+    height: 62px;
+    margin: 7px;
+    box-sizing: border-box;
+    border: 3px dashed #f59e0b;
+    border-radius: 50%;
+    background: rgba(245, 158, 11, .14);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.94), 0 2px 9px rgba(0,0,0,.30);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #78350f;
+    font-size: 12px;
+    font-weight: 950;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* v16.11 — bulle de segment contre la route, taille progressive selon le zoom. */
 .npf-waypoint-segment-tooltip {
-    padding: 4px 7px !important;
+    padding: 3px 6px !important;
     border: 2px solid #1d4ed8 !important;
-    border-radius: 8px !important;
+    border-radius: 7px !important;
     background: rgba(255,255,255,.96) !important;
     color: #172554 !important;
-    box-shadow: 0 2px 7px rgba(0,0,0,.24) !important;
-    font-size: 12px !important;
-    line-height: 1.05 !important;
+    box-shadow: 0 1px 5px rgba(0,0,0,.22) !important;
+    font-size: 11px !important;
+    line-height: 1 !important;
     font-weight: 950 !important;
     white-space: nowrap !important;
+}
+.npf-waypoint-segment-tooltip.npf-waypoint-segment-zoom-very-low {
+    padding: 1px 3px !important;
+    border-width: 1px !important;
+    border-radius: 4px !important;
+    font-size: 7.5px !important;
+}
+.npf-waypoint-segment-tooltip.npf-waypoint-segment-zoom-low {
+    padding: 2px 4px !important;
+    border-width: 1px !important;
+    border-radius: 5px !important;
+    font-size: 8.5px !important;
+}
+.npf-waypoint-segment-tooltip.npf-waypoint-segment-zoom-medium {
+    padding: 2px 5px !important;
+    border-width: 1.5px !important;
+    border-radius: 6px !important;
+    font-size: 9.5px !important;
+}
+.npf-waypoint-segment-tooltip.npf-waypoint-segment-zoom-high {
+    font-size: 11px !important;
 }
 .npf-waypoint-segment-tooltip::before {
     display: none !important;
@@ -17464,7 +17514,7 @@ body.pelic-notams-modal-open {
 }
 
 /* Bandeau supérieur du mode route. */
-#commune-info-display.wp-route-navigation-active {
+#npf-waypoint-route-banner {
     top: calc(var(--safe-area-top) + 4px) !important;
     left: 50% !important;
     right: auto !important;
@@ -17503,6 +17553,8 @@ body.pelic-notams-modal-open {
 }
 .wp-route-band-label {
     color: #1d4ed8;
+    font-size: 18px;
+    line-height: 1;
     font-weight: 950;
 }
 .wp-route-band-final .wp-route-band-label {
@@ -17528,7 +17580,7 @@ body.pelic-notams-modal-open {
 }
 
 @media (max-width: 760px) {
-    #commune-info-display.wp-route-navigation-active {
+    #npf-waypoint-route-banner {
         left: 6px !important;
         right: 6px !important;
         transform: none !important;
@@ -17557,70 +17609,17 @@ body.npf-waypoint-search-open {
 }
 
 
-/* ==========================================================================
-   v16.10 — ROUTE WP : POPUPS SOURCE / BULLES / BANDEAU INDÉPENDANT
-   ========================================================================== */
-
-.npf-waypoint-source-existing {
-    margin-top: 9px;
-    padding: 5px 8px;
-    border-radius: 7px;
-    background: #eef2ff;
-    color: #3730a3;
-    font-size: 13px;
-    font-weight: 950;
-    text-align: center;
+/* v16.10 — actions WP également dans les popups des sources VFR / aéroports. */
+.npf-source-waypoint-actions {
+    margin-top: 10px;
+}
+.sia-vrp-existing-wp-actions {
+    display: grid;
 }
 
-.npf-waypoint-source-actions {
-    margin-top: 7px !important;
-}
-
-/* Bandeau Route indépendant du bandeau Feu (#commune-info-display). */
-#npf-waypoint-route-banner.wp-route-navigation-banner {
-    position: fixed;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    z-index: 1002;
-    width: max-content;
-    max-width: calc(100vw - 150px);
-    min-height: 56px;
-    padding: 7px 10px;
-    box-sizing: border-box;
-    display: none;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    border: 2px solid #2563eb;
-    border-radius: 15px;
-    background: rgba(255,255,255,.97);
-    box-shadow: 0 2px 9px rgba(0,0,0,.28);
-    color: #0f172a;
-    pointer-events: auto;
-}
-
-#npf-waypoint-route-banner .wp-route-band-label {
-    font-size: 18px !important;
-    line-height: 1 !important;
-    font-weight: 950 !important;
-}
-
-#npf-waypoint-route-banner .wp-route-band-metric {
-    font-size: 14px !important;
-}
-
-@media (max-width: 820px) {
-    #npf-waypoint-route-banner.wp-route-navigation-banner {
-        max-width: calc(100vw - 88px);
-        padding: 6px 8px;
-        gap: 6px;
-    }
+/* v16.10 — WPn / WP Final plus lisibles sur iPad, y compris en vue étroite. */
+@media (max-width: 760px) {
     #npf-waypoint-route-banner .wp-route-band-label {
         font-size: 18px !important;
-    }
-    #npf-waypoint-route-banner .wp-route-band-metric {
-        font-size: 13px !important;
     }
 }
