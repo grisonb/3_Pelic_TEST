@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.22';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.25';
 
 
 /*
@@ -6297,6 +6297,11 @@ function initMap() {
 
     applyPelicanVisualScale();
     map.on('zoomend', applyPelicanVisualScale);
+
+    /* PÉLIC : après rendu complet de la fiche, la garder dans la zone visible. */
+    map.on('popupopen', event => {
+        scheduleNpfPelicPopupReposition(event?.popup);
+    });
 
     if (!npfStartupCorePriorityActive) {
         drawPermanentAirportMarkers();
@@ -17993,8 +17998,13 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
 
     drawWaterPointMarkersForCommune(commune);
 
-    const isLftwInClosest = closestAirports.some(ap => ap.oaci === 'LFTW');
-    if (showLftwRoute && !isLftwInClosest) {
+    /*
+     * Si la BASE actuelle fait déjà partie des PÉLIC affichés, sa route PÉLIC
+     * porte déjà le cartouche BASE au-dessus de l'OACI. Ne pas redessiner en
+     * plus la route/étiquette BASE dédiée : cela créait un doublon visuel.
+     */
+    const isBaseInClosest = closestAirports.some(ap => normalizeOaciCodeInput(ap.oaci) === normalizeOaciCodeInput(selectedBaseOACI));
+    if (showLftwRoute && !isBaseInClosest) {
         drawLftwRoute();
     }
 
@@ -22716,15 +22726,28 @@ function getNpfWaypointMagneticBearing(fromLat, fromLon, toLat, toLon) {
     return (trueBearing - MAGNETIC_DECLINATION + 360) % 360;
 }
 
+function isNpfWaypointSourceLinked(wp) {
+    const source = String(wp?.source || '').trim().toLowerCase();
+    return source === 'airport' || source === 'vfr';
+}
+
 function buildNpfWaypointIcon(wp, index) {
     const active = wp?.id === npfWaypointRouteState.activeId;
+    const sourceLinked = isNpfWaypointSourceLinked(wp);
     const label = `WP${index + 1}`;
+    const markerClass = [
+        'npf-waypoint-marker',
+        active ? 'npf-waypoint-marker-active' : '',
+        sourceLinked ? 'npf-waypoint-marker-source' : ''
+    ].filter(Boolean).join(' ');
+    const diamondClass = `npf-waypoint-diamond${sourceLinked ? ' npf-waypoint-diamond-source' : ''}`;
+
     return L.divIcon({
-        className: `npf-waypoint-marker${active ? ' npf-waypoint-marker-active' : ''}`,
-        html: `<span class="npf-waypoint-diamond"><span class="npf-waypoint-diamond-label">${label}</span></span>`,
-        iconSize: [48, 48],
-        iconAnchor: [24, 24],
-        popupAnchor: [0, -25]
+        className: markerClass,
+        html: `<span class="${diamondClass}"><span class="npf-waypoint-diamond-label">${label}</span></span>`,
+        iconSize: sourceLinked ? [58, 58] : [48, 48],
+        iconAnchor: sourceLinked ? [29, 29] : [24, 24],
+        popupAnchor: [0, sourceLinked ? -31 : -25]
     });
 }
 
@@ -22737,6 +22760,26 @@ function buildNpfWaypointActionsHtml(wp) {
         <button type="button" class="npf-waypoint-action npf-waypoint-edit" onclick="window.npfWaypointModify('${safeId}')">Modifier</button>
         <button type="button" class="npf-waypoint-action npf-waypoint-move" onclick="window.npfWaypointMove('${safeId}')">Déplacer</button>
         <button type="button" class="npf-waypoint-action npf-waypoint-delete-route" onclick="window.npfWaypointDeleteRoute()">Supp. Route</button>
+    `;
+}
+
+function buildNpfWaypointPelicActionsHtml(wp) {
+    const safeId = String(wp?.id || '').replace(/[^A-Za-z0-9_-]/g, '');
+    if (!safeId) return '';
+
+    /*
+     * Fiche PÉLIC + WP : les actions de navigation/édition restent groupées,
+     * puis les deux suppressions occupent ensemble la dernière ligne.
+     * Le libellé « Supp. WP » évite toute ambiguïté avec « Supp. Route ».
+     */
+    return `
+        <div class="npf-waypoint-popup-actions npf-source-waypoint-actions npf-pelic-waypoint-actions">
+            <button type="button" class="npf-waypoint-action npf-waypoint-goto" onclick="window.npfWaypointGoto('${safeId}')">GoTo</button>
+            <button type="button" class="npf-waypoint-action npf-waypoint-edit" onclick="window.npfWaypointModify('${safeId}')">Modifier</button>
+            <button type="button" class="npf-waypoint-action npf-waypoint-move" onclick="window.npfWaypointMove('${safeId}')">Déplacer</button>
+            <button type="button" class="npf-waypoint-action npf-waypoint-delete" onclick="window.npfWaypointDelete('${safeId}')">Supp. WP</button>
+            <button type="button" class="npf-waypoint-action npf-waypoint-delete-route" onclick="window.npfWaypointDeleteRoute()">Supp. Route</button>
+        </div>
     `;
 }
 
@@ -22771,7 +22814,7 @@ function buildNpfWaypointPelicPopupHtml(wp) {
      * et insère ses actions Route dans cette même fiche. buildAirportGoToButtonHtml()
      * masque de son côté le Go To aéroport indépendant : un seul GoTo reste visible.
      */
-    return `<div class="airport-popup"><b>${escapeHtml(oaci)}</b><br>${escapeHtml(String(airport.name || oaci))}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${oaci}')">${baseButtonText}</button>${customPelicButton}</div>${buildPelicPdfButtonsHtml(oaci)}${buildVacButtonHtml(oaci)}${buildPelicNotamsButtonHtml(oaci)}${buildAirportGoToButtonHtml(oaci)}${buildAirportAddWpButtonHtml(oaci)}</div>`;
+    return `<div class="airport-popup"><b>${escapeHtml(oaci)}</b><br>${escapeHtml(String(airport.name || oaci))}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${oaci}')">${baseButtonText}</button>${customPelicButton}</div>${buildPelicPdfButtonsHtml(oaci)}${buildVacButtonHtml(oaci)}${buildPelicNotamsButtonHtml(oaci)}${buildAirportGoToButtonHtml(oaci)}${buildNpfWaypointPelicActionsHtml(wp)}</div>`;
 }
 
 function buildNpfWaypointPopupHtml(wp, index) {
@@ -22963,17 +23006,29 @@ function redrawNpfWaypointRoute() {
     npfWaypointMarkerRegistry = new Map();
 
     npfWaypointRouteState.waypoints.forEach((wp, index) => {
+        const sourceLinked = isNpfWaypointSourceLinked(wp);
         const marker = L.marker([wp.lat, wp.lon], {
             pane: 'npfWaypointMarkerPane',
             icon: buildNpfWaypointIcon(wp, index),
             zIndexOffset: wp.id === npfWaypointRouteState.activeId ? 3300 : 3200,
             keyboard: false,
-            draggable: false
+            draggable: false,
+            /*
+             * Aéroport / PÉLIC / VFR déjà représenté par son icône métier :
+             * le losange WP devient un simple encadrement visuel. Le clic traverse
+             * donc vers l'icône d'origine, dont la fiche contient les actions WP.
+             */
+            interactive: !sourceLinked
         });
-        marker.bindPopup(buildNpfWaypointPopupHtml(wp, index), {
-            maxWidth: 330,
-            closeButton: true
-        });
+        const waypointIsPelic = String(wp?.source || '').trim() === 'airport'
+            && typeof isSelectablePelicanAirport === 'function'
+            && isSelectablePelicanAirport(normalizeOaciCodeInput(wp?.sourceRef));
+        marker.bindPopup(
+            buildNpfWaypointPopupHtml(wp, index),
+            waypointIsPelic
+                ? getNpfPelicPopupOptions({ maxWidth: 330 })
+                : { maxWidth: 330, closeButton: true }
+        );
         marker.addTo(npfWaypointMarkerLayer);
         npfWaypointMarkerRegistry.set(wp.id, marker);
     });
@@ -23782,6 +23837,90 @@ function drawNpfRunwayMapLayer() {
 }
 
 
+
+/*
+ * Fiche PÉLIC — maintien dans la zone visible de la carte.
+ *
+ * Leaflet ancre normalement la popup à l'icône et peut donc placer une grande
+ * fiche en partie hors écran lorsqu'un PÉLIC se trouve près du bord supérieur.
+ * Pour les PÉLIC uniquement, on laisse la carte immobile puis on descend la
+ * popup elle-même si nécessaire. La fiche peut donc être visuellement séparée
+ * de l'icône : la priorité est donnée à la lisibilité complète des commandes.
+ */
+const NPF_PELIC_POPUP_CLASS = 'npf-pelic-leaflet-popup';
+const NPF_PELIC_POPUP_MARGIN_PX = 10;
+
+function getNpfPelicPopupOptions(extraOptions = {}) {
+    return {
+        maxWidth: 330,
+        closeButton: true,
+        autoPan: false,
+        className: NPF_PELIC_POPUP_CLASS,
+        ...extraOptions
+    };
+}
+
+function getNpfPelicPopupSafeTop(popupRect, mapRect) {
+    let safeTop = mapRect.top + NPF_PELIC_POPUP_MARGIN_PX;
+
+    /*
+     * Les bandeaux supérieurs font partie de la zone réellement occupée sur
+     * l'iPad. Si la popup les recouvre horizontalement, elle est placée sous
+     * leur bord inférieur plutôt que simplement sous le bord physique du map.
+     */
+    ['#bingo-map-display', '#commune-info-display', '#npf-waypoint-route-banner']
+        .forEach(selector => {
+            const element = document.querySelector(selector);
+            if (!element) return;
+            const style = window.getComputedStyle(element);
+            if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return;
+            const rect = element.getBoundingClientRect();
+            if (!(rect.width > 0 && rect.height > 0)) return;
+            const horizontalOverlap = Math.min(popupRect.right, rect.right) - Math.max(popupRect.left, rect.left);
+            if (horizontalOverlap <= 0) return;
+            if (rect.bottom <= mapRect.top || rect.top >= mapRect.bottom) return;
+            safeTop = Math.max(safeTop, rect.bottom + 8);
+        });
+
+    return safeTop;
+}
+
+function repositionNpfPelicPopupIfNeeded(popup) {
+    if (!popup || !map) return;
+    const className = String(popup?.options?.className || '');
+    if (!className.split(/\s+/).includes(NPF_PELIC_POPUP_CLASS)) return;
+
+    const container = typeof popup.getElement === 'function'
+        ? popup.getElement()
+        : popup._container;
+    const mapContainer = typeof map.getContainer === 'function' ? map.getContainer() : null;
+    if (!container || !mapContainer) return;
+
+    /* Repart toujours de la position Leaflet normale avant de calculer le décalage. */
+    try {
+        if (typeof popup._updatePosition === 'function') popup._updatePosition();
+    } catch (_) {}
+
+    const popupRect = container.getBoundingClientRect();
+    const mapRect = mapContainer.getBoundingClientRect();
+    const safeTop = getNpfPelicPopupSafeTop(popupRect, mapRect);
+    const shiftDown = Math.ceil(safeTop - popupRect.top);
+    if (!(shiftDown > 0)) return;
+
+    const currentBottom = Number.parseFloat(container.style.bottom);
+    if (!Number.isFinite(currentBottom)) return;
+
+    /* Diminuer bottom déplace la popup vers le bas sans déplacer la carte. */
+    container.style.bottom = `${currentBottom - shiftDown}px`;
+    container.dataset.npfPelicPopupShift = String(shiftDown);
+}
+
+function scheduleNpfPelicPopupReposition(popup) {
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => repositionNpfPelicPopupIfNeeded(popup));
+    });
+}
+
 function addAirportTouchHitbox(airport, popupHtml) {
     /*
      * v15.50 — correction tactile ciblée.
@@ -23813,7 +23952,8 @@ function addAirportTouchHitbox(airport, popupHtml) {
         keyboard: false
     });
 
-    hitbox.bindPopup(popupHtml, { maxWidth: 300 });
+    const pelicPopup = typeof isSelectablePelicanAirport === 'function' && isSelectablePelicanAirport(airport.oaci);
+    hitbox.bindPopup(popupHtml, pelicPopup ? getNpfPelicPopupOptions({ maxWidth: 300 }) : { maxWidth: 300 });
     hitbox.on('click', event => {
         try {
             if (event?.originalEvent) {
@@ -24670,7 +24810,7 @@ function drawPermanentAirportMarkers() {
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
             const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] }), zIndexOffset: 2500, keyboard: false });
-            marker.bindPopup(popupHtml);
+            marker.bindPopup(popupHtml, getNpfPelicPopupOptions());
             marker.addTo(permanentAirportLayer);
             addAirportTouchHitbox(airport, popupHtml);
             return;
@@ -24727,7 +24867,7 @@ function drawPermanentAirportMarkers() {
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
         const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
-        marker.bindPopup(popupHtml);
+        marker.bindPopup(popupHtml, getNpfPelicPopupOptions());
         marker.addTo(permanentAirportLayer);
         addAirportTouchHitbox(airport, popupHtml);
     });
