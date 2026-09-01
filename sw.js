@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-11_hyeres_wp_move_insert_labels';
-const APP_VERSION = 'v16.11';
+const SW_VERSION = 'sw-v16-13_route_banner_single_wp_goto';
+const APP_VERSION = 'v16.13';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
