@@ -1,3 +1,60 @@
+VERSION TEST v16.15 — BANDEAU ROUTE SOUS BANDEAUX FEU
+Date : 01/09/2026
+Base : TEST v16.14
+
+OBJECTIFS
+- Conserver les bandeaux Feu/BINGO entièrement visibles lorsqu'une route WP est active.
+- Décaler automatiquement le bandeau Route juste sous les bandeaux Feu visibles.
+- Faire remonter automatiquement le bandeau Route lorsque ces bandeaux disparaissent.
+
+1. POSITION VERTICALE DYNAMIQUE DU BANDEAU ROUTE
+- Le bandeau Route calcule sa position à partir de la safe-area puis du bord inférieur des bandeaux BINGO et Feu réellement visibles.
+- Le décalage est recalculé lors des changements d'affichage du BINGO/feu et lors du rendu du bandeau Route.
+- La propriété top calculée est appliquée avec priorité !important afin de ne plus être neutralisée par la règle CSS historique du bandeau.
+- Sans feu/BINGO visible, le bandeau Route revient automatiquement à sa position haute normale.
+
+2. ÉLÉMENTS INCHANGÉS
+- Fenêtre Loupe devant le bandeau Route inchangée.
+- Fiche PÉLIC complète lorsqu'un WP est confondu avec un pélicandrome inchangée.
+- Snap et priorité tactile WP, insertion sur segment, bulles adaptatives, Hyères/MultiPolygon et progression 1 NM inchangés.
+- SIA / AIRAC strictement inchangé.
+
+3. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.15 Index / Manifest / Script / Style / SW.
+- SIA comparé bit-à-bit avec v16.13.
+
+
+VERSION TEST v16.14 — LOUPE DEVANT ROUTE / FICHE PÉLIC COMPLÈTE SUR WP
+Date : 01/09/2026
+Base : TEST v16.13
+
+OBJECTIFS
+- Afficher la fenêtre de recherche ouverte par la loupe devant le bandeau Route.
+- Lorsqu'un WP coïncide avec un pélicandrome, conserver la fiche opérationnelle complète du PÉLIC au clic sur le WP.
+
+1. LOUPE / RECHERCHE PRINCIPALE
+- Pendant l'ouverture de la recherche principale, #ui-overlay reçoit une priorité d'affichage supérieure au bandeau Route.
+- À la fermeture ou après sélection d'une destination, cette priorité temporaire est supprimée.
+- Aucun z-index global de la recherche n'est modifié hors ouverture de la loupe.
+
+2. WP CONFONDU AVEC UN PÉLICANDROME
+- Si le WP est rattaché à un aéroport actuellement reconnu comme PÉLIC, son popup reprend la fiche PÉLIC complète : EAU/RETARDANT, Activer/Désactiver, BASE, PDF Pélic, Doc PDF Réduite, VAC et NOTAMS.
+- Les actions Route du WP sont conservées dans la même fiche : GoTo, Supprimer, Modifier, Déplacer et Supp. Route.
+- Le Go To aéroport indépendant reste masqué lorsque le point est déjà un WP : un seul GoTo est affiché.
+- Un WP non PÉLIC conserve son popup WP habituel.
+
+3. ÉLÉMENTS INCHANGÉS
+- Bandeau Route v16.13, snap WP, priorité tactile, route persistante et fonctions PÉLIC hors popup inchangés.
+- SIA / AIRAC strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.14 des composants concernés avant intégration v16.15.
+
+
 VERSION TEST v16.13 — BANDEAU ROUTE RÉTABLI / GOTO UNIQUE SUR WP AÉROPORT-PÉLIC
 Date : 01/09/2026
 Base : TEST v16.12
