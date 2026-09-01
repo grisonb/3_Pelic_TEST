@@ -1,3 +1,85 @@
+VERSION TEST v16.13 — BANDEAU ROUTE RÉTABLI / GOTO UNIQUE SUR WP AÉROPORT-PÉLIC
+Date : 01/09/2026
+Base : TEST v16.12
+
+OBJECTIFS
+- Rétablir de façon fiable le bandeau supérieur de la route WP.
+- Ne jamais afficher deux boutons GoTo lorsqu'un aéroport/PÉLIC correspond déjà à un WP de la route.
+- Ne modifier aucun autre comportement de la v16.12.
+
+1. BANDEAU SUPÉRIEUR ROUTE
+- Cause corrigée : le bandeau #npf-waypoint-route-banner est créé directement dans <body>, mais son CSS ne définissait pas explicitement position: fixed.
+- top/left pouvaient donc ne pas positionner le bandeau dans la zone visible de la PWA.
+- Position fixe explicite et z-index dédié 1700.
+- Centrage desktop rétabli par translateX(-50 %) ; règle mobile existante conservée (left/right 6 px et transform:none).
+- À chaque redraw de la route, le bandeau est resynchronisé si le GoTo route est actif.
+- La restauration d'une route persistante après mise à jour recrée donc également le bandeau sans dépendre du bandeau commune/feu.
+
+2. UN SEUL GOTO SUR AÉROPORT / PÉLIC UTILISÉ COMME WP
+- Si l'aéroport/PÉLIC est déjà un WP, le bouton « Go To » aéroport indépendant est masqué.
+- Le bouton GoTo conservé est celui des actions du WP afin d'activer le WP dans la route et de conserver le fonctionnement du bandeau Route.
+- Le popup aéroport/PÉLIC resynchronise désormais au clic la zone Go To et la zone Ajout WP/actions WP.
+- Si le WP est ensuite supprimé, le Go To aéroport normal peut réapparaître.
+
+3. ÉLÉMENTS INCHANGÉS
+- Snap WP et priorité tactile v16.12 inchangés.
+- Hyères/MultiPolygon, déplacement WP, insertion sur segment et bulles adaptatives v16.11 inchangés.
+- Route WP, acquisition 1 NM, progression, persistance, PÉLIC, VAC, NOTAMS, GAAR, SafeSky, GLR, BFG, cartes offline et moteur routier inchangés.
+- SIA / AIRAC strictement inchangé (sia.js repris bit-à-bit de v16.12).
+- Production inchangée.
+
+4. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.13 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.12.
+- Vérifications ciblées : position fixed/z-index du bandeau, resynchronisation au redraw, suppression du Go To aéroport lorsqu'un WP correspondant existe.
+
+
+VERSION TEST v16.12 — SNAP WP / PRIORITÉ DE SÉLECTION PRÈS DES POINTS
+Date : 01/09/2026
+Base : TEST v16.11
+
+OBJECTIFS
+- Recaler exactement un WP sur un aéroport/PÉLIC ou un point VFR/VRP lorsqu'il est relâché à proximité immédiate.
+- Permettre de sélectionner le WP lorsqu'il est posé sur ou très près d'un point dont la grande hitbox tactile prenait auparavant le clic.
+- Empêcher le menu Créer Feu / Ajout WP / Sélection Zone de prendre la priorité lors d'un appui long réellement effectué sur un WP.
+
+1. SNAP AUTOMATIQUE AU RELÂCHEMENT
+- Recherche des aéroports/PÉLIC connus et des VRP SIA chargés.
+- Tolérance maximale : 0,20 NM, avec garde visuelle de 36 px afin que le snap reste limité à une proximité immédiate à l'écran.
+- Le candidat le plus proche est retenu.
+- Après snap, latitude/longitude du WP deviennent exactement celles du point source.
+- L'identité du WP (airport/vfr + OACI/libellé source) est mise à jour afin que la fiche du point reconnaisse ensuite qu'il s'agit déjà d'un WP.
+- Si un ancien WP aéroport/VFR est déplacé franchement hors de son point, il devient un WP libre afin d'éviter une fausse association ; son libellé reste conservé.
+
+2. PRIORITÉ DE SÉLECTION DU WP
+- Les grandes hitbox tactiles aéroport (64 px) et VRP/SIA (56 px) restent en place.
+- Lors d'un clic dans ces hitbox, l'application vérifie d'abord si le doigt se trouve à moins de 30 px d'un WP.
+- Si oui : ouverture du popup WP (GoTo / Supprimer / Modifier / Déplacer / Supp. Route).
+- Sinon : ouverture normale de la fiche aéroport ou VFR/SIA.
+- Cette règle évite de rendre toute la fiche source inaccessible : seule la zone réellement proche du losange WP devient prioritaire.
+
+3. APPUI LONG PRÈS D'UN WP
+- Avant toute création de feu, ajout WP carte ou insertion sur segment, un appui long est testé contre les WP existants.
+- À moins de 30 px d'un WP : ouverture du popup WP et aucune autre action carte.
+- Hors de cette zone : comportement v16.11 inchangé, notamment insertion directe d'un WP intermédiaire sur un segment.
+
+4. ÉLÉMENTS INCHANGÉS
+- Correction Hyères/MultiPolygon v16.11 inchangée.
+- Route WP, ordre, GoTo, acquisition 1 NM, bulles adaptatives et insertion sur segment inchangés hors arbitrage tactile ci-dessus.
+- PÉLIC, VAC, NOTAMS, GAAR, SafeSky, GLR, BFG, cartes offline et moteur routier inchangés.
+- SIA / AIRAC strictement inchangé (sia.js repris bit-à-bit de v16.11).
+- Production inchangée.
+
+5. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.12 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.11.
+- Vérifications ciblées : snap coordonnées exactes, identité source après snap, priorité WP dans hitbox aéroport/VRP et appui long WP avant menu carte.
+
+
 VERSION TEST v16.11 — HYÈRES / DÉPLACEMENT WP / INSERTION SUR ROUTE / BULLES ADAPTATIVES
 Date : 01/09/2026
 Base : TEST v16.10 corrigée (dernière série du 31/08/2026)
