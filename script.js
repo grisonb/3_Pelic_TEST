@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.10';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.11';
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -8621,7 +8621,7 @@ function updateCommuneDisplay(commune) {
     const communeDisplay = document.getElementById('commune-info-display');
     if (!communeDisplay) return;
 
-    /* v16.10 — le bandeau Route est indépendant : ne jamais remplacer le bandeau Feu/aéroport. */
+    /* v16.10 — le bandeau Route est indépendant du bandeau Feu/BINGO. */
     communeDisplay.classList.remove('wp-route-navigation-active');
 
     communeDisplay.classList.toggle(
@@ -8683,14 +8683,14 @@ function updateCommuneDisplay(commune) {
                 performAirportDestinationClear
             );
         }
-        if (window.__npfWaypointRouteReady === true) renderNpfWaypointNavigationBanner();
+        syncNpfWaypointNavigationBanner();
         return;
     }
 
     if (!commune) {
         communeDisplay.innerHTML = '';
         communeDisplay.style.display = 'none';
-        if (window.__npfWaypointRouteReady === true) renderNpfWaypointNavigationBanner();
+        syncNpfWaypointNavigationBanner();
         return;
     }
 
@@ -8764,8 +8764,7 @@ function updateCommuneDisplay(commune) {
             }
         });
     }
-
-    if (window.__npfWaypointRouteReady === true) renderNpfWaypointNavigationBanner();
+    syncNpfWaypointNavigationBanner();
 }
 
 
@@ -21639,18 +21638,6 @@ function buildAirportGoToButtonHtml(oaci) {
         .replace(/[^A-Z0-9]/g, '');
     if (!safeOaci) return '';
 
-    /* v16.10 — si l'aéroport est déjà un WP, le GoTo doit piloter ce WP via ses actions. */
-    if (window.__npfWaypointRouteReady === true) {
-        const airport = getNpfAirportForWaypoint(safeOaci);
-        const existing = airport ? findNpfWaypointForSourcePoint({
-            source: 'airport',
-            identity: safeOaci,
-            lat: Number(airport.lat),
-            lon: Number(airport.lon)
-        }) : null;
-        if (existing) return '';
-    }
-
     return `<div class="popup-buttons popup-goto-buttons"><button type="button" class="goto-btn" onclick="window.goToAirportDestinationByOaci('${safeOaci}')">Go To</button></div>`;
 }
 
@@ -21691,11 +21678,27 @@ let npfWaypointLineLayer = null;
 let npfWaypointMarkerLayer = null;
 let npfWaypointLabelLayer = null;
 let npfWaypointMarkerRegistry = new Map();
+let npfWaypointMoveHandle = null;
 let npfWaypointSearchOverlayState = null;
 let npfWaypointZoomListenerInstalled = false;
 
 function ensureNpfWaypointRouteLayers() {
     if (!map || typeof L === 'undefined') return false;
+
+    /*
+     * v16.11 — pane réservé UNIQUEMENT à la poignée temporaire de déplacement.
+     * Les losanges WP ordinaires restent dans markerPane afin de ne pas masquer
+     * les fiches des points VFR / aéroports superposés.
+     */
+    if (map.createPane && !map.getPane('npfWaypointMovePane')) {
+        map.createPane('npfWaypointMovePane');
+        const pane = map.getPane('npfWaypointMovePane');
+        if (pane) {
+            pane.style.zIndex = '699';
+            pane.style.pointerEvents = 'auto';
+        }
+    }
+
     if (!npfWaypointLineLayer) npfWaypointLineLayer = L.layerGroup().addTo(map);
     if (!npfWaypointLabelLayer) npfWaypointLabelLayer = L.layerGroup().addTo(map);
     if (!npfWaypointMarkerLayer) npfWaypointMarkerLayer = L.layerGroup().addTo(map);
@@ -21723,7 +21726,7 @@ function normalizeNpfWaypointRouteState(raw) {
                 lon,
                 name: String(wp?.name || `WP ${index + 1}`).trim() || `WP ${index + 1}`,
                 source: String(wp?.source || 'map').trim() || 'map',
-                sourceKey: String(wp?.sourceKey || '').trim()
+                sourceRef: String(wp?.sourceRef || '').trim()
             };
         })
         .filter(Boolean);
@@ -21785,81 +21788,55 @@ function getNpfWaypointDisplayNumber(id) {
     return index >= 0 ? index + 1 : 0;
 }
 
-/* v16.10 — reconnaître un point source déjà utilisé comme WP. */
-const NPF_WAYPOINT_SOURCE_MATCH_TOLERANCE_NM = 0.05;
-
-function normalizeNpfWaypointSourceIdentity(value) {
-    return String(value || '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim()
-        .toUpperCase()
-        .replace(/\s+/g, ' ');
+function normalizeNpfWaypointSourceRef(value) {
+    return String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
 }
 
-function getNpfWaypointSourceKey(source, identity) {
-    const normalizedSource = String(source || '').trim().toLowerCase();
-    const normalizedIdentity = normalizeNpfWaypointSourceIdentity(identity);
-    if (!normalizedSource || !normalizedIdentity) return '';
-    return `${normalizedSource}:${normalizedIdentity}`;
-}
-
-function isNpfWaypointNearSourcePoint(wp, lat, lon, toleranceNm = NPF_WAYPOINT_SOURCE_MATCH_TOLERANCE_NM) {
+function findNpfWaypointForSource({ source = '', sourceRef = '', lat = NaN, lon = NaN } = {}) {
+    const wantedSource = String(source || '').trim().toLowerCase();
+    const wantedRef = normalizeNpfWaypointSourceRef(sourceRef);
     const targetLat = Number(lat);
     const targetLon = Number(lon);
-    if (!wp || !Number.isFinite(targetLat) || !Number.isFinite(targetLon)) return false;
-    const distance = calculateDistanceInNm(Number(wp.lat), Number(wp.lon), targetLat, targetLon);
-    return Number.isFinite(distance) && distance <= toleranceNm;
-}
-
-function findNpfWaypointForSourcePoint({ source, identity, lat, lon } = {}) {
-    const normalizedSource = String(source || '').trim().toLowerCase();
-    const normalizedIdentity = normalizeNpfWaypointSourceIdentity(identity);
-    const expectedKey = getNpfWaypointSourceKey(normalizedSource, normalizedIdentity);
-    if (!normalizedSource || !normalizedIdentity) return null;
 
     return npfWaypointRouteState.waypoints.find(wp => {
-        if (String(wp?.source || '').trim().toLowerCase() !== normalizedSource) return false;
-        if (!isNpfWaypointNearSourcePoint(wp, lat, lon)) return false;
+        const wpSource = String(wp?.source || '').trim().toLowerCase();
+        if (wantedSource && wpSource && wpSource !== wantedSource) return false;
 
-        const storedKey = String(wp?.sourceKey || '').trim();
-        if (storedKey && expectedKey && storedKey === expectedKey) return true;
-
-        const wpIdentity = normalizeNpfWaypointSourceIdentity(wp?.name || '');
-        if (normalizedSource === 'airport') {
-            return wpIdentity === normalizedIdentity || wpIdentity.startsWith(`${normalizedIdentity} —`);
+        const wpRef = normalizeNpfWaypointSourceRef(wp?.sourceRef);
+        const wpName = normalizeNpfWaypointSourceRef(wp?.name);
+        if (wantedRef) {
+            if (wpRef && wpRef === wantedRef) return true;
+            if (wantedSource === 'vfr' && wpName === wantedRef) return true;
+            if (wantedSource === 'airport' && (wpName === wantedRef || wpName.startsWith(`${wantedRef} —`) || wpName.startsWith(`${wantedRef} -`))) return true;
         }
-        return wpIdentity === normalizedIdentity;
+
+        if (Number.isFinite(targetLat) && Number.isFinite(targetLon)) {
+            const distance = calculateDistanceInNm(targetLat, targetLon, Number(wp?.lat), Number(wp?.lon));
+            if (Number.isFinite(distance) && distance <= 0.05) return true;
+        }
+        return false;
     }) || null;
 }
 
-function openNpfWaypointPopupById(id) {
-    const marker = npfWaypointMarkerRegistry.get(id);
-    if (!marker) return false;
-    try {
-        map?.closePopup?.();
-        marker.openPopup();
-        return true;
-    } catch (_) {
-        return false;
-    }
+function getNpfWaypointForAirport(oaci) {
+    const safeOaci = normalizeOaciCodeInput(oaci);
+    if (!safeOaci) return null;
+    const airport = getNpfAirportForWaypoint(safeOaci);
+    return findNpfWaypointForSource({
+        source: 'airport',
+        sourceRef: safeOaci,
+        lat: Number(airport?.lat),
+        lon: Number(airport?.lon)
+    });
 }
 
-function buildNpfWaypointSourceActionsHtml(wp) {
-    if (!wp) return '';
-    const safeId = String(wp.id || '').replace(/[^A-Za-z0-9_-]/g, '');
-    const number = getNpfWaypointDisplayNumber(wp.id);
-    if (!safeId || number <= 0) return '';
-    return `
-        <div class="npf-waypoint-source-existing">WP${number} dans la route</div>
-        <div class="npf-waypoint-popup-actions npf-waypoint-source-actions">
-            <button type="button" class="npf-waypoint-action npf-waypoint-goto" onclick="window.npfWaypointGoto('${safeId}')">GoTo</button>
-            <button type="button" class="npf-waypoint-action npf-waypoint-delete" onclick="window.npfWaypointDelete('${safeId}')">Supprimer</button>
-            <button type="button" class="npf-waypoint-action npf-waypoint-edit" onclick="window.npfWaypointModify('${safeId}')">Modifier</button>
-            <button type="button" class="npf-waypoint-action npf-waypoint-move" onclick="window.npfWaypointMove('${safeId}')">Déplacer</button>
-            <button type="button" class="npf-waypoint-action npf-waypoint-delete-route" onclick="window.npfWaypointDeleteRoute()">Supp. Route</button>
-        </div>
-    `;
+function getNpfWaypointForVfr(name, lat, lon) {
+    return findNpfWaypointForSource({
+        source: 'vfr',
+        sourceRef: name,
+        lat: Number(lat),
+        lon: Number(lon)
+    });
 }
 
 function formatNpfWaypointDistanceNm(distanceNm) {
@@ -21885,21 +21862,28 @@ function buildNpfWaypointIcon(wp, index) {
     });
 }
 
+function buildNpfWaypointActionsHtml(wp) {
+    const safeId = String(wp?.id || '').replace(/[^A-Za-z0-9_-]/g, '');
+    if (!safeId) return '';
+    return `
+        <button type="button" class="npf-waypoint-action npf-waypoint-goto" onclick="window.npfWaypointGoto('${safeId}')">GoTo</button>
+        <button type="button" class="npf-waypoint-action npf-waypoint-delete" onclick="window.npfWaypointDelete('${safeId}')">Supprimer</button>
+        <button type="button" class="npf-waypoint-action npf-waypoint-edit" onclick="window.npfWaypointModify('${safeId}')">Modifier</button>
+        <button type="button" class="npf-waypoint-action npf-waypoint-move" onclick="window.npfWaypointMove('${safeId}')">Déplacer</button>
+        <button type="button" class="npf-waypoint-action npf-waypoint-delete-route" onclick="window.npfWaypointDeleteRoute()">Supp. Route</button>
+    `;
+}
+
 function buildNpfWaypointPopupHtml(wp, index) {
     const number = index + 1;
     const active = wp?.id === npfWaypointRouteState.activeId;
     const safeName = escapeHtml(String(wp?.name || `WP ${number}`));
-    const safeId = String(wp?.id || '').replace(/[^A-Za-z0-9_-]/g, '');
     return `
         <div class="npf-waypoint-popup">
             <div class="npf-waypoint-popup-title">WP${number}${active ? ' — ACTIF' : ''}</div>
             <div class="npf-waypoint-popup-name">${safeName}</div>
             <div class="npf-waypoint-popup-actions">
-                <button type="button" class="npf-waypoint-action npf-waypoint-goto" onclick="window.npfWaypointGoto('${safeId}')">GoTo</button>
-                <button type="button" class="npf-waypoint-action npf-waypoint-delete" onclick="window.npfWaypointDelete('${safeId}')">Supprimer</button>
-                <button type="button" class="npf-waypoint-action npf-waypoint-edit" onclick="window.npfWaypointModify('${safeId}')">Modifier</button>
-                <button type="button" class="npf-waypoint-action npf-waypoint-move" onclick="window.npfWaypointMove('${safeId}')">Déplacer</button>
-                <button type="button" class="npf-waypoint-action npf-waypoint-delete-route" onclick="window.npfWaypointDeleteRoute()">Supp. Route</button>
+                ${buildNpfWaypointActionsHtml(wp)}
             </div>
         </div>
     `;
@@ -21948,71 +21932,93 @@ function drawNpfWaypointRouteLines() {
     }
 }
 
-function getNpfWaypointSegmentLabelLatLng(from, to, labelWidth = 150, labelHeight = 28, segmentIndex = 0) {
-    if (!map || !from || !to) return L.latLng(from?.lat || 0, from?.lon || 0);
+function getNpfWaypointSegmentScreenMetrics(from, to) {
+    if (!map || !from || !to) return null;
     try {
         const a = map.latLngToLayerPoint([from.lat, from.lon]);
         const b = map.latLngToLayerPoint([to.lat, to.lon]);
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const length = Math.hypot(dx, dy);
-        if (length < 1) return L.latLng(from.lat, from.lon);
+        if (!Number.isFinite(length) || length < 1) return null;
+        return {
+            a,
+            b,
+            dx,
+            dy,
+            length,
+            ux: dx / length,
+            uy: dy / length
+        };
+    } catch (_) {
+        return null;
+    }
+}
 
-        const ux = dx / length;
-        const uy = dy / length;
-        const nx = -uy;
-        const ny = ux;
-        const halfW = Math.max(45, Number(labelWidth) / 2);
-        const halfH = Math.max(12, Number(labelHeight) / 2);
-        const markerClearance = 31;
-        const gap = 9;
-        const projectedHalfAlong = Math.abs(ux) * halfW + Math.abs(uy) * halfH;
-        const desiredAlong = markerClearance + gap + projectedHalfAlong;
-        const maxAlong = length - markerClearance - gap - projectedHalfAlong;
-        const lateral = markerClearance + gap + Math.abs(nx) * halfW + Math.abs(ny) * halfH;
+function getNpfWaypointSegmentZoomClass() {
+    const zoom = Number(map?.getZoom?.());
+    if (!Number.isFinite(zoom)) return 'npf-waypoint-segment-zoom-medium';
+    if (zoom <= 7) return 'npf-waypoint-segment-zoom-very-low';
+    if (zoom <= 9) return 'npf-waypoint-segment-zoom-low';
+    if (zoom <= 11) return 'npf-waypoint-segment-zoom-medium';
+    return 'npf-waypoint-segment-zoom-high';
+}
 
-        const clampAlong = value => Math.max(0, Math.min(length, value));
-        const candidates = [];
-        if (desiredAlong <= maxAlong) {
-            candidates.push([desiredAlong, 0]);
-            candidates.push([desiredAlong, lateral]);
-            candidates.push([desiredAlong, -lateral]);
-        }
+function buildNpfWaypointSegmentLabel(from, to) {
+    const metrics = getNpfWaypointSegmentScreenMetrics(from, to);
+    if (!metrics || metrics.length < 34) return null;
 
-        const mid = length * 0.5;
-        const sideSign = segmentIndex % 2 === 0 ? 1 : -1;
-        candidates.push([mid, lateral * sideSign]);
-        candidates.push([mid, -lateral * sideSign]);
-        candidates.push([clampAlong(length * 0.35), lateral * sideSign]);
-        candidates.push([clampAlong(length * 0.65), -lateral * sideSign]);
+    const distance = calculateDistanceInNm(from.lat, from.lon, to.lat, to.lon);
+    const magneticBearing = getNpfWaypointMagneticBearing(from.lat, from.lon, to.lat, to.lon);
+    const routeText = formatRouteDegrees(magneticBearing);
+    const distanceText = formatNpfWaypointDistanceNm(distance);
+    const timeText = formatGpsEtaMinutes(distance);
 
-        const waypointPoints = npfWaypointRouteState.waypoints.map(wp => map.latLngToLayerPoint([wp.lat, wp.lon]));
-        const collidesWithWaypoint = point => waypointPoints.some(wpPoint => (
-            Math.abs(point.x - wpPoint.x) < halfW + markerClearance
-            && Math.abs(point.y - wpPoint.y) < halfH + markerClearance
-        ));
+    /*
+     * v16.11 — priorité demandée : Route, puis Distance, puis Temps.
+     * Le nombre d'informations dépend de la longueur réellement disponible à
+     * l'écran ; le zoom fait donc apparaître progressivement les compléments.
+     */
+    let text = routeText;
+    if (metrics.length >= 86) text += ` / ${distanceText}`;
+    if (metrics.length >= 144) text += ` / ${timeText}`;
 
-        let chosen = null;
-        for (const [along, side] of candidates) {
-            const point = L.point(
-                a.x + ux * along + nx * side,
-                a.y + uy * along + ny * side
-            );
-            if (!collidesWithWaypoint(point)) {
-                chosen = point;
-                break;
-            }
-        }
+    return {
+        text,
+        metrics,
+        zoomClass: getNpfWaypointSegmentZoomClass()
+    };
+}
 
-        if (!chosen) {
-            chosen = L.point(
-                a.x + ux * mid + nx * lateral * sideSign,
-                a.y + uy * mid + ny * lateral * sideSign
-            );
-        }
+function getNpfWaypointSegmentLabelLatLng(from, to, metrics = null) {
+    if (!map || !from || !to) return L.latLng(from?.lat || 0, from?.lon || 0);
+    try {
+        const m = metrics || getNpfWaypointSegmentScreenMetrics(from, to);
+        if (!m) return L.latLng(from.lat, from.lon);
+
+        const px = -m.uy;
+        const py = m.ux;
+        const zoom = Number(map.getZoom());
+        const sideOffset = !Number.isFinite(zoom)
+            ? 13
+            : (zoom <= 7 ? 9 : zoom <= 9 ? 10 : zoom <= 11 ? 12 : 14);
+
+        /*
+         * La bulle reste CONTRE la route : centre au milieu du segment avec
+         * seulement le décalage perpendiculaire nécessaire pour que son bord
+         * ne masque pas le trait. On choisit le côté le plus proche du centre
+         * de la carte afin de limiter les sorties d'écran.
+         */
+        const middle = L.point(m.a.x + m.dx * 0.5, m.a.y + m.dy * 0.5);
+        const candidateA = L.point(middle.x + px * sideOffset, middle.y + py * sideOffset);
+        const candidateB = L.point(middle.x - px * sideOffset, middle.y - py * sideOffset);
+        const mapCenter = map.latLngToLayerPoint(map.getCenter());
+        const chosen = candidateB.distanceTo(mapCenter) < candidateA.distanceTo(mapCenter)
+            ? candidateB
+            : candidateA;
         return map.layerPointToLatLng(chosen);
     } catch (_) {
-        return getRouteTooltipLatLng([from.lat, from.lon], [to.lat, to.lon], 0.18);
+        return getRouteTooltipLatLng([from.lat, from.lon], [to.lat, to.lon], 0.5);
     }
 }
 
@@ -22025,25 +22031,19 @@ function updateNpfWaypointSegmentLabels() {
     for (let i = 0; i < waypoints.length - 1; i += 1) {
         const from = waypoints[i];
         const to = waypoints[i + 1];
-        const distance = calculateDistanceInNm(from.lat, from.lon, to.lat, to.lon);
-        const magneticBearing = getNpfWaypointMagneticBearing(from.lat, from.lon, to.lat, to.lon);
-        const label = `${formatRouteDegrees(magneticBearing)} / ${formatNpfWaypointDistanceNm(distance)} / ${formatGpsEtaMinutes(distance)}`;
-        const tooltip = L.tooltip({
+        const label = buildNpfWaypointSegmentLabel(from, to);
+        if (!label) continue;
+
+        L.tooltip({
             permanent: true,
             direction: 'center',
-            className: 'npf-waypoint-segment-tooltip',
+            className: `npf-waypoint-segment-tooltip ${label.zoomClass}`,
             opacity: 1,
             interactive: false
         })
-            .setLatLng([from.lat, from.lon])
-            .setContent(label)
+            .setLatLng(getNpfWaypointSegmentLabelLatLng(from, to, label.metrics))
+            .setContent(label.text)
             .addTo(npfWaypointLabelLayer);
-
-        const element = tooltip.getElement?.();
-        const rect = element?.getBoundingClientRect?.();
-        const width = Number(rect?.width) || 150;
-        const height = Number(rect?.height) || 28;
-        tooltip.setLatLng(getNpfWaypointSegmentLabelLatLng(from, to, width, height, i));
     }
 }
 
@@ -22106,14 +22106,24 @@ function addNpfWaypoint(point = {}) {
     const lon = Number(point.lon ?? point.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
 
+    const source = String(point.source || 'map').trim() || 'map';
+    const sourceRef = String(point.sourceRef || '').trim();
+    const existing = findNpfWaypointForSource({ source, sourceRef, lat, lon });
+    if (existing && source !== 'map') {
+        redrawNpfWaypointRoute();
+        const existingMarker = npfWaypointMarkerRegistry.get(existing.id);
+        try { existingMarker?.openPopup?.(); } catch (_) {}
+        return false;
+    }
+
     const wasEmpty = npfWaypointRouteState.waypoints.length === 0;
     const wp = {
         id: `wp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         lat,
         lon,
         name: String(point.name || '').trim() || `WP ${npfWaypointRouteState.waypoints.length + 1}`,
-        source: String(point.source || 'map').trim() || 'map',
-        sourceKey: String(point.sourceKey || '').trim()
+        source,
+        sourceRef
     };
     npfWaypointRouteState.waypoints.push(wp);
 
@@ -22146,50 +22156,24 @@ function getNpfAirportForWaypoint(oaci) {
 function addNpfWaypointFromAirportByOaci(oaci) {
     const airport = getNpfAirportForWaypoint(oaci);
     if (!airport) return false;
-    const identity = normalizeOaciCodeInput(airport.oaci || oaci);
-    const existing = findNpfWaypointForSourcePoint({
-        source: 'airport',
-        identity,
-        lat: Number(airport.lat),
-        lon: Number(airport.lon)
-    });
-    if (existing) return openNpfWaypointPopupById(existing.id);
-
     return addNpfWaypoint({
         lat: Number(airport.lat),
         lon: Number(airport.lon),
         name: `${airport.oaci} — ${airport.name || airport.oaci}`,
         source: 'airport',
-        sourceKey: getNpfWaypointSourceKey('airport', identity)
-    });
-}
-
-function decodeNpfVfrWaypointName(encodedName) {
-    try { return decodeURIComponent(String(encodedName || '')); }
-    catch (_) { return String(encodedName || ''); }
-}
-
-function getNpfWaypointForVfr(encodedName, lat, lon) {
-    const name = decodeNpfVfrWaypointName(encodedName) || 'Point VFR';
-    return findNpfWaypointForSourcePoint({
-        source: 'vfr',
-        identity: name,
-        lat: Number(lat),
-        lon: Number(lon)
+        sourceRef: normalizeOaciCodeInput(airport.oaci)
     });
 }
 
 function addNpfWaypointFromVfr(encodedName, lat, lon) {
-    const name = decodeNpfVfrWaypointName(encodedName) || 'Point VFR';
-    const existing = getNpfWaypointForVfr(encodedName, lat, lon);
-    if (existing) return openNpfWaypointPopupById(existing.id);
-
+    let name = '';
+    try { name = decodeURIComponent(String(encodedName || '')); } catch (_) { name = String(encodedName || ''); }
     return addNpfWaypoint({
         lat: Number(lat),
         lon: Number(lon),
-        name,
+        name: name || 'Point VFR',
         source: 'vfr',
-        sourceKey: getNpfWaypointSourceKey('vfr', name)
+        sourceRef: name || 'Point VFR'
     });
 }
 
@@ -22207,26 +22191,109 @@ function addNpfWaypointFromMapLatLng(latlng) {
     });
 }
 
+
+const NPF_WAYPOINT_ROUTE_LONG_PRESS_TOLERANCE_PX = 22;
+
+function getNpfWaypointRouteSegmentAtLatLng(latlng, tolerancePx = NPF_WAYPOINT_ROUTE_LONG_PRESS_TOLERANCE_PX) {
+    if (!map || !latlng || npfWaypointRouteState.waypoints.length < 2) return null;
+    let p;
+    try { p = map.latLngToContainerPoint(latlng); } catch (_) { return null; }
+    if (!p) return null;
+
+    let best = null;
+    for (let i = 0; i < npfWaypointRouteState.waypoints.length - 1; i += 1) {
+        const from = npfWaypointRouteState.waypoints[i];
+        const to = npfWaypointRouteState.waypoints[i + 1];
+        let a;
+        let b;
+        try {
+            a = map.latLngToContainerPoint([from.lat, from.lon]);
+            b = map.latLngToContainerPoint([to.lat, to.lon]);
+        } catch (_) {
+            continue;
+        }
+
+        const vx = b.x - a.x;
+        const vy = b.y - a.y;
+        const len2 = vx * vx + vy * vy;
+        if (!Number.isFinite(len2) || len2 < 25) continue;
+
+        const rawT = ((p.x - a.x) * vx + (p.y - a.y) * vy) / len2;
+        /* « Entre 2 WP » : on ne capte pas les extrémités elles-mêmes. */
+        if (rawT <= 0.05 || rawT >= 0.95) continue;
+        const t = Math.max(0, Math.min(1, rawT));
+        const qx = a.x + vx * t;
+        const qy = a.y + vy * t;
+        const distancePx = Math.hypot(p.x - qx, p.y - qy);
+        if (!Number.isFinite(distancePx) || distancePx > tolerancePx) continue;
+
+        if (!best || distancePx < best.distancePx) {
+            best = { segmentIndex: i, insertIndex: i + 1, distancePx, t };
+        }
+    }
+    return best;
+}
+
+function insertNpfWaypointOnRouteSegment(segmentInfo, latlng) {
+    if (!segmentInfo || !latlng) return null;
+    const insertIndex = Number(segmentInfo.insertIndex);
+    if (!Number.isInteger(insertIndex) || insertIndex <= 0 || insertIndex >= npfWaypointRouteState.waypoints.length) return null;
+
+    const lat = Number(latlng.lat);
+    const lon = Number(latlng.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+
+    let name = 'Point route';
+    try { name = findClosestCommuneName(lat, lon) || name; } catch (_) {}
+
+    const wp = {
+        id: `wp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        lat,
+        lon,
+        name,
+        source: 'map',
+        sourceRef: ''
+    };
+
+    npfWaypointRouteState.waypoints.splice(insertIndex, 0, wp);
+    persistNpfWaypointRouteState();
+    redrawNpfWaypointRoute();
+    drawUserToTargetRoute();
+    updateCommuneDisplay(currentCommune);
+    return wp;
+}
+
+function handleNpfWaypointRouteLongPress(latlng) {
+    const segmentInfo = getNpfWaypointRouteSegmentAtLatLng(latlng);
+    if (!segmentInfo) return false;
+
+    const wp = insertNpfWaypointOnRouteSegment(segmentInfo, latlng);
+    if (!wp) return false;
+
+    /*
+     * v16.11 — aucun menu intermédiaire : le WP est inséré dans l'ordre de la
+     * route puis passe immédiatement en mode Déplacer.
+     */
+    requestAnimationFrame(() => startNpfWaypointMove(wp.id));
+    return true;
+}
+
 function buildAirportAddWpButtonHtml(oaci) {
     const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (!safeOaci) return '';
-    const airport = getNpfAirportForWaypoint(safeOaci);
-    if (airport) {
-        const existing = findNpfWaypointForSourcePoint({
-            source: 'airport',
-            identity: safeOaci,
-            lat: Number(airport.lat),
-            lon: Number(airport.lon)
-        });
-        if (existing) return buildNpfWaypointSourceActionsHtml(existing);
+    const existing = getNpfWaypointForAirport(safeOaci);
+    if (existing) {
+        return `<div class="npf-waypoint-popup-actions npf-source-waypoint-actions popup-add-wp-buttons">${buildNpfWaypointActionsHtml(existing)}</div>`;
     }
     return `<div class="popup-buttons popup-add-wp-buttons"><button type="button" class="add-wp-btn" onclick="window.addNpfWaypointFromAirportByOaci('${safeOaci}')">Ajout WP</button></div>`;
 }
 
-function buildNpfVfrWaypointActionsHtml(encodedName, lat, lon) {
-    const existing = getNpfWaypointForVfr(encodedName, lat, lon);
-    if (existing) return buildNpfWaypointSourceActionsHtml(existing);
-    return `<div class="sia-vrp-popup-actions"><button type="button" class="sia-vrp-add-wp-btn" onclick="window.addNpfWaypointFromVfr('${encodedName}', ${Number(lat)}, ${Number(lon)})">Ajout WP</button></div>`;
+function refreshAirportWaypointPopupHtml(popupHtml, oaci) {
+    const freshSection = buildAirportAddWpButtonHtml(oaci);
+    return String(popupHtml || '').replace(
+        /<div class="(?:popup-buttons |npf-waypoint-popup-actions npf-source-waypoint-actions )?popup-add-wp-buttons">[\s\S]*?<\/div>/,
+        freshSection
+    );
 }
 
 function deleteNpfWaypoint(id) {
@@ -22311,49 +22378,24 @@ function handleNpfWaypointAutoAdvance(userLat, userLon) {
     return true;
 }
 
-let npfWaypointBannerResizeObserver = null;
-let npfWaypointBannerWindowListenersInstalled = false;
-
-function ensureNpfWaypointNavigationBanner() {
+function getOrCreateNpfWaypointNavigationBanner() {
     let banner = document.getElementById('npf-waypoint-route-banner');
-    if (!banner && document.body) {
-        banner = document.createElement('div');
-        banner.id = 'npf-waypoint-route-banner';
-        banner.className = 'wp-route-navigation-banner';
-        banner.style.display = 'none';
-        document.body.appendChild(banner);
-    }
-    if (!banner) return null;
-
-    if (!npfWaypointBannerWindowListenersInstalled) {
-        const reposition = () => requestAnimationFrame(updateNpfWaypointNavigationBannerPosition);
-        window.addEventListener('resize', reposition, { passive: true });
-        window.addEventListener('orientationchange', reposition, { passive: true });
-        npfWaypointBannerWindowListenersInstalled = true;
-    }
-
-    if (!npfWaypointBannerResizeObserver && typeof ResizeObserver !== 'undefined') {
-        npfWaypointBannerResizeObserver = new ResizeObserver(() => {
-            requestAnimationFrame(updateNpfWaypointNavigationBannerPosition);
-        });
-        [banner, document.getElementById('bingo-map-display'), document.getElementById('commune-info-display')]
-            .filter(Boolean)
-            .forEach(element => npfWaypointBannerResizeObserver.observe(element));
-    }
+    if (banner || !document.body) return banner;
+    banner = document.createElement('div');
+    banner.id = 'npf-waypoint-route-banner';
+    banner.setAttribute('role', 'status');
+    document.body.appendChild(banner);
     return banner;
 }
 
-function isNpfWaypointBannerBlockerVisible(element) {
-    if (!element) return false;
-    const style = window.getComputedStyle?.(element);
-    if (style?.display === 'none' || style?.visibility === 'hidden') return false;
-    const rect = element.getBoundingClientRect?.();
-    return Boolean(rect && rect.width > 1 && rect.height > 1);
+function removeNpfWaypointNavigationBanner() {
+    const banner = document.getElementById('npf-waypoint-route-banner');
+    if (banner?.parentNode) banner.parentNode.removeChild(banner);
 }
 
-function updateNpfWaypointNavigationBannerPosition() {
+function positionNpfWaypointNavigationBanner() {
     const banner = document.getElementById('npf-waypoint-route-banner');
-    if (!banner || banner.style.display === 'none') return false;
+    if (!banner || banner.style.display === 'none') return;
 
     let top = 8;
     const blockers = [
@@ -22361,29 +22403,35 @@ function updateNpfWaypointNavigationBannerPosition() {
         document.getElementById('commune-info-display')
     ];
     blockers.forEach(element => {
-        if (!isNpfWaypointBannerBlockerVisible(element)) return;
+        if (!element) return;
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return;
         const rect = element.getBoundingClientRect();
-        top = Math.max(top, rect.bottom + 8);
+        if (rect.width > 1 && rect.height > 1) top = Math.max(top, rect.bottom + 8);
     });
+
     banner.style.top = `${Math.round(top)}px`;
-    return true;
 }
 
-function hideNpfWaypointNavigationBanner() {
-    const banner = document.getElementById('npf-waypoint-route-banner');
-    if (banner) banner.style.display = 'none';
+function syncNpfWaypointNavigationBanner() {
+    if (window.__npfWaypointRouteReady !== true || !isNpfWaypointGotoActive()) {
+        removeNpfWaypointNavigationBanner();
+        return false;
+    }
+    return renderNpfWaypointNavigationBanner();
 }
 
 function renderNpfWaypointNavigationBanner() {
-    const banner = ensureNpfWaypointNavigationBanner();
     const active = getNpfActiveWaypoint();
-    if (!banner || !active || !isNpfWaypointGotoActive()) {
-        hideNpfWaypointNavigationBanner();
+    if (!active || !isNpfWaypointGotoActive()) {
+        removeNpfWaypointNavigationBanner();
         return false;
     }
+    const display = getOrCreateNpfWaypointNavigationBanner();
+    if (!display) return false;
 
     const activeNumber = getNpfWaypointDisplayNumber(active.id);
-    banner.innerHTML = `
+    display.innerHTML = `
         <div class="wp-route-band-metric">
             <span class="wp-route-band-label">WP${activeNumber}</span>
             <span id="wp-route-active-metric">---° / -- Nm / -- min</span>
@@ -22395,18 +22443,14 @@ function renderNpfWaypointNavigationBanner() {
         <button type="button" class="wp-route-band-button wp-route-disable-goto" onclick="window.npfWaypointDisableGoto()">Désact. GoTo</button>
         <button type="button" class="wp-route-band-button wp-route-delete-all" onclick="window.npfWaypointDeleteRoute()">Supp. Route</button>
     `;
-    banner.style.display = 'flex';
+    display.style.display = 'flex';
     updateNpfWaypointNavigationBannerMetrics();
-    requestAnimationFrame(updateNpfWaypointNavigationBannerPosition);
-    setTimeout(updateNpfWaypointNavigationBannerPosition, 60);
+    requestAnimationFrame(positionNpfWaypointNavigationBanner);
     return true;
 }
 
 function updateNpfWaypointNavigationBannerMetrics() {
-    if (!isNpfWaypointGotoActive()) {
-        hideNpfWaypointNavigationBanner();
-        return false;
-    }
+    if (!isNpfWaypointGotoActive()) return false;
     const active = getNpfActiveWaypoint();
     const finalWp = npfWaypointRouteState.waypoints[npfWaypointRouteState.waypoints.length - 1];
     const activeMetric = document.getElementById('wp-route-active-metric');
@@ -22425,7 +22469,7 @@ function updateNpfWaypointNavigationBannerMetrics() {
 
     if (activeMetric) activeMetric.textContent = formatMetric(active);
     if (finalMetric) finalMetric.textContent = formatMetric(finalWp);
-    requestAnimationFrame(updateNpfWaypointNavigationBannerPosition);
+    requestAnimationFrame(positionNpfWaypointNavigationBanner);
     return true;
 }
 
@@ -22584,48 +22628,85 @@ function openNpfWaypointSearchOverlay(id) {
 function startNpfWaypointMove(id) {
     const wp = getNpfWaypointById(id);
     const marker = npfWaypointMarkerRegistry.get(id);
-    if (!wp || !marker || !marker.dragging) return false;
+    if (!wp || !marker || !map || typeof L === 'undefined') return false;
+    if (!ensureNpfWaypointRouteLayers()) return false;
 
-    try { map?.closePopup?.(); } catch (_) {}
-    marker.dragging.enable();
-    marker.getElement?.()?.classList.add('npf-waypoint-dragging');
+    try { map.closePopup?.(); } catch (_) {}
 
-    const onDrag = event => {
-        const latlng = event.target.getLatLng();
+    /*
+     * v16.11 — ne pas rendre le losange permanent prioritaire : cela masquerait
+     * les fiches VFR / aéroport lorsqu'ils sont superposés. On crée seulement
+     * pendant « Déplacer » une poignée tactile de 76 px, dans un pane supérieur
+     * aux hitbox SIA/NPF. Le déplacement devient ainsi fiable sans régression
+     * sur l'ouverture normale des points sources.
+     */
+    if (npfWaypointMoveHandle) {
+        try { npfWaypointMoveHandle.remove(); } catch (_) {}
+        npfWaypointMoveHandle = null;
+    }
+
+    const wpIndex = Math.max(0, npfWaypointRouteState.waypoints.findIndex(item => item.id === id));
+    const label = `WP${wpIndex + 1}`;
+    const moveIcon = L.divIcon({
+        className: 'npf-waypoint-move-handle',
+        html: `<span class="npf-waypoint-move-handle-ring"><span>${label}</span></span>`,
+        iconSize: [76, 76],
+        iconAnchor: [38, 38]
+    });
+
+    const handle = L.marker([wp.lat, wp.lon], {
+        icon: moveIcon,
+        pane: map.getPane('npfWaypointMovePane') ? 'npfWaypointMovePane' : 'markerPane',
+        zIndexOffset: 20000,
+        keyboard: false,
+        draggable: true,
+        autoPan: true,
+        autoPanPadding: [60, 60],
+        autoPanSpeed: 10
+    }).addTo(map);
+    npfWaypointMoveHandle = handle;
+
+    const syncPosition = latlng => {
+        if (!latlng) return;
         wp.lat = Number(latlng.lat);
         wp.lon = Number(latlng.lng);
+        try { marker.setLatLng(latlng); } catch (_) {}
         drawNpfWaypointRouteLines();
         updateNpfWaypointSegmentLabels();
         drawUserToTargetRoute();
     };
-    const onDragEnd = event => {
-        const latlng = event.target.getLatLng();
-        wp.lat = Number(latlng.lat);
-        wp.lon = Number(latlng.lng);
-        marker.off('drag', onDrag);
-        marker.dragging.disable();
+
+    const finishMove = event => {
+        const latlng = event?.target?.getLatLng?.() || handle.getLatLng();
+        syncPosition(latlng);
         persistNpfWaypointRouteState();
+        try { handle.remove(); } catch (_) {}
+        if (npfWaypointMoveHandle === handle) npfWaypointMoveHandle = null;
         redrawNpfWaypointRoute();
         drawUserToTargetRoute();
         updateCommuneDisplay(currentCommune);
     };
-    marker.on('drag', onDrag);
-    marker.once('dragend', onDragEnd);
 
-    // Indication courte : le prochain geste sur le losange déplace réellement le WP.
+    handle.on('drag', event => syncPosition(event.target.getLatLng()));
+    handle.once('dragend', finishMove);
+
     try {
-        marker.bindTooltip('Maintenir et déplacer le WP', {
+        handle.bindTooltip('Déplacer le WP puis relâcher', {
             permanent: false,
             direction: 'top',
-            className: 'npf-waypoint-move-hint'
+            className: 'npf-waypoint-move-hint',
+            offset: [0, -32]
         }).openTooltip();
-        setTimeout(() => { try { marker.closeTooltip(); } catch (_) {} }, 1800);
+        setTimeout(() => { try { handle.closeTooltip(); } catch (_) {} }, 1800);
     } catch (_) {}
+
     return true;
 }
 
 restoreNpfWaypointRouteState();
 window.__npfWaypointRouteReady = true;
+window.addEventListener('resize', () => requestAnimationFrame(positionNpfWaypointNavigationBanner), { passive: true });
+window.addEventListener('orientationchange', () => setTimeout(positionNpfWaypointNavigationBanner, 120), { passive: true });
 
 /*
  * initMap() est exécuté plus haut dans le fichier. On initialise donc les couches
@@ -22749,7 +22830,6 @@ function addAirportTouchHitbox(airport, popupHtml) {
         keyboard: false
     });
 
-    // v16.10 — accepte aussi une fonction afin de recalculer les actions WP à l'ouverture.
     hitbox.bindPopup(popupHtml, { maxWidth: 300 });
     hitbox.on('click', event => {
         try {
@@ -22757,7 +22837,10 @@ function addAirportTouchHitbox(airport, popupHtml) {
                 L.DomEvent.stopPropagation(event.originalEvent);
             }
         } catch (_) {}
-        try { hitbox.openPopup(); } catch (_) {}
+        try {
+            hitbox.setPopupContent(refreshAirportWaypointPopupHtml(popupHtml, airport.oaci));
+            hitbox.openPopup();
+        } catch (_) {}
     });
     hitbox.addTo(permanentAirportLayer);
     try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
@@ -23567,7 +23650,7 @@ function drawPermanentAirportMarkers() {
             interactive: false
         }).addTo(permanentAirportLayer);
 
-        const popupHtml = () => `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
         addAirportTouchHitbox(airport, popupHtml);
     });
 
@@ -23588,7 +23671,7 @@ function drawPermanentAirportMarkers() {
             const waterButtonClass = isWater ? "water-btn water-btn-retardant" : "water-btn";
             const disableButtonText = isDisabled ? "Activer" : "Désactiver";
             const disableButtonClass = isDisabled ? "enable-btn" : "disable-btn";
-            const popupHtml = () => `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
+            const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
             const marker = L.marker([airport.lat, airport.lon], { icon: L.divIcon({ className: iconClass, html: iconHTML, iconSize: [26, 26], iconAnchor: [13, 13], popupAnchor: [0, -15] }), zIndexOffset: 2500, keyboard: false });
             marker.bindPopup(popupHtml);
             marker.addTo(permanentAirportLayer);
@@ -23628,7 +23711,7 @@ function drawPermanentAirportMarkers() {
             interactive: false
         }).addTo(permanentAirportLayer);
 
-        const popupHtml = () => `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
         addAirportTouchHitbox(airport, popupHtml);
     });
 
@@ -23646,7 +23729,7 @@ function drawPermanentAirportMarkers() {
         const isBase = selectedBaseOACI === airport.oaci;
         const baseButtonText = isBase ? 'BASE ✓' : 'BASE';
         const baseButtonClass = isBase ? 'base-btn base-btn-active' : 'base-btn';
-        const popupHtml = () => `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${waterButtonClass}" onclick="window.toggleWater('${airport.oaci}')">${waterButtonText}</button><button class="${disableButtonClass}" onclick="window.toggleAirport('${airport.oaci}')">${disableButtonText}</button><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button></div>${buildPelicPdfButtonsHtml(airport.oaci)}${buildVacButtonHtml(airport.oaci)}${buildPelicNotamsButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
         marker.bindPopup(popupHtml);
         marker.addTo(permanentAirportLayer);
         addAirportTouchHitbox(airport, popupHtml);
@@ -24345,14 +24428,14 @@ function buildDepartmentPolygonIndex(departmentsGeojson) {
         const depCode = getDepartmentCodeFromProperties(properties);
         if (!depCode) return;
 
-        const rings = coordinatesToRings(feature.geometry);
-        const bounds = getGeometryBoundsFromRings(rings);
+        const polygons = coordinatesToPolygonSets(feature.geometry);
+        const bounds = getGeometryBoundsFromPolygonSets(polygons);
         if (!bounds) return;
 
         index.push({
             depCode,
             depName: getDepartmentNameFromProperties(properties),
-            rings,
+            polygons,
             bounds
         });
     });
@@ -24380,7 +24463,7 @@ function findDepartmentContainingPoint(lat, lon) {
             continue;
         }
 
-        if (isPointInPolygonRings(numericLat, numericLon, department.rings)) {
+        if (isPointInPolygonSets(numericLat, numericLon, department.polygons)) {
             return {
                 dep_code: department.depCode,
                 dep_nom: department.depName || ''
@@ -24391,42 +24474,48 @@ function findDepartmentContainingPoint(lat, lon) {
     return null;
 }
 
-function coordinatesToRings(geometry) {
+function coordinatesToPolygonSets(geometry) {
     if (!geometry || !geometry.type || !Array.isArray(geometry.coordinates)) return [];
 
     if (geometry.type === 'Polygon') {
-        return geometry.coordinates;
+        return [geometry.coordinates];
     }
 
     if (geometry.type === 'MultiPolygon') {
-        return geometry.coordinates.flat();
+        /*
+         * v16.11 — IMPORTANT : conserver chaque polygone séparément.
+         * L'ancien .flat() transformait les polygones 2..n en « trous » du
+         * premier. C'est notamment faux pour Hyères (continent + îles).
+         */
+        return geometry.coordinates;
     }
 
     return [];
 }
 
-function getGeometryBoundsFromRings(rings) {
+function getGeometryBoundsFromPolygonSets(polygons) {
     let minLat = Infinity;
     let maxLat = -Infinity;
     let minLon = Infinity;
     let maxLon = -Infinity;
 
-    rings.forEach((ring) => {
-        if (!Array.isArray(ring)) return;
-        ring.forEach((coord) => {
-            if (!Array.isArray(coord) || coord.length < 2) return;
-            const lon = Number(coord[0]);
-            const lat = Number(coord[1]);
-            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-            minLat = Math.min(minLat, lat);
-            maxLat = Math.max(maxLat, lat);
-            minLon = Math.min(minLon, lon);
-            maxLon = Math.max(maxLon, lon);
+    (Array.isArray(polygons) ? polygons : []).forEach((rings) => {
+        (Array.isArray(rings) ? rings : []).forEach((ring) => {
+            if (!Array.isArray(ring)) return;
+            ring.forEach((coord) => {
+                if (!Array.isArray(coord) || coord.length < 2) return;
+                const lon = Number(coord[0]);
+                const lat = Number(coord[1]);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+                minLon = Math.min(minLon, lon);
+                maxLon = Math.max(maxLon, lon);
+            });
         });
     });
 
     if (!Number.isFinite(minLat) || !Number.isFinite(minLon)) return null;
-
     return { minLat, maxLat, minLon, maxLon };
 }
 
@@ -24457,18 +24546,17 @@ function isPointInRing(lat, lon, ring) {
 function isPointInPolygonRings(lat, lon, rings) {
     if (!Array.isArray(rings) || !rings.length) return false;
 
-    /*
-     * Convention GeoJSON :
-     * - premier anneau = contour extérieur ;
-     * - anneaux suivants = trous éventuels.
-     */
+    /* GeoJSON : anneau 0 = extérieur ; anneaux suivants = trous. */
     if (!isPointInRing(lat, lon, rings[0])) return false;
-
     for (let i = 1; i < rings.length; i += 1) {
         if (isPointInRing(lat, lon, rings[i])) return false;
     }
-
     return true;
+}
+
+function isPointInPolygonSets(lat, lon, polygons) {
+    if (!Array.isArray(polygons) || !polygons.length) return false;
+    return polygons.some(rings => isPointInPolygonRings(lat, lon, rings));
 }
 
 function buildCommunePolygonIndex(communesGeojson) {
@@ -24480,8 +24568,8 @@ function buildCommunePolygonIndex(communesGeojson) {
         const name = getCommuneNameFromProperties(properties);
         if (!name) return;
 
-        const rings = coordinatesToRings(feature.geometry);
-        const bounds = getGeometryBoundsFromRings(rings);
+        const polygons = coordinatesToPolygonSets(feature.geometry);
+        const bounds = getGeometryBoundsFromPolygonSets(polygons);
         if (!bounds) return;
 
         const codeInsee = getCommuneInseeCodeFromProperties(properties);
@@ -24490,7 +24578,7 @@ function buildCommunePolygonIndex(communesGeojson) {
             name,
             codeInsee,
             depCode: getCommuneDepCodeFromProperties(properties),
-            rings,
+            polygons,
             bounds
         });
     });
@@ -24514,7 +24602,7 @@ function findCommuneContainingPoint(lat, lon) {
             continue;
         }
 
-        if (isPointInPolygonRings(lat, lon, commune.rings)) {
+        if (isPointInPolygonSets(lat, lon, commune.polygons)) {
             const departmentAtPoint = findDepartmentContainingPoint(lat, lon);
             return {
                 nom_standard: commune.name,
@@ -36496,6 +36584,16 @@ async function executeMapLongPressAction(latlng) {
     }
 
     /*
+     * v16.11 — priorité à la route WP : un appui long au voisinage d'un segment
+     * insère directement un WP intermédiaire et ouvre son mode Déplacer.
+     * Ailleurs, le menu historique Créer Feu / Ajout WP / Sélection Zone reste
+     * strictement inchangé.
+     */
+    if (window.__npfWaypointRouteReady === true && handleNpfWaypointRouteLongPress(latlng)) {
+        return;
+    }
+
+    /*
      * v15.77 — l'appui long utilise une logique unique en mode normal et SIM.
      * Le SIV reste recherché à la demande même lorsque son calque graphique est
      * masqué, conformément au comportement v15.74.
@@ -38308,11 +38406,15 @@ function buildSiaPointPopup(item) {
         const encodedWpName = encodeURIComponent(title || code || 'Point VFR');
         const wpLat = Number(item.x);
         const wpLon = Number(item.y);
+        const existingWp = getNpfWaypointForVfr(title || code || 'Point VFR', wpLat, wpLon);
+        const waypointActions = existingWp
+            ? `<div class="npf-waypoint-popup-actions npf-source-waypoint-actions sia-vrp-existing-wp-actions">${buildNpfWaypointActionsHtml(existingWp)}</div>`
+            : `<div class="sia-vrp-popup-actions"><button type="button" class="sia-vrp-add-wp-btn" onclick="window.addNpfWaypointFromVfr('${encodedWpName}', ${wpLat}, ${wpLon})">Ajout WP</button></div>`;
         return `
             <div class="sia-popup sia-vrp-popup">
                 <div class="sia-popup-title">${escapeHtml(title || 'Point VFR')}</div>
                 ${remark ? `<div class="sia-popup-remark">${escapeHtml(remark).replace(/#|\n/g, '<br>')}</div>` : ''}
-                ${buildNpfVfrWaypointActionsHtml(encodedWpName, wpLat, wpLon)}
+                ${waypointActions}
             </div>
         `;
     }
@@ -38565,7 +38667,10 @@ async function refreshSiaLayers(reason = 'manual') {
             pane: 'siaPointPane',
             renderer: siaPointRenderer
         });
-        marker.bindPopup(() => buildSiaPointPopup(item), { maxWidth: 320 });
+        marker.bindPopup(buildSiaPointPopup(item), { maxWidth: 320 });
+        if (item.k === 'dpn:VRP') {
+            marker.on('popupopen', () => marker.setPopupContent(buildSiaPointPopup(item)));
+        }
 
         const label = item.k === 'dpn:VRP'
             ? String(item.d || '').trim()
@@ -39793,7 +39898,7 @@ function getSiaVrpVisualSize(label) {
     return 24;
 }
 
-function addSiaTouchHitbox(latlng, popupHtml) {
+function addSiaTouchHitbox(latlng, popupHtml, popupFactory = null) {
     if (!siaLayerGroup || !latlng || !popupHtml) return null;
 
     /*
@@ -39815,7 +39920,6 @@ function addSiaTouchHitbox(latlng, popupHtml) {
         bubblingMouseEvents: false,
         keyboard: false
     });
-    // v16.10 — popupHtml peut être une fonction Leaflet pour recalculer les actions WP à l'ouverture.
     hitbox.bindPopup(popupHtml, { maxWidth: 340 });
     hitbox.on('click', event => {
         try {
@@ -39823,7 +39927,12 @@ function addSiaTouchHitbox(latlng, popupHtml) {
                 L.DomEvent.stopPropagation(event.originalEvent);
             }
         } catch (_) {}
-        try { hitbox.openPopup(); } catch (_) {}
+        try {
+            if (typeof popupFactory === 'function') {
+                hitbox.setPopupContent(popupFactory());
+            }
+            hitbox.openPopup();
+        } catch (_) {}
     });
     hitbox.addTo(siaLayerGroup);
     try { if (hitbox.bringToFront) hitbox.bringToFront(); } catch (_) {}
@@ -42350,7 +42459,7 @@ async function refreshSiaLayers(reason = 'manual') {
             const latlng = L.latLng(Number(item.x), Number(item.y));
             if (!pointBounds.contains(latlng)) continue;
 
-            const popupHtml = () => buildSiaPointPopup(item);
+            const popupHtml = buildSiaPointPopup(item);
 
             if (item.k === 'dpn:VRP') {
                 const symbolText = getSiaVrpSymbolText(item);
@@ -42369,8 +42478,9 @@ async function refreshSiaLayers(reason = 'manual') {
                     })
                 });
                 marker.bindPopup(popupHtml, { maxWidth: 340 });
+                marker.on('popupopen', () => marker.setPopupContent(buildSiaPointPopup(item)));
                 marker.addTo(siaLayerGroup);
-                addSiaTouchHitbox(latlng, popupHtml);
+                addSiaTouchHitbox(latlng, popupHtml, () => buildSiaPointPopup(item));
                 rendered += 1;
                 continue;
             }
