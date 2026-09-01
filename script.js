@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.25';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.27';
 
 
 /*
@@ -407,7 +407,31 @@ function ensureNpfStartupDiagnosticUi() {
     panel.addEventListener('click', event => {
         if (event.target === panel) close();
     });
+
+    positionNpfStartupDiagButtonNextToScale();
 }
+
+function positionNpfStartupDiagButtonNextToScale() {
+    const button = document.getElementById('npf-startup-diag-button');
+    const scale = document.getElementById('npf-nautical-scale-fixed');
+    if (!button) return;
+
+    if (!scale) {
+        button.style.removeProperty('--npf-diag-left');
+        return;
+    }
+
+    try {
+        const rect = scale.getBoundingClientRect();
+        const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        const buttonWidth = button.offsetWidth || 64;
+        const gap = 10;
+        let left = Math.round(rect.right + gap);
+        if (viewportWidth > 0) left = Math.min(left, Math.max(8, viewportWidth - buttonWidth - 8));
+        button.style.setProperty('--npf-diag-left', `${left}px`);
+    } catch (_) {}
+}
+window.positionNpfStartupDiagButtonNextToScale = positionNpfStartupDiagButtonNextToScale;
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -4279,7 +4303,6 @@ async function initializeApp() {
     }, 900);
 
     setTimeout(showPostUpdateRestartNoticeIfNeeded, 900);
-    setTimeout(showUpdateReminderIfDue, 1700);
 
     /*
      * v15.99 — autorisation BFG -> NPF silencieuse et non bloquante.
@@ -5692,6 +5715,9 @@ function updateNauticalScale() {
         <div class="npf-nautical-scale-bar-wrap" style="width:${pixelWidth}px"></div>
         <div class="npf-nautical-scale-label"><span class="nm">${formatNauticalMiles(niceNm)}</span></div>
     `;
+    if (typeof positionNpfStartupDiagButtonNextToScale === 'function') {
+        window.requestAnimationFrame(positionNpfStartupDiagButtonNextToScale);
+    }
 }
 
 function ensureNauticalScaleControl() {
@@ -22560,8 +22586,8 @@ function ensureNpfWaypointRouteLayers() {
         return pane;
     };
 
-    ensureWaypointPane('npfWaypointLinePane', 668, 'none');
-    ensureWaypointPane('npfWaypointLabelPane', 669, 'none');
+    ensureWaypointPane('npfWaypointLinePane', 548, 'none');
+    ensureWaypointPane('npfWaypointLabelPane', 550, 'none');
     ensureWaypointPane('npfWaypointMarkerPane', 670, 'auto');
     ensureWaypointPane('npfWaypointMovePane', 699, 'auto');
 
@@ -22745,9 +22771,9 @@ function buildNpfWaypointIcon(wp, index) {
     return L.divIcon({
         className: markerClass,
         html: `<span class="${diamondClass}"><span class="npf-waypoint-diamond-label">${label}</span></span>`,
-        iconSize: sourceLinked ? [58, 58] : [48, 48],
-        iconAnchor: sourceLinked ? [29, 29] : [24, 24],
-        popupAnchor: [0, sourceLinked ? -31 : -25]
+        iconSize: sourceLinked ? [52, 52] : [48, 48],
+        iconAnchor: sourceLinked ? [26, 26] : [24, 24],
+        popupAnchor: [0, sourceLinked ? -28 : -24]
     });
 }
 
@@ -23026,8 +23052,8 @@ function redrawNpfWaypointRoute() {
         marker.bindPopup(
             buildNpfWaypointPopupHtml(wp, index),
             waypointIsPelic
-                ? getNpfPelicPopupOptions({ maxWidth: 330 })
-                : { maxWidth: 330, closeButton: true }
+                ? getNpfPelicPopupOptions({ maxWidth: 390 })
+                : { maxWidth: 390, closeButton: true }
         );
         marker.addTo(npfWaypointMarkerLayer);
         npfWaypointMarkerRegistry.set(wp.id, marker);
@@ -23953,7 +23979,7 @@ function addAirportTouchHitbox(airport, popupHtml) {
     });
 
     const pelicPopup = typeof isSelectablePelicanAirport === 'function' && isSelectablePelicanAirport(airport.oaci);
-    hitbox.bindPopup(popupHtml, pelicPopup ? getNpfPelicPopupOptions({ maxWidth: 300 }) : { maxWidth: 300 });
+    hitbox.bindPopup(popupHtml, pelicPopup ? getNpfPelicPopupOptions({ maxWidth: 390 }) : { maxWidth: 300 });
     hitbox.on('click', event => {
         try {
             if (event?.originalEvent) {
