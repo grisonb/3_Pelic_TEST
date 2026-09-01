@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-18_diag_button_visible';
-const APP_VERSION = 'v16.18';
+const SW_VERSION = 'sw-v16-20_fire_pelic_auto_cycle';
+const APP_VERSION = 'v16.20';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
