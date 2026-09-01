@@ -1,3 +1,36 @@
+VERSION TEST v16.27 — MISE À JOUR AUTO / RECHERCHE DEVANT ROUTE
+Date : 01/09/2026
+Base : TEST v16.26
+
+OBJECTIFS
+- Ne pas réintroduire de bouton MAJ : la mise à jour reste entièrement automatique.
+- Corriger le cas où la PWA reste affichée sur l'ancienne version après publication des nouveaux fichiers.
+- Garantir que la fenêtre principale de recherche/feu reste devant le bandeau Route, y compris lorsqu'elle est déjà ouverte au démarrage.
+
+1. MISE À JOUR AUTOMATIQUE PWA
+- Suppression du bouton technique caché « Forcer MAJ » restant dans le HTML ; aucun bouton MAJ n'est réintroduit.
+- Le rappel périodique demandant de cliquer sur MAJ n'est plus programmé : la vérification de mise à jour est automatique.
+- Le garde-fou de controllerchange devient limité à la page courante : un ancien marqueur sessionStorage ne peut plus bloquer une future prise de contrôle.
+- À l'activation d'un nouveau service worker, les clients encore ouverts avec un ?appv= ancien sont redirigés une seule fois vers le nouvel appv.
+- Le service worker ne sert plus son ancien shell lorsqu'une requête demande explicitement une version NPF plus récente que la sienne.
+- Les tentatives de validation atomique du shell sont prolongées pour mieux tolérer la propagation décalée des fichiers GitHub Pages.
+- Aucune suppression/modification des cartes Offline, IndexedDB ou données métier.
+
+2. FENÊTRE RECHERCHE / FEU
+- #ui-overlay possède désormais directement un z-index supérieur au bandeau Route.
+- La priorité ne dépend plus uniquement de la classe ajoutée après clic sur la loupe : une recherche déjà ouverte/restaurée au démarrage reste également au premier plan.
+
+3. ÉLÉMENTS INCHANGÉS
+- Route WP, bulles, losanges, PÉLIC, GoTo, navette Feu↔PÉLIC et DIAG inchangés.
+- SIA strictement inchangé.
+
+4. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.27 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.26.
+
+
 VERSION TEST v16.26 — PRIORITÉ POINTS / LOSANGES / DIAG / FICHE PÉLIC
 Date : 01/09/2026
 Base : TEST v16.25
