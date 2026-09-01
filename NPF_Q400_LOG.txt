@@ -1,3 +1,57 @@
+VERSION TEST v16.20 — NAVETTE AUTOMATIQUE FEU ↔ PÉLIC
+Date : 01/09/2026
+Base : TEST v16.19
+
+OBJECTIF
+- Automatiser le changement de cible entre le feu sélectionné et le pélicandrome retenu pendant les rotations.
+
+1. CYCLE FEU → PÉLIC → FEU
+- À la création ou à la sélection d'un feu, la cible GPS reste d'abord le feu.
+- À l'entrée dans un rayon de 1 NM du feu, la cible bascule automatiquement vers le pélicandrome sélectionné.
+- À l'entrée dans un rayon de 1 NM du pélicandrome, la cible rebascule automatiquement vers le feu.
+- Le cycle se répète ensuite à chaque rotation.
+- Une marge de sortie à 1,15 NM empêche un aller-retour instantané si les deux cibles sont exceptionnellement très proches.
+
+2. PRIORITÉ AUX ACTIONS MANUELLES
+- Un GoTo manuel vers un WP ou un aéroport/PÉLIC suspend la navette automatique.
+- Reprendre explicitement le GoTo du feu réarme le cycle à partir du feu.
+- Désactiver le GoTo WP restitue la navigation vers le feu et réarme le cycle.
+
+3. GPS / SIMULATION
+- Le changement automatique de cible utilise uniquement une position GPS fraîche ou une position de simulation active.
+- Une position GPS restaurée du stockage au démarrage ne peut jamais déclencher un basculement Feu/PÉLIC.
+
+4. AFFICHAGE
+- Le trait rouge GPS suit immédiatement la cible active du cycle.
+- Les informations route/distance/temps du bandeau Feu sont calculées vers la même cible que le trait.
+- Le pélicandrome utilisé reste celui déjà sélectionné par la logique opérationnelle existante.
+
+5. ÉLÉMENTS INCHANGÉS
+- Restauration visuelle route WP, DIAG, fluidité carte, bandeaux, loupe, snap WP, PÉLIC/VAC/NOTAMS/Doc FDF et SIA inchangés.
+- sia.js strictement inchangé.
+
+VERSION TEST v16.19 — RESTAURATION VISUELLE ROUTE WP
+Date : 01/09/2026
+Base : TEST v16.18
+
+OBJECTIF
+- Corriger le cas où, après réouverture de NPF avec une route sauvegardée, seules les bulles des segments réapparaissaient tandis que les traits et/ou losanges WP pouvaient rester invisibles.
+
+1. COUCHES ROUTE WP DÉDIÉES
+- Ajout de panes Leaflet dédiés et stables pour les traits, bulles et marqueurs WP.
+- Ordre d'affichage indépendant de l'ordre de chargement ultérieur des couches SIA, VFR et autres couches métier.
+- La poignée temporaire de déplacement conserve son pane prioritaire spécifique.
+
+2. RESTAURATION APRÈS RÉOUVERTURE
+- Vérification explicite que les trois LayerGroups de la route sont réellement rattachés à la carte avant chaque redessin.
+- Premier redessin lorsque Leaflet est prêt.
+- Contrôle de cohérence différé après le chargement progressif des couches métier, sans modifier l'état sauvegardé de la route.
+- Route, ordre des WP, WP actif, GoTo et persistance restent inchangés.
+
+3. ÉLÉMENTS INCHANGÉS
+- DIAG, GoTo Feu, pélicandromes, loupe, bandeaux Route/Feu, snap WP et logique de navigation inchangés.
+- SIA strictement inchangé.
+
 VERSION TEST v16.18 — DIAGNOSTIC : BOUTON TOUJOURS VISIBLE
 Date : 01/09/2026
 Base : TEST v16.17
