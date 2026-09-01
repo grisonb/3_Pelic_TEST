@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-13_route_banner_single_wp_goto';
-const APP_VERSION = 'v16.13';
+const SW_VERSION = 'sw-v16-15_route_banner_fire_offset_pelic_wp_popup';
+const APP_VERSION = 'v16.15';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
