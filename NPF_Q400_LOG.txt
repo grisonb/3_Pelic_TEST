@@ -1,49 +1,100 @@
-VERSION TEST v16.10 — CORRECTIONS ROUTE WP / BANDEAU INDÉPENDANT
+VERSION TEST v16.11 — HYÈRES / DÉPLACEMENT WP / INSERTION SUR ROUTE / BULLES ADAPTATIVES
+Date : 01/09/2026
+Base : TEST v16.10 corrigée (dernière série du 31/08/2026)
+
+OBJECTIFS
+- Corriger la commune survolée à Hyères et, plus généralement, les communes MultiPolygon.
+- Fiabiliser le mode « Déplacer » lorsque le WP provient d'un point VFR / VRP ou d'un aéroport.
+- Sur appui long directement entre deux WP, créer un WP intermédiaire au bon rang et passer immédiatement en mode Déplacer.
+- Garder les bulles de segments contre la route, les réduire avec le dézoom et afficher progressivement Route, puis Distance, puis Temps.
+
+1. COMMUNE SURVOLÉE — MULTIPOLYGON / HYÈRES
+- Cause identifiée : les MultiPolygon GeoJSON étaient aplatis ; les polygones 2..n étaient alors interprétés comme des trous du premier.
+- Hyères (INSEE 83069) comporte plusieurs polygones distincts (territoire principal + îles), ce qui expliquait « indisponible/non déterminée » à certaines positions.
+- Les polygones restent désormais séparés ; les trous éventuels restent propres à chaque polygone.
+- Correction appliquée aux communes et aux départements sans modifier la source 500 m locale ni le fonctionnement offline.
+
+2. DÉPLACEMENT MANUEL DES WP VFR / AÉROPORT
+- Le losange WP normal reste dans son pane historique afin de conserver l'accès aux fiches VFR / aéroport superposées.
+- Dès l'appui sur « Déplacer », une poignée tactile temporaire de 76 px apparaît au-dessus des hitbox VFR/SIA/NPF.
+- Cette poignée est la seule couche rendue prioritaire et disparaît au relâchement : déplacement, sauvegarde, route et GoTo restent inchangés.
+- Cette solution évite le conflit tactile sans rendre les points sources inaccessibles en fonctionnement normal.
+
+3. APPUI LONG SUR UN SEGMENT DE ROUTE WP
+- Détection tactile d'un segment dans une tolérance de 22 px.
+- Un appui long entre deux WP crée directement un WP à l'endroit appuyé.
+- Le WP est inséré entre les deux WP concernés dans l'ordre de la route, et non ajouté en fin de route.
+- Aucun menu intermédiaire n'est affiché sur la route : le nouveau WP passe immédiatement en mode « Déplacer ».
+- Hors route, le menu historique Créer Feu / Ajout WP / Sélection Zone reste inchangé.
+
+4. BULLES ROUTE / DISTANCE / TEMPS
+- Placement au milieu du segment avec faible décalage perpendiculaire : la bulle reste contre la route.
+- Taille de police, bordure et padding réduits progressivement aux faibles zooms.
+- Affichage selon la place réellement disponible à l'écran :
+  1) Route dès que possible ;
+  2) Route + Distance lorsque le segment est assez long ;
+  3) Route + Distance + Temps dès que l'espace le permet.
+- Les bulles sont recalculées à chaque zoom comme auparavant.
+
+5. ÉLÉMENTS INCHANGÉS
+- Route WP persistante, acquisition automatique à 1 NM, GoTo, WP Final et suppression de route inchangés.
+- PÉLIC, VAC, NOTAMS, GAAR, SafeSky, GLR, BFG, cartes offline et moteur routier inchangés hors fonctions ci-dessus.
+- SIA / AIRAC strictement inchangé (sia.js repris bit-à-bit de v16.10).
+- Production inchangée.
+
+6. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.11 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.10.
+- Test géométrique ciblé sur Hyères MultiPolygon (point LFTH / territoire principal).
+- Vérifications statiques ciblées : poignée temporaire de déplacement prioritaire, insertion au rang i+1, appui long route prioritaire, bulles progressives.
+
+
+VERSION TEST v16.10 — CORRECTIONS ROUTE WP / BANDEAU / BULLES
 Date : 31/08/2026
 Base : TEST v16.09 corrigée
 
 OBJECTIFS
-- Lorsqu’un point VFR/VRP, aéroport ou PÉLIC déjà présent dans la route est touché, afficher les actions du WP existant au lieu de « Ajout WP ».
-- Empêcher l’ajout en double d’un même point source lorsqu’il correspond déjà à un WP de la route.
-- Replacer automatiquement les bulles Route / Distance / Tps afin qu’elles ne recouvrent aucun WP.
-- Agrandir les libellés « WPn » et « WP Final » du bandeau de navigation.
-- Séparer le bandeau Route du bandeau Feu afin que Route, BINGO et Feu puissent rester visibles simultanément sans recouvrement.
+- Sur un point VFR / aéroport / PÉLIC déjà utilisé comme WP, afficher les actions du WP au lieu de « Ajout WP ».
+- Éviter les doublons lors d'un nouvel ajout de la même source.
+- Empêcher les bulles Route / Distance / Tps de recouvrir les losanges WP.
+- Rendre le bandeau Route indépendant du bandeau Feu et du BINGO.
+- Augmenter la taille des libellés WPn et WP Final dans le bandeau Route.
 
-1. POINTS SOURCE DÉJÀ PRÉSENTS DANS LA ROUTE
-- Détection d’un WP existant par type de source, identité et proximité géographique.
-- Point VFR/VRP déjà utilisé : popup avec GoTo / Supprimer / Modifier / Déplacer / Supp. Route.
-- Aéroport ou PÉLIC déjà utilisé : mêmes actions WP à la place de « Ajout WP ».
-- Protection anti-doublon également appliquée au clic d’ajout si un popup ancien est encore ouvert.
-- Compatibilité avec les routes v16.09 déjà enregistrées, même si elles ne contiennent pas encore la nouvelle clé d’identité de source.
+1. POPUPS DES POINTS DÉJÀ DANS LA ROUTE
+- Détection par identité de la source (OACI / nom VFR) avec secours par position à 0,05 NM.
+- Si le point est déjà un WP : GoTo / Supprimer / Modifier / Déplacer / Supp. Route.
+- Sinon : Ajout WP inchangé.
+- Les popups VFR et les hitbox aéroport sont rafraîchis au moment du clic afin de ne pas conserver un ancien « Ajout WP » mis en cache dans le popup Leaflet.
+- Les nouveaux WP mémorisent également une référence de source pour fiabiliser les clics après déplacement du WP.
 
 2. BULLES DES SEGMENTS
-- La bulle reste liée au segment et placée en priorité juste après le WP de départ.
-- Le placement est calculé en pixels selon le zoom, la taille réelle de la bulle et la direction du segment.
-- Une zone de sécurité est conservée autour de tous les losanges WP.
-- Si le segment est trop court, la bulle est décalée latéralement au trait plutôt que superposée à un WP.
-- Recalcul automatique au changement de zoom.
+- Placement recalculé en coordonnées écran à chaque zoom.
+- Sur segment suffisamment long : bulle juste après le WP de départ avec garde calculée autour du losange.
+- Sur segment court : bulle décalée perpendiculairement au trait pour ne masquer ni le WP de départ ni le WP suivant.
 
 3. BANDEAU ROUTE
-- Le bandeau Route n’utilise plus #commune-info-display : un bandeau indépendant #npf-waypoint-route-banner est créé.
-- BINGO et le bandeau Feu restent affichés normalement lorsqu’un feu est sélectionné.
-- Le bandeau Route se place automatiquement sous les bandeaux visibles, avec une marge de sécurité.
-- « WPn » et « WP Final » passent à 18 px gras ; les valeurs Route / Distance / Temps conservent une taille plus compacte.
-- « Désact. GoTo » continue de fermer uniquement le bandeau Route, sans supprimer la route.
+- Le bandeau Route n'utilise plus #commune-info-display.
+- Élément indépendant #npf-waypoint-route-banner.
+- BINGO et bandeau Feu restent visibles et fonctionnels lorsqu'un GoTo route est actif.
+- Position verticale calculée automatiquement sous les bandeaux visibles.
+- WPn et WP Final : police 18 px, graisse forte.
+- Désact. GoTo ferme uniquement le bandeau Route ; la route reste dessinée.
 
 4. ÉLÉMENTS INCHANGÉS
-- Cercle d’acquisition 1 NM, progression automatique conditionnée par GoTo, persistance route et suppression confirmée inchangés.
-- UI PÉLIC v16.09 (VAC / NOTAMS / Go To), poignée Profil et dézoom GAAR 1,35 inchangés.
-- PÉLIC : Vert=RETARDANT, Bleu=EAU, Rouge=DÉSACTIVÉ + croix rouge centrée inchangés.
-- SIA / AIRAC strictement inchangé.
+- Logique 1 NM / progression automatique / persistance route inchangée.
+- Couleurs PÉLIC : Vert=RETARDANT, Bleu=EAU, Rouge=DÉSACTIVÉ + X rouge inchangées.
+- GAAR 1,35, VAC/NOTAMS/Go To, poignée Profil inchangés.
+- SIA strictement inchangé.
 - BFG et production inchangés.
 
 5. CONTRÔLES
-- node --check Script NPF.
-- node --check Service Worker NPF.
+- node --check Script et SW.
 - Manifest JSON parsé.
 - Cohérence v16.10 Index / Manifest / Script / Style / SW.
 - SIA comparé bit-à-bit avec v16.09.
-- Vérifications ciblées : popup VFR existant, popup aéroport/PÉLIC existant, anti-doublon, collision bulles/WP, bandeau indépendant, libellés WP agrandis.
+- Vérifications ciblées sur actions WP source, anti-doublon, collision bulles et bandeau indépendant.
 
 
 VERSION TEST v16.09 — ROUTE WP / UI PÉLIC / PROFIL / DÉZOOM GAAR
