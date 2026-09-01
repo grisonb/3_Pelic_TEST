@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-27_auto_update_search_overlay';
-const APP_VERSION = 'v16.27';
+const SW_VERSION = 'sw-v16-28_wp_label_pelic_spacing';
+const APP_VERSION = 'v16.28';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
