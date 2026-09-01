@@ -1,3 +1,33 @@
+VERSION TEST v16.28 — LIBELLÉS WP / SÉPARATION FICHE PÉLIC+WP
+Date : 01/09/2026
+Base : TEST v16.27
+
+OBJECTIFS
+- Décaler WP1, WP2, etc. lorsqu'un WP correspond à un PÉLIC, un aéroport ou un point VFR/VRP afin de ne jamais masquer l'icône métier.
+- Renforcer la séparation visuelle entre la section PÉLIC et la section WP dans la fiche d'un PÉLIC utilisé comme WP.
+
+1. LIBELLÉS WP SUR POINTS MÉTIER
+- Le contour losange WP reste centré autour du point source.
+- Le cartouche WPn est déporté davantage vers l'extérieur du losange pour libérer complètement l'icône PÉLIC / aéroport / VFR au centre.
+- Taille, couleur et logique du WP actif inchangées.
+- WP libres inchangés.
+
+2. FICHE PÉLIC + WP
+- Les actions PÉLIC restent regroupées en haut jusqu'au bouton NOTAMS.
+- L'espace vertical avant la section WP est augmenté afin de distinguer immédiatement les deux groupes.
+- Disposition GoTo / Modifier / Déplacer puis Supp. WP / Supp. Route inchangée.
+
+3. ÉLÉMENTS INCHANGÉS
+- Carte, Offline, DIAG, mise à jour automatique, routes, bulles, GoTo, navette Feu↔PÉLIC et restauration inchangés.
+- SIA strictement inchangé.
+
+4. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.28 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.27.
+
+
 VERSION TEST v16.27 — MISE À JOUR AUTO / RECHERCHE DEVANT ROUTE
 Date : 01/09/2026
 Base : TEST v16.26
