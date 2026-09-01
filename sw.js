@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-26_route_layer_wp_diag_pelic_layout';
-const APP_VERSION = 'v16.26';
+const SW_VERSION = 'sw-v16-27_auto_update_search_overlay';
+const APP_VERSION = 'v16.27';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
@@ -167,7 +167,7 @@ async function validateVersionSensitiveCoreResponse(url, response) {
 async function fetchValidatedCoreForInstall(url) {
     const filename = getAppShellFilename(url);
     const versionSensitive = VERSION_SENSITIVE_CORE_FILES.has(filename);
-    const maxAttempts = versionSensitive ? 6 : 1;
+    const maxAttempts = versionSensitive ? 10 : 1;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
@@ -182,7 +182,7 @@ async function fetchValidatedCoreForInstall(url) {
         } catch (_) {}
 
         if (attempt < maxAttempts) {
-            await swDelay(1400);
+            await swDelay(1600);
         }
     }
     return null;
@@ -301,11 +301,31 @@ self.addEventListener('activate', event => {
         await self.clients.claim();
 
         /*
-         * v14.65 — aucune navigation forcée depuis le service worker.
-         * clients.claim() provoque controllerchange dans la page, qui effectue
-         * au maximum un rechargement protégé par session. La double navigation
-         * npfupdate de la v14.64 pouvait réarmer indéfiniment l'alerte de MAJ.
+         * Transition automatique de version : une PWA installée peut conserver
+         * dans son start_url un ancien ?appv=. Lorsque ce nouveau SW prend le
+         * contrôle, on ne navigue QUE les clients qui portent encore un appv
+         * différent. Cela évite de rester visuellement sur l'ancien shell tout
+         * en empêchant les boucles de rechargement.
+         *
+         * Les bases IndexedDB / cartes Offline ne sont jamais modifiées ici.
          */
+        try {
+            const windowClients = await self.clients.matchAll({
+                type: 'window',
+                includeUncontrolled: true
+            });
+            await Promise.allSettled(windowClients.map(async client => {
+                try {
+                    const clientUrl = new URL(client.url);
+                    const clientVersion = clientUrl.searchParams.get('appv') || '';
+                    if (clientVersion === APP_VERSION) return;
+                    clientUrl.pathname = clientUrl.pathname.replace(/[^/]*$/, 'index.html');
+                    clientUrl.searchParams.set('appv', APP_VERSION);
+                    clientUrl.searchParams.set('swrefresh', APP_VERSION);
+                    await client.navigate(clientUrl.toString());
+                } catch (_) {}
+            }));
+        } catch (_) {}
     })());
 });
 
@@ -681,6 +701,17 @@ function isCriticalAppShellRequest(request) {
     }
 }
 
+function compareNpfAppVersions(left, right) {
+    const parse = value => {
+        const match = String(value || '').match(/v?(\d+)\.(\d+)/i);
+        return match ? [Number(match[1]), Number(match[2])] : [0, 0];
+    };
+    const a = parse(left);
+    const b = parse(right);
+    if (a[0] !== b[0]) return a[0] - b[0];
+    return a[1] - b[1];
+}
+
 async function handleAppShellRequest(request) {
     const cache = await caches.open(APP_SHELL_CACHE);
     const isNavigation = request.mode === 'navigate';
@@ -693,9 +724,30 @@ async function handleAppShellRequest(request) {
     const cached = await cache.match(cacheKey, { ignoreSearch: true })
         || await cache.match(request, { ignoreSearch: true });
     const requestUrl = new URL(request.url);
+    const requestedAppVersion = requestUrl.searchParams.get('appv') || '';
+    const requestsNewerAppVersion = requestedAppVersion
+        && compareNpfAppVersions(requestedAppVersion, APP_VERSION) > 0;
     const forcedTransition = isNavigation
         && (requestUrl.searchParams.has('swrefresh')
             || requestUrl.searchParams.has('ts'));
+
+    /*
+     * Si une page demande explicitement une version plus récente que celle de
+     * ce SW, celui-ci ne doit jamais lui substituer son ancien shell en cache.
+     * On laisse le réseau fournir les nouveaux fichiers ; en cas d'absence de
+     * réseau le shell courant reste disponible comme secours.
+     */
+    if (requestsNewerAppVersion) {
+        try {
+            const fresh = await swFetchWithTimeout(
+                new Request(request, { cache: 'reload' }),
+                {},
+                5000
+            );
+            if (fresh && fresh.ok) return fresh;
+        } catch (_) {}
+        if (cached) return cached;
+    }
 
     const refreshFromNetwork = async (timeoutMs = 4500) => {
         try {
