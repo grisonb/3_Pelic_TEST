@@ -1,3 +1,52 @@
+VERSION TEST v16.22 — EXPORT DU DIAGNOSTIC
+Date : 01/09/2026
+Base : TEST v16.21
+
+OBJECTIF
+- Permettre d'envoyer le diagnostic complet sans captures d'écran.
+
+1. BOUTON EXPORTER
+- Ajout d'un bouton « Exporter » dans l'en-tête du panneau DIAG.
+- L'export contient l'intégralité des deux pages du diagnostic dans un seul fichier texte : carte, zoom, packs, tuiles IndexedDB, toutes les étapes chronométrées, blocages JavaScript et LongTask.
+- Le fichier est nommé automatiquement avec la date et l'heure du diagnostic.
+
+2. PARTAGE IPAD
+- Sur iPadOS compatible, le bouton ouvre la feuille de partage native avec le fichier .txt en pièce jointe ; Mail peut être choisi directement.
+- Si le partage de fichier n'est pas disponible, NPF tente le partage du texte complet.
+- En dernier recours, le diagnostic est copié dans le presse-papiers ou exporté comme fichier texte local.
+
+3. FONCTIONNEMENT
+- L'export est un instantané des mesures déjà enregistrées : il peut être lancé après que la lenteur a eu lieu.
+- Aucun changement du moteur de chargement, d'IndexedDB, du moteur Offline ou de l'ordre des tâches.
+- DIAG deux écrans, navette Feu ↔ PÉLIC, route WP et SIA inchangés.
+
+VERSION TEST v16.21 — DIAG EN DEUX CAPTURES
+Date : 01/09/2026
+Base : TEST v16.20
+
+OBJECTIF
+- Présenter l’intégralité du diagnostic de démarrage sur deux écrans fixes afin que deux captures iPad suffisent, sans faire défiler le panneau.
+
+1. PAGE 1/2 — CARTE ET DÉMARRAGE PRINCIPAL
+- Regroupe les informations de carte, zoom, packs Offline et compteurs de tuiles IndexedDB.
+- Affiche les mesures depuis l’exécution du script jusqu’à « Démarrage principal prêt ».
+- Colonnes compactées : Étape / Depuis ouverture / Δ / Détail.
+
+2. PAGE 2/2 — COUCHES ANNEXES ET BLOCAGES
+- Regroupe toutes les mesures postérieures au démarrage principal : polygones communes, SIA, départements, localités hors ligne, trafic et autres couches réellement chargées.
+- Les blocages JavaScript et LongTask sont placés à côté du tableau sur iPad paysage afin de rester dans la même capture.
+- Le diagnostic continue d’enregistrer automatiquement avant l’ouverture du panneau.
+
+3. NAVIGATION / AFFICHAGE
+- Deux boutons fixes « 1/2 Démarrage » et « 2/2 Suite » permettent de passer d’une capture à l’autre.
+- À chaque ouverture de DIAG, la page 1 est affichée en premier.
+- Marges, hauteur des lignes et textes répétitifs réduits uniquement dans le panneau DIAG.
+
+4. ÉLÉMENTS INCHANGÉS
+- Aucun changement du moteur de chargement de la carte, d’IndexedDB, du moteur Offline ni de l’ordre des tâches.
+- Navette automatique Feu ↔ PÉLIC, route WP, GoTo, bandeaux et autres fonctions opérationnelles inchangés.
+- sia.js strictement inchangé.
+
 VERSION TEST v16.20 — NAVETTE AUTOMATIQUE FEU ↔ PÉLIC
 Date : 01/09/2026
 Base : TEST v16.19
