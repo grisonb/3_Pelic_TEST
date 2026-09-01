@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.15 */
+/* NPF_STYLE_BUILD_VERSION: v16.17 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17636,4 +17636,120 @@ body.npf-waypoint-search-open {
     #npf-waypoint-route-banner .wp-route-band-label {
         font-size: 18px !important;
     }
+}
+
+
+/* ========================================================================== 
+   Diagnostic TEST passif du démarrage
+   ========================================================================== */
+.npf-startup-diag-button {
+    background: rgba(255, 250, 220, 0.94) !important;
+    border-color: rgba(161, 98, 7, 0.45) !important;
+    color: #713f12 !important;
+}
+.npf-startup-diag-button-label {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+}
+.npf-startup-diag-panel[hidden] { display: none !important; }
+.npf-startup-diag-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483630;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.34);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+.npf-startup-diag-card {
+    width: min(860px, calc(100vw - 24px));
+    max-height: min(82vh, 760px);
+    overflow: auto;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.985);
+    color: #111827;
+    border: 1px solid rgba(15,23,42,.18);
+    box-shadow: 0 12px 34px rgba(0,0,0,.32);
+}
+.npf-startup-diag-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(248,250,252,.99);
+    border-bottom: 1px solid #d1d5db;
+    font-size: 18px;
+}
+#npf-startup-diag-close {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border: 0;
+    border-radius: 10px;
+    background: #dc2626;
+    color: #fff;
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 800;
+}
+.npf-startup-diag-body { padding: 12px 14px 16px; }
+.npf-startup-diag-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px 14px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+.npf-startup-diag-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.npf-startup-diag-table th,
+.npf-startup-diag-table td {
+    padding: 6px 7px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    vertical-align: top;
+}
+.npf-startup-diag-table th:nth-child(2),
+.npf-startup-diag-table th:nth-child(3),
+.npf-startup-diag-table td:nth-child(2),
+.npf-startup-diag-table td:nth-child(3) {
+    white-space: nowrap;
+    text-align: right;
+}
+.npf-startup-diag-stalls {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+}
+.npf-startup-diag-stalls ul { margin: 6px 0 8px 18px; padding: 0; }
+.npf-startup-diag-help {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+}
+@media (max-width: 760px) {
+    .npf-startup-diag-button-label { font-size: 10px !important; }
+    .npf-startup-diag-panel { padding: 8px; }
+    .npf-startup-diag-card { width: calc(100vw - 16px); max-height: calc(100vh - 30px); }
+    .npf-startup-diag-header { font-size: 16px; padding: 8px 10px; }
+    .npf-startup-diag-body { padding: 8px; }
+    .npf-startup-diag-table { font-size: 11px; }
+    .npf-startup-diag-table th,
+    .npf-startup-diag-table td { padding: 5px 4px; }
 }
