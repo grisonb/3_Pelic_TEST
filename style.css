@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.22 */
+/* NPF_STYLE_BUILD_VERSION: v16.25 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17518,6 +17518,27 @@ body.pelic-notams-modal-open {
     border: 1px solid #7f1d1d;
 }
 
+/* Fiche PÉLIC lorsqu'il est aussi un WP : disposition dédiée, non tassée. */
+.npf-pelic-waypoint-actions {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 9px;
+}
+.npf-pelic-waypoint-actions .npf-waypoint-goto,
+.npf-pelic-waypoint-actions .npf-waypoint-edit,
+.npf-pelic-waypoint-actions .npf-waypoint-move {
+    grid-column: span 2;
+}
+.npf-pelic-waypoint-actions .npf-waypoint-delete,
+.npf-pelic-waypoint-actions .npf-waypoint-delete-route {
+    grid-column: span 3;
+}
+.npf-pelic-waypoint-actions .npf-waypoint-action {
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+}
+
 /* Bandeau supérieur du mode route. */
 #npf-waypoint-route-banner {
     /*
@@ -17866,4 +17887,42 @@ body.npf-waypoint-search-open {
     .npf-startup-diag-table th,
     .npf-startup-diag-table td { padding: 2px 3px; }
     .npf-startup-diag-page2-grid { grid-template-columns: 1fr; }
+}
+
+/* PÉLIC / aéroport / VFR utilisé comme WP : conserver l'icône métier visible. */
+.npf-waypoint-marker-source {
+    pointer-events: none !important;
+}
+.npf-waypoint-marker-source .npf-waypoint-diamond-source {
+    left: 7px;
+    top: 7px;
+    width: 44px;
+    height: 44px;
+    background: transparent !important;
+    border-width: 3px;
+    box-shadow: 0 0 0 2px #111827, 0 2px 7px rgba(0,0,0,.28);
+    pointer-events: none !important;
+}
+.npf-waypoint-marker-source.npf-waypoint-marker-active .npf-waypoint-diamond-source {
+    background: transparent !important;
+    border-color: #ffffff;
+    box-shadow: 0 0 0 3px #16a34a, 0 2px 8px rgba(0,0,0,.32);
+}
+.npf-waypoint-marker-source .npf-waypoint-diamond-label {
+    position: absolute;
+    right: -12px;
+    top: -10px;
+    min-width: 27px;
+    padding: 2px 4px;
+    border-radius: 7px;
+    background: #111827;
+    color: #ffffff;
+    transform: rotate(-45deg);
+    text-align: center;
+    font-size: 9px;
+    line-height: 1.1;
+    box-shadow: 0 0 0 2px #ffffff;
+}
+.npf-waypoint-marker-source.npf-waypoint-marker-active .npf-waypoint-diamond-label {
+    background: #16a34a;
 }
