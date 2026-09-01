@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.18';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.20';
 
 
 /*
@@ -894,6 +894,109 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================================================================
 // v14.44 — filtre trafics au sol et zone centrée sur la carte.
 let allCommunes = [], map, baseTileLayer, permanentAirportLayer, routesLayer, waterPointsLayer, currentCommune = null, selectedPelicanOACI = null, selectedAirportDestination = null;
+
+/*
+ * Navigation automatique Feu ↔ PÉLIC.
+ * Le cycle n'agit que lorsqu'il est explicitement armé sur le feu courant.
+ * Un GoTo manuel WP/aéroport reste prioritaire et suspend le cycle.
+ */
+const NPF_FIRE_PELIC_CAPTURE_RADIUS_NM = 1;
+const NPF_FIRE_PELIC_RELEASE_RADIUS_NM = 1.15;
+let npfFirePelicAutoCycleState = {
+    armed: false,
+    target: 'fire',
+    captureBlocked: false
+};
+
+function resetNpfFirePelicAutoCycle() {
+    npfFirePelicAutoCycleState = {
+        armed: false,
+        target: 'fire',
+        captureBlocked: false
+    };
+}
+
+function armNpfFirePelicAutoCycle(target = 'fire') {
+    if (!currentCommune) {
+        resetNpfFirePelicAutoCycle();
+        return false;
+    }
+    npfFirePelicAutoCycleState = {
+        armed: true,
+        target: target === 'pelic' ? 'pelic' : 'fire',
+        captureBlocked: false
+    };
+    return true;
+}
+
+function suspendNpfFirePelicAutoCycle() {
+    npfFirePelicAutoCycleState.armed = false;
+    npfFirePelicAutoCycleState.captureBlocked = false;
+}
+
+function getNpfFirePelicAutoCycleTarget() {
+    if (!npfFirePelicAutoCycleState.armed || !currentCommune) return null;
+
+    if (npfFirePelicAutoCycleState.target === 'pelic') {
+        const pelic = getSelectedPelicanAirport();
+        if (pelic && !disabledAirports.has(pelic.oaci)) {
+            return {
+                kind: 'pelic',
+                oaci: pelic.oaci,
+                lat: Number(pelic.lat),
+                lon: Number(pelic.lon)
+            };
+        }
+        npfFirePelicAutoCycleState.target = 'fire';
+        npfFirePelicAutoCycleState.captureBlocked = false;
+    }
+
+    return {
+        kind: 'fire',
+        lat: Number(currentCommune.latitude_mairie),
+        lon: Number(currentCommune.longitude_mairie)
+    };
+}
+
+function handleNpfFirePelicAutoCycle(userLat, userLon) {
+    if (!npfFirePelicAutoCycleState.armed || !currentCommune) return false;
+    if (selectedAirportDestination) return false;
+    if (window.__npfWaypointRouteReady === true && typeof isNpfWaypointGotoActive === 'function' && isNpfWaypointGotoActive()) return false;
+
+    const target = getNpfFirePelicAutoCycleTarget();
+    if (!target || !Number.isFinite(target.lat) || !Number.isFinite(target.lon)) return false;
+
+    const distance = calculateDistanceInNm(Number(userLat), Number(userLon), target.lat, target.lon);
+    if (!Number.isFinite(distance)) return false;
+
+    /*
+     * Après un basculement, il faut d'abord sortir du petit voisinage de la
+     * nouvelle cible avant d'autoriser une nouvelle acquisition. Cela évite un
+     * aller-retour instantané si Feu et PÉLIC sont exceptionnellement proches.
+     */
+    if (npfFirePelicAutoCycleState.captureBlocked) {
+        if (distance > NPF_FIRE_PELIC_RELEASE_RADIUS_NM) {
+            npfFirePelicAutoCycleState.captureBlocked = false;
+        }
+        return false;
+    }
+
+    if (distance > NPF_FIRE_PELIC_CAPTURE_RADIUS_NM) return false;
+
+    if (target.kind === 'fire') {
+        const pelic = getSelectedPelicanAirport();
+        if (!pelic || disabledAirports.has(pelic.oaci)) return false;
+        npfFirePelicAutoCycleState.target = 'pelic';
+    } else {
+        npfFirePelicAutoCycleState.target = 'fire';
+    }
+    npfFirePelicAutoCycleState.captureBlocked = true;
+
+    updateCommuneDisplay(currentCommune);
+    drawUserToTargetRoute();
+    return true;
+}
+
 // v15.50 — renderers SVG dédiés aux grandes zones tactiles iPad.
 let npfTouchRenderer = null;
 let siaPointTouchRenderer = null;
@@ -3338,6 +3441,7 @@ function selectFireFromHistoryMap(item) {
     currentCommune = normalized;
     localStorage.setItem('currentCommune', JSON.stringify(normalized));
     displayCommuneDetails(normalized, false);
+    armNpfFirePelicAutoCycle('fire');
 
     if (map && Number.isFinite(Number(normalized.latitude_mairie)) && Number.isFinite(Number(normalized.longitude_mairie))) {
         map.panTo([Number(normalized.latitude_mairie), Number(normalized.longitude_mairie)]);
@@ -3528,6 +3632,7 @@ function displayFireHistory() {
             currentCommune = item;
             localStorage.setItem('currentCommune', JSON.stringify(item));
             displayCommuneDetails(item);
+            armNpfFirePelicAutoCycle('fire');
             resultsList.style.display = 'none';
 
             const searchInput = document.getElementById('search-input');
@@ -4164,6 +4269,7 @@ async function initializeApp() {
         try {
             currentCommune = JSON.parse(savedCommuneJSON);
             displayCommuneDetails(currentCommune, true);
+            armNpfFirePelicAutoCycle('fire');
             setTimeout(
                 () => fitMapToStartupFireContext({ reason: 'saved-fire-after-display' }),
                 350
@@ -7802,6 +7908,7 @@ function setupBaseTileLayer() {
 
 function clearCurrentSelection(options = {}) {
     const preserveMapView = !!options.preserveMapView;
+    resetNpfFirePelicAutoCycle();
     selectedAirportDestination = null;
     selectedPelicanOACI = null;
     const searchInput = document.getElementById('search-input');
@@ -8286,6 +8393,7 @@ function setupEventListeners() {
                 currentCommune = gpsCommune;
                 localStorage.setItem('currentCommune', JSON.stringify(gpsCommune));
                 displayCommuneDetails(gpsCommune, false);
+                armNpfFirePelicAutoCycle('fire');
             },
             () => { alert("Impossible d'obtenir la position GPS. Veuillez vérifier vos autorisations."); },
             { enableHighAccuracy: true }
@@ -8739,6 +8847,7 @@ function displayResults(results) {
                 currentCommune = c;
                 localStorage.setItem('currentCommune', JSON.stringify(c));
                 displayCommuneDetails(c);
+                armNpfFirePelicAutoCycle('fire');
             });
             resultsList.appendChild(li);
         });
@@ -9150,19 +9259,29 @@ function updateCommuneGpsRouteDisplay() {
     const rotationInfo = document.getElementById('gps-feu-rotation-info');
     if (!routeInfo && !rotationInfo) return;
 
+    const automaticFirePelicTarget = !selectedAirportDestination
+        ? getNpfFirePelicAutoCycleTarget()
+        : null;
+
     const target = selectedAirportDestination
         ? {
             lat: Number(selectedAirportDestination.lat),
             lon: Number(selectedAirportDestination.lon),
             airport: true
         }
-        : (currentCommune
+        : (automaticFirePelicTarget
             ? {
-                lat: Number(currentCommune.latitude_mairie),
-                lon: Number(currentCommune.longitude_mairie),
-                airport: false
+                lat: Number(automaticFirePelicTarget.lat),
+                lon: Number(automaticFirePelicTarget.lon),
+                airport: automaticFirePelicTarget.kind === 'pelic'
             }
-            : null);
+            : (currentCommune
+                ? {
+                    lat: Number(currentCommune.latitude_mairie),
+                    lon: Number(currentCommune.longitude_mairie),
+                    airport: false
+                }
+                : null));
 
     if (!target || !userMarker || !userMarker.getLatLng) {
         if (routeInfo) {
@@ -17979,6 +18098,9 @@ function searchAirportsByOaci(rawSearch) {
 function clearAirportDestination({ restoreFire = true, redraw = true } = {}) {
     if (!selectedAirportDestination) return false;
     selectedAirportDestination = null;
+    if (restoreFire && currentCommune) {
+        armNpfFirePelicAutoCycle('fire');
+    }
 
     if (redraw) {
         if (userToTargetLayer) userToTargetLayer.clearLayers();
@@ -18009,6 +18131,8 @@ function isCurrentFireGotoActive() {
 
 function activateCurrentFireGoto() {
     if (!currentCommune) return false;
+
+    armNpfFirePelicAutoCycle('fire');
 
     /*
      * Le feu reste sélectionné même lorsqu'un GoTo WP ou aéroport/PÉLIC prend
@@ -18049,6 +18173,9 @@ window.activateCurrentFireGoto = activateCurrentFireGoto;
 function selectAirportDestination(airport) {
     const normalized = getAirportByOaci(airport?.oaci);
     if (!normalized) return false;
+
+    /* Un GoTo aéroport/PÉLIC demandé manuellement suspend la navette automatique. */
+    suspendNpfFirePelicAutoCycle();
 
     selectedAirportDestination = {
         oaci: normalized.oaci,
@@ -22249,22 +22376,40 @@ function ensureNpfWaypointRouteLayers() {
     if (!map || typeof L === 'undefined') return false;
 
     /*
-     * v16.11 — pane réservé UNIQUEMENT à la poignée temporaire de déplacement.
-     * Les losanges WP ordinaires restent dans markerPane afin de ne pas masquer
-     * les fiches des points VFR / aéroports superposés.
+     * Restauration route WP : panes dédiés et stables.
+     * Les couches SIA/VFR et leurs hitbox sont ajoutées progressivement au
+     * démarrage. Les traits et losanges WP ne doivent donc pas dépendre de
+     * l'ordre de création des panes Leaflet génériques.
      */
-    if (map.createPane && !map.getPane('npfWaypointMovePane')) {
-        map.createPane('npfWaypointMovePane');
-        const pane = map.getPane('npfWaypointMovePane');
+    const ensureWaypointPane = (name, zIndex, pointerEvents) => {
+        if (!map.createPane) return null;
+        let pane = map.getPane(name);
+        if (!pane) pane = map.createPane(name);
         if (pane) {
-            pane.style.zIndex = '699';
-            pane.style.pointerEvents = 'auto';
+            pane.style.zIndex = String(zIndex);
+            pane.style.pointerEvents = pointerEvents;
         }
-    }
+        return pane;
+    };
 
-    if (!npfWaypointLineLayer) npfWaypointLineLayer = L.layerGroup().addTo(map);
-    if (!npfWaypointLabelLayer) npfWaypointLabelLayer = L.layerGroup().addTo(map);
-    if (!npfWaypointMarkerLayer) npfWaypointMarkerLayer = L.layerGroup().addTo(map);
+    ensureWaypointPane('npfWaypointLinePane', 668, 'none');
+    ensureWaypointPane('npfWaypointLabelPane', 669, 'none');
+    ensureWaypointPane('npfWaypointMarkerPane', 670, 'auto');
+    ensureWaypointPane('npfWaypointMovePane', 699, 'auto');
+
+    if (!npfWaypointLineLayer) npfWaypointLineLayer = L.layerGroup();
+    if (!npfWaypointLabelLayer) npfWaypointLabelLayer = L.layerGroup();
+    if (!npfWaypointMarkerLayer) npfWaypointMarkerLayer = L.layerGroup();
+
+    /*
+     * Ne pas supposer qu'un LayerGroup existant est encore attaché à la carte.
+     * Cette vérification rend la restauration idempotente après réouverture,
+     * changement de fond ou reconstruction progressive des couches.
+     */
+    if (!map.hasLayer(npfWaypointLineLayer)) npfWaypointLineLayer.addTo(map);
+    if (!map.hasLayer(npfWaypointLabelLayer)) npfWaypointLabelLayer.addTo(map);
+    if (!map.hasLayer(npfWaypointMarkerLayer)) npfWaypointMarkerLayer.addTo(map);
+
     if (!npfWaypointZoomListenerInstalled) {
         map.on('zoomend', updateNpfWaypointSegmentLabels);
         npfWaypointZoomListenerInstalled = true;
@@ -22500,6 +22645,7 @@ function drawNpfWaypointRouteLines() {
         const to = waypoints[i + 1];
         const latlngs = [[from.lat, from.lon], [to.lat, to.lon]];
         L.polyline(latlngs, {
+            pane: 'npfWaypointLinePane',
             color: '#ffffff',
             weight: 8,
             opacity: .95,
@@ -22508,6 +22654,7 @@ function drawNpfWaypointRouteLines() {
             lineJoin: 'round'
         }).addTo(npfWaypointLineLayer);
         L.polyline(latlngs, {
+            pane: 'npfWaypointLinePane',
             color: '#1d4ed8',
             weight: 4,
             opacity: 1,
@@ -22520,6 +22667,7 @@ function drawNpfWaypointRouteLines() {
     const active = getNpfActiveWaypoint();
     if (active && isNpfWaypointGotoActive()) {
         L.circle([active.lat, active.lon], {
+            pane: 'npfWaypointLinePane',
             radius: NPF_WAYPOINT_CAPTURE_RADIUS_NM * 1852,
             color: '#16a34a',
             weight: 2,
@@ -22635,6 +22783,7 @@ function updateNpfWaypointSegmentLabels() {
         if (!label) continue;
 
         L.tooltip({
+            pane: 'npfWaypointLabelPane',
             permanent: true,
             direction: 'center',
             className: `npf-waypoint-segment-tooltip ${label.zoomClass}`,
@@ -22657,6 +22806,7 @@ function redrawNpfWaypointRoute() {
 
     npfWaypointRouteState.waypoints.forEach((wp, index) => {
         const marker = L.marker([wp.lat, wp.lon], {
+            pane: 'npfWaypointMarkerPane',
             icon: buildNpfWaypointIcon(wp, index),
             zIndexOffset: wp.id === npfWaypointRouteState.activeId ? 3300 : 3200,
             keyboard: false,
@@ -22695,6 +22845,7 @@ function ensureNpfWaypointGps() {
 function activateNpfWaypointGoto(id) {
     const wp = getNpfWaypointById(id);
     if (!wp) return false;
+    suspendNpfFirePelicAutoCycle();
     npfWaypointRouteState.activeId = wp.id;
     npfWaypointRouteState.gotoActive = true;
 
@@ -22737,6 +22888,7 @@ function addNpfWaypoint(point = {}) {
     npfWaypointRouteState.waypoints.push(wp);
 
     if (wasEmpty) {
+        suspendNpfFirePelicAutoCycle();
         npfWaypointRouteState.activeId = wp.id;
         npfWaypointRouteState.gotoActive = true;
         selectedAirportDestination = null;
@@ -22971,6 +23123,7 @@ function deleteWholeNpfWaypointRoute() {
 function disableNpfWaypointGoto() {
     if (!npfWaypointRouteState.waypoints.length) return false;
     npfWaypointRouteState.gotoActive = false;
+    if (currentCommune) armNpfFirePelicAutoCycle('fire');
     persistNpfWaypointRouteState();
     drawNpfWaypointRouteLines();
     updateNpfWaypointSegmentLabels();
@@ -23372,13 +23525,25 @@ window.addEventListener('orientationchange', () => setTimeout(positionNpfWaypoin
  * initMap() est exécuté plus haut dans le fichier. On initialise donc les couches
  * WP ici, une fois que les variables/constantes route sont réellement créées.
  */
-setTimeout(() => {
+const restoreNpfWaypointRouteLayersAfterStartup = () => {
     if (!ensureNpfWaypointRouteLayers()) return;
     redrawNpfWaypointRoute();
     if (isNpfWaypointGotoActive()) {
         updateCommuneDisplay(currentCommune);
         drawUserToTargetRoute();
     }
+};
+
+setTimeout(() => {
+    if (map?.whenReady) map.whenReady(restoreNpfWaypointRouteLayersAfterStartup);
+    else restoreNpfWaypointRouteLayersAfterStartup();
+
+    /*
+     * Deuxième contrôle après le chargement progressif des couches métier.
+     * Il ne change aucun état de route : il garantit seulement que les trois
+     * LayerGroups persistants sont encore présents et redessinés.
+     */
+    setTimeout(restoreNpfWaypointRouteLayersAfterStartup, 1200);
 }, 0);
 
 window.addNpfWaypointFromAirportByOaci = addNpfWaypointFromAirportByOaci;
@@ -26448,6 +26613,10 @@ function drawUserToTargetRoute() {
         ? getNpfActiveWaypoint()
         : null;
 
+    const automaticFirePelicTarget = (!routeWaypointTarget && !selectedAirportDestination)
+        ? getNpfFirePelicAutoCycleTarget()
+        : null;
+
     const target = routeWaypointTarget
         ? {
             lat: Number(routeWaypointTarget.lat),
@@ -26458,12 +26627,17 @@ function drawUserToTargetRoute() {
                 lat: Number(selectedAirportDestination.lat),
                 lon: Number(selectedAirportDestination.lon)
             }
-            : (currentCommune
+            : (automaticFirePelicTarget
                 ? {
-                    lat: Number(currentCommune.latitude_mairie),
-                    lon: Number(currentCommune.longitude_mairie)
+                    lat: Number(automaticFirePelicTarget.lat),
+                    lon: Number(automaticFirePelicTarget.lon)
                 }
-                : null));
+                : (currentCommune
+                    ? {
+                        lat: Number(currentCommune.latitude_mairie),
+                        lon: Number(currentCommune.longitude_mairie)
+                    }
+                    : null)));
 
     if (target && userMarker && userMarker.getLatLng()
         && Number.isFinite(target.lat) && Number.isFinite(target.lon)) {
@@ -27231,6 +27405,11 @@ function updateUserPosition(pos) {
         handleNpfWaypointAutoAdvance(latitude, longitude);
     }
 
+    /* Navette automatique Feu ↔ PÉLIC : uniquement sur une position GPS fraîche. */
+    if (pos?.npfIsStoredPosition !== true) {
+        handleNpfFirePelicAutoCycle(latitude, longitude);
+    }
+
     scheduleSiaProfileRefresh('gps');
 
     updateNearestCommuneDisplay(latitude, longitude);
@@ -27506,6 +27685,7 @@ async function createSimulatedFireAtPoint(lat, lng) {
     currentCommune = simulatedFire;
     localStorage.setItem('currentCommune', JSON.stringify(simulatedFire));
     displayCommuneDetails(simulatedFire, false);
+    armNpfFirePelicAutoCycle('fire');
 }
 
 function openSimulationActionPopup(latlng) {
@@ -37130,6 +37310,7 @@ async function createManualFireAtLatLng(latlng) {
     currentCommune = manualCommune;
     localStorage.setItem('currentCommune', JSON.stringify(manualCommune));
     displayCommuneDetails(manualCommune, false);
+    armNpfFirePelicAutoCycle('fire');
 }
 
 function openMapLongPressActionPopup(latlng, zoneCandidates = [], options = {}) {
