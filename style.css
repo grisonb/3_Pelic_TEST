@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.26 */
+/* NPF_STYLE_BUILD_VERSION: v16.27 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -32,7 +32,7 @@ html, body {
 
 #ui-overlay {
     position: absolute; top: var(--safe-area-top); left: 10px; right: 10px;
-    z-index: 1000; max-width: 500px; margin: auto;
+    z-index: 1900; max-width: 500px; margin: auto;
     background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     padding: 15px; border-radius: var(--border-radius); box-shadow: var(--shadow);
 }
@@ -43,22 +43,6 @@ body.npf-main-search-open #ui-overlay {
 }
 
 #status-message { color: var(--light-text-color); font-style: italic; text-align: center; }
-#boot-force-update-button {
-    margin: 12px auto 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    max-width: 240px;
-    height: 42px;
-    border: 1px solid #c9d3e1;
-    border-radius: 10px;
-    background: #ffffff;
-    color: #0d4f8b;
-    font-weight: 600;
-    cursor: pointer;
-}
-#boot-force-update-button:disabled { opacity: 0.65; cursor: default; }
 .controls-container { display: flex; align-items: center; gap: 10px; }
 .search-wrapper { position: relative; flex-grow: 1; }
 .search-wrapper::before { content: '🔍'; position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 1.2em; opacity: 0.5; pointer-events: none; }
