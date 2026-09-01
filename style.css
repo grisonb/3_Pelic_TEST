@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.11 */
+/* NPF_STYLE_BUILD_VERSION: v16.13 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17515,9 +17515,18 @@ body.pelic-notams-modal-open {
 
 /* Bandeau supérieur du mode route. */
 #npf-waypoint-route-banner {
+    /*
+     * v16.13 — le bandeau est un élément indépendant ajouté à <body>.
+     * Il doit donc définir explicitement son positionnement et son z-index ;
+     * sans cela top/left n'avaient aucun effet et le bandeau pouvait rester
+     * hors de la zone visible de la PWA.
+     */
+    position: fixed !important;
+    z-index: 1700 !important;
     top: calc(var(--safe-area-top) + 4px) !important;
     left: 50% !important;
     right: auto !important;
+    transform: translateX(-50%) !important;
     width: auto !important;
     max-width: calc(100vw - 24px) !important;
     min-height: 56px !important;
