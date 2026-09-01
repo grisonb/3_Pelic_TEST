@@ -1,4 +1,255 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.15';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.17';
+
+
+/*
+ * Diagnostic TEST passif du démarrage.
+ * Il ne modifie aucun ordre de chargement : il enregistre uniquement les temps
+ * et les blocages de la boucle principale afin d'identifier une lenteur iPad.
+ */
+const NPF_STARTUP_DIAGNOSTIC = (() => {
+    const now = () => (
+        typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now()
+    );
+    const state = {
+        marks: [],
+        markIndex: Object.create(null),
+        stalls: [],
+        longTasks: [],
+        monitorStartedAt: now(),
+        monitorStoppedAt: null,
+        eventLoopMonitorSupported: true,
+        longTaskObserverSupported: false
+    };
+
+    const refreshOpenPanel = () => {
+        try {
+            const panel = document.getElementById('npf-startup-diag-panel');
+            if (panel && !panel.hidden && typeof window.renderNpfStartupDiagnosticPanel === 'function') {
+                window.renderNpfStartupDiagnosticPanel();
+            }
+        } catch (_) {}
+    };
+
+    const mark = (key, label, detail = '') => {
+        const safeKey = String(key || '').trim();
+        if (!safeKey || state.markIndex[safeKey] !== undefined) {
+            return safeKey ? state.marks[state.markIndex[safeKey]] || null : null;
+        }
+        const entry = {
+            key: safeKey,
+            label: String(label || safeKey),
+            detail: detail == null ? '' : String(detail),
+            t: now()
+        };
+        state.markIndex[safeKey] = state.marks.length;
+        state.marks.push(entry);
+        refreshOpenPanel();
+        return entry;
+    };
+
+    const has = key => state.markIndex[String(key || '')] !== undefined;
+
+    mark('script_eval', 'Script NPF exécuté');
+
+    /* Mesure indépendante des API LongTask, absentes de certaines versions Safari. */
+    try {
+        const intervalMs = 250;
+        const stopAfterMs = 18000;
+        let expected = now() + intervalMs;
+        const timer = setInterval(() => {
+            const current = now();
+            const drift = Math.max(0, current - expected);
+            if (drift >= 120) {
+                state.stalls.push({
+                    t: current,
+                    delay: drift
+                });
+                if (state.stalls.length > 40) state.stalls.shift();
+                refreshOpenPanel();
+            }
+            expected = current + intervalMs;
+            if (current - state.monitorStartedAt >= stopAfterMs) {
+                clearInterval(timer);
+                state.monitorStoppedAt = current;
+                refreshOpenPanel();
+            }
+        }, intervalMs);
+    } catch (_) {
+        state.eventLoopMonitorSupported = false;
+    }
+
+    try {
+        if (typeof PerformanceObserver === 'function') {
+            const supported = Array.isArray(PerformanceObserver.supportedEntryTypes)
+                && PerformanceObserver.supportedEntryTypes.includes('longtask');
+            if (supported) {
+                state.longTaskObserverSupported = true;
+                const observer = new PerformanceObserver(list => {
+                    list.getEntries().forEach(entry => {
+                        state.longTasks.push({
+                            t: Number(entry.startTime) || 0,
+                            duration: Number(entry.duration) || 0
+                        });
+                    });
+                    if (state.longTasks.length > 40) {
+                        state.longTasks.splice(0, state.longTasks.length - 40);
+                    }
+                    refreshOpenPanel();
+                });
+                observer.observe({ entryTypes: ['longtask'] });
+                setTimeout(() => {
+                    try { observer.disconnect(); } catch (_) {}
+                }, 18000);
+            }
+        }
+    } catch (_) {}
+
+    return { state, mark, has, now };
+})();
+
+window.NPF_STARTUP_DIAGNOSTIC = NPF_STARTUP_DIAGNOSTIC;
+function npfStartupDiagMark(key, label, detail = '') {
+    return NPF_STARTUP_DIAGNOSTIC.mark(key, label, detail);
+}
+function npfStartupDiagHasMark(key) {
+    return NPF_STARTUP_DIAGNOSTIC.has(key);
+}
+
+function escapeNpfStartupDiagnosticHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function getNpfStartupDiagnosticRuntimeInfo() {
+    let source = '—';
+    let pack = '';
+    let zoom = '—';
+    try {
+        source = offlineTilesMode ? 'OFFLINE' : 'ONLINE';
+        if (offlineTilesMode && Array.isArray(activeOfflinePacks) && activeOfflinePacks.length) {
+            pack = activeOfflinePacks.join(', ');
+        }
+    } catch (_) {}
+    try {
+        if (map && typeof map.getZoom === 'function') zoom = String(map.getZoom());
+    } catch (_) {}
+
+    return {
+        source,
+        pack,
+        zoom,
+        directHits: typeof directOfflineTileHitCount === 'number' ? directOfflineTileHitCount : null,
+        directMisses: typeof directOfflineTileMissCount === 'number' ? directOfflineTileMissCount : null
+    };
+}
+
+function renderNpfStartupDiagnosticPanel() {
+    const panel = document.getElementById('npf-startup-diag-panel');
+    const body = document.getElementById('npf-startup-diag-body');
+    if (!panel || !body) return;
+
+    const diag = NPF_STARTUP_DIAGNOSTIC.state;
+    const runtime = getNpfStartupDiagnosticRuntimeInfo();
+    const marks = diag.marks.slice().sort((a, b) => a.t - b.t);
+    let previous = 0;
+    const rows = marks.map(entry => {
+        const delta = Math.max(0, entry.t - previous);
+        previous = entry.t;
+        return `<tr>
+            <td>${escapeNpfStartupDiagnosticHtml(entry.label)}</td>
+            <td>${(entry.t / 1000).toFixed(2)} s</td>
+            <td>${(delta / 1000).toFixed(2)} s</td>
+            <td>${escapeNpfStartupDiagnosticHtml(entry.detail)}</td>
+        </tr>`;
+    }).join('');
+
+    const stalls = diag.stalls.slice().sort((a, b) => b.delay - a.delay);
+    const maxStall = stalls.length ? stalls[0].delay : 0;
+    const stallRows = stalls.slice(0, 8).map(item => (
+        `<li>+${(item.t / 1000).toFixed(2)} s : blocage ≈ ${Math.round(item.delay)} ms</li>`
+    )).join('');
+
+    const longTasks = diag.longTasks.slice().sort((a, b) => b.duration - a.duration);
+    const longTaskRows = longTasks.slice(0, 5).map(item => (
+        `<li>+${(item.t / 1000).toFixed(2)} s : LongTask ${Math.round(item.duration)} ms</li>`
+    )).join('');
+
+    const offlineCounters = runtime.directHits === null
+        ? ''
+        : `<span>Tuiles IDB : ${runtime.directHits} trouvées / ${runtime.directMisses} absentes</span>`;
+
+    body.innerHTML = `
+        <div class="npf-startup-diag-meta">
+            <span>Carte : <b>${escapeNpfStartupDiagnosticHtml(runtime.source)}</b></span>
+            <span>Zoom : <b>${escapeNpfStartupDiagnosticHtml(runtime.zoom)}</b></span>
+            ${runtime.pack ? `<span>Pack : <b>${escapeNpfStartupDiagnosticHtml(runtime.pack)}</b></span>` : ''}
+            ${offlineCounters}
+        </div>
+        <table class="npf-startup-diag-table">
+            <thead><tr><th>Étape</th><th>Depuis ouverture</th><th>Δ</th><th>Détail</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4">Aucune mesure.</td></tr>'}</tbody>
+        </table>
+        <div class="npf-startup-diag-stalls">
+            <b>Blocages JS détectés : ${diag.stalls.length}</b>
+            ${diag.stalls.length ? ` — maximum ≈ ${Math.round(maxStall)} ms` : ''}
+            ${stallRows ? `<ul>${stallRows}</ul>` : '<div>Aucun blocage supérieur à 120 ms détecté.</div>'}
+            ${diag.longTaskObserverSupported
+                ? `<div><b>LongTask API :</b> ${longTasks.length}${longTaskRows ? `<ul>${longTaskRows}</ul>` : ''}</div>`
+                : '<div>LongTask API Safari indisponible : mesure par retard de boucle utilisée.</div>'}
+        </div>
+        <div class="npf-startup-diag-help">Fais une capture de ce panneau quand le chargement te paraît lent.</div>`;
+}
+window.renderNpfStartupDiagnosticPanel = renderNpfStartupDiagnosticPanel;
+
+function ensureNpfStartupDiagnosticUi() {
+    const button = document.getElementById('npf-startup-diag-button');
+    if (!button || button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+
+    let panel = document.getElementById('npf-startup-diag-panel');
+    if (!panel) {
+        panel = document.createElement('div');
+        panel.id = 'npf-startup-diag-panel';
+        panel.className = 'npf-startup-diag-panel';
+        panel.hidden = true;
+        panel.setAttribute('aria-hidden', 'true');
+        panel.innerHTML = `
+            <div class="npf-startup-diag-card">
+                <div class="npf-startup-diag-header">
+                    <strong>Diagnostic démarrage</strong>
+                    <button type="button" id="npf-startup-diag-close" aria-label="Fermer">×</button>
+                </div>
+                <div id="npf-startup-diag-body" class="npf-startup-diag-body"></div>
+            </div>`;
+        document.body.appendChild(panel);
+    }
+
+    const close = () => {
+        panel.hidden = true;
+        panel.setAttribute('aria-hidden', 'true');
+    };
+    const open = () => {
+        renderNpfStartupDiagnosticPanel();
+        panel.hidden = false;
+        panel.setAttribute('aria-hidden', 'false');
+    };
+
+    button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        open();
+    });
+    panel.querySelector('#npf-startup-diag-close')?.addEventListener('click', close);
+    panel.addEventListener('click', event => {
+        if (event.target === panel) close();
+    });
+}
 
 /*
  * v15.96 — séquence de démarrage prioritaire :
@@ -145,6 +396,9 @@ function installGlobalStylusBlocker() {
 installGlobalStylusBlocker();
 
 document.addEventListener('DOMContentLoaded', () => {
+    npfStartupDiagMark('dom_ready', 'DOM prêt');
+    ensureNpfStartupDiagnosticUi();
+
     const markAppReady = () => {
         if (document.body) {
             document.body.classList.add('app-ready');
@@ -3477,12 +3731,15 @@ function computeConvexHull(latLngPoints) {
 // =========================================================================
 // LOGIQUE PRINCIPALE DE L'APPLICATION
 // =========================================================================
+
 async function initializeApp() {
+    npfStartupDiagMark('init_start', 'Initialisation NPF');
     const statusMessage = document.getElementById('status-message');
     const searchSection = document.getElementById('search-section');
 
     try {
         loadState();
+        npfStartupDiagMark('state_loaded', 'État local chargé');
     } catch (stateError) {
         console.error('État local invalide, réinitialisation.', stateError);
         localStorage.removeItem('disabled_airports');
@@ -3575,7 +3832,9 @@ async function initializeApp() {
     if (statusMessage) statusMessage.style.display = 'none';
     if (searchSection) searchSection.style.display = 'none';
 
+    npfStartupDiagMark('map_init_start', 'Création carte — début');
     initMap();
+    npfStartupDiagMark('map_init_ready', 'Carte Leaflet créée');
     scheduleRememberedOfflineMapStartupRecovery(
         'initializeApp-v15.96-map-first'
     );
@@ -3596,8 +3855,14 @@ async function initializeApp() {
      * IndexedDB reste utile au mode offline, mais son ouverture est désormais
      * non bloquante pour la carte et pour la recherche communes/alias.
      */
+    npfStartupDiagMark('idb_start', 'IndexedDB — ouverture');
     const startupDbPromise = initDB()
+        .then((result) => {
+            npfStartupDiagMark('idb_ready', 'IndexedDB prête');
+            return result;
+        })
         .catch((startupError) => {
+            npfStartupDiagMark('idb_error', 'IndexedDB en erreur', startupError?.message || startupError);
             console.warn('Initialisation IndexedDB différée indisponible:', startupError);
             return null;
         });
@@ -3627,6 +3892,7 @@ async function initializeApp() {
      * Cette phase démarre immédiatement après le premier rendu de la carte.
      */
     let communesLoadError = null;
+    npfStartupDiagMark('communes_start', 'Communes — chargement');
     try {
         let data = null;
 
@@ -3641,6 +3907,7 @@ async function initializeApp() {
         }
 
         if (!data) data = await loadCommunesData();
+        npfStartupDiagMark('communes_data_ready', 'Communes — données prêtes', `${Array.isArray(data?.data) ? data.data.length : 0} communes`);
 
         allCommunes = data.data.map(c => {
             const normalizedName = simplifyString(c.nom_standard);
@@ -3654,6 +3921,8 @@ async function initializeApp() {
             };
         });
 
+        npfStartupDiagMark('communes_index_ready', 'Communes — index recherche prêt', `${allCommunes.length} entrées`);
+
         communesByCodeInsee = new Map(
             allCommunes
                 .map(commune => [
@@ -3664,10 +3933,12 @@ async function initializeApp() {
         );
 
         communeAliases = await loadCommunesAliases();
+        npfStartupDiagMark('communes_aliases_ready', 'Alias communes prêts', `${communeAliases.length} alias`);
     } catch (error) {
         communesLoadError = error;
         allCommunes = [];
         communeAliases = [];
+        npfStartupDiagMark('communes_error', 'Communes / alias en erreur', error?.message || error);
         console.error('Chargement communes/alias indisponible:', error);
     }
 
@@ -3688,13 +3959,17 @@ async function initializeApp() {
      * Aucun dessin de cette couche n'est lancé par initMap() pendant la phase
      * prioritaire ; il est effectué ici seulement après communes + alias.
      */
+    npfStartupDiagMark('pelic_start', 'PÉLIC — affichage');
     try {
         drawPermanentAirportMarkers();
         applyPelicanVisualScale();
+        npfStartupDiagMark('pelic_ready', 'PÉLIC affichés', `${permanentAirportLayer?.getLayers?.().length || 0} calques`);
     } catch (pelicError) {
+        npfStartupDiagMark('pelic_error', 'PÉLIC en erreur', pelicError?.message || pelicError);
         console.error('Affichage PÉLIC au démarrage impossible:', pelicError);
     }
 
+    npfStartupDiagMark('core_ready', 'Démarrage principal prêt');
     npfStartupCorePriorityActive = false;
     window.__npfStartupCoreReady = true;
     try {
@@ -3717,6 +3992,7 @@ async function initializeApp() {
      * chat et SIA dans la même tranche CPU juste après l'affichage PÉLIC.
      */
     setTimeout(() => {
+        npfStartupDiagMark('aux_schedule', 'Couches annexes programmées');
         try { scheduleStartupAuxiliaryLayers(); } catch (_) {}
     }, 420);
 
@@ -3729,9 +4005,12 @@ async function initializeApp() {
     }, 700);
 
     setTimeout(() => {
+        npfStartupDiagMark('sia_init_start', 'SIA — initialisation');
         try {
             initializeSiaSystem();
+            npfStartupDiagMark('sia_init_ready', 'SIA — initialisation prête');
         } catch (siaInitError) {
+            npfStartupDiagMark('sia_init_error', 'SIA — initialisation en erreur', siaInitError?.message || siaInitError);
             console.error('[SIA] Erreur initialisation système:', siaInitError);
         }
     }, 900);
@@ -3798,14 +4077,17 @@ async function initializeApp() {
      * survolée et au positionnement précis des feux manuels.
      */
     setTimeout(() => {
+        npfStartupDiagMark('commune_polygons_start', 'Polygones communes — chargement');
         ensureCommunesLayerDataLoaded()
             .then(() => {
+                npfStartupDiagMark('commune_polygons_ready', 'Polygones communes prêts');
                 repairManualFireCommuneLabelsFromPolygons();
                 if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
                     refreshNearestCommuneDisplayFromKnownGps();
                 }
             })
             .catch((error) => {
+                npfStartupDiagMark('commune_polygons_error', 'Polygones communes en erreur', error?.message || error);
                 console.warn('Préchargement polygones communes impossible:', error);
                 if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
                     refreshNearestCommuneDisplayFromKnownGps();
@@ -3814,8 +4096,10 @@ async function initializeApp() {
     }, 650);
 
     setTimeout(() => {
+        npfStartupDiagMark('localities_start', 'Localités hors ligne — chargement');
         loadNamedPlacesOfflineDatabase()
             .then(() => {
+                npfStartupDiagMark('localities_ready', 'Localités hors ligne prêtes');
                 if (!namedPlacesOfflineIndex) return;
                 const noticeKey = 'npfNamedPlacesFranceReadyNoticeVersion';
                 if (localStorage.getItem(noticeKey) !== 'v14.69') {
@@ -3836,8 +4120,10 @@ async function initializeApp() {
     }, 1150);
 
     setTimeout(() => {
+        npfStartupDiagMark('departments_data_start', 'Départements — données');
         ensureDepartmentsLayerDataLoaded()
             .then(() => {
+                npfStartupDiagMark('departments_data_ready', 'Départements — données prêtes');
                 if (typeof refreshNearestCommuneDisplayFromKnownGps === 'function') {
                     refreshNearestCommuneDisplayFromKnownGps();
                 }
@@ -6520,28 +6806,53 @@ function scheduleStartupAuxiliaryLayers() {
     const baseDelay = offlineTilesMode ? OFFLINE_AUX_LAYER_START_DELAY_MS : 900;
 
     if (areDepartmentsVisible) {
-        setTimeout(() => { toggleDepartmentsLayer(true); }, baseDelay + 600);
+        setTimeout(() => {
+            npfStartupDiagMark('layer_departments_start', 'Calque départements — début');
+            try { toggleDepartmentsLayer(true); } finally {
+                npfStartupDiagMark('layer_departments_called', 'Calque départements — commande terminée');
+            }
+        }, baseDelay + 600);
     }
 
     areCommunesVisible = localStorage.getItem(SHOW_COMMUNES_LAYER_KEY) === 'true';
     if (areCommunesVisible) {
-        setTimeout(() => { toggleCommunesLayer(true); }, baseDelay + 1400);
+        setTimeout(() => {
+            npfStartupDiagMark('layer_communes_start', 'Calque communes — début');
+            try { toggleCommunesLayer(true); } finally {
+                npfStartupDiagMark('layer_communes_called', 'Calque communes — commande terminée');
+            }
+        }, baseDelay + 1400);
     }
 
     if (showHighVoltageLinesLayer) {
         setTimeout(() => {
-            toggleHighVoltageLinesLayer(true, { silent: true, retry: true, source: 'startup' });
+            npfStartupDiagMark('layer_ht_start', 'Lignes HT — début');
+            try {
+                toggleHighVoltageLinesLayer(true, { silent: true, retry: true, source: 'startup' });
+            } finally {
+                npfStartupDiagMark('layer_ht_called', 'Lignes HT — commande terminée');
+            }
         }, baseDelay + 2200);
     }
 
     if (showRoadOverlayLayer) {
         setTimeout(() => {
-            toggleRoadOverlayLayer(true, { silent: true, source: 'startup' });
+            npfStartupDiagMark('layer_routes_start', 'Calque routes — début');
+            try {
+                toggleRoadOverlayLayer(true, { silent: true, source: 'startup' });
+            } finally {
+                npfStartupDiagMark('layer_routes_called', 'Calque routes — commande terminée');
+            }
         }, baseDelay + 2800);
     }
 
     if (showTrafficLayer) {
-        setTimeout(() => { toggleTrafficLayer(true); }, baseDelay + 3600);
+        setTimeout(() => {
+            npfStartupDiagMark('layer_traffic_start', 'Trafic — début');
+            try { toggleTrafficLayer(true); } finally {
+                npfStartupDiagMark('layer_traffic_called', 'Trafic — commande terminée');
+            }
+        }, baseDelay + 3600);
     }
 }
 
@@ -7464,7 +7775,23 @@ function setupBaseTileLayer() {
     baseTileLayer = offlineTilesMode
         ? buildDirectOfflineLeafletLayer(tileLayerOptions)
         : L.tileLayer(tileLayerUrl, tileLayerOptions);
+
+    if (!npfStartupDiagHasMark('first_tile')) {
+        try {
+            baseTileLayer.once('tileload', () => {
+                npfStartupDiagMark('first_tile', 'Première tuile affichée');
+            });
+            baseTileLayer.once('load', () => {
+                npfStartupDiagMark('base_tiles_loaded', 'Fond de carte visible chargé');
+            });
+        } catch (_) {}
+    }
     baseTileLayer.addTo(map);
+    npfStartupDiagMark(
+        'base_layer_added',
+        'Fond de carte ajouté',
+        offlineTilesMode ? 'OFFLINE' : 'ONLINE'
+    );
 
     enforceOfflineZoomLimit();
 
@@ -17326,6 +17653,22 @@ function displayCommuneDetails(commune, shouldFitBounds = true) {
             const actions = document.createElement('div');
             actions.className = 'fire-history-map-popup-actions';
 
+            /*
+             * Si le GoTo a été repris par un WP ou un aéroport/PÉLIC, le feu
+             * sélectionné reste cliquable et propose de redevenir la cible.
+             */
+            if (!isCurrentFireGotoActive()) {
+                const gotoButton = document.createElement('button');
+                gotoButton.type = 'button';
+                gotoButton.textContent = 'GoTo';
+                gotoButton.className = 'fire-history-map-select-btn fire-history-map-goto-btn';
+                gotoButton.title = 'Reprendre le GoTo vers ce feu';
+                gotoButton.addEventListener('click', () => {
+                    activateCurrentFireGoto();
+                });
+                actions.appendChild(gotoButton);
+            }
+
             const deleteButton = document.createElement('button');
             deleteButton.type = 'button';
             deleteButton.textContent = 'Supprimer';
@@ -17650,6 +17993,58 @@ function clearAirportDestination({ restoreFire = true, redraw = true } = {}) {
     }
     return true;
 }
+
+
+function isCurrentFireGotoActive() {
+    if (!currentCommune) return false;
+
+    const waypointActive = (
+        window.__npfWaypointRouteReady === true
+        && typeof isNpfWaypointGotoActive === 'function'
+        && isNpfWaypointGotoActive()
+    );
+
+    return !waypointActive && !selectedAirportDestination;
+}
+
+function activateCurrentFireGoto() {
+    if (!currentCommune) return false;
+
+    /*
+     * Le feu reste sélectionné même lorsqu'un GoTo WP ou aéroport/PÉLIC prend
+     * temporairement la priorité. Reprendre le GoTo feu désactive uniquement
+     * ces cibles de navigation, sans supprimer la route WP ni le feu.
+     */
+    selectedAirportDestination = null;
+
+    if (
+        window.__npfWaypointRouteReady === true
+        && npfWaypointRouteState?.waypoints?.length
+        && npfWaypointRouteState.gotoActive
+    ) {
+        npfWaypointRouteState.gotoActive = false;
+        persistNpfWaypointRouteState();
+        drawNpfWaypointRouteLines();
+        updateNpfWaypointSegmentLabels();
+    }
+
+    updateCommuneDisplay(currentCommune);
+    drawUserToTargetRoute();
+
+    if (!userMarker && typeof requestOneShotGps === 'function') {
+        requestOneShotGps({
+            silent: true,
+            highAccuracy: true,
+            timeout: 15000,
+            maximumAge: 600000
+        });
+    }
+
+    try { map?.closePopup?.(); } catch (_) {}
+    return true;
+}
+
+window.activateCurrentFireGoto = activateCurrentFireGoto;
 
 function selectAirportDestination(airport) {
     const normalized = getAirportByOaci(airport?.oaci);
@@ -37353,6 +37748,7 @@ async function ensureSiaDatasetLoaded(options = {}) {
     if (siaDataset && !forceEmbedded) return siaDataset;
     if (siaDatasetLoadPromise && !forceEmbedded) return siaDatasetLoadPromise;
 
+    npfStartupDiagMark('sia_dataset_start', 'SIA — données');
     siaDatasetLoadPromise = (async () => {
         if (!forceEmbedded) {
             try {
@@ -37378,7 +37774,16 @@ async function ensureSiaDatasetLoaded(options = {}) {
     })();
 
     try {
-        return await siaDatasetLoadPromise;
+        const loaded = await siaDatasetLoadPromise;
+        npfStartupDiagMark(
+            'sia_dataset_ready',
+            'SIA — données prêtes',
+            `${Array.isArray(loaded?.airspaces) ? loaded.airspaces.length : 0} espaces`
+        );
+        return loaded;
+    } catch (error) {
+        npfStartupDiagMark('sia_dataset_error', 'SIA — données en erreur', error?.message || error);
+        throw error;
     } finally {
         siaDatasetLoadPromise = null;
     }
