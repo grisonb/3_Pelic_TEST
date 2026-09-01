@@ -7,9 +7,9 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v16.26" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v16.26">
-    <link rel="manifest" href="manifest.json?appv=v16.26">
+    <link rel="preload" href="data/localites/localites-france-v14.56.zip?appv=v16.27" as="fetch" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css?appv=v16.27">
+    <link rel="manifest" href="manifest.json?appv=v16.27">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -57,7 +57,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v16.26';
+        const APP_VERSION = 'v16.27';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -240,13 +240,24 @@
         }, { once: true });
 
         if ('serviceWorker' in navigator) {
+            /*
+             * Mise à jour automatique : le garde-fou est limité à la page
+             * courante. Un ancien marqueur sessionStorage ne doit plus empêcher
+             * une nouvelle prise de contrôle lors d'une mise à jour ultérieure.
+             */
+            let npfControllerReloadScheduled = false;
             navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (npfControllerReloadScheduled) return;
+                npfControllerReloadScheduled = true;
                 try {
-                    const reloadKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:${APP_VERSION}`;
-                    if (sessionStorage.getItem(reloadKey) === '1') return;
-                    sessionStorage.setItem(reloadKey, '1');
-                } catch (_) {}
-                window.location.reload();
+                    const refreshUrl = new URL(window.location.href);
+                    refreshUrl.pathname = refreshUrl.pathname.replace(/[^/]*$/, 'index.html');
+                    refreshUrl.searchParams.set('appv', APP_VERSION);
+                    refreshUrl.searchParams.set('swrefresh', Date.now().toString());
+                    window.location.replace(refreshUrl.toString());
+                } catch (_) {
+                    window.location.reload();
+                }
             });
         }
 
@@ -840,7 +851,6 @@
     </div>
     <div id="ui-overlay">
         <div id="status-message">Chargement des données...</div>
-        <button id="boot-force-update-button" type="button" style="display:none;">🔄 Forcer MAJ</button>
         <div id="search-section" style="display: none;">
             <div class="controls-container">
                 <div class="search-wrapper">
@@ -878,7 +888,7 @@
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
     <script src="sia.js?siav=15.69"></script>
-    <script src="script.js?appv=v16.26"></script>
+    <script src="script.js?appv=v16.27"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
