@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.17 */
+/* NPF_STYLE_BUILD_VERSION: v16.18 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17643,9 +17643,26 @@ body.npf-waypoint-search-open {
    Diagnostic TEST passif du démarrage
    ========================================================================== */
 .npf-startup-diag-button {
-    background: rgba(255, 250, 220, 0.94) !important;
-    border-color: rgba(161, 98, 7, 0.45) !important;
+    /* Diagnostic temporaire : hors de la colonne gauche pour rester toujours visible. */
+    position: fixed !important;
+    left: 124px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 1800 !important;
+    width: 64px !important;
+    height: 46px !important;
+    border-radius: 12px !important;
+    background: rgba(255, 250, 220, 0.96) !important;
+    border-color: rgba(161, 98, 7, 0.55) !important;
     color: #713f12 !important;
+    box-shadow: 0 3px 10px rgba(0,0,0,.22) !important;
+}
+@media (max-width: 760px) {
+    .npf-startup-diag-button {
+        left: 104px !important;
+        width: 58px !important;
+        height: 42px !important;
+    }
 }
 .npf-startup-diag-button-label {
     font-size: 16px;
