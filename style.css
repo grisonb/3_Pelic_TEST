@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.28 */
+/* NPF_STYLE_BUILD_VERSION: v16.29 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17506,8 +17506,8 @@ body.pelic-notams-modal-open {
 .npf-pelic-waypoint-actions {
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 7px;
-    /* Séparation visuelle nette entre les actions PÉLIC (jusqu'à NOTAMS) et la section WP. */
-    margin-top: 22px;
+    /* Séparation visuelle renforcée entre les actions PÉLIC (jusqu'à NOTAMS) et la section WP. */
+    margin-top: 38px;
 }
 .npf-pelic-waypoint-actions .npf-waypoint-goto,
 .npf-pelic-waypoint-actions .npf-waypoint-edit,
