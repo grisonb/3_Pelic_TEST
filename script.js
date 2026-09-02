@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.28';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.29';
 
 
 /*
@@ -22416,6 +22416,7 @@ let npfWaypointMarkerLayer = null;
 let npfWaypointLabelLayer = null;
 let npfWaypointMarkerRegistry = new Map();
 let npfWaypointMoveHandle = null;
+let npfWaypointMoveOutsidePointerHandler = null;
 let npfWaypointSearchOverlayState = null;
 let npfWaypointZoomListenerInstalled = false;
 
@@ -23652,6 +23653,62 @@ function openNpfWaypointSearchOverlay(id) {
     return true;
 }
 
+function clearNpfWaypointMoveOutsideListener() {
+    if (!npfWaypointMoveOutsidePointerHandler) return;
+    try {
+        document.removeEventListener('pointerdown', npfWaypointMoveOutsidePointerHandler, true);
+    } catch (_) {}
+    npfWaypointMoveOutsidePointerHandler = null;
+}
+
+function cancelNpfWaypointMoveFromOutside() {
+    const handle = npfWaypointMoveHandle;
+    clearNpfWaypointMoveOutsideListener();
+    if (!handle) return false;
+
+    try { handle.closeTooltip?.(); } catch (_) {}
+    try { handle.remove(); } catch (_) {}
+    if (npfWaypointMoveHandle === handle) npfWaypointMoveHandle = null;
+
+    /*
+     * Un clic extérieur annule seulement le mode « Déplacer » : il ne modifie
+     * ni les coordonnées enregistrées ni l'action que l'utilisateur vient de
+     * viser. Le redessin restaure simplement l'affichage WP normal.
+     */
+    redrawNpfWaypointRoute();
+    drawUserToTargetRoute();
+    updateCommuneDisplay(currentCommune);
+    return true;
+}
+
+function armNpfWaypointMoveOutsideCancellation(handle) {
+    clearNpfWaypointMoveOutsideListener();
+
+    /*
+     * Le listener est armé au tour d'événement suivant afin que l'appui sur le
+     * bouton « Déplacer » qui vient d'ouvrir le mode ne puisse pas l'annuler.
+     * Capture document => fonctionne aussi sur un autre marqueur ou une popup.
+     */
+    window.setTimeout(() => {
+        if (!handle || npfWaypointMoveHandle !== handle) return;
+
+        npfWaypointMoveOutsidePointerHandler = event => {
+            if (!npfWaypointMoveHandle || npfWaypointMoveHandle !== handle) {
+                clearNpfWaypointMoveOutsideListener();
+                return;
+            }
+
+            const target = event?.target;
+            if (target instanceof Element && target.closest('.npf-waypoint-move-handle')) {
+                return;
+            }
+
+            cancelNpfWaypointMoveFromOutside();
+        };
+        document.addEventListener('pointerdown', npfWaypointMoveOutsidePointerHandler, true);
+    }, 0);
+}
+
 function startNpfWaypointMove(id) {
     const wp = getNpfWaypointById(id);
     const marker = npfWaypointMarkerRegistry.get(id);
@@ -23668,8 +23725,9 @@ function startNpfWaypointMove(id) {
      * sur l'ouverture normale des points sources.
      */
     if (npfWaypointMoveHandle) {
-        try { npfWaypointMoveHandle.remove(); } catch (_) {}
-        npfWaypointMoveHandle = null;
+        cancelNpfWaypointMoveFromOutside();
+    } else {
+        clearNpfWaypointMoveOutsideListener();
     }
 
     const wpIndex = Math.max(0, npfWaypointRouteState.waypoints.findIndex(item => item.id === id));
@@ -23692,6 +23750,7 @@ function startNpfWaypointMove(id) {
         autoPanSpeed: 10
     }).addTo(map);
     npfWaypointMoveHandle = handle;
+    armNpfWaypointMoveOutsideCancellation(handle);
 
     const syncPosition = latlng => {
         if (!latlng) return;
@@ -23732,6 +23791,7 @@ function startNpfWaypointMove(id) {
 
         syncPosition(finalLatLng);
         persistNpfWaypointRouteState();
+        clearNpfWaypointMoveOutsideListener();
         try { handle.remove(); } catch (_) {}
         if (npfWaypointMoveHandle === handle) npfWaypointMoveHandle = null;
         redrawNpfWaypointRoute();
