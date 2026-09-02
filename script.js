@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.29';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.30';
 
 
 /*
@@ -17,6 +17,7 @@ const NPF_STARTUP_DIAGNOSTIC = (() => {
         markIndex: Object.create(null),
         stalls: [],
         longTasks: [],
+        siaInteractions: [],
         monitorStartedAt: now(),
         monitorStoppedAt: null,
         eventLoopMonitorSupported: true,
@@ -51,12 +52,27 @@ const NPF_STARTUP_DIAGNOSTIC = (() => {
 
     const has = key => state.markIndex[String(key || '')] !== undefined;
 
+    const addSiaInteraction = (kind, detail = '', metrics = null) => {
+        const entry = {
+            t: now(),
+            kind: String(kind || 'SIA'),
+            detail: detail == null ? '' : String(detail),
+            metrics: metrics && typeof metrics === 'object' ? { ...metrics } : null
+        };
+        state.siaInteractions.push(entry);
+        if (state.siaInteractions.length > 80) {
+            state.siaInteractions.splice(0, state.siaInteractions.length - 80);
+        }
+        refreshOpenPanel();
+        return entry;
+    };
+
     mark('script_eval', 'Script NPF exécuté');
 
     /* Mesure indépendante des API LongTask, absentes de certaines versions Safari. */
     try {
         const intervalMs = 250;
-        const stopAfterMs = 18000;
+        const stopAfterMs = 120000;
         let expected = now() + intervalMs;
         const timer = setInterval(() => {
             const current = now();
@@ -101,12 +117,12 @@ const NPF_STARTUP_DIAGNOSTIC = (() => {
                 observer.observe({ entryTypes: ['longtask'] });
                 setTimeout(() => {
                     try { observer.disconnect(); } catch (_) {}
-                }, 18000);
+                }, 120000);
             }
         }
     } catch (_) {}
 
-    return { state, mark, has, now };
+    return { state, mark, has, now, addSiaInteraction };
 })();
 
 window.NPF_STARTUP_DIAGNOSTIC = NPF_STARTUP_DIAGNOSTIC;
@@ -115,6 +131,9 @@ function npfStartupDiagMark(key, label, detail = '') {
 }
 function npfStartupDiagHasMark(key) {
     return NPF_STARTUP_DIAGNOSTIC.has(key);
+}
+function npfDiagSiaInteraction(kind, detail = '', metrics = null) {
+    return NPF_STARTUP_DIAGNOSTIC.addSiaInteraction(kind, detail, metrics);
 }
 
 function escapeNpfStartupDiagnosticHtml(value) {
@@ -179,6 +198,27 @@ function buildNpfStartupDiagnosticExportText() {
             entry.detail || ''
         ].join(' | '));
     });
+
+    const siaInteractions = Array.isArray(diag.siaInteractions) ? diag.siaInteractions.slice() : [];
+    lines.push('');
+    lines.push('DIAGNOSTIC SIA / FLUIDITÉ CARTE');
+    if (!siaInteractions.length) {
+        lines.push('Aucune interaction SIA enregistrée.');
+    } else {
+        siaInteractions.forEach(item => {
+            const metrics = item.metrics && typeof item.metrics === 'object'
+                ? Object.entries(item.metrics)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join(' | ')
+                : '';
+            lines.push(
+                '+ ' + (item.t / 1000).toFixed(2) + ' s | '
+                + item.kind
+                + (item.detail ? ' | ' + item.detail : '')
+                + (metrics ? ' | ' + metrics : '')
+            );
+        });
+    }
 
     const stalls = diag.stalls.slice().sort((a, b) => b.delay - a.delay);
     lines.push('');
@@ -332,6 +372,11 @@ function renderNpfStartupDiagnosticPanel() {
                     ${diag.longTaskObserverSupported
                         ? `<div class="npf-startup-diag-longtasks"><b>LongTask API : ${longTasks.length}</b>${longTaskRows ? `<ul>${longTaskRows}</ul>` : ''}</div>`
                         : '<div class="npf-startup-diag-longtasks">LongTask API Safari indisponible : mesure par retard de boucle.</div>'}
+                    <div class="npf-startup-diag-longtasks"><b>SIA / carte : ${Array.isArray(diag.siaInteractions) ? diag.siaInteractions.length : 0}</b>${
+                        Array.isArray(diag.siaInteractions) && diag.siaInteractions.length
+                            ? `<ul>${diag.siaInteractions.slice(-6).map(item => `<li>${escapeNpfStartupDiagnosticHtml(item.kind)}${item.detail ? ' · ' + escapeNpfStartupDiagnosticHtml(item.detail) : ''}</li>`).join('')}</ul>`
+                            : '<div>Aucune interaction enregistrée.</div>'
+                    }</div>
                     <div class="npf-startup-diag-monitor">Mesure automatique dès l’ouverture, même panneau fermé.</div>
                 </div>
             </div>
@@ -41046,9 +41091,63 @@ function initializeSiaSystem() {
          * v15.91 — précharger avant de sortir du tampon pendant le déplacement,
          * puis repositionner/recharger proprement à la fin du geste.
          */
-        map.on('move', scheduleSiaMovePreloadRefresh);
-        map.on('moveend', () => scheduleSiaCoverageRefresh('moveend'));
-        map.on('zoomend', () => scheduleSiaLayerRefresh('zoomend'));
+        let npfDiagMoveSample = null;
+        let npfDiagZoomStartedAt = 0;
+
+        map.on('movestart', () => {
+            const now = NPF_STARTUP_DIAGNOSTIC.now();
+            npfDiagMoveSample = {
+                startedAt: now,
+                lastAt: now,
+                events: 0,
+                gapTotal: 0,
+                maxGap: 0
+            };
+        });
+        map.on('move', () => {
+            scheduleSiaMovePreloadRefresh();
+            if (!npfDiagMoveSample) return;
+            const now = NPF_STARTUP_DIAGNOSTIC.now();
+            const gap = Math.max(0, now - npfDiagMoveSample.lastAt);
+            npfDiagMoveSample.lastAt = now;
+            npfDiagMoveSample.events += 1;
+            npfDiagMoveSample.gapTotal += gap;
+            npfDiagMoveSample.maxGap = Math.max(npfDiagMoveSample.maxGap, gap);
+        });
+        map.on('moveend', () => {
+            const sample = npfDiagMoveSample;
+            npfDiagMoveSample = null;
+            if (sample) {
+                const now = NPF_STARTUP_DIAGNOSTIC.now();
+                const avgGap = sample.events > 0 ? sample.gapTotal / sample.events : 0;
+                npfDiagSiaInteraction(
+                    'PAN CARTE',
+                    `zones=${siaMapAirspacesVisible ? 'AFFICHÉES' : 'MASQUÉES'} · zoom=${map.getZoom()} · zonesVisibles=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0}`,
+                    {
+                        dureeMs: Math.round(now - sample.startedAt),
+                        moveEvents: sample.events,
+                        gapMoyMs: Math.round(avgGap),
+                        gapMaxMs: Math.round(sample.maxGap)
+                    }
+                );
+            }
+            scheduleSiaCoverageRefresh('moveend');
+        });
+        map.on('zoomstart', () => {
+            npfDiagZoomStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
+        });
+        map.on('zoomend', () => {
+            const now = NPF_STARTUP_DIAGNOSTIC.now();
+            if (npfDiagZoomStartedAt > 0) {
+                npfDiagSiaInteraction(
+                    'ZOOM CARTE',
+                    `zones=${siaMapAirspacesVisible ? 'AFFICHÉES' : 'MASQUÉES'} · zoom=${map.getZoom()} · zonesVisibles=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0}`,
+                    { dureeMs: Math.round(now - npfDiagZoomStartedAt) }
+                );
+                npfDiagZoomStartedAt = 0;
+            }
+            scheduleSiaLayerRefresh('zoomend');
+        });
     }
 
     if (hasAnyEnabledSiaFilter()) {
@@ -43467,6 +43566,7 @@ function clearSiaZoomDependentLayers() {
 }
 
 function renderSiaZoomDependentDecorations(features) {
+    const npfDiagStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
     clearSiaZoomDependentLayers();
     if (!siaMapAirspacesVisible || !Array.isArray(features) || !features.length) return;
 
@@ -43493,6 +43593,12 @@ function renderSiaZoomDependentDecorations(features) {
             );
             if (marker) siaZoomDependentLayers.push(marker);
         });
+
+    npfDiagSiaInteraction(
+        'SIA DÉCORATIONS',
+        `zones=${features.length} · labels=${labelState.count} · zoom=${map?.getZoom?.() ?? '—'}`,
+        { dureeMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagStartedAt) }
+    );
 }
 
 const SIA_REFRESH_ABORT_ERROR_NAME = 'NpfSiaRefreshAborted';
@@ -43522,6 +43628,16 @@ async function yieldSiaRefreshToMap(refreshGeneration) {
 async function refreshSiaLayers(reason = 'manual') {
     if (!map) return;
     ensureSiaMapPanes();
+
+    const npfDiagRefreshStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
+    let npfDiagDatasetMs = 0;
+    let npfDiagScanMs = 0;
+    let npfDiagGeoJsonMs = 0;
+    let npfDiagTouchDecorMs = 0;
+    let npfDiagPointsMs = 0;
+    let npfDiagCommitMs = 0;
+    let npfDiagVisibleZones = 0;
+    let npfDiagRenderedObjects = 0;
 
     const refreshGeneration = getSiaRefreshGeneration();
     let previousSiaLayerGroupForSwap = null;
@@ -43560,9 +43676,19 @@ async function refreshSiaLayers(reason = 'manual') {
             && siaRenderedPointLabelsEnabled === pointLabelsEnabledNow
             && Array.isArray(siaRenderedAirspaceFeatures)
         ) {
+            const npfDiagDecorStart = NPF_STARTUP_DIAGNOSTIC.now();
             renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+            npfDiagTouchDecorMs += NPF_STARTUP_DIAGNOSTIC.now() - npfDiagDecorStart;
             siaRenderedZoom = zoom;
             scheduleSiaProfileRefresh('sia-zoomend-decorations');
+            npfDiagSiaInteraction(
+                'SIA RAFRAÎCHISSEMENT',
+                `raison=${reason} · décorations seules · zones=${siaRenderedAirspaceFeatures.length} · zoom=${zoom}`,
+                {
+                    totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt),
+                    decorationsMs: Math.round(npfDiagTouchDecorMs)
+                }
+            );
             return;
         }
 
@@ -43577,13 +43703,25 @@ async function refreshSiaLayers(reason = 'manual') {
             && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
         ) {
             if (siaMapAirspacesVisible && Array.isArray(siaRenderedAirspaceFeatures)) {
+                const npfDiagDecorStart = NPF_STARTUP_DIAGNOSTIC.now();
                 renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+                npfDiagTouchDecorMs += NPF_STARTUP_DIAGNOSTIC.now() - npfDiagDecorStart;
             }
             scheduleSiaProfileRefresh('sia-moveend-decorations');
+            npfDiagSiaInteraction(
+                'SIA RAFRAÎCHISSEMENT',
+                `raison=${reason} · décorations seules · zones=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0} · zoom=${zoom}`,
+                {
+                    totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt),
+                    decorationsMs: Math.round(npfDiagTouchDecorMs)
+                }
+            );
             return;
         }
 
+        const npfDiagDatasetStart = NPF_STARTUP_DIAGNOSTIC.now();
         const dataset = await ensureSiaDatasetLoaded();
+        npfDiagDatasetMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagDatasetStart;
         throwIfSiaRefreshObsolete(refreshGeneration);
         // v15.83 — inutile de scanner les familles TMA lorsque les volumes sont masqués.
         const siaTmaOperationalFamilies = siaMapAirspacesVisible
@@ -43624,6 +43762,7 @@ async function refreshSiaLayers(reason = 'manual') {
         let rendered = 0;
 
         const visibleAirspaceFeatures = [];
+        const npfDiagScanStart = NPF_STARTUP_DIAGNOSTIC.now();
 
         if (siaMapAirspacesVisible) {
             let siaAirspaceScanIndex = 0;
@@ -43650,8 +43789,11 @@ async function refreshSiaLayers(reason = 'manual') {
                 });
             }
         }
+        npfDiagScanMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagScanStart;
+        npfDiagVisibleZones = visibleAirspaceFeatures.length;
 
         if (visibleAirspaceFeatures.length) {
+            const npfDiagGeoStart = NPF_STARTUP_DIAGNOSTIC.now();
             const airspaceLayer = L.geoJSON(
                 { type: 'FeatureCollection', features: visibleAirspaceFeatures },
                 {
@@ -43676,16 +43818,20 @@ async function refreshSiaLayers(reason = 'manual') {
                 }
             );
             airspaceLayer.addTo(siaLayerGroup);
+            npfDiagGeoJsonMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagGeoStart;
 
+            const npfDiagTouchStart = NPF_STARTUP_DIAGNOSTIC.now();
             visibleAirspaceFeatures.forEach(feature => {
                 addSiaCtrTouchSurface(feature);
             });
 
             renderSiaZoomDependentDecorations(visibleAirspaceFeatures);
+            npfDiagTouchDecorMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagTouchStart;
             rendered += visibleAirspaceFeatures.length;
         }
 
         const showSiaDesignatedPoints = showSiaDesignatedPointsNow;
+        const npfDiagPointsStart = NPF_STARTUP_DIAGNOSTIC.now();
 
         let siaTerrainScanIndex = 0;
         for (const item of dataset.terrain || []) {
@@ -43779,10 +43925,12 @@ async function refreshSiaLayers(reason = 'manual') {
             addSiaTouchHitbox(latlng, popupHtml);
             rendered += 1;
         }
+        npfDiagPointsMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagPointsStart;
 
         throwIfSiaRefreshObsolete(refreshGeneration);
 
         /* Le nouveau groupe devient visible d'un bloc, puis l'ancien est retiré. */
+        const npfDiagCommitStart = NPF_STARTUP_DIAGNOSTIC.now();
         replacementSiaLayerGroupForSwap.addTo(map);
         if (
             previousSiaLayerGroupForSwap
@@ -43792,6 +43940,8 @@ async function refreshSiaLayers(reason = 'manual') {
             map.removeLayer(previousSiaLayerGroupForSwap);
         }
         replacementSiaLayerGroupCommitted = true;
+        npfDiagCommitMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagCommitStart;
+        npfDiagRenderedObjects = rendered;
 
         // Couverture et signature ne sont validées qu'après un rendu complet.
         siaRenderedCoverageBounds = renderBounds;
@@ -43811,6 +43961,20 @@ async function refreshSiaLayers(reason = 'manual') {
                 : ' Zones carte masquées.';
             footer.textContent = `${rendered} objet${rendered > 1 ? 's' : ''} SIA affiché${rendered > 1 ? 's' : ''} dans la zone chargée.${zonesNote}${scaleNote}`;
         }
+
+        npfDiagSiaInteraction(
+            'SIA RAFRAÎCHISSEMENT',
+            `raison=${reason} · zones=${npfDiagVisibleZones} · objets=${npfDiagRenderedObjects} · zoom=${zoom} · carteZones=${siaMapAirspacesVisible ? 'ON' : 'OFF'}`,
+            {
+                totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt),
+                datasetMs: Math.round(npfDiagDatasetMs),
+                scanMs: Math.round(npfDiagScanMs),
+                geoJsonMs: Math.round(npfDiagGeoJsonMs),
+                touchDecorMs: Math.round(npfDiagTouchDecorMs),
+                pointsMs: Math.round(npfDiagPointsMs),
+                commitMs: Math.round(npfDiagCommitMs)
+            }
+        );
 
         scheduleSiaProfileRefresh(`sia-${reason}`);
     } catch (error) {
