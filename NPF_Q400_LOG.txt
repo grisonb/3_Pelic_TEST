@@ -1,3 +1,40 @@
+VERSION TEST v16.31 — FLUIDITÉ CARTE AVEC ZONES SIA
+Date : 02/09/2026
+Base : TEST v16.30
+
+OBJECTIFS
+- Corriger la forte perte de fluidité pendant le déplacement de la carte lorsque les zones SIA sont affichées.
+- S'appuyer sur le diagnostic v16.30 : les blocages proviennent surtout des rafraîchissements/décorations SIA lancés pendant ou immédiatement autour du pan.
+- Conserver toutes les zones, filtres, points VFR/VRP, surfaces tactiles et données SIA.
+
+1. DÉPLACEMENT DE CARTE
+- Suppression du préchargement SIA déclenché pendant chaque événement `move`.
+- Pendant le geste, Leaflet déplace uniquement les calques SIA déjà présents : aucun scan/rebuild SIA n'est lancé sous le doigt.
+- Le rafraîchissement de couverture reste déclenché à `moveend` uniquement lorsqu'il est réellement nécessaire.
+
+2. DÉCORATIONS SIA
+- Si la vue reste dans le tampon SIA déjà chargé, les volumes, points et hitboxes sont conservés.
+- Les bandes intérieures et libellés dépendants de l'écran sont recalculés après une courte période d'inactivité (260 ms), et non pendant le geste.
+- Les décorations sont limitées aux zones proches du viewport courant au lieu de traiter toutes les zones du tampon de préchargement.
+- Un nouveau geste annule immédiatement un recalcul de décorations encore en attente.
+
+3. DIAGNOSTIC
+- DIAG reste actif et mesure les déplacements, les rafraîchissements et les décorations.
+- Les lignes « SIA DÉCORATIONS » indiquent désormais zones décorées / zones disponibles dans le tampon.
+
+4. ÉLÉMENTS INCHANGÉS
+- Aucune zone SIA supprimée.
+- Filtres SIA, fréquences, limites verticales, points VFR/VRP et interactions inchangés.
+- Fond de carte Online/Offline, IndexedDB, PÉLIC, route WP, GoTo, navette Feu/PÉLIC et mise à jour automatique inchangés.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES
+- node --check Script et Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.31 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.30.
+
+
 VERSION TEST v16.30 — DIAGNOSTIC FLUIDITÉ SIA / DÉPLACEMENT CARTE
 Date : 02/09/2026
 Base : TEST v16.29
