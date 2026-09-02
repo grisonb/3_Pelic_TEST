@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.36';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.37';
 
 
 /*
@@ -43933,63 +43933,15 @@ async function refreshSiaLayers(reason = 'manual') {
         const pointLabelsEnabledNow = zoom >= 8;
 
         /*
-         * v16.34 — zoom avant depuis une vue allégée (8/9 -> 10 typiquement) :
-         * si le nouveau viewport est toujours dans la couverture déjà chargée,
-         * conserver le GeoJSON principal, les surfaces de sélection et les
-         * objets déjà présents. Si les points désignés deviennent visibles,
-         * les ajouter seuls sur toute la couverture existante, puis reconstruire
-         * uniquement les décorations dépendantes du zoom.
+         * v16.37 — retour vers une vue rapprochée : ne plus réutiliser la
+         * couverture très large d'un zoom 7/8/9 lorsque les points SIA
+         * désignés doivent réapparaître. Le DIAG v16.34-v16.36 montre que
+         * l'ajout de plusieurs centaines de points sur l'ancien grand tampon
+         * (jusqu'à ~500 points) coûte davantage qu'une reconstruction normale
+         * centrée sur le nouveau viewport. Dans ce cas, on laisse donc le
+         * chemin de rendu complet ci-dessous reconstruire un tampon adapté au
+         * zoom courant. Les autres réutilisations de zoom restent conservées.
          */
-        if (
-            (reason === 'zoomend' || reason === 'moveend')
-            && siaRenderedCoverageBounds
-            && siaRenderedSignature === signature
-            && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
-            && siaRenderedShowDesignatedPoints === false
-            && showSiaDesignatedPointsNow === true
-            && siaRenderedPointLabelsEnabled === pointLabelsEnabledNow
-            && Array.isArray(siaRenderedAirspaceFeatures)
-        ) {
-            clearTimeout(siaMoveDecorationRefreshTimer);
-            siaMoveDecorationRefreshTimer = null;
-
-            const datasetStart = NPF_STARTUP_DIAGNOSTIC.now();
-            const dataset = await ensureSiaDatasetLoaded();
-            npfDiagDatasetMs = NPF_STARTUP_DIAGNOSTIC.now() - datasetStart;
-            throwIfSiaRefreshObsolete(refreshGeneration);
-
-            let pointCoverage = siaRenderedCoverageBounds;
-            try { pointCoverage = siaRenderedCoverageBounds.pad(0.03); } catch (_) {}
-            const pointsStart = NPF_STARTUP_DIAGNOSTIC.now();
-            const pointsAdded = await addSiaDesignatedPointsToExistingCoverage(
-                dataset,
-                pointCoverage,
-                refreshGeneration
-            );
-            npfDiagPointsMs = NPF_STARTUP_DIAGNOSTIC.now() - pointsStart;
-
-            const decorStart = NPF_STARTUP_DIAGNOSTIC.now();
-            await renderSiaZoomDependentDecorationsProgressive(
-                siaRenderedAirspaceFeatures,
-                refreshGeneration
-            );
-            npfDiagTouchDecorMs = NPF_STARTUP_DIAGNOSTIC.now() - decorStart;
-
-            siaRenderedZoom = zoom;
-            siaRenderedShowDesignatedPoints = true;
-            scheduleSiaProfileRefresh('sia-zoom-reuse-add-points');
-            npfDiagSiaInteraction(
-                'SIA RAFRAÎCHISSEMENT',
-                `raison=${reason} · zoom-réutilisé · points-ajoutés=${pointsAdded} · zones=${siaRenderedAirspaceFeatures.length} · zoom=${zoom}`,
-                {
-                    totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt),
-                    datasetMs: Math.round(npfDiagDatasetMs),
-                    touchDecorMs: Math.round(npfDiagTouchDecorMs),
-                    pointsMs: Math.round(npfDiagPointsMs)
-                }
-            );
-            return;
-        }
 
         /*
          * v15.80 — zoom dans une couverture déjà chargée : conserver volumes,
