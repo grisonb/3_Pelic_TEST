@@ -1,3 +1,40 @@
+VERSION TEST v16.34 — FLUIDITÉ SIA : RÉUTILISATION AU ZOOM + DOUBLE PASSE DÉMARRAGE SUPPRIMÉE
+Date : 02/09/2026
+Base : TEST v16.33
+
+OBJECTIFS
+- Supprimer la seconde reconstruction SIA observée immédiatement après le rendu initial startup-prefs.
+- Réduire le coût du passage d'une vue allégée zoom 8/9 vers le zoom 10 sans retirer de zones ni de fonctions.
+- Préserver les gains de fluidité obtenus en v16.33 aux zooms 8 et 9.
+
+1. DOUBLE PASSE SIA AU DÉMARRAGE
+- Après un startup-prefs réussi, une garde one-shot ignore le moveend passif Leaflet qui peut survenir sans movestart utilisateur juste après l'initialisation.
+- Un vrai déplacement utilisateur reste traité normalement : la garde ne s'applique qu'à un moveend sans échantillon de mouvement.
+- DIAG trace explicitement « moveend-passif-post-startup · ignoré » lorsqu'elle intervient.
+
+2. ZOOM 8/9 -> 10 : RÉUTILISATION DU RENDU EXISTANT
+- Si le nouveau viewport reste dans la couverture SIA déjà chargée, le GeoJSON principal des zones et les surfaces de sélection ne sont plus reconstruits.
+- Lorsque les points désignés deviennent visibles au zoom plus rapproché, seuls ces points sont ajoutés sur la couverture existante.
+- Les décorations dépendantes du zoom sont ensuite recalculées progressivement.
+- Le zoom arrière continue d'utiliser le chemin v16.33, déjà rapide en mode allégé.
+- DIAG trace « zoom-réutilisé » avec le nombre de points ajoutés et les temps séparés.
+
+3. ÉLÉMENTS INCHANGÉS
+- Affichage allégé >= 10 NM de v16.33 conservé.
+- Zones, contours, filtres SIA, points VFR/VRP et sélection Zone conservés.
+- Localités hors ligne à la demande inchangées.
+- Mécanisme de mise à jour automatique PWA v16.32/v16.33 inchangé.
+- Carte Offline / IndexedDB inchangées.
+- sia.js strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.34 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.33.
+- Contrôle ciblé des deux nouveaux chemins : garde moveend post-startup et zoom-réutilisé avec ajout des points désignés.
+
+
 VERSION TEST v16.33 — FLUIDITÉ SIA : DÉCORATIONS ALLÉGÉES À GRANDE ÉCHELLE
 Date : 02/09/2026
 Base : TEST v16.32
