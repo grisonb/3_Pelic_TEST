@@ -1,3 +1,56 @@
+VERSION TEST v16.30 — DIAGNOSTIC FLUIDITÉ SIA / DÉPLACEMENT CARTE
+Date : 02/09/2026
+Base : TEST v16.29
+
+OBJECTIFS
+- Mesurer précisément la perte de fluidité lors du déplacement/zoom de la carte lorsque les zones SIA sont affichées.
+- Ne modifier ni le rendu SIA, ni les filtres, ni l'ordre de chargement, ni le moteur Offline.
+- Enrichir l'export DIAG afin de comparer objectivement zones affichées / zones masquées.
+
+1. DIAGNOSTIC DÉPLACEMENT / ZOOM CARTE
+- Enregistrement de chaque séquence de déplacement de carte :
+  - état zones SIA AFFICHÉES/MASQUÉES ;
+  - zoom ;
+  - nombre de zones SIA actuellement visibles ;
+  - durée du geste ;
+  - nombre d'événements Leaflet move ;
+  - intervalle moyen entre événements move ;
+  - intervalle maximal entre événements move.
+- Enregistrement des séquences de zoom avec durée, zoom atteint et état des zones.
+
+2. DIAGNOSTIC RAFRAÎCHISSEMENT SIA
+- Mesure détaillée de chaque rafraîchissement SIA :
+  - raison du rafraîchissement (moveend, zoomend, preload, etc.) ;
+  - nombre de zones retenues et d'objets rendus ;
+  - attente/accès au dataset ;
+  - scan/filtrage des espaces ;
+  - création GeoJSON ;
+  - surfaces tactiles + décorations/étiquettes ;
+  - points/VRP/terrains ;
+  - bascule finale du groupe Leaflet ;
+  - temps total.
+- Les rafraîchissements « décorations seules » sont mesurés séparément.
+
+3. EXPORT DIAG
+- Nouvelle section « DIAGNOSTIC SIA / FLUIDITÉ CARTE » dans le fichier exporté.
+- Les mesures répétitives SIA sont conservées même si elles ont lieu après le démarrage initial.
+- Surveillance des blocages JS prolongée afin de pouvoir capturer un déplacement de carte effectué après l'ouverture.
+
+4. ÉLÉMENTS INCHANGÉS
+- Aucun changement de logique de rendu des zones SIA.
+- Aucun changement de filtre SIA.
+- Aucun changement du fond de carte Online/Offline.
+- IndexedDB, packs Offline, PÉLIC, route WP, GoTo, navette Feu/PÉLIC et autres fonctions inchangés.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES
+- node --check Script.
+- node --check Service Worker.
+- Manifest JSON parsé.
+- Cohérence v16.30 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.29.
+
+
 VERSION TEST v16.29 — ESPACEMENT PÉLIC+WP / ANNULATION DÉPLACER
 Date : 02/09/2026
 Base : TEST v16.28
