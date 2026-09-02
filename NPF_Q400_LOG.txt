@@ -1,3 +1,42 @@
+VERSION TEST v16.36 — MISE À JOUR PWA : RELANCES AUTOMATIQUES APRÈS PROPAGATION GITHUB
+Date : 02/09/2026
+Base : TEST v16.35
+
+OBJECTIF
+- Corriger le cas où une nouvelle version GitHub n'est pas prise en compte lors de la première ouverture de la PWA parce que les fichiers du shell ne sont pas encore tous propagés au même instant.
+- Conserver le rechargement unique par controllerchange validé en v16.32 et ne réintroduire aucun bouton MAJ.
+
+1. RELANCES AUTOMATIQUES DE MISE À JOUR
+- Après l'ouverture, la PWA continue de vérifier automatiquement registration.update() pendant environ 65 secondes tant que le service worker qui contrôle la page n'annonce pas la version applicative courante.
+- Intervalle nominal entre vérifications : 5 secondes.
+- En cas d'installation atomique refusée / worker devenu redundant, une nouvelle tentative est reproposée rapidement sans intervention utilisateur.
+- Dès que le nouveau service worker est actif, les relances sont arrêtées.
+- Le mécanisme atomique du service worker reste inchangé : index.html, script.js, style.css et manifest.json doivent toujours correspondre à la même version avant activation.
+
+2. TRANSITION / RECHARGEMENT
+- Le nouveau service worker expose sa version à la page via le message GET_SW_VERSION.
+- Le controllerchange reste l'unique mécanisme autorisé à recharger automatiquement la page après prise de contrôle.
+- Aucun client.navigate() n'est réintroduit côté service worker.
+- Aucun bouton MAJ n'est ajouté.
+
+3. DIAGNOSTIC
+- Ajout d'un journal court des étapes de mise à jour : load, check, updatefound, installing, installed, waiting, redundant, active, erreurs éventuelles.
+- Les événements sont conservés temporairement en session afin de survivre au rechargement de transition.
+- L'export DIAG comporte maintenant une section « MISE À JOUR PWA » pour identifier précisément l'étape d'un éventuel échec futur.
+
+4. ÉLÉMENTS INCHANGÉS
+- Optimisations SIA et zoom out de v16.35 inchangées.
+- Carte Offline et bases IndexedDB inchangées.
+- Chargement des localités hors ligne inchangé.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.36 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.35.
+
+
 VERSION TEST v16.35 — FLUIDITÉ SIA : ZOOM OUT / SUPPRESSION DES YIELDS ARTIFICIELS
 Date : 02/09/2026
 Base : TEST v16.34
