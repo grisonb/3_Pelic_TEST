@@ -1,3 +1,37 @@
+VERSION TEST v16.35 — FLUIDITÉ SIA : ZOOM OUT / SUPPRESSION DES YIELDS ARTIFICIELS
+Date : 02/09/2026
+Base : TEST v16.34
+
+OBJECTIF
+- Réduire la latence observée lors des zooms arrière, particulièrement aux zooms 8 et 7 avec plusieurs centaines à plus de 1 000 zones SIA.
+- Conserver strictement toutes les zones, contours, filtres et possibilités de Sélection Zone.
+
+1. CAUSE IDENTIFIÉE DANS LE DIAG v16.34
+- À zoom 7, 1 164 zones étaient rendues en mode allégé : les décorations visibles étaient déjà à 0 ms, mais touchDecorMs restait à 861 ms.
+- Depuis v15.75, les volumes surfaciques ne créent pourtant plus chacun un GeoJSON tactile : ils enregistrent essentiellement leur géométrie pour la commande « Sélection Zone ».
+- Le coût résiduel venait donc principalement du yield WebKit imposé toutes les 24 zones : environ 48 restitutions de thread pour 1 164 zones, soit plusieurs centaines de millisecondes de latence artificielle.
+
+2. OPTIMISATION ZOOM OUT
+- En affichage allégé (échelle >= 10 NM), le lot d'enregistrement des géométries tactiles passe de 24 à 512 zones avant restitution de la main à WebKit.
+- Aux vues rapprochées (< 10 NM), le lot prudent de 24 reste inchangé.
+- Les rares D-OTHER ponctuels conservent leur couche tactile directe et leur comportement d'appui court.
+- « Sélection Zone » continue d'utiliser exactement les mêmes géométries et la même recherche point-dans-polygone.
+- Aucun espace SIA n'est supprimé ni simplifié.
+
+3. ÉLÉMENTS INCHANGÉS
+- Optimisations v16.33/v16.34 de pan, décorations allégées et réutilisation au zoom conservées.
+- Démarrage, localités hors ligne à la demande et mise à jour automatique PWA inchangés.
+- Carte Offline / IndexedDB inchangées.
+- sia.js strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.35 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.34.
+- Vérification ciblée du batch 512 uniquement en mode allégé >= 10 NM ; batch 24 conservé aux vues rapprochées.
+
+
 VERSION TEST v16.34 — FLUIDITÉ SIA : RÉUTILISATION AU ZOOM + DOUBLE PASSE DÉMARRAGE SUPPRIMÉE
 Date : 02/09/2026
 Base : TEST v16.33
