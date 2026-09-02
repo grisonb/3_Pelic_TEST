@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-36_update_retry';
-const APP_VERSION = 'v16.36';
+const SW_VERSION = 'sw-v16-37_zoom10_refine';
+const APP_VERSION = 'v16.37';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
