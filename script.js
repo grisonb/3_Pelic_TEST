@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.31';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.32';
 
 
 /*
@@ -4426,29 +4426,17 @@ async function initializeApp() {
             });
     }, 650);
 
-    setTimeout(() => {
-        npfStartupDiagMark('localities_start', 'Localités hors ligne — chargement');
-        loadNamedPlacesOfflineDatabase()
-            .then(() => {
-                npfStartupDiagMark('localities_ready', 'Localités hors ligne prêtes');
-                if (!namedPlacesOfflineIndex) return;
-                const noticeKey = 'npfNamedPlacesFranceReadyNoticeVersion';
-                if (localStorage.getItem(noticeKey) !== 'v14.69') {
-                    localStorage.setItem(noticeKey, 'v14.69');
-                    showNamedPlacesOfflineStatus(
-                        `Base localités France hors ligne prête — ${Number(
-                            namedPlacesOfflineIndex.total_count
-                        ).toLocaleString('fr-FR')} localités`
-                    );
-                }
-            })
-            .catch(() => {
-                showNamedPlacesOfflineStatus(
-                    'Base localités France hors ligne indisponible',
-                    { error: true, duration: 6500 }
-                );
-            });
-    }, 1150);
+    /*
+     * v16.32 — la base nationale de localités n'est plus préparée au démarrage.
+     * Elle est déjà intégralement disponible hors ligne et searchNamedPlacesOffline()
+     * appelle loadNamedPlacesOfflineDatabase() au premier besoin. Éviter ici la
+     * lecture du ZIP + JSZip + index supprime une grosse tâche concurrente du SIA
+     * et de la carte lors des ouvertures lentes sur iPad.
+     */
+    npfStartupDiagMark(
+        'localities_deferred',
+        'Localités hors ligne — chargement à la demande'
+    );
 
     setTimeout(() => {
         npfStartupDiagMark('departments_data_start', 'Départements — données');
@@ -38258,7 +38246,11 @@ let siaRefreshPendingReason = null;
  * seulement après la fin du geste et après une courte période d'inactivité.
  */
 let siaMoveDecorationRefreshTimer = null;
-const SIA_MOVE_DECORATION_IDLE_MS = 260;
+const SIA_MOVE_DECORATION_IDLE_MS = 320;
+/* v16.32 — décorations SIA construites par petits lots pour ne plus figer WebKit. */
+const SIA_DECORATION_BATCH_SIZE = 18;
+const SIA_TOUCH_SURFACE_BATCH_SIZE = 24;
+let siaDecorationProgressiveRun = 0;
 /* Ancien préchargement conservé pour compatibilité mais non déclenché pendant le pan. */
 let siaMovePreloadLastTriggerAt = 0;
 const SIA_MOVE_PRELOAD_MIN_INTERVAL_MS = 400;
@@ -41102,6 +41094,8 @@ function initializeSiaSystem() {
         map.on('movestart', () => {
             clearTimeout(siaMoveDecorationRefreshTimer);
             siaMoveDecorationRefreshTimer = null;
+            /* Annule immédiatement une construction progressive encore en cours. */
+            siaDecorationProgressiveRun += 1;
             const now = NPF_STARTUP_DIAGNOSTIC.now();
             npfDiagMoveSample = {
                 startedAt: now,
@@ -43635,21 +43629,92 @@ function renderSiaZoomDependentDecorations(features) {
     );
 }
 
+async function renderSiaZoomDependentDecorationsProgressive(features, refreshGeneration) {
+    const npfDiagStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
+    const runId = ++siaDecorationProgressiveRun;
+    clearSiaZoomDependentLayers();
+    if (!siaMapAirspacesVisible || !Array.isArray(features) || !features.length) return;
+
+    const decorationFeatures = getSiaDecorationFeaturesForCurrentView(features);
+    const labelState = { points: [], count: 0 };
+
+    for (let index = 0; index < decorationFeatures.length; index += 1) {
+        throwIfSiaRefreshObsolete(refreshGeneration);
+        if (runId !== siaDecorationProgressiveRun) {
+            const error = new Error('Décorations SIA remplacées par une vue plus récente');
+            error.name = SIA_REFRESH_ABORT_ERROR_NAME;
+            throw error;
+        }
+        const feature = decorationFeatures[index];
+        const item = feature?.properties?.siaItem;
+        if (item && Number(item?.co || 0) !== 1) {
+            const itemStyle = getSiaAirspaceStyle(item);
+            const layers = addSiaCtrInnerBand(feature.geometry, itemStyle.color);
+            if (Array.isArray(layers)) siaZoomDependentLayers.push(...layers);
+        }
+        if ((index + 1) % SIA_DECORATION_BATCH_SIZE === 0) {
+            await yieldSiaRefreshToMap(refreshGeneration);
+        }
+    }
+
+    const labelFeatures = decorationFeatures
+        .filter(feature => Number(feature?.properties?.siaItem?.co || 0) !== 1)
+        .sort((a, b) =>
+            getSiaBoundaryLabelPriority(a.properties.siaItem)
+            - getSiaBoundaryLabelPriority(b.properties.siaItem)
+        );
+
+    for (let index = 0; index < labelFeatures.length; index += 1) {
+        throwIfSiaRefreshObsolete(refreshGeneration);
+        if (runId !== siaDecorationProgressiveRun) {
+            const error = new Error('Décorations SIA remplacées par une vue plus récente');
+            error.name = SIA_REFRESH_ABORT_ERROR_NAME;
+            throw error;
+        }
+        const feature = labelFeatures[index];
+        const marker = addSiaAirspaceBoundaryLabel(
+            feature.properties.siaItem,
+            feature.geometry,
+            labelState
+        );
+        if (marker) siaZoomDependentLayers.push(marker);
+        if ((index + 1) % SIA_DECORATION_BATCH_SIZE === 0) {
+            await yieldSiaRefreshToMap(refreshGeneration);
+        }
+    }
+
+    npfDiagSiaInteraction(
+        'SIA DÉCORATIONS',
+        `zones=${decorationFeatures.length}/${features.length} · labels=${labelState.count} · zoom=${map?.getZoom?.() ?? '—'} · progressif=oui`,
+        { dureeMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagStartedAt) }
+    );
+}
+
 function scheduleSiaMoveDecorationRefresh(reason = 'moveend-idle') {
     clearTimeout(siaMoveDecorationRefreshTimer);
-    siaMoveDecorationRefreshTimer = setTimeout(() => {
+    siaMoveDecorationRefreshTimer = setTimeout(async () => {
         siaMoveDecorationRefreshTimer = null;
         if (!map || !siaMapAirspacesVisible || !Array.isArray(siaRenderedAirspaceFeatures)) return;
         if (!siaRenderedAirspaceFeatures.length) return;
 
         const startedAt = NPF_STARTUP_DIAGNOSTIC.now();
-        renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
-        scheduleSiaProfileRefresh('sia-moveend-idle-decorations');
-        npfDiagSiaInteraction(
-            'SIA RAFRAÎCHISSEMENT',
-            `raison=${reason} · décorations différées · zones=${siaRenderedAirspaceFeatures.length} · zoom=${map.getZoom()}`,
-            { totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - startedAt) }
-        );
+        const refreshGeneration = getSiaRefreshGeneration();
+        try {
+            await renderSiaZoomDependentDecorationsProgressive(
+                siaRenderedAirspaceFeatures,
+                refreshGeneration
+            );
+            scheduleSiaProfileRefresh('sia-moveend-idle-decorations');
+            npfDiagSiaInteraction(
+                'SIA RAFRAÎCHISSEMENT',
+                `raison=${reason} · décorations différées progressives · zones=${siaRenderedAirspaceFeatures.length} · zoom=${map.getZoom()}`,
+                { totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - startedAt) }
+            );
+        } catch (error) {
+            if (error?.name !== SIA_REFRESH_ABORT_ERROR_NAME) {
+                console.warn('[SIA] Décorations différées impossibles:', error);
+            }
+        }
     }, SIA_MOVE_DECORATION_IDLE_MS);
 }
 
@@ -43729,7 +43794,10 @@ async function refreshSiaLayers(reason = 'manual') {
             && Array.isArray(siaRenderedAirspaceFeatures)
         ) {
             const npfDiagDecorStart = NPF_STARTUP_DIAGNOSTIC.now();
-            renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+            await renderSiaZoomDependentDecorationsProgressive(
+                siaRenderedAirspaceFeatures,
+                refreshGeneration
+            );
             npfDiagTouchDecorMs += NPF_STARTUP_DIAGNOSTIC.now() - npfDiagDecorStart;
             siaRenderedZoom = zoom;
             scheduleSiaProfileRefresh('sia-zoomend-decorations');
@@ -43868,11 +43936,18 @@ async function refreshSiaLayers(reason = 'manual') {
             npfDiagGeoJsonMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagGeoStart;
 
             const npfDiagTouchStart = NPF_STARTUP_DIAGNOSTIC.now();
-            visibleAirspaceFeatures.forEach(feature => {
-                addSiaCtrTouchSurface(feature);
-            });
+            for (let index = 0; index < visibleAirspaceFeatures.length; index += 1) {
+                throwIfSiaRefreshObsolete(refreshGeneration);
+                addSiaCtrTouchSurface(visibleAirspaceFeatures[index]);
+                if ((index + 1) % SIA_TOUCH_SURFACE_BATCH_SIZE === 0) {
+                    await yieldSiaRefreshToMap(refreshGeneration);
+                }
+            }
 
-            renderSiaZoomDependentDecorations(visibleAirspaceFeatures);
+            await renderSiaZoomDependentDecorationsProgressive(
+                visibleAirspaceFeatures,
+                refreshGeneration
+            );
             npfDiagTouchDecorMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagTouchStart;
             rendered += visibleAirspaceFeatures.length;
         }
