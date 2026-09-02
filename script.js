@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.35';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.36';
 
 
 /*
@@ -219,6 +219,25 @@ function buildNpfStartupDiagnosticExportText() {
             );
         });
     }
+
+    /* v16.36 — événements de mise à jour PWA conservés brièvement entre deux rechargements. */
+    try {
+        const swDiagKey = window.NPF_SW_UPDATE_DIAG_STORAGE_KEY || 'npfSwUpdateDiagV1';
+        const swEvents = JSON.parse(sessionStorage.getItem(swDiagKey) || '[]');
+        const recentSwEvents = Array.isArray(swEvents)
+            ? swEvents.filter(item => item && Number(item.at) >= Date.now() - 15 * 60 * 1000)
+            : [];
+        lines.push('');
+        lines.push('MISE À JOUR PWA');
+        if (!recentSwEvents.length) {
+            lines.push('Aucun événement de mise à jour récent.');
+        } else {
+            recentSwEvents.forEach(item => {
+                const time = new Date(Number(item.at) || Date.now()).toLocaleTimeString('fr-FR');
+                lines.push(`${time} | ${item.stage || 'événement'}${item.detail ? ' | ' + item.detail : ''}`);
+            });
+        }
+    } catch (_) {}
 
     const stalls = diag.stalls.slice().sort((a, b) => b.delay - a.delay);
     lines.push('');
