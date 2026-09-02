@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-31_sia_pan_fluidity';
-const APP_VERSION = 'v16.31';
+const SW_VERSION = 'sw-v16-32_sia_progressive_update_transition';
+const APP_VERSION = 'v16.32';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
@@ -301,31 +301,13 @@ self.addEventListener('activate', event => {
         await self.clients.claim();
 
         /*
-         * Transition automatique de version : une PWA installée peut conserver
-         * dans son start_url un ancien ?appv=. Lorsque ce nouveau SW prend le
-         * contrôle, on ne navigue QUE les clients qui portent encore un appv
-         * différent. Cela évite de rester visuellement sur l'ancien shell tout
-         * en empêchant les boucles de rechargement.
-         *
-         * Les bases IndexedDB / cartes Offline ne sont jamais modifiées ici.
+         * v16.32 — transition de version à rechargement unique.
+         * Le service worker prend seulement le contrôle des clients. Il ne les
+         * navigue plus lui-même : la page écoute `controllerchange` et effectue
+         * l'unique rechargement contrôlé. Cela supprime la concurrence
+         * client.navigate() + window.location.replace() observée sur iPadOS.
+         * Les bases IndexedDB et les cartes Offline ne sont jamais modifiées ici.
          */
-        try {
-            const windowClients = await self.clients.matchAll({
-                type: 'window',
-                includeUncontrolled: true
-            });
-            await Promise.allSettled(windowClients.map(async client => {
-                try {
-                    const clientUrl = new URL(client.url);
-                    const clientVersion = clientUrl.searchParams.get('appv') || '';
-                    if (clientVersion === APP_VERSION) return;
-                    clientUrl.pathname = clientUrl.pathname.replace(/[^/]*$/, 'index.html');
-                    clientUrl.searchParams.set('appv', APP_VERSION);
-                    clientUrl.searchParams.set('swrefresh', APP_VERSION);
-                    await client.navigate(clientUrl.toString());
-                } catch (_) {}
-            }));
-        } catch (_) {}
     })());
 });
 
