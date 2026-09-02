@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.32';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.33';
 
 
 /*
@@ -38246,9 +38246,12 @@ let siaRefreshPendingReason = null;
  * seulement après la fin du geste et après une courte période d'inactivité.
  */
 let siaMoveDecorationRefreshTimer = null;
-const SIA_MOVE_DECORATION_IDLE_MS = 320;
+const SIA_MOVE_DECORATION_IDLE_MS = 420;
 /* v16.32 — décorations SIA construites par petits lots pour ne plus figer WebKit. */
-const SIA_DECORATION_BATCH_SIZE = 18;
+/* v16.33 — lots encore plus courts + décorations limitées à la vue utile. */
+const SIA_DECORATION_BATCH_SIZE = 6;
+const SIA_DECORATION_VIEW_PAD_RATIO = 0.015;
+const SIA_DECORATION_LIGHTWEIGHT_SCALE_NM = 10;
 const SIA_TOUCH_SURFACE_BATCH_SIZE = 24;
 let siaDecorationProgressiveRun = 0;
 /* Ancien préchargement conservé pour compatibilité mais non déclenché pendant le pan. */
@@ -43574,7 +43577,7 @@ function getSiaDecorationFeaturesForCurrentView(features) {
     let viewportBounds = null;
     try {
         /* Petit débord seulement : ne pas décorer tout le tampon de rendu. */
-        viewportBounds = map.getBounds().pad(0.04);
+        viewportBounds = map.getBounds().pad(SIA_DECORATION_VIEW_PAD_RATIO);
     } catch (_) {
         viewportBounds = map.getBounds?.() || null;
     }
@@ -43591,6 +43594,22 @@ function renderSiaZoomDependentDecorations(features) {
     const npfDiagStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
     clearSiaZoomDependentLayers();
     if (!siaMapAirspacesVisible || !Array.isArray(features) || !features.length) return;
+
+    /*
+     * v16.33 — à grande échelle, les contours principaux suffisent. Les bandes
+     * intérieures et libellés impliquent des centaines de conversions écran et
+     * n'apportent pas d'information supplémentaire lorsque l'échelle est >= 10 NM.
+     * Les zones, leurs contours et la sélection restent intégralement disponibles.
+     */
+    const scaleNm = getCurrentNpfScaleNm();
+    if (scaleNm >= SIA_DECORATION_LIGHTWEIGHT_SCALE_NM) {
+        npfDiagSiaInteraction(
+            'SIA DÉCORATIONS',
+            `zones=0/${features.length} · labels=0 · zoom=${map?.getZoom?.() ?? '—'} · allégées=oui · echelle=${Number.isFinite(scaleNm) ? scaleNm.toFixed(1) : '—'}NM`,
+            { dureeMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagStartedAt) }
+        );
+        return;
+    }
 
     /*
      * Les volumes sont chargés avec un tampon pour éviter les reconstructions
@@ -43634,6 +43653,23 @@ async function renderSiaZoomDependentDecorationsProgressive(features, refreshGen
     const runId = ++siaDecorationProgressiveRun;
     clearSiaZoomDependentLayers();
     if (!siaMapAirspacesVisible || !Array.isArray(features) || !features.length) return;
+
+    /*
+     * v16.33 — mode allégé à grande échelle. Le GeoJSON principal reste visible
+     * et sélectionnable ; seules les décorations dépendantes des pixels écran
+     * (bandes intérieures / libellés) sont omises. Cela évite les blocs de 1–2 s
+     * observés au zoom 8/9 sur iPad, sans retirer aucune zone SIA.
+     */
+    const scaleNm = getCurrentNpfScaleNm();
+    if (scaleNm >= SIA_DECORATION_LIGHTWEIGHT_SCALE_NM) {
+        throwIfSiaRefreshObsolete(refreshGeneration);
+        npfDiagSiaInteraction(
+            'SIA DÉCORATIONS',
+            `zones=0/${features.length} · labels=0 · zoom=${map?.getZoom?.() ?? '—'} · progressif=oui · allégées=oui · echelle=${Number.isFinite(scaleNm) ? scaleNm.toFixed(1) : '—'}NM`,
+            { dureeMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagStartedAt) }
+        );
+        return;
+    }
 
     const decorationFeatures = getSiaDecorationFeaturesForCurrentView(features);
     const labelState = { points: [], count: 0 };
