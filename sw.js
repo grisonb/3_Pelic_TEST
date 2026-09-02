@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-32_sia_progressive_update_transition';
-const APP_VERSION = 'v16.32';
+const SW_VERSION = 'sw-v16-33_sia_broad_scale_lightweight';
+const APP_VERSION = 'v16.33';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
