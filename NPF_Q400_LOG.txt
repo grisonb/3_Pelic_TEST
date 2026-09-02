@@ -1,3 +1,37 @@
+VERSION TEST v16.37 — FLUIDITÉ SIA : AFFINAGE DU RETOUR VERS ZOOM 10
+Date : 02/09/2026
+Base : TEST v16.36
+
+OBJECTIF
+- Réduire le coût restant lors du retour d'une vue éloignée (zoom 7/8/9) vers une vue rapprochée, principalement autour du zoom 10.
+- Préserver intégralement les gains obtenus aux zooms 7/8/9 et ne toucher ni au démarrage ni au mécanisme de mise à jour PWA.
+
+1. CONSTAT DIAG v16.36
+- Aux zooms 7/8/9, les recalculs sont désormais rapides grâce au mode allégé.
+- Lors d'un retour au zoom 10, le chemin v16.34 réutilisait encore le très grand tampon de la vue éloignée puis y ajoutait plusieurs centaines de points SIA (ex. 484 ou 525 points), ce qui coûtait environ 0,7 à 0,8 s.
+- Les diagnostics antérieurs montrent qu'une reconstruction normale centrée sur la vue rapprochée est plus courte car elle ne traite qu'une fraction de ces objets.
+
+2. AFFINAGE ZOOM 10
+- Suppression du chemin spécial qui ajoutait les points désignés sur toute l'ancienne couverture large lorsque ces points réapparaissent en revenant à une vue rapprochée.
+- Dans ce cas précis, NPF utilise désormais le rendu normal : nouveau tampon centré sur le viewport courant, uniquement avec les zones et points nécessaires autour de la vue.
+- La réutilisation des calques reste conservée lorsque les paramètres de visibilité des points ne changent pas.
+- Le garde-fou v16.34 supprimant la double passe SIA au démarrage reste inchangé.
+
+3. ÉLÉMENTS INCHANGÉS
+- Optimisations zoom out v16.35 conservées.
+- Fluidité pan v16.31-v16.35 conservée.
+- Mise à jour PWA v16.36 strictement inchangée.
+- Carte Offline / IndexedDB / localités hors ligne inchangées.
+- sia.js strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.37 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.36.
+- Vérification ciblée : le chemin « zoom-réutilisé · points-ajoutés » n'est plus utilisé lors du passage d'une vue allégée vers la vue rapprochée ; le rendu normal prend le relais.
+
+
 VERSION TEST v16.36 — MISE À JOUR PWA : RELANCES AUTOMATIQUES APRÈS PROPAGATION GITHUB
 Date : 02/09/2026
 Base : TEST v16.35
