@@ -7,8 +7,8 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v16.35">
-    <link rel="manifest" href="manifest.json?appv=v16.35">
+    <link rel="stylesheet" href="style.css?appv=v16.36">
+    <link rel="manifest" href="manifest.json?appv=v16.36">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v16.35';
+        const APP_VERSION = 'v16.36';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -300,10 +300,45 @@
 
         if ('serviceWorker' in navigator) {
             const watchedRegistrations = new WeakSet();
+            const SW_UPDATE_RETRY_DELAY_MS = 5000;
+            const SW_UPDATE_RETRY_WINDOW_MS = 65000;
+            const SW_UPDATE_DIAG_STORAGE_KEY = 'npfSwUpdateDiagV1';
+            let swUpdateRetryTimer = 0;
+            let swUpdateRetryStartedAt = 0;
+            let swUpdateAttempt = 0;
+            let swUpdateStopped = false;
+
+            /*
+             * v16.36 — journal court persistant : les événements d'une transition
+             * peuvent survivre au controllerchange/rechargement et apparaître dans
+             * l'export DIAG de la nouvelle page.
+             */
+            const recordSwUpdateDiag = (stage, detail = '') => {
+                try {
+                    const now = Date.now();
+                    const previous = JSON.parse(sessionStorage.getItem(SW_UPDATE_DIAG_STORAGE_KEY) || '[]');
+                    const recent = Array.isArray(previous)
+                        ? previous.filter(item => item && Number(item.at) >= now - 15 * 60 * 1000)
+                        : [];
+                    recent.push({ at: now, stage: String(stage || ''), detail: String(detail || '') });
+                    sessionStorage.setItem(SW_UPDATE_DIAG_STORAGE_KEY, JSON.stringify(recent.slice(-40)));
+                } catch (_) {}
+                try {
+                    const diag = window.NPF_STARTUP_DIAGNOSTIC;
+                    if (diag && typeof diag.mark === 'function') {
+                        const key = `sw_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+                        diag.mark(key, `PWA MAJ — ${stage}`, detail);
+                    }
+                } catch (_) {}
+            };
+            window.NPF_SW_UPDATE_DIAG_STORAGE_KEY = SW_UPDATE_DIAG_STORAGE_KEY;
 
             const activateWaitingServiceWorker = registration => {
                 try {
-                    registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+                    if (registration?.waiting) {
+                        recordSwUpdateDiag('waiting', 'activation demandée');
+                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
                 } catch (_) {}
             };
 
@@ -311,14 +346,94 @@
                 if (!registration || watchedRegistrations.has(registration)) return;
                 watchedRegistrations.add(registration);
                 registration.addEventListener('updatefound', () => {
+                    recordSwUpdateDiag('updatefound', `tentative ${swUpdateAttempt || 1}`);
                     const worker = registration.installing;
                     if (!worker) return;
+                    recordSwUpdateDiag('installing', worker.state || 'installing');
                     worker.addEventListener('statechange', () => {
+                        recordSwUpdateDiag(worker.state || 'statechange');
                         if (worker.state === 'installed') {
-                            worker.postMessage({ type: 'SKIP_WAITING' });
+                            try { worker.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+                        }
+                        if (worker.state === 'redundant') {
+                            /* Échec d'installation atomique : la boucle de retry page continue. */
+                            scheduleServiceWorkerRetry(registration, 1200);
                         }
                     });
                 });
+            };
+
+            const askControllerVersion = async (timeoutMs = 900) => {
+                if (!navigator.serviceWorker.controller || typeof MessageChannel === 'undefined') return '';
+                return await new Promise(resolve => {
+                    let done = false;
+                    const finish = version => {
+                        if (done) return;
+                        done = true;
+                        resolve(String(version || ''));
+                    };
+                    const timer = setTimeout(() => finish(''), timeoutMs);
+                    try {
+                        const channel = new MessageChannel();
+                        channel.port1.onmessage = event => {
+                            clearTimeout(timer);
+                            finish(event?.data?.version || '');
+                        };
+                        navigator.serviceWorker.controller.postMessage(
+                            { type: 'GET_SW_VERSION' },
+                            [channel.port2]
+                        );
+                    } catch (_) {
+                        clearTimeout(timer);
+                        finish('');
+                    }
+                });
+            };
+
+            const stopServiceWorkerRetryIfCurrent = async () => {
+                const controlledVersion = await askControllerVersion();
+                if (controlledVersion === APP_VERSION) {
+                    swUpdateStopped = true;
+                    if (swUpdateRetryTimer) clearTimeout(swUpdateRetryTimer);
+                    swUpdateRetryTimer = 0;
+                    recordSwUpdateDiag('active', controlledVersion);
+                    return true;
+                }
+                return false;
+            };
+
+            const scheduleServiceWorkerRetry = (registration, delayMs = SW_UPDATE_RETRY_DELAY_MS) => {
+                if (swUpdateStopped || swUpdateRetryTimer) return;
+                if (!swUpdateRetryStartedAt) swUpdateRetryStartedAt = Date.now();
+                if (Date.now() - swUpdateRetryStartedAt >= SW_UPDATE_RETRY_WINDOW_MS) {
+                    recordSwUpdateDiag('retry-stop', `${swUpdateAttempt} tentatives`);
+                    return;
+                }
+                swUpdateRetryTimer = setTimeout(async () => {
+                    swUpdateRetryTimer = 0;
+                    if (await stopServiceWorkerRetryIfCurrent()) return;
+                    await runServiceWorkerUpdateAttempt(registration);
+                }, Math.max(500, Number(delayMs) || SW_UPDATE_RETRY_DELAY_MS));
+            };
+
+            const runServiceWorkerUpdateAttempt = async registration => {
+                if (!registration || swUpdateStopped) return;
+                if (await stopServiceWorkerRetryIfCurrent()) return;
+                swUpdateAttempt += 1;
+                recordSwUpdateDiag('check', `tentative ${swUpdateAttempt}`);
+                activateWaitingServiceWorker(registration);
+                try {
+                    if (typeof registration.update === 'function') {
+                        await Promise.race([
+                            registration.update(),
+                            new Promise(resolve => setTimeout(resolve, 4500))
+                        ]).catch(() => null);
+                    }
+                } catch (error) {
+                    recordSwUpdateDiag('check-error', error?.message || String(error || ''));
+                }
+                activateWaitingServiceWorker(registration);
+                scheduleServiceWorkerRetry(registration);
             };
 
             const checkForServiceWorkerUpdate = async () => {
@@ -329,19 +444,19 @@
                     );
                     watchServiceWorkerUpdate(registration);
                     activateWaitingServiceWorker(registration);
-                    if (typeof registration.update === 'function') {
-                        const updatedRegistration = await registration.update()
-                            .catch(() => registration);
-                        watchServiceWorkerUpdate(updatedRegistration || registration);
-                        activateWaitingServiceWorker(updatedRegistration || registration);
-                    }
+                    if (!swUpdateRetryStartedAt) swUpdateRetryStartedAt = Date.now();
+                    await runServiceWorkerUpdateAttempt(registration);
+                    return registration;
                 } catch (error) {
                     console.log('Erreur enregistrement Service Worker:', error);
+                    recordSwUpdateDiag('register-error', error?.message || String(error || ''));
+                    return null;
                 }
             };
 
             window.addEventListener('load', async () => {
-                await checkForServiceWorkerUpdate();
+                recordSwUpdateDiag('load', APP_VERSION);
+                const registration = await checkForServiceWorkerUpdate();
                 try {
                     if (!navigator.serviceWorker.controller) {
                         const guardKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:offline:${APP_VERSION}`;
@@ -357,9 +472,12 @@
                             const refreshUrl = new URL(window.location.href);
                             refreshUrl.searchParams.set('appv', APP_VERSION);
                             refreshUrl.searchParams.set('swctl', Date.now().toString());
+                            recordSwUpdateDiag('no-controller', 'rechargement de prise de contrôle');
                             window.location.replace(refreshUrl.toString());
+                            return;
                         }
                     }
+                    if (registration) scheduleServiceWorkerRetry(registration);
                 } catch (_) {}
             }, { once: true });
         }
@@ -893,7 +1011,7 @@
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
     <script src="sia.js?siav=15.69"></script>
-    <script src="script.js?appv=v16.35"></script>
+    <script src="script.js?appv=v16.36"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
