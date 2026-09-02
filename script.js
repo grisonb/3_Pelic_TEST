@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.30';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.31';
 
 
 /*
@@ -38252,7 +38252,14 @@ let siaRenderedShowDesignatedPoints = null;
 let siaRenderedPointLabelsEnabled = null;
 let siaRefreshInProgress = false;
 let siaRefreshPendingReason = null;
-/* v15.91 — préchargement progressif pendant un déplacement manuel/GPS. */
+/*
+ * Fluidité iPad : pendant un pan, Leaflet déplace le rendu existant sans
+ * reconstruire le SIA. Les décorations dépendantes de l'écran sont recalculées
+ * seulement après la fin du geste et après une courte période d'inactivité.
+ */
+let siaMoveDecorationRefreshTimer = null;
+const SIA_MOVE_DECORATION_IDLE_MS = 260;
+/* Ancien préchargement conservé pour compatibilité mais non déclenché pendant le pan. */
 let siaMovePreloadLastTriggerAt = 0;
 const SIA_MOVE_PRELOAD_MIN_INTERVAL_MS = 400;
 const SIA_MOVE_PRELOAD_INNER_PAD_RATIO = -0.08;
@@ -38558,14 +38565,12 @@ function scheduleSiaCoverageRefresh(reason = 'moveend') {
         && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
     ) {
         /*
-         * v15.91 — les géométries/points déjà chargés restent valides, mais les
-         * noms de zones sont dépendants de la position écran : les replacer à
-         * chaque fin de déplacement même sans reconstruction GeoJSON.
+         * Les géométries, hitboxes et points sont déjà dans le tampon de rendu.
+         * Pendant le pan, Leaflet les déplace nativement. Après relâchement, ne
+         * reconstruire que les décorations et seulement après un court repos.
          */
-        if (siaMapAirspacesVisible && Array.isArray(siaRenderedAirspaceFeatures)) {
-            renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
-        }
-        scheduleSiaProfileRefresh('sia-moveend-decorations');
+        scheduleSiaMoveDecorationRefresh('moveend-contained');
+        scheduleSiaProfileRefresh('sia-moveend-contained');
         return;
     }
     scheduleSiaLayerRefresh(reason);
@@ -41095,6 +41100,8 @@ function initializeSiaSystem() {
         let npfDiagZoomStartedAt = 0;
 
         map.on('movestart', () => {
+            clearTimeout(siaMoveDecorationRefreshTimer);
+            siaMoveDecorationRefreshTimer = null;
             const now = NPF_STARTUP_DIAGNOSTIC.now();
             npfDiagMoveSample = {
                 startedAt: now,
@@ -41105,7 +41112,10 @@ function initializeSiaSystem() {
             };
         });
         map.on('move', () => {
-            scheduleSiaMovePreloadRefresh();
+            /*
+             * Ne lancer aucun scan/rendu SIA pendant le geste. Les calques déjà
+             * présents suivent la carte avec Leaflet ; le refresh intervient à moveend.
+             */
             if (!npfDiagMoveSample) return;
             const now = NPF_STARTUP_DIAGNOSTIC.now();
             const gap = Math.max(0, now - npfDiagMoveSample.lastAt);
@@ -43565,13 +43575,37 @@ function clearSiaZoomDependentLayers() {
     siaZoomDependentLayers = [];
 }
 
+function getSiaDecorationFeaturesForCurrentView(features) {
+    if (!map || !Array.isArray(features) || !features.length) return [];
+    let viewportBounds = null;
+    try {
+        /* Petit débord seulement : ne pas décorer tout le tampon de rendu. */
+        viewportBounds = map.getBounds().pad(0.04);
+    } catch (_) {
+        viewportBounds = map.getBounds?.() || null;
+    }
+    if (!viewportBounds) return features;
+
+    return features.filter(feature => {
+        const item = feature?.properties?.siaItem;
+        if (!item) return false;
+        return siaBoundsIntersects(item.b, viewportBounds);
+    });
+}
+
 function renderSiaZoomDependentDecorations(features) {
     const npfDiagStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
     clearSiaZoomDependentLayers();
     if (!siaMapAirspacesVisible || !Array.isArray(features) || !features.length) return;
 
+    /*
+     * Les volumes sont chargés avec un tampon pour éviter les reconstructions
+     * permanentes. En revanche, bandes intérieures et libellés ne sont utiles
+     * qu'autour de la vue courante : ne pas les créer pour toutes les zones du tampon.
+     */
+    const decorationFeatures = getSiaDecorationFeaturesForCurrentView(features);
     const labelState = { points: [], count: 0 };
-    features.forEach(feature => {
+    decorationFeatures.forEach(feature => {
         const item = feature?.properties?.siaItem;
         if (!item || Number(item?.co || 0) === 1) return;
         const itemStyle = getSiaAirspaceStyle(item);
@@ -43579,7 +43613,7 @@ function renderSiaZoomDependentDecorations(features) {
         if (Array.isArray(layers)) siaZoomDependentLayers.push(...layers);
     });
 
-    features
+    decorationFeatures
         .filter(feature => Number(feature?.properties?.siaItem?.co || 0) !== 1)
         .sort((a, b) =>
             getSiaBoundaryLabelPriority(a.properties.siaItem)
@@ -43596,9 +43630,27 @@ function renderSiaZoomDependentDecorations(features) {
 
     npfDiagSiaInteraction(
         'SIA DÉCORATIONS',
-        `zones=${features.length} · labels=${labelState.count} · zoom=${map?.getZoom?.() ?? '—'}`,
+        `zones=${decorationFeatures.length}/${features.length} · labels=${labelState.count} · zoom=${map?.getZoom?.() ?? '—'}`,
         { dureeMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagStartedAt) }
     );
+}
+
+function scheduleSiaMoveDecorationRefresh(reason = 'moveend-idle') {
+    clearTimeout(siaMoveDecorationRefreshTimer);
+    siaMoveDecorationRefreshTimer = setTimeout(() => {
+        siaMoveDecorationRefreshTimer = null;
+        if (!map || !siaMapAirspacesVisible || !Array.isArray(siaRenderedAirspaceFeatures)) return;
+        if (!siaRenderedAirspaceFeatures.length) return;
+
+        const startedAt = NPF_STARTUP_DIAGNOSTIC.now();
+        renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
+        scheduleSiaProfileRefresh('sia-moveend-idle-decorations');
+        npfDiagSiaInteraction(
+            'SIA RAFRAÎCHISSEMENT',
+            `raison=${reason} · décorations différées · zones=${siaRenderedAirspaceFeatures.length} · zoom=${map.getZoom()}`,
+            { totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - startedAt) }
+        );
+    }, SIA_MOVE_DECORATION_IDLE_MS);
 }
 
 const SIA_REFRESH_ABORT_ERROR_NAME = 'NpfSiaRefreshAborted';
@@ -43692,9 +43744,8 @@ async function refreshSiaLayers(reason = 'manual') {
             return;
         }
 
-        // v15.91 — dans une couverture déjà dessinée, conserver les GeoJSON,
-        // points et surfaces tactiles mais recalculer les décorations dépendantes
-        // de l'écran afin que les noms de zones suivent toujours la nouvelle vue.
+        // Pan dans une couverture déjà dessinée : aucune reconstruction immédiate.
+        // Les volumes/points suivent Leaflet ; les décorations sont recalculées après repos.
         if (
             reason === 'moveend'
             && siaRenderedCoverageBounds
@@ -43702,22 +43753,18 @@ async function refreshSiaLayers(reason = 'manual') {
             && siaRenderedSignature === signature
             && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
         ) {
-            if (siaMapAirspacesVisible && Array.isArray(siaRenderedAirspaceFeatures)) {
-                const npfDiagDecorStart = NPF_STARTUP_DIAGNOSTIC.now();
-                renderSiaZoomDependentDecorations(siaRenderedAirspaceFeatures);
-                npfDiagTouchDecorMs += NPF_STARTUP_DIAGNOSTIC.now() - npfDiagDecorStart;
-            }
-            scheduleSiaProfileRefresh('sia-moveend-decorations');
+            scheduleSiaMoveDecorationRefresh('moveend-refresh-contained');
+            scheduleSiaProfileRefresh('sia-moveend-contained');
             npfDiagSiaInteraction(
                 'SIA RAFRAÎCHISSEMENT',
-                `raison=${reason} · décorations seules · zones=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0} · zoom=${zoom}`,
-                {
-                    totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt),
-                    decorationsMs: Math.round(npfDiagTouchDecorMs)
-                }
+                `raison=${reason} · rendu conservé · décorations différées · zones=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0} · zoom=${zoom}`,
+                { totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt) }
             );
             return;
         }
+
+        clearTimeout(siaMoveDecorationRefreshTimer);
+        siaMoveDecorationRefreshTimer = null;
 
         const npfDiagDatasetStart = NPF_STARTUP_DIAGNOSTIC.now();
         const dataset = await ensureSiaDatasetLoaded();
