@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-30_sia_pan_diagnostic';
-const APP_VERSION = 'v16.30';
+const SW_VERSION = 'sw-v16-31_sia_pan_fluidity';
+const APP_VERSION = 'v16.31';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
