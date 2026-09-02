@@ -1,3 +1,39 @@
+VERSION TEST v16.33 — FLUIDITÉ SIA : DÉCORATIONS ALLÉGÉES À GRANDE ÉCHELLE
+Date : 02/09/2026
+Base : TEST v16.32
+
+OBJECTIFS
+- Réduire le gel résiduel après déplacement de la carte lorsque plusieurs centaines de zones SIA sont visibles.
+- Conserver toutes les zones, contours, filtres et possibilités de sélection.
+- Ne pas modifier le chargement initial ni le mécanisme de mise à jour PWA désormais validé.
+
+1. DÉCORATIONS SIA À GRANDE ÉCHELLE
+- À une échelle >= 10 NM, conservation intégrale des contours principaux des espaces SIA.
+- Les décorations dépendantes des pixels écran (bandes intérieures et libellés) ne sont plus reconstruites à cette échelle.
+- Les données SIA et la sélection des zones restent intégralement disponibles.
+- Objectif : supprimer les traitements touchDecor de 1 à 2,6 s observés au zoom 8/9.
+
+2. VUE UTILE / RENDU PROGRESSIF
+- Marge de calcul des décorations réduite autour de l'écran : 4 % -> 1,5 %.
+- Lots progressifs réduits : 18 -> 6 zones avant restitution de la main à WebKit.
+- Délai de repos après moveend : 320 -> 420 ms afin de privilégier la fluidité Leaflet avant le travail décoratif.
+- Un nouveau mouvement continue d'annuler un rendu devenu obsolète.
+
+3. ÉLÉMENTS INCHANGÉS
+- GeoJSON principal des zones, filtres SIA, points VFR/VRP, sélection Zone et données AIRAC inchangés.
+- Carte Offline / IndexedDB inchangées.
+- Localités hors ligne toujours chargées à la demande.
+- Mise à jour automatique PWA v16.32 inchangée.
+- sia.js strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.33 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.32.
+- Vérification ciblée : mode allégé >= 10 NM, décorations normales conservées < 10 NM, aucun retrait des zones SIA.
+
+
 VERSION TEST v16.32 — FLUIDITÉ SIA / DÉMARRAGE / TRANSITION PWA
 Date : 02/09/2026
 Base : TEST v16.31
