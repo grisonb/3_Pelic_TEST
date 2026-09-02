@@ -1,3 +1,32 @@
+VERSION TEST v16.29 — ESPACEMENT PÉLIC+WP / ANNULATION DÉPLACER
+Date : 02/09/2026
+Base : TEST v16.28
+
+OBJECTIFS
+- Renforcer encore la séparation visuelle entre les boutons PÉLIC et les commandes WP.
+- Quitter immédiatement le mode « Déplacer » lorsqu'un appui est effectué ailleurs que sur la poignée de déplacement du WP.
+
+1. FICHE PÉLIC + WP
+- L'espace vertical après NOTAMS et avant GoTo / Modifier / Déplacer est encore augmenté.
+- L'organisation des boutons reste inchangée : GoTo / Modifier / Déplacer, puis Supp. WP / Supp. Route.
+
+2. MODE « DÉPLACER » WP
+- Après activation de « Déplacer », un appui ailleurs sur la carte, un autre point, un autre WP ou une autre fiche annule immédiatement le mode déplacement.
+- L'appui d'annulation n'est pas bloqué : l'action normalement visée continue de fonctionner.
+- Un appui sur la poignée du WP reste réservé au déplacement et n'annule pas le mode.
+- Après relâchement d'un déplacement effectif, le mode se ferme comme auparavant et le snap éventuel est conservé.
+
+3. ÉLÉMENTS INCHANGÉS
+- Carte, Offline, DIAG, mise à jour automatique, route, bulles, GoTo, navette Feu↔PÉLIC, restauration et comportement des points métier inchangés.
+- SIA strictement inchangé.
+
+4. CONTRÔLES
+- node --check script.js et sw.js.
+- manifest.json parsé.
+- Cohérence v16.29 Index / Manifest / Script / Style / SW.
+- sia.js comparé bit-à-bit avec v16.28.
+
+
 VERSION TEST v16.28 — LIBELLÉS WP / SÉPARATION FICHE PÉLIC+WP
 Date : 01/09/2026
 Base : TEST v16.27
