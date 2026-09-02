@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.34';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.35';
 
 
 /*
@@ -38253,6 +38253,7 @@ const SIA_DECORATION_BATCH_SIZE = 6;
 const SIA_DECORATION_VIEW_PAD_RATIO = 0.015;
 const SIA_DECORATION_LIGHTWEIGHT_SCALE_NM = 10;
 const SIA_TOUCH_SURFACE_BATCH_SIZE = 24;
+const SIA_TOUCH_SURFACE_LIGHTWEIGHT_BATCH_SIZE = 512;
 let siaDecorationProgressiveRun = 0;
 /*
  * v16.34 — garde one-shot : certains ajustements Leaflet de fin de démarrage
@@ -44128,10 +44129,25 @@ async function refreshSiaLayers(reason = 'manual') {
             npfDiagGeoJsonMs = NPF_STARTUP_DIAGNOSTIC.now() - npfDiagGeoStart;
 
             const npfDiagTouchStart = NPF_STARTUP_DIAGNOSTIC.now();
+            /*
+             * v16.35 — zoom arrière / vue allégée : la très grande majorité des
+             * volumes ne crée plus de calque tactile Leaflet depuis v15.75 ; elle
+             * ajoute seulement une entrée géométrique dans siaAirspaceTouchEntries.
+             * Rendre la main toutes les 24 zones imposait donc artificiellement
+             * ~16 ms de délai par lot (jusqu'à ~0,8 s pour 1 100+ zones), alors
+             * que le travail entre deux yields est minime. À >= 10 NM, on conserve
+             * les mêmes données et la même sélection Zone mais on espace fortement
+             * les yields. Les vues rapprochées gardent le lot prudent historique.
+             */
+            const siaTouchScaleNm = getCurrentNpfScaleNm();
+            const siaTouchBatchSize = siaTouchScaleNm >= SIA_DECORATION_LIGHTWEIGHT_SCALE_NM
+                ? SIA_TOUCH_SURFACE_LIGHTWEIGHT_BATCH_SIZE
+                : SIA_TOUCH_SURFACE_BATCH_SIZE;
+
             for (let index = 0; index < visibleAirspaceFeatures.length; index += 1) {
                 throwIfSiaRefreshObsolete(refreshGeneration);
                 addSiaCtrTouchSurface(visibleAirspaceFeatures[index]);
-                if ((index + 1) % SIA_TOUCH_SURFACE_BATCH_SIZE === 0) {
+                if ((index + 1) % siaTouchBatchSize === 0) {
                     await yieldSiaRefreshToMap(refreshGeneration);
                 }
             }
