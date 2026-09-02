@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.33';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.34';
 
 
 /*
@@ -38254,6 +38254,13 @@ const SIA_DECORATION_VIEW_PAD_RATIO = 0.015;
 const SIA_DECORATION_LIGHTWEIGHT_SCALE_NM = 10;
 const SIA_TOUCH_SURFACE_BATCH_SIZE = 24;
 let siaDecorationProgressiveRun = 0;
+/*
+ * v16.34 — garde one-shot : certains ajustements Leaflet de fin de démarrage
+ * émettent un moveend sans movestart utilisateur juste après startup-prefs.
+ * Ne pas relancer une deuxième fois les mêmes décorations dans ce cas.
+ */
+let siaStartupPassiveMoveendGuardUntil = 0;
+const SIA_STARTUP_PASSIVE_MOVEEND_GUARD_MS = 2500;
 /* Ancien préchargement conservé pour compatibilité mais non déclenché pendant le pan. */
 let siaMovePreloadLastTriggerAt = 0;
 const SIA_MOVE_PRELOAD_MIN_INTERVAL_MS = 400;
@@ -38512,6 +38519,19 @@ function siaBoundsFullyContains(outer, inner) {
     } catch (_) {
         return false;
     }
+}
+
+function armSiaStartupPassiveMoveendGuard() {
+    siaStartupPassiveMoveendGuardUntil = NPF_STARTUP_DIAGNOSTIC.now()
+        + SIA_STARTUP_PASSIVE_MOVEEND_GUARD_MS;
+}
+
+function consumeSiaStartupPassiveMoveendGuard() {
+    if (!siaStartupPassiveMoveendGuardUntil) return false;
+    const now = NPF_STARTUP_DIAGNOSTIC.now();
+    const active = now <= siaStartupPassiveMoveendGuardUntil;
+    siaStartupPassiveMoveendGuardUntil = 0;
+    return active;
 }
 
 function scheduleSiaMovePreloadRefresh() {
@@ -41137,6 +41157,17 @@ function initializeSiaSystem() {
                         gapMaxMs: Math.round(sample.maxGap)
                     }
                 );
+            } else if (consumeSiaStartupPassiveMoveendGuard()) {
+                /*
+                 * v16.34 — moveend passif immédiatement après startup-prefs :
+                 * le rendu est déjà à jour, donc ne pas reconstruire les décorations.
+                 */
+                npfDiagSiaInteraction(
+                    'SIA RAFRAÎCHISSEMENT',
+                    `raison=moveend-passif-post-startup · ignoré · zoom=${map.getZoom()} · zones=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0}`,
+                    { totalMs: 0 }
+                );
+                return;
             }
             scheduleSiaCoverageRefresh('moveend');
         });
@@ -43778,6 +43809,72 @@ async function yieldSiaRefreshToMap(refreshGeneration) {
     throwIfSiaRefreshObsolete(refreshGeneration);
 }
 
+async function addSiaDesignatedPointsToExistingCoverage(dataset, bounds, refreshGeneration) {
+    if (!map || !siaLayerGroup || !dataset || !bounds) return 0;
+    let rendered = 0;
+    let scanIndex = 0;
+    const zoom = map.getZoom();
+
+    for (const item of dataset.points || []) {
+        scanIndex += 1;
+        if (scanIndex % 512 === 0) {
+            await yieldSiaRefreshToMap(refreshGeneration);
+        }
+        if (!isSiaFilterEnabled(getSiaEffectiveFilterKey(item))) continue;
+        if (item.k === 'dpn:VRP' && !siaMapVrpVisible) continue;
+        const latlng = L.latLng(Number(item.x), Number(item.y));
+        if (!bounds.contains(latlng)) continue;
+
+        const popupHtml = buildSiaPointPopup(item);
+        if (item.k === 'dpn:VRP') {
+            const symbolText = getSiaVrpSymbolText(item);
+            const size = getSiaVrpVisualSize(symbolText);
+            const vrpVisual = getSiaVrpAirportVisual(item);
+            const marker = L.marker(latlng, {
+                pane: 'siaPointPane',
+                interactive: true,
+                bubblingMouseEvents: false,
+                keyboard: false,
+                icon: L.divIcon({
+                    className: 'sia-vrp-div-icon',
+                    html: `<span class="sia-vrp-symbol" style="--sia-vrp-bg:${vrpVisual.background};--sia-vrp-fg:${vrpVisual.foreground};width:${size}px;height:${size}px;font-size:${symbolText.length >= 5 ? 7 : symbolText.length === 4 ? 8 : symbolText.length === 3 ? 9 : 11}px">${escapeHtml(symbolText)}</span>`,
+                    iconSize: [size, size],
+                    iconAnchor: [size / 2, size / 2]
+                })
+            });
+            marker.bindPopup(popupHtml, { maxWidth: 340 });
+            marker.on('popupopen', () => marker.setPopupContent(buildSiaPointPopup(item)));
+            marker.addTo(siaLayerGroup);
+            addSiaTouchHitbox(latlng, popupHtml, () => buildSiaPointPopup(item));
+            rendered += 1;
+            continue;
+        }
+
+        const marker = L.circleMarker(latlng, {
+            ...getSiaPointMarkerStyle(item),
+            pane: 'siaPointPane',
+            renderer: siaPointRenderer,
+            interactive: true,
+            bubblingMouseEvents: false
+        });
+        marker.bindPopup(popupHtml, { maxWidth: 340 });
+
+        const label = String(item.d || item.c || '').trim();
+        if (zoom >= 8 && label && item.k !== 'dpn:ADHP') {
+            marker.bindTooltip(escapeHtml(label), {
+                permanent: true,
+                direction: 'right',
+                offset: [5, 0],
+                className: 'sia-point-label'
+            });
+        }
+        marker.addTo(siaLayerGroup);
+        addSiaTouchHitbox(latlng, popupHtml);
+        rendered += 1;
+    }
+    return rendered;
+}
+
 async function refreshSiaLayers(reason = 'manual') {
     if (!map) return;
     ensureSiaMapPanes();
@@ -43814,6 +43911,65 @@ async function refreshSiaLayers(reason = 'manual') {
         const signature = getSiaRenderSignature();
         const showSiaDesignatedPointsNow = shouldDisplaySiaDesignatedPoints();
         const pointLabelsEnabledNow = zoom >= 8;
+
+        /*
+         * v16.34 — zoom avant depuis une vue allégée (8/9 -> 10 typiquement) :
+         * si le nouveau viewport est toujours dans la couverture déjà chargée,
+         * conserver le GeoJSON principal, les surfaces de sélection et les
+         * objets déjà présents. Si les points désignés deviennent visibles,
+         * les ajouter seuls sur toute la couverture existante, puis reconstruire
+         * uniquement les décorations dépendantes du zoom.
+         */
+        if (
+            (reason === 'zoomend' || reason === 'moveend')
+            && siaRenderedCoverageBounds
+            && siaRenderedSignature === signature
+            && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
+            && siaRenderedShowDesignatedPoints === false
+            && showSiaDesignatedPointsNow === true
+            && siaRenderedPointLabelsEnabled === pointLabelsEnabledNow
+            && Array.isArray(siaRenderedAirspaceFeatures)
+        ) {
+            clearTimeout(siaMoveDecorationRefreshTimer);
+            siaMoveDecorationRefreshTimer = null;
+
+            const datasetStart = NPF_STARTUP_DIAGNOSTIC.now();
+            const dataset = await ensureSiaDatasetLoaded();
+            npfDiagDatasetMs = NPF_STARTUP_DIAGNOSTIC.now() - datasetStart;
+            throwIfSiaRefreshObsolete(refreshGeneration);
+
+            let pointCoverage = siaRenderedCoverageBounds;
+            try { pointCoverage = siaRenderedCoverageBounds.pad(0.03); } catch (_) {}
+            const pointsStart = NPF_STARTUP_DIAGNOSTIC.now();
+            const pointsAdded = await addSiaDesignatedPointsToExistingCoverage(
+                dataset,
+                pointCoverage,
+                refreshGeneration
+            );
+            npfDiagPointsMs = NPF_STARTUP_DIAGNOSTIC.now() - pointsStart;
+
+            const decorStart = NPF_STARTUP_DIAGNOSTIC.now();
+            await renderSiaZoomDependentDecorationsProgressive(
+                siaRenderedAirspaceFeatures,
+                refreshGeneration
+            );
+            npfDiagTouchDecorMs = NPF_STARTUP_DIAGNOSTIC.now() - decorStart;
+
+            siaRenderedZoom = zoom;
+            siaRenderedShowDesignatedPoints = true;
+            scheduleSiaProfileRefresh('sia-zoom-reuse-add-points');
+            npfDiagSiaInteraction(
+                'SIA RAFRAÎCHISSEMENT',
+                `raison=${reason} · zoom-réutilisé · points-ajoutés=${pointsAdded} · zones=${siaRenderedAirspaceFeatures.length} · zoom=${zoom}`,
+                {
+                    totalMs: Math.round(NPF_STARTUP_DIAGNOSTIC.now() - npfDiagRefreshStartedAt),
+                    datasetMs: Math.round(npfDiagDatasetMs),
+                    touchDecorMs: Math.round(npfDiagTouchDecorMs),
+                    pointsMs: Math.round(npfDiagPointsMs)
+                }
+            );
+            return;
+        }
 
         /*
          * v15.80 — zoom dans une couverture déjà chargée : conserver volumes,
@@ -44108,6 +44264,9 @@ async function refreshSiaLayers(reason = 'manual') {
         siaRenderedAirspaceFeatures = visibleAirspaceFeatures;
         siaRenderedShowDesignatedPoints = showSiaDesignatedPointsNow;
         siaRenderedPointLabelsEnabled = pointLabelsEnabledNow;
+        if (reason === 'startup-prefs') {
+            armSiaStartupPassiveMoveendGuard();
+        }
 
         const footer = document.getElementById('sia-filter-footer-status');
         if (footer) {
