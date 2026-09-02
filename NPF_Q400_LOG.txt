@@ -1,3 +1,44 @@
+VERSION TEST v16.32 — FLUIDITÉ SIA / DÉMARRAGE / TRANSITION PWA
+Date : 02/09/2026
+Base : TEST v16.31
+
+OBJECTIFS
+- Continuer à améliorer la fluidité avec les zones SIA sans supprimer de données ni de fonctions.
+- Réduire les grosses tâches concurrentes au démarrage de la PWA.
+- Corriger la transition de mise à jour qui pouvait nécessiter une seconde ouverture de la PWA.
+
+1. SIA — DÉCORATIONS PROGRESSIVES
+- Les surfaces tactiles des zones sont construites par petits lots avec restitution régulière du thread principal à WebKit.
+- Les bandes intérieures et libellés SIA sont également construits progressivement par lots.
+- Un nouveau déplacement de carte annule immédiatement une construction progressive devenue obsolète.
+- Le délai après fin de déplacement passe de 260 à 320 ms afin de laisser la carte finir son mouvement avant les décorations.
+- Les zones principales restent affichées ; les éléments tactiles/décoratifs se complètent sans bloc JavaScript monolithique.
+
+2. LOCALITÉS HORS LIGNE — CHARGEMENT À LA DEMANDE
+- Suppression du préchargement automatique de la base nationale de 179 402 localités au démarrage.
+- Le ZIP/index est chargé uniquement lors de la première recherche qui en a réellement besoin.
+- La recherche hors ligne reste inchangée et disponible en mode avion.
+- DIAG indique désormais « Localités hors ligne — chargement à la demande ».
+
+3. MISE À JOUR AUTOMATIQUE PWA
+- Suppression de la navigation client déclenchée directement par le service worker pendant son activation.
+- `controllerchange` devient l'unique mécanisme de rechargement automatique.
+- Lors de ce rechargement, l'ancienne page ne réinjecte plus son ancien `appv` dans l'URL.
+- Le nouveau service worker sert alors le shell correspondant à sa propre version active, ce qui évite la concurrence entre deux rechargements et le besoin de relancer manuellement la PWA.
+- Aucun bouton MAJ n'est ajouté ni réintroduit.
+
+4. ÉLÉMENTS INCHANGÉS
+- Cartes Offline et bases IndexedDB inchangées.
+- Données SIA `sia.js` strictement inchangées.
+- Filtres SIA, zones, points VFR/VRP, PÉLIC, route WP, GoTo et navette Feu/PÉLIC inchangés.
+
+5. CONTRÔLES
+- `node --check` sur Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.32 Index / Manifest / Script / Style / SW.
+- `sia.js` comparé bit-à-bit avec v16.31.
+
+
 VERSION TEST v16.31 — FLUIDITÉ CARTE AVEC ZONES SIA
 Date : 02/09/2026
 Base : TEST v16.30
