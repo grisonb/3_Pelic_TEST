@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.37';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.38';
 
 
 /*
@@ -145,6 +145,28 @@ function escapeNpfStartupDiagnosticHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+function getNpfStartupDiagnosticOverlaySnapshot() {
+    let roadOverlayInstalledParts = 0;
+    try {
+        roadOverlayInstalledParts = Number(getRoadOverlayManifest?.()?.parts?.length || 0);
+    } catch (_) {}
+
+    return {
+        routes: showRoadOverlayLayer ? 'ON' : 'OFF',
+        routesInstalledParts: roadOverlayInstalledParts,
+        routesRenderedLines: Number(roadOverlayLineLayer?.getLayers?.().length || 0),
+        routesRenderedLabels: Number(roadOverlayLabelsLayer?.getLayers?.().length || 0),
+        ht: showHighVoltageLinesLayer ? 'ON' : 'OFF',
+        htLoaded: hasLoadedHighVoltageLines ? 'OUI' : 'NON',
+        htSegments: Number(highVoltageLinesFeatureCount || 0)
+    };
+}
+
+function recordNpfStartupDiagnosticOverlaySnapshot(detail = '') {
+    const snapshot = getNpfStartupDiagnosticOverlaySnapshot();
+    return npfDiagSiaInteraction('Couches carte', detail || 'état', snapshot);
+}
+
 function getNpfStartupDiagnosticRuntimeInfo() {
     let source = '—';
     let pack = '';
@@ -159,12 +181,21 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         if (map && typeof map.getZoom === 'function') zoom = String(map.getZoom());
     } catch (_) {}
 
+    const layers = getNpfStartupDiagnosticOverlaySnapshot();
+
     return {
         source,
         pack,
         zoom,
         directHits: typeof directOfflineTileHitCount === 'number' ? directOfflineTileHitCount : null,
-        directMisses: typeof directOfflineTileMissCount === 'number' ? directOfflineTileMissCount : null
+        directMisses: typeof directOfflineTileMissCount === 'number' ? directOfflineTileMissCount : null,
+        roadOverlaySelected: layers.routes,
+        roadOverlayInstalledParts: layers.routesInstalledParts,
+        roadOverlayRenderedLines: layers.routesRenderedLines,
+        roadOverlayRenderedLabels: layers.routesRenderedLabels,
+        highVoltageSelected: layers.ht,
+        highVoltageLoaded: layers.htLoaded,
+        highVoltageFeatureCount: layers.htSegments
     };
 }
 
@@ -184,6 +215,15 @@ function buildNpfStartupDiagnosticExportText() {
     if (runtime.directHits !== null) {
         lines.push('Tuiles IDB : ' + runtime.directHits + ' trouvées / ' + runtime.directMisses + ' absentes');
     }
+    lines.push('Couches : Routes ' + runtime.roadOverlaySelected + ' | Lignes HT ' + runtime.highVoltageSelected);
+    lines.push(
+        'Détail couches : '
+        + runtime.roadOverlayInstalledParts + ' parties routes installées | '
+        + runtime.roadOverlayRenderedLines + ' calques routes / '
+        + runtime.roadOverlayRenderedLabels + ' cartouches | '
+        + 'HT chargées ' + runtime.highVoltageLoaded + ' | '
+        + runtime.highVoltageFeatureCount + ' tronçons HT'
+    );
     lines.push('');
     lines.push('ÉTAPES');
     lines.push('Étape | Depuis ouverture | Delta | Détail');
@@ -383,6 +423,14 @@ function renderNpfStartupDiagnosticPanel() {
     } else {
         body.innerHTML = `
             <div class="npf-startup-diag-page-title">2/2 — COUCHES ANNEXES ET BLOCAGES</div>
+            <div class="npf-startup-diag-meta npf-startup-diag-meta-compact">
+                <span>Routes : <b>${escapeNpfStartupDiagnosticHtml(runtime.roadOverlaySelected)}</b></span>
+                <span>Routes installées : <b>${runtime.roadOverlayInstalledParts}</b></span>
+                <span>Routes rendues : <b>${runtime.roadOverlayRenderedLines}</b> / labels <b>${runtime.roadOverlayRenderedLabels}</b></span>
+                <span>Lignes HT : <b>${escapeNpfStartupDiagnosticHtml(runtime.highVoltageSelected)}</b></span>
+                <span>HT chargées : <b>${escapeNpfStartupDiagnosticHtml(runtime.highVoltageLoaded)}</b></span>
+                <span>Tronçons HT : <b>${runtime.highVoltageFeatureCount}</b></span>
+            </div>
             <div class="npf-startup-diag-page2-grid">
                 <div class="npf-startup-diag-page2-table">${table}</div>
                 <div class="npf-startup-diag-stalls">
@@ -1495,6 +1543,7 @@ const HIGH_VOLTAGE_LINES_GEOJSON_URL = 'lignes_ht_rte_simplifiees.geojson';
 let showHighVoltageLinesLayer = localStorage.getItem(HIGH_VOLTAGE_LINES_LAYER_KEY) === 'true';
 let hasLoadedHighVoltageLines = false;
 let isHighVoltageLinesLoading = false;
+let highVoltageLinesFeatureCount = 0;
 
 const ROAD_OVERLAY_LAYER_KEY = 'showRoadOverlayLayer';
 const ROAD_OVERLAY_CACHE_NAME = 'npf-road-overlay-data-v1';
@@ -7150,6 +7199,7 @@ function scheduleStartupAuxiliaryLayers() {
      * premières tuiles offline. Safari/IndexedDB devient très lent si la carte,
      * les lignes HT, les communes et les départements démarrent simultanément.
      */
+    recordNpfStartupDiagnosticOverlaySnapshot('état mémorisé au démarrage');
     const baseDelay = offlineTilesMode ? OFFLINE_AUX_LAYER_START_DELAY_MS : 900;
 
     if (areDepartmentsVisible) {
@@ -9740,6 +9790,7 @@ async function loadHighVoltageLinesLayerData() {
     try {
         const geojson = await fetchHighVoltageLinesGeojson();
         const featuresCount = Array.isArray(geojson?.features) ? geojson.features.length : 0;
+        highVoltageLinesFeatureCount = featuresCount;
 
         const geoJsonLayer = L.geoJSON(geojson, {
             style: getHighVoltageLineStyle,
@@ -9783,6 +9834,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
             showHighVoltageLinesLayer = true;
             localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, 'true');
             refreshHighVoltageLinesButtonState();
+            recordNpfStartupDiagnosticOverlaySnapshot(`lignes-ht ${showHighVoltageLinesLayer ? 'ON' : 'OFF'} · ${options.source || 'load-error'}`);
             if (allowRetry) scheduleHighVoltageLinesRetry(options.source || 'load-error');
             if (!silent) {
                 alert("Chargement Lignes HT différé. L'application va réessayer automatiquement.");
@@ -9803,6 +9855,7 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
 
     localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, String(showHighVoltageLinesLayer));
     refreshHighVoltageLinesButtonState();
+    recordNpfStartupDiagnosticOverlaySnapshot(`lignes-ht ${showHighVoltageLinesLayer ? 'ON' : 'OFF'} · ${options.source || 'toggle'}`);
 }
 
 
@@ -10303,6 +10356,7 @@ async function deleteRoadOverlayData() {
 
     await clearRoadOverlayCacheAndManifest();
     refreshRoadOverlayButtonState();
+    recordNpfStartupDiagnosticOverlaySnapshot('routes OFF · suppression');
 }
 
 function formatRoadOverlayImportedDate(timestamp) {
@@ -11297,6 +11351,7 @@ async function toggleRoadOverlayLayer(forceState = null, options = {}) {
         showRoadOverlayLayer = false;
         localStorage.setItem(ROAD_OVERLAY_LAYER_KEY, 'false');
         refreshRoadOverlayButtonState();
+        recordNpfStartupDiagnosticOverlaySnapshot(`routes OFF · ${options.source || 'toggle'} · pack absent`);
 
         if (!options.silent) {
             const modal = document.getElementById('offline-map-modal');
@@ -11327,6 +11382,7 @@ async function toggleRoadOverlayLayer(forceState = null, options = {}) {
     }
 
     refreshRoadOverlayButtonState();
+    recordNpfStartupDiagnosticOverlaySnapshot(`routes ${showRoadOverlayLayer ? 'ON' : 'OFF'} · ${options.source || 'toggle'}`);
 }
 
 
@@ -22403,6 +22459,103 @@ function buildPermanentAirportDotIcon() {
 }
 
 
+function getTerrainAirportRunways(airport) {
+    const oaci = String(airport?.oaci || '').trim().toUpperCase();
+    if (!oaci) return [];
+
+    if (typeof getAdditionalAerodromeRunways === 'function') {
+        const additional = getAdditionalAerodromeRunways(oaci);
+        if (Array.isArray(additional) && additional.length) return additional;
+    }
+
+    if (typeof otherAirportRunwaysByOaci !== 'undefined' && otherAirportRunwaysByOaci?.has?.(oaci)) {
+        return otherAirportRunwaysByOaci.get(oaci) || [];
+    }
+
+    if (typeof declaredPelicanRunwaysByOaci !== 'undefined' && declaredPelicanRunwaysByOaci?.has?.(oaci)) {
+        return declaredPelicanRunwaysByOaci.get(oaci) || [];
+    }
+
+    return [];
+}
+
+function getTerrainAirportPrimaryRunway(airport) {
+    const runways = getTerrainAirportRunways(airport);
+    if (!Array.isArray(runways) || !runways.length) return null;
+
+    return runways.reduce((best, runway) => {
+        if (!best) return runway;
+        const bestLength = Number(best?.lengthM) || 0;
+        const runwayLength = Number(runway?.lengthM) || 0;
+        return runwayLength > bestLength ? runway : best;
+    }, null);
+}
+
+function getTerrainAirportIconHeading(airport) {
+    const runway = getTerrainAirportPrimaryRunway(airport);
+    if (
+        runway
+        && Number.isFinite(runway.leLat)
+        && Number.isFinite(runway.leLon)
+        && Number.isFinite(runway.heLat)
+        && Number.isFinite(runway.heLon)
+    ) {
+        try {
+            return Number(calculateBearing(runway.leLat, runway.leLon, runway.heLat, runway.heLon)) || 0;
+        } catch (_) {}
+    }
+    return 90;
+}
+
+function buildTerrainAirportSymbolHtml(airport, options = {}) {
+    const inverted = !!options.inverted;
+    const showCardinalTabs = options.showCardinalTabs !== false;
+    const heading = getTerrainAirportIconHeading(airport);
+    const mainColor = '#3358d4';
+    const fillColor = inverted ? '#ffffff' : mainColor;
+    const strokeColor = inverted ? mainColor : '#ffffff';
+    const runwayColor = inverted ? mainColor : '#ffffff';
+    const ringColor = mainColor;
+
+    const tabsSvg = showCardinalTabs ? `
+        <rect x="28" y="2.5" width="8" height="10" rx="2.4" fill="${fillColor}" stroke="${strokeColor}" stroke-width="3"/>
+        <rect x="28" y="51.5" width="8" height="10" rx="2.4" fill="${fillColor}" stroke="${strokeColor}" stroke-width="3"/>
+        <rect x="2.5" y="28" width="10" height="8" rx="2.4" fill="${fillColor}" stroke="${strokeColor}" stroke-width="3"/>
+        <rect x="51.5" y="28" width="10" height="8" rx="2.4" fill="${fillColor}" stroke="${strokeColor}" stroke-width="3"/>
+    ` : '';
+
+    return `
+        <span class="terrain-airport-symbol" aria-hidden="true">
+            <svg viewBox="0 0 64 64" focusable="false" aria-hidden="true">
+                ${tabsSvg}
+                <circle cx="32" cy="32" r="20.5" fill="${fillColor}" stroke="${ringColor}" stroke-width="4"/>
+                ${!inverted ? '<circle cx="32" cy="32" r="20.5" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.95"/>' : ''}
+                <g transform="rotate(${Number.isFinite(heading) ? heading.toFixed(1) : '90.0'} 32 32)">
+                    <rect x="15" y="27.6" width="34" height="8.8" rx="4.4" fill="${runwayColor}"/>
+                </g>
+            </svg>
+        </span>`;
+}
+
+function buildTerrainAirportMapIcon(airport, options = {}) {
+    const showCardinalTabs = options.showCardinalTabs !== false;
+    const size = Number(options.size) || (showCardinalTabs ? 30 : 22);
+    const anchor = Math.round(size / 2);
+    const className = [
+        'terrain-airport-marker-icon',
+        options.inverted ? 'terrain-airport-marker-icon-inverted' : 'terrain-airport-marker-icon-selectable'
+    ].join(' ');
+
+    return L.divIcon({
+        className,
+        html: buildTerrainAirportSymbolHtml(airport, options),
+        iconSize: [size, size],
+        iconAnchor: [anchor, anchor],
+        popupAnchor: [0, -anchor]
+    });
+}
+
+
 function buildPelicPdfButtonsHtml(oaci) {
     const safeOaci = String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     return `<div class="popup-buttons popup-pdf-buttons"><button class="pdf-btn" onclick="window.openAirportPdf('${safeOaci}')">PDF Pélic</button><button class="pdf-btn fdf-reduced-pdf-btn" onclick="window.openFdfReducedPdf()">Doc PDF Réduite</button></div>`;
@@ -24917,12 +25070,15 @@ function drawPermanentAirportMarkers() {
      * pistes intégrée à la carte NPF. Les pistes ne remplacent plus les ronds.
      */
     additionalAerodromes.forEach(airport => {
-        L.circleMarker([airport.lat, airport.lon], {
-            radius: 2.7,
-            stroke: false,
-            fillColor: '#111111',
-            fillOpacity: 1,
-            interactive: false
+        L.marker([airport.lat, airport.lon], {
+            icon: buildTerrainAirportMapIcon(airport, {
+                inverted: true,
+                showCardinalTabs: false,
+                size: 22
+            }),
+            interactive: false,
+            keyboard: false,
+            zIndexOffset: 1700
         }).addTo(permanentAirportLayer);
 
         const popupHtml = `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
@@ -24955,35 +25111,20 @@ function drawPermanentAirportMarkers() {
         }
 
         /*
-         * v12.10 — points noirs aéroports réellement cerclés :
-         * les aéroports non pélicandromes étaient des L.circleMarker avec
-         * un gros trait transparent pour la zone tactile. Le CSS ne pouvait
-         * donc pas modifier leur rendu. On dessine maintenant :
-         * - un cercle externe noir ;
-         * - un cercle blanc ;
-         * - un point noir central ;
-         * - un cercle transparent séparé pour conserver une grande zone tactile.
-         *
-         * v14.73 — symbole légèrement agrandi pour mieux distinguer les
-         * aérodromes pouvant être sélectionnés comme pélicandrome. La zone
-         * tactile transparente reste volontairement inchangée.
+         * v16.38 — pictogramme terrain orienté.
+         * Les terrains sélectionnables comme PÉLIC adoptent désormais une icône
+         * bleue dédiée dont le trait central reprend l’orientation de la piste
+         * principale disponible dans la base locale.
          */
-        L.circleMarker([airport.lat, airport.lon], {
-            radius: 6,
-            color: '#111111',
-            weight: 1,
-            fillColor: '#ffffff',
-            fillOpacity: 1,
-            interactive: false
-        }).addTo(permanentAirportLayer);
-
-        L.circleMarker([airport.lat, airport.lon], {
-            radius: 3.5,
-            color: '#ffffff',
-            weight: 1,
-            fillColor: '#111111',
-            fillOpacity: 1,
-            interactive: false
+        L.marker([airport.lat, airport.lon], {
+            icon: buildTerrainAirportMapIcon(airport, {
+                inverted: false,
+                showCardinalTabs: true,
+                size: 30
+            }),
+            interactive: false,
+            keyboard: false,
+            zIndexOffset: 1850
         }).addTo(permanentAirportLayer);
 
         const popupHtml = `<div class="airport-popup"><b>${airport.oaci}</b><br>${airport.name}<div class="popup-buttons"><button class="${baseButtonClass}" onclick="window.setBaseAirport('${airport.oaci}')">${baseButtonText}</button><button class="${customPelicClass}" onclick="window.toggleCustomPelican('${airport.oaci}')">${customPelicText}</button></div>${buildVacButtonHtml(airport.oaci)}${buildAirportGoToButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
