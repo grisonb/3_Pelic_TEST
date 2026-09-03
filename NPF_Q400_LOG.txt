@@ -1,3 +1,37 @@
+VERSION TEST v16.39 — CORRECTION INSTALLATION PWA / MARQUEUR STYLE
+Date : 03/09/2026
+Base : TEST v16.38
+
+OBJECTIF
+- Corriger le blocage de mise à jour v16.37 → v16.38 observé dans la PWA.
+- Conserver sans modification fonctionnelle les icônes terrains et le DIAG Routes / Lignes HT introduits en v16.38.
+
+1. CAUSE IDENTIFIÉE
+- Le fichier style.css livré en v16.38 conservait en première ligne le marqueur interne `NPF_STYLE_BUILD_VERSION: v16.37`.
+- Le service worker contrôle de manière atomique la cohérence de index.html, script.js, style.css et manifest.json avant activation.
+- Cette incohérence faisait donc refuser l’installation de la v16.38 et la PWA restait pilotée par la v16.37.
+
+2. CORRECTION
+- Marqueur interne du style mis à jour vers v16.39.
+- Version applicative mise à jour de manière cohérente dans Index, Manifest, Script, Style et Service Worker.
+- Nouveau cache app-shell SW v16.39 pour forcer une installation propre et atomique.
+- Mécanisme de mise à jour automatique v16.36 conservé tel quel : aucun bouton MAJ, un seul rechargement via controllerchange.
+
+3. ÉLÉMENTS INCHANGÉS
+- Icônes terrains v16.38 inchangées.
+- DIAG Routes / Lignes HT v16.38 inchangé.
+- Optimisations SIA v16.31 à v16.37 inchangées.
+- Carte Offline / IndexedDB / localités hors ligne inchangées.
+- sia.js strictement inchangé.
+
+4. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.39 Index / Manifest / Script / Style / SW.
+- Vérification du marqueur `NPF_STYLE_BUILD_VERSION: v16.39`.
+- sia.js comparé bit-à-bit avec v16.38.
+
+
 VERSION TEST v16.38 — ICÔNES TERRAINS + DIAG COUCHES ROUTES / HT
 Date : 03/09/2026
 Base : TEST v16.37
