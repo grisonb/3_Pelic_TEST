@@ -1,3 +1,44 @@
+VERSION TEST v16.38 — ICÔNES TERRAINS + DIAG COUCHES ROUTES / HT
+Date : 03/09/2026
+Base : TEST v16.37
+
+OBJECTIF
+- Remplacer les anciens ronds noirs des terrains par deux nouvelles icônes orientées selon la piste principale.
+- Distinguer visuellement les terrains sélectionnables comme PÉLIC des aérodromes non sélectionnables.
+- Ajouter au diagnostic l’état explicite des couches Routes et Lignes HT afin de savoir immédiatement si elles étaient activées.
+
+1. ICÔNES TERRAINS
+- Aéroports sélectionnables comme PÉLIC (liste otherAirports non encore activée en PÉLIC) : remplacement du rond noir cerclé par un pictogramme bleu inspiré de la référence fournie.
+- Le trait central blanc représente la piste et tourne automatiquement selon l’orientation de la piste principale (la plus longue disponible dans la base locale).
+- Les petits rectangles périphériques sont conservés sur cette version sélectionnable.
+
+2. AÉRODROMES NON SÉLECTIONNABLES COMME PÉLIC
+- Remplacement des points noirs par la même famille d’icône en version inversée.
+- Couleurs inversées : fond blanc / bleu au lieu de bleu / blanc.
+- Suppression des petits rectangles périphériques haut / bas / droite / gauche, conformément à la demande.
+- L’orientation de la piste est également reprise quand la géométrie locale est disponible ; sinon l’icône reste horizontale par défaut.
+
+3. DIAGNOSTIC ROUTES / LIGNES HT
+- Le DIAG exporté et le panneau 2/2 affichent maintenant explicitement :
+  - Routes : ON/OFF ;
+  - Lignes HT : ON/OFF ;
+  - nombre de parties routières installées ;
+  - nombre de lignes/cartouches routiers actuellement rendus ;
+  - état de chargement HT et nombre de tronçons HT connus.
+- Un instantané de ces couches est enregistré au démarrage puis à chaque bascule Routes / HT, pour faciliter l’interprétation d’un rapport utilisateur.
+
+4. ÉLÉMENTS INCHANGÉS
+- Optimisations de fluidité SIA v16.31 à v16.37 conservées.
+- Mécanisme de mise à jour PWA v16.36-v16.37 inchangé.
+- Carte Offline / IndexedDB / localités hors ligne inchangées.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES
+- Cohérence v16.38 Index / Manifest / Script / Style / SW.
+- Contrôle ciblé des nouveaux pictogrammes terrains : variante sélectionnable avec ergots, variante non sélectionnable inversée sans ergots.
+- Contrôle ciblé DIAG : présence explicite de Routes et Lignes HT dans l’export texte et dans le panneau 2/2.
+
+
 VERSION TEST v16.37 — FLUIDITÉ SIA : AFFINAGE DU RETOUR VERS ZOOM 10
 Date : 02/09/2026
 Base : TEST v16.36
