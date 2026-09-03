@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-38_terrain_icons_diag_layers';
-const APP_VERSION = 'v16.38';
+const SW_VERSION = 'sw-v16-39_style_marker_fix';
+const APP_VERSION = 'v16.39';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
