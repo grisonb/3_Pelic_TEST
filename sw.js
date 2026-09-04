@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-46_tile_reader_queue_fix';
-const APP_VERSION = 'v16.46';
+const SW_VERSION = 'sw-v16-47_tile_reader_airport_vac_fix';
+const APP_VERSION = 'v16.47';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
