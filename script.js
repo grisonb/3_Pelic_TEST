@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.43';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.44';
 
 
 /*
@@ -278,7 +278,7 @@ function buildNpfStartupDiagnosticExportText() {
         'Détail couches : '
         + runtime.roadOverlayInstalledParts + ' parties routes installées | '
         + runtime.roadOverlayRenderedLines + ' groupes routes / '
-        + runtime.roadOverlaySourceSegments + ' segments source indexés / '
+        + runtime.roadOverlaySourceSegments + ' segments source chargés / '
         + runtime.roadOverlayRenderedSegments + ' segments rendus / '
         + runtime.roadOverlayRenderedLabels + ' cartouches | '
         + 'HT chargées ' + runtime.highVoltageLoaded + ' | '
@@ -1472,15 +1472,15 @@ const ROAD_OVERLAY_LABEL_REFRESH_VIEWPORT_RATIO = 0.24;
  * v15.00 — laisser le fond de carte et SafeSky se stabiliser avant le
  * rendu routier, et éviter de charger des secteurs trop éloignés de l'écran.
  */
-const ROAD_OVERLAY_MAP_CHANGE_DELAY_MS = 1050;
-const ROAD_OVERLAY_VIEWPORT_PAD_TIER_1 = 0.12;
-const ROAD_OVERLAY_VIEWPORT_PAD_TIER_2 = 0.16;
-const ROAD_OVERLAY_FEATURE_PAD_TIER_1 = 0.34;
-const ROAD_OVERLAY_FEATURE_PAD_TIER_2 = 0.26;
-const ROAD_OVERLAY_FILTER_YIELD_EVERY = 2500;
-const ROAD_OVERLAY_TILE_PRIORITY_QUEUE_LIMIT = 6;
-const ROAD_OVERLAY_TILE_PRIORITY_ACTIVE_LIMIT = 1;
-const ROAD_OVERLAY_TILE_PRIORITY_MAX_WAIT_MS = 2800;
+const ROAD_OVERLAY_MAP_CHANGE_DELAY_MS = 1150;
+const ROAD_OVERLAY_VIEWPORT_PAD_TIER_1 = 0.10;
+const ROAD_OVERLAY_VIEWPORT_PAD_TIER_2 = 0.12;
+const ROAD_OVERLAY_FEATURE_PAD_TIER_1 = 0.18;
+const ROAD_OVERLAY_FEATURE_PAD_TIER_2 = 0.12;
+const ROAD_OVERLAY_FILTER_YIELD_EVERY = 1200;
+const ROAD_OVERLAY_TILE_PRIORITY_QUEUE_LIMIT = 0;
+const ROAD_OVERLAY_TILE_PRIORITY_ACTIVE_LIMIT = 0;
+const ROAD_OVERLAY_TILE_PRIORITY_MAX_WAIT_MS = 6000;
 
 let areDepartmentsVisible = false;
 let hasLoadedDepartments = false;
@@ -10873,6 +10873,45 @@ async function buildRoadOverlayGeojsonForTierAndBounds(geojson, tier, bounds, to
     };
 }
 
+/*
+ * v16.44 — rendu Canvas agrégé par classe routière.
+ * Le GeoJSON filtré conserve les features originales pour les cartouches et le
+ * diagnostic, mais le dessin n'a plus besoin d'une Polyline Leaflet par feature.
+ * Chaque classe A/N/D/M/T devient au maximum un MultiLineString par partie.
+ */
+function buildRoadOverlayAggregatedRenderGeojson(filteredGeojson) {
+    const groupedLines = new Map();
+    const features = Array.isArray(filteredGeojson?.features)
+        ? filteredGeojson.features
+        : [];
+
+    for (const feature of features) {
+        const roadClass = String(feature?.properties?.roadClass || '').toUpperCase();
+        if (!roadClass) continue;
+        const lines = getRoadOverlayGeometryLines(feature);
+        if (!lines.length) continue;
+        if (!groupedLines.has(roadClass)) groupedLines.set(roadClass, []);
+        const target = groupedLines.get(roadClass);
+        for (const line of lines) {
+            if (Array.isArray(line) && line.length >= 2) target.push(line);
+        }
+    }
+
+    return {
+        type: 'FeatureCollection',
+        features: [...groupedLines.entries()]
+            .filter(([, lines]) => lines.length)
+            .map(([roadClass, lines]) => ({
+                type: 'Feature',
+                properties: { roadClass, ref: roadClass },
+                geometry: {
+                    type: 'MultiLineString',
+                    coordinates: lines
+                }
+            }))
+    };
+}
+
 function getRoadOverlayLineStyle(feature, casing = false) {
     const roadClass = getRoadOverlayClassFromRef(
         feature?.properties?.ref || feature?.properties?.roadClass
@@ -11486,18 +11525,18 @@ async function getRoadOverlaySourcePart(part, token, tier) {
         ? storedGeojson.features
         : [];
 
-    for (let index = 0; index < sourceFeatures.length; index += 1) {
-        if (
-            token !== roadOverlayRefreshToken
-            || !showRoadOverlayLayer
-            || tier !== roadOverlayLoadedZoomTier
-        ) {
-            return null;
-        }
-        getRoadOverlayFeatureBbox(sourceFeatures[index]);
-        if (index > 0 && index % ROAD_OVERLAY_FILTER_YIELD_EVERY === 0) {
-            await yieldRoadOverlayRenderTurn();
-        }
+    /*
+     * v16.44 — ne plus pré-calculer les bbox des dizaines de milliers de
+     * tronçons juste après le JSON.parse(). Le filtrage viewport les calcule
+     * paresseusement, et seulement pour les classes réellement visibles au
+     * niveau de zoom courant. On supprime ainsi un parcours complet en double.
+     */
+    if (
+        token !== roadOverlayRefreshToken
+        || !showRoadOverlayLayer
+        || tier !== roadOverlayLoadedZoomTier
+    ) {
+        return null;
     }
 
     const record = {
@@ -11540,13 +11579,14 @@ async function loadRoadOverlayPart(part, token, tier, renderBounds) {
         return emptyRecord;
     }
 
-    const casing = L.geoJSON(geojson, {
+    const renderGeojson = buildRoadOverlayAggregatedRenderGeojson(geojson);
+    const casing = L.geoJSON(renderGeojson, {
         pane: 'roadOverlayCasingPane',
         renderer: roadOverlayCasingRenderer || undefined,
         interactive: false,
         style: feature => getRoadOverlayLineStyle(feature, true)
     });
-    const lines = L.geoJSON(geojson, {
+    const lines = L.geoJSON(renderGeojson, {
         pane: 'roadOverlayLinePane',
         renderer: roadOverlayLineRenderer || undefined,
         interactive: false,
@@ -11560,8 +11600,10 @@ async function loadRoadOverlayPart(part, token, tier, renderBounds) {
         casing,
         lines,
         geojson,
+        renderGeojson,
         tier,
-        sourceFeatureCount: sourceRecord.featureCount
+        sourceFeatureCount: sourceRecord.featureCount,
+        renderGroupCount: renderGeojson.features.length
     };
     loadedRoadOverlayParts.set(part.key, record);
     return record;
