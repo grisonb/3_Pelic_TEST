@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-43_road_viewport_tile_priority';
-const APP_VERSION = 'v16.43';
+const SW_VERSION = 'sw-v16-44_light_install_road_aggregate';
+const APP_VERSION = 'v16.44';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
@@ -164,28 +164,57 @@ async function validateVersionSensitiveCoreResponse(url, response) {
  * l'installation du nouveau Service Worker. Les fichiers versionnés sont donc
  * relus plusieurs fois avec une URL anti-cache différente avant abandon.
  */
-async function fetchValidatedCoreForInstall(url) {
-    const filename = getAppShellFilename(url);
-    const versionSensitive = VERSION_SENSITIVE_CORE_FILES.has(filename);
-    const maxAttempts = versionSensitive ? 10 : 1;
+async function fetchValidatedVersionSensitiveCoreSetForInstall(urls) {
+    const pending = new Set(urls);
+    const responses = new Map();
+    const maxAttempts = 8;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        try {
-            const response = await fetchForAppShell(
-                url,
-                versionSensitive ? 6500 : 15000,
-                attempt
-            );
-            const valid = response && response.ok
-                && await validateVersionSensitiveCoreResponse(url, response);
-            if (valid) return response;
-        } catch (_) {}
+    for (let attempt = 1; attempt <= maxAttempts && pending.size; attempt += 1) {
+        const batch = [...pending];
+        const results = await Promise.all(batch.map(async url => {
+            try {
+                const response = await fetchForAppShell(url, 6500, attempt);
+                const valid = response && response.ok
+                    && await validateVersionSensitiveCoreResponse(url, response);
+                return { url, response: valid ? response : null };
+            } catch (_) {
+                return { url, response: null };
+            }
+        }));
 
-        if (attempt < maxAttempts) {
-            await swDelay(1600);
+        for (const result of results) {
+            if (!result.response) continue;
+            responses.set(result.url, result.response);
+            pending.delete(result.url);
+        }
+
+        if (pending.size && attempt < maxAttempts) {
+            await swDelay(1200);
         }
     }
-    return null;
+
+    return { responses, missing: [...pending] };
+}
+
+async function notifyClientsOfSwInstallStage(stage, detail = '') {
+    try {
+        const clients = await self.clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        });
+        clients.forEach(client => {
+            try {
+                client.postMessage({
+                    type: 'NPF_SW_INSTALL_STAGE',
+                    stage: String(stage || ''),
+                    detail: String(detail || ''),
+                    appVersion: APP_VERSION,
+                    swVersion: SW_VERSION,
+                    at: Date.now()
+                });
+            } catch (_) {}
+        });
+    } catch (_) {}
 }
 
 async function copyExistingCachedAsset(url, targetCache) {
@@ -203,26 +232,66 @@ async function copyExistingCachedAsset(url, targetCache) {
 
 self.addEventListener('install', event => {
     event.waitUntil((async () => {
+        const installStartedAt = Date.now();
+        await notifyClientsOfSwInstallStage('start', APP_VERSION);
+
         await caches.delete(APP_SHELL_CACHE).catch(() => false);
         const cache = await caches.open(APP_SHELL_CACHE);
         const failedCoreUrls = [];
 
-        for (const url of CORE_APP_SHELL_URLS) {
-            let stored = false;
-            try {
-                const response = await fetchValidatedCoreForInstall(url);
-                if (response) {
-                    await cache.put(url, response.clone());
-                    stored = true;
-                }
-            } catch (_) {}
+        const versionSensitiveUrls = CORE_APP_SHELL_URLS.filter(url => (
+            VERSION_SENSITIVE_CORE_FILES.has(getAppShellFilename(url))
+        ));
+        const stableCoreUrls = CORE_APP_SHELL_URLS.filter(url => (
+            !VERSION_SENSITIVE_CORE_FILES.has(getAppShellFilename(url))
+        ));
 
-            if (!stored) stored = await copyExistingCachedAsset(url, cache);
-            if (!stored) failedCoreUrls.push(url);
+        /*
+         * v16.44 — les fichiers sensibles sont validés en parallèle à chaque
+         * tentative. Cela évite quatre chaînes de retry séquentielles pendant
+         * la propagation GitHub Pages.
+         */
+        const sensitiveResult = await fetchValidatedVersionSensitiveCoreSetForInstall(
+            versionSensitiveUrls
+        );
+        for (const url of versionSensitiveUrls) {
+            const response = sensitiveResult.responses.get(url);
+            if (!response) {
+                failedCoreUrls.push(url);
+                continue;
+            }
+            try {
+                await cache.put(url, response.clone());
+            } catch (_) {
+                failedCoreUrls.push(url);
+            }
         }
+
+        /*
+         * Bibliothèques statiques : réutiliser d'abord le shell déjà validé.
+         * Aucun téléchargement n'est lancé à chaque changement de version si
+         * Leaflet / SunCalc / JSZip sont déjà disponibles hors ligne.
+         */
+        await Promise.all(stableCoreUrls.map(async url => {
+            let stored = await copyExistingCachedAsset(url, cache);
+            if (!stored) {
+                try {
+                    const response = await fetchForAppShell(url, 8000, 1);
+                    if (response && response.ok) {
+                        await cache.put(url, response.clone());
+                        stored = true;
+                    }
+                } catch (_) {}
+            }
+            if (!stored) failedCoreUrls.push(url);
+        }));
 
         if (failedCoreUrls.length) {
             await caches.delete(APP_SHELL_CACHE).catch(() => false);
+            await notifyClientsOfSwInstallStage(
+                'refused',
+                failedCoreUrls.join(', ')
+            );
             throw new Error(
                 `[SW ${APP_VERSION}] Installation atomique refusée, app-shell `
                 + `incomplet ou incohérent: ${failedCoreUrls.join(', ')}`
@@ -230,46 +299,17 @@ self.addEventListener('install', event => {
         }
 
         /*
-         * v15.76 — données SIA séparées du script principal.
-         * Le cache SIA est indépendant du numéro de version NPF. Son échec ne
-         * doit jamais empêcher l'installation du shell principal.
+         * v16.44 — aucune opération SIA ni APP_DATA pendant `install`.
+         * - sia.js reste dans le cache indépendant de révision 15.69 ;
+         * - les données communes/HT/icônes restent dans APP_DATA_CACHE ;
+         * - les handlers fetch les servent cache-first et les régénèrent à la
+         *   demande si nécessaire.
+         * Les bases IndexedDB de cartes Offline ne sont jamais touchées.
          */
-        try {
-            const siaCache = await caches.open(SIA_DATA_CACHE);
-            let siaResponse = null;
-            try {
-                const siaUrl = new URL(SIA_DATA_URL, self.location.href);
-                siaUrl.searchParams.set('siav', SIA_DATA_REVISION);
-                siaUrl.searchParams.set('swinstall', SW_VERSION);
-                const request = new Request(siaUrl.toString(), {
-                    cache: 'reload',
-                    mode: 'same-origin'
-                });
-                const response = await swFetchWithTimeout(request, {}, 18000);
-                if (response && response.ok) {
-                    const text = await response.clone().text();
-                    if (text.includes(`const NPF_SIA_DATA_REVISION = '${SIA_DATA_REVISION}'`)) {
-                        siaResponse = response;
-                    }
-                }
-            } catch (_) {}
-
-            if (siaResponse) {
-                await siaCache.put(SIA_DATA_URL, siaResponse.clone());
-            } else {
-                const existing = await caches.match(SIA_DATA_URL, { ignoreSearch: true });
-                if (existing) await siaCache.put(SIA_DATA_URL, existing.clone());
-            }
-        } catch (_) {}
-
-        try {
-            const dataCache = await caches.open(APP_DATA_CACHE);
-            await Promise.allSettled(APP_DATA_URLS.map(async url => {
-                const existing = await caches.match(url, { ignoreSearch: true });
-                if (existing) await dataCache.put(url, existing.clone());
-            }));
-        } catch (_) {}
-
+        await notifyClientsOfSwInstallStage(
+            'shell-ready',
+            `${Date.now() - installStartedAt} ms`
+        );
         await self.skipWaiting();
     })());
 });
