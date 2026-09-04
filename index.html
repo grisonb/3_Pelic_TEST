@@ -7,8 +7,8 @@
     <title>NPF-Q400</title>
     <link rel="stylesheet" href="leaflet.css">
     <link rel="preload" href="communes_aliases.json" as="fetch" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css?appv=v16.43">
-    <link rel="manifest" href="manifest.json?appv=v16.43">
+    <link rel="stylesheet" href="style.css?appv=v16.44">
+    <link rel="manifest" href="manifest.json?appv=v16.44">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png?appv=v13.92">
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png?appv=v13.92">
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png?appv=v13.92">
@@ -56,7 +56,7 @@
     </style>
 
     <script>
-        const APP_VERSION = 'v16.43';
+        const APP_VERSION = 'v16.44';
         const SERVICE_WORKER_URL = `./sw.js?appv=${encodeURIComponent(APP_VERSION)}`;
         const APP_VERSION_STORAGE_KEY = 'appVersion';
         const SW_CONTROLLER_RELOAD_GUARD_KEY = 'swControllerReloadGuard';
@@ -411,17 +411,23 @@
                 }
                 swUpdateRetryTimer = setTimeout(async () => {
                     swUpdateRetryTimer = 0;
-                    if (await stopServiceWorkerRetryIfCurrent()) return;
                     await runServiceWorkerUpdateAttempt(registration);
                 }, Math.max(500, Number(delayMs) || SW_UPDATE_RETRY_DELAY_MS));
             };
 
             const runServiceWorkerUpdateAttempt = async registration => {
                 if (!registration || swUpdateStopped) return;
-                if (await stopServiceWorkerRetryIfCurrent()) return;
+
+                /*
+                 * v16.44 — effectuer AU MOINS une vraie `registration.update()`
+                 * à chaque lancement différé. Le fait que le contrôleur courant
+                 * ait la même version que la page ne prouve pas qu'une version
+                 * plus récente n'est pas déjà disponible sur GitHub.
+                 */
                 swUpdateAttempt += 1;
                 recordSwUpdateDiag('check', `tentative ${swUpdateAttempt}`);
                 activateWaitingServiceWorker(registration);
+
                 try {
                     if (typeof registration.update === 'function') {
                         await Promise.race([
@@ -432,31 +438,110 @@
                 } catch (error) {
                     recordSwUpdateDiag('check-error', error?.message || String(error || ''));
                 }
+
                 activateWaitingServiceWorker(registration);
+
+                if (registration.installing || registration.waiting) {
+                    scheduleServiceWorkerRetry(registration);
+                    return;
+                }
+
+                const controlledVersion = await askControllerVersion();
+                if (controlledVersion === APP_VERSION) {
+                    swUpdateStopped = true;
+                    if (swUpdateRetryTimer) clearTimeout(swUpdateRetryTimer);
+                    swUpdateRetryTimer = 0;
+                    recordSwUpdateDiag('active', controlledVersion);
+                    return;
+                }
+
                 scheduleServiceWorkerRetry(registration);
             };
 
-            const checkForServiceWorkerUpdate = async () => {
+            const getOrRegisterServiceWorker = async ({ allowRegister = true } = {}) => {
                 try {
-                    const registration = await navigator.serviceWorker.register(
-                        SERVICE_WORKER_URL,
-                        { updateViaCache: 'none' }
-                    );
-                    watchServiceWorkerUpdate(registration);
-                    activateWaitingServiceWorker(registration);
-                    if (!swUpdateRetryStartedAt) swUpdateRetryStartedAt = Date.now();
-                    await runServiceWorkerUpdateAttempt(registration);
-                    return registration;
+                    let registration = await navigator.serviceWorker.getRegistration();
+                    if (!registration && allowRegister) {
+                        registration = await navigator.serviceWorker.register(
+                            SERVICE_WORKER_URL,
+                            { updateViaCache: 'none' }
+                        );
+                    }
+                    if (registration) {
+                        watchServiceWorkerUpdate(registration);
+                        activateWaitingServiceWorker(registration);
+                    }
+                    return registration || null;
                 } catch (error) {
-                    console.log('Erreur enregistrement Service Worker:', error);
+                    console.log('Erreur accès Service Worker:', error);
                     recordSwUpdateDiag('register-error', error?.message || String(error || ''));
                     return null;
                 }
             };
 
+            let swUpdateFlowStarted = false;
+            const startDeferredServiceWorkerUpdateFlow = async (reason = 'deferred') => {
+                if (swUpdateFlowStarted) return;
+                swUpdateFlowStarted = true;
+                recordSwUpdateDiag('check-start', reason);
+
+                const registration = await getOrRegisterServiceWorker({ allowRegister: true });
+                if (!registration) return;
+
+                if (!swUpdateRetryStartedAt) swUpdateRetryStartedAt = Date.now();
+                await runServiceWorkerUpdateAttempt(registration);
+                scheduleServiceWorkerRetry(registration);
+            };
+
+            navigator.serviceWorker.addEventListener('message', event => {
+                const data = event?.data || {};
+                if (data.type !== 'NPF_SW_INSTALL_STAGE') return;
+                recordSwUpdateDiag(
+                    `sw-${String(data.stage || 'install')}`,
+                    data.detail || ''
+                );
+            });
+
             window.addEventListener('load', async () => {
                 recordSwUpdateDiag('load', APP_VERSION);
-                const registration = await checkForServiceWorkerUpdate();
+
+                /*
+                 * v16.44 — ne plus provoquer la recherche d'une nouvelle version
+                 * pendant le chemin critique de démarrage quand un SW contrôle déjà
+                 * la PWA. `register()` peut lui-même déclencher une vérification :
+                 * on utilise donc d'abord la registration existante, puis on attend
+                 * `npf-startup-core-ready` avant le premier `registration.update()`.
+                 */
+                if (navigator.serviceWorker.controller) {
+                    const registration = await getOrRegisterServiceWorker({ allowRegister: false });
+                    if (registration) watchServiceWorkerUpdate(registration);
+
+                    let deferredTimer = 0;
+                    const startAfterCore = () => {
+                        if (deferredTimer || swUpdateFlowStarted) return;
+                        recordSwUpdateDiag('check-deferred', 'après démarrage principal');
+                        deferredTimer = setTimeout(() => {
+                            deferredTimer = 0;
+                            startDeferredServiceWorkerUpdateFlow('core-ready + 5000 ms');
+                        }, 5000);
+                    };
+
+                    window.addEventListener('npf-startup-core-ready', startAfterCore, { once: true });
+                    if (window.NPF_STARTUP_CORE_READY === true) {
+                        startAfterCore();
+                    }
+
+                    /* Sécurité : si l'événement n'arrive pas, vérifier plus tard sans bloquer le démarrage. */
+                    setTimeout(() => {
+                        if (!swUpdateFlowStarted) {
+                            startDeferredServiceWorkerUpdateFlow('fallback 18000 ms');
+                        }
+                    }, 18000);
+                    return;
+                }
+
+                /* Première installation / absence réelle de contrôleur : comportement immédiat conservé. */
+                const registration = await getOrRegisterServiceWorker({ allowRegister: true });
                 try {
                     if (!navigator.serviceWorker.controller) {
                         const guardKey = `${SW_CONTROLLER_RELOAD_GUARD_KEY}:offline:${APP_VERSION}`;
@@ -477,7 +562,12 @@
                             return;
                         }
                     }
-                    if (registration) scheduleServiceWorkerRetry(registration);
+                    if (registration) {
+                        swUpdateFlowStarted = true;
+                        if (!swUpdateRetryStartedAt) swUpdateRetryStartedAt = Date.now();
+                        await runServiceWorkerUpdateAttempt(registration);
+                        scheduleServiceWorkerRetry(registration);
+                    }
                 } catch (_) {}
             }, { once: true });
         }
@@ -1011,7 +1101,7 @@
     <script src="suncalc.js"></script>
     <script src="jszip.min.js"></script>
     <script src="sia.js?siav=15.69"></script>
-    <script src="script.js?appv=v16.43"></script>
+    <script src="script.js?appv=v16.44"></script>
     
     <div id="fuel-split-modal" class="fuel-split-modal" style="display: none;">
         <div class="fuel-split-modal-content">
