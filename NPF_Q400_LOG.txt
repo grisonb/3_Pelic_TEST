@@ -1,3 +1,49 @@
+VERSION TEST v16.49 — FILE TUILES NETTOYÉE + LIGNES HT REGROUPÉES
+Date : 04/09/2026
+Base : TEST v16.48
+
+OBJECTIF
+- Supprimer l'accumulation de demandes de tuiles appartenant à d'anciennes vues après plusieurs zooms/pans.
+- Maintenir la priorité absolue au fond NPF sans réintroduire les tuiles blanches permanentes.
+- Réduire fortement la charge Leaflet/Safari du calque Lignes HT, particulièrement aux zooms faibles.
+
+1. TUILES NPF — PURGE DES DEMANDES OBSOLÈTES
+- Chaque demande mise en file mémorise désormais ses coordonnées de tuile et sa clé Leaflet.
+- À chaque fin de pan ou de zoom, les demandes qui ne correspondent plus aux tuiles réellement retenues par la GridLayer courante sont retirées de la file.
+- Les cinq lectures IndexedDB déjà actives ne sont pas annulées : elles terminent normalement afin d'éviter le thrashing des v16.45/v16.46.
+- Les demandes encore utiles au viewport courant sont conservées et restent prioritaires.
+- Une demande retirée parce que sa tuile n'appartient plus à la vue courante ne déclenche plus de retry inutile côté createTile().
+- Le seuil diagnostic de file NPF est ramené à 96 et provoque une purge ciblée des seules demandes devenues obsolètes, jamais des tuiles visibles.
+- Aucun changement de concurrence : 5 lectures simultanées conservées.
+- Aucun changement des bases IndexedDB ni des packs Offline.
+
+2. LIGNES HT — REGROUPEMENT CANVAS
+- Le filtrage par viewport est conservé.
+- Les milliers de tronçons visibles ne sont plus transformés en milliers de Polyline Leaflet distinctes.
+- Les géométries visibles sont regroupées par classe de tension (400 / 225 / 90 / 63 / autres) dans quelques MultiLineString rendues sur Canvas.
+- Le nombre de tronçons source visibles reste comptabilisé dans le DIAG, mais le nombre de couches Leaflet créées chute à quelques groupes seulement.
+- Style, épaisseur, tirets et ordre d'affichage des tensions sont conservés.
+- La reconstruction HT reste différée jusqu'au retour des tuiles visibles NPF.
+
+3. ROUTES / SIA / VAC / AÉRODROMES
+- Routes : logique v16.48 conservée.
+- SIA : sia.js strictement inchangé.
+- VAC : synchronisation automatique v16.48 conservée.
+- Positions et orientations exactes des pistes : corrections v16.47/v16.48 conservées.
+
+4. DIAGNOSTIC
+- Le DIAG conserve le nombre de tronçons HT rendus et ajoute le nombre de groupes HT réellement créés.
+- Les compteurs de file tuiles permettent de vérifier que les anciennes vues ne s'accumulent plus.
+
+5. CONTRÔLES
+- node --check Script et SW.
+- Scripts inline de l'Index contrôlés.
+- Manifest JSON parsé.
+- Cohérence v16.49 Index / Manifest / Script / Style / SW.
+- Recherche des références actives v16.48 dans les fichiers applicatifs.
+- sia.js comparé bit-à-bit avec v16.48.
+
+
 VERSION TEST v16.48 — SYNCHRONISATION VAC 100 % AUTOMATIQUE
 Date : 04/09/2026
 Base : TEST v16.47
