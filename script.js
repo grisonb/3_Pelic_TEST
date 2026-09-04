@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.48';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.49';
 
 
 /*
@@ -198,6 +198,7 @@ function getNpfStartupDiagnosticOverlaySnapshot() {
         htLoaded: hasLoadedHighVoltageLines ? 'OUI' : 'NON',
         htSegments: Number(highVoltageLinesFeatureCount || 0),
         htRenderedSegments: Number(highVoltageLinesRenderedFeatureCount || 0),
+        htRenderedGroups: Number(highVoltageLinesRenderedGeoJsonLayer?.getLayers?.().length || 0),
         tilesRetained: getNpfRetainedBaseTileCount(),
         tilesDom: getNpfBaseTileDomCount(),
         tilesVisible: typeof countVisibleLoadedBaseTiles === 'function' ? countVisibleLoadedBaseTiles() : 0,
@@ -249,6 +250,7 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         highVoltageLoaded: layers.htLoaded,
         highVoltageFeatureCount: layers.htSegments,
         highVoltageRenderedFeatureCount: layers.htRenderedSegments,
+        highVoltageRenderedGroupCount: layers.htRenderedGroups,
         retainedTileCount: layers.tilesRetained,
         tileDomCount: layers.tilesDom,
         visibleTileCount: layers.tilesVisible,
@@ -289,7 +291,8 @@ function buildNpfStartupDiagnosticExportText() {
         + runtime.roadOverlayRenderedLabels + ' cartouches | '
         + 'HT chargées ' + runtime.highVoltageLoaded + ' | '
         + runtime.highVoltageFeatureCount + ' tronçons HT connus | '
-        + runtime.highVoltageRenderedFeatureCount + ' tronçons HT rendus'
+        + runtime.highVoltageRenderedFeatureCount + ' tronçons HT rendus / '
+        + runtime.highVoltageRenderedGroupCount + ' groupes HT'
     );
     lines.push(
         'Mémoire carte : '
@@ -6414,11 +6417,13 @@ function initMap() {
     });
     map.on('zoomend', enforceOfflineZoomLimit);
     map.on('zoomend', () => {
+        try { pruneDirectOfflineNpfQueueForCurrentView('zoomend'); } catch (_) {}
         scheduleBaseMapStabilityRefresh('zoomend');
         scheduleNpfOfflineZoomCleanup('zoomend');
         scheduleTrafficVisualResumeAfterMapInteraction('zoomend');
     });
     map.on('moveend', () => {
+        try { pruneDirectOfflineNpfQueueForCurrentView('moveend'); } catch (_) {}
         scheduleTrafficVisualResumeAfterMapInteraction('moveend');
     });
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
@@ -7648,7 +7653,7 @@ let directOfflineLastRecoveryReason = '';
  * concurrence uniquement pour le groupe NPF ; OACI conserve son chemin rapide.
  */
 const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 5;
-const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 160;
+const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 96;
 const DIRECT_OFFLINE_TILE_ABORTED = Symbol('direct-offline-tile-aborted');
 let directOfflineNpfActiveReads = 0;
 const directOfflineNpfReadQueue = [];
@@ -7665,6 +7670,64 @@ let directOfflineNpfLastSuccessfulLookup = null;
 function markDirectOfflineNpfViewportPriority(reason = 'view-change') {
     directOfflineTileViewPriorityEpoch += 1;
     return directOfflineTileViewPriorityEpoch;
+}
+
+function getDirectOfflineNpfQueueTileKey(coords) {
+    if (!coords) return '';
+    try {
+        if (baseTileLayer && typeof baseTileLayer._tileCoordsToKey === 'function') {
+            return String(baseTileLayer._tileCoordsToKey(coords));
+        }
+    } catch (_) {}
+    const x = Number(coords?.x);
+    const y = Number(coords?.y);
+    const z = Number(coords?.z);
+    if (![x, y, z].every(Number.isFinite)) return '';
+    return `${x}:${y}:${z}`;
+}
+
+function pruneDirectOfflineNpfQueueForCurrentView(reason = 'view-end') {
+    if (!directOfflineNpfReadQueue.length || !baseTileLayer || !map) return 0;
+
+    const retainedTiles = baseTileLayer._tiles || {};
+    const currentZoom = Math.round(Number(map.getZoom?.()));
+    const retainedKeys = new Set(Object.keys(retainedTiles));
+    const kept = [];
+    const removed = [];
+
+    for (const item of directOfflineNpfReadQueue) {
+        const coords = item?.coords || null;
+        const z = Number(coords?.z);
+        const tileKey = String(item?.tileKey || getDirectOfflineNpfQueueTileKey(coords));
+        const sameGeneration = item?.hardGeneration === directOfflineTileReadGeneration;
+        const sameZoom = Number.isFinite(currentZoom) && Number.isFinite(z) && z === currentZoom;
+        const retained = !!tileKey && retainedKeys.has(tileKey);
+        const latestViewport = (Number(item?.viewEpoch) || 0) === directOfflineTileViewPriorityEpoch;
+
+        /*
+         * Toujours conserver les demandes créées pour le viewport courant,
+         * même si Leaflet n'a pas encore inscrit la tuile dans _tiles au même
+         * instant. Pour les anciens epochs, ne garder que les tuiles encore
+         * réellement retenues par la GridLayer.
+         */
+        if (sameGeneration && sameZoom && (latestViewport || retained)) {
+            kept.push(item);
+        } else {
+            removed.push(item);
+        }
+    }
+
+    if (!removed.length) return 0;
+
+    directOfflineNpfReadQueue.length = 0;
+    directOfflineNpfReadQueue.push(...kept);
+
+    for (const item of removed) {
+        directOfflineNpfAbortedReadCount += 1;
+        try { item.resolve(DIRECT_OFFLINE_TILE_ABORTED); } catch (_) {}
+    }
+
+    return removed.length;
 }
 
 function resetPendingDirectOfflineNpfReads() {
@@ -7731,6 +7794,9 @@ function runNextDirectOfflineNpfRead() {
 
 function enqueueDirectOfflineNpfRead(task, options = {}) {
     return new Promise((resolve, reject) => {
+        const coords = options?.coords
+            ? { x: Number(options.coords.x), y: Number(options.coords.y), z: Number(options.coords.z) }
+            : null;
         const item = {
             task,
             resolve,
@@ -7740,19 +7806,20 @@ function enqueueDirectOfflineNpfRead(task, options = {}) {
                 : directOfflineTileReadGeneration,
             viewEpoch: Number.isFinite(Number(options.viewEpoch))
                 ? Number(options.viewEpoch)
-                : directOfflineTileViewPriorityEpoch
+                : directOfflineTileViewPriorityEpoch,
+            coords,
+            tileKey: getDirectOfflineNpfQueueTileKey(coords)
         };
         directOfflineNpfReadQueue.push(item);
 
         /*
-         * v16.47 — ne plus supprimer une tuile valide parce que la file a
-         * momentanément grandi pendant plusieurs zooms rapides. L'ordonnanceur
-         * sélectionne déjà l'epoch de viewport le plus récent en premier ; les
-         * anciennes demandes attendent donc sans bloquer les nouvelles et
-         * alimentent ensuite le cache si elles sont encore utiles.
-         * DIRECT_OFFLINE_NPF_MAX_QUEUED_READS devient une cible de diagnostic,
-         * pas un seuil destructif.
+         * v16.49 — la file ne doit jamais conserver des dizaines de tuiles
+         * appartenant à d'anciens zooms/pans. Si elle grossit, on purge
+         * uniquement les demandes que la GridLayer courante ne retient plus.
          */
+        if (directOfflineNpfReadQueue.length > DIRECT_OFFLINE_NPF_MAX_QUEUED_READS) {
+            try { pruneDirectOfflineNpfQueueForCurrentView('queue-limit'); } catch (_) {}
+        }
         runNextDirectOfflineNpfRead();
     });
 }
@@ -8560,7 +8627,7 @@ async function findDirectOfflineTileBlob(coords) {
             return DIRECT_OFFLINE_TILE_ABORTED;
         }
         return blob;
-    }, { hardGeneration, viewEpoch });
+    }, { hardGeneration, viewEpoch, coords });
 
     directOfflineNpfInflightReads.set(inflightKey, pending);
     pending.finally(() => {
@@ -8625,11 +8692,30 @@ function buildDirectOfflineLeafletLayer(options = {}) {
 
                     if (blob === DIRECT_OFFLINE_TILE_ABORTED) {
                         /*
-                         * Une annulation n'est pas une absence. Si Leaflet a
-                         * conservé cette tuile dans le viewport, la redemander
-                         * dans la génération courante jusqu'à ce qu'elle soit
-                         * servie ou réellement déchargée.
+                         * v16.49 — une demande retirée d'une ancienne vue ne
+                         * doit pas se réinjecter dans la file. On ne retente que
+                         * si cette tuile appartient encore réellement à la
+                         * GridLayer et au zoom courant.
                          */
+                        let stillNeeded = false;
+                        try {
+                            const tileKey = typeof this._tileCoordsToKey === 'function'
+                                ? this._tileCoordsToKey(coords)
+                                : `${coords.x}:${coords.y}:${coords.z}`;
+                            const retained = this._tiles?.[tileKey];
+                            stillNeeded = (
+                                !tile.__npfDisposed
+                                && Number(coords.z) === Math.round(Number(map?.getZoom?.()))
+                                && !!retained
+                                && (!retained.el || retained.el === tile)
+                            );
+                        } catch (_) {}
+
+                        if (!stillNeeded) {
+                            finish(null);
+                            return;
+                        }
+
                         tile.__npfReadRetryCount += 1;
                         directOfflineNpfTileRetryCount += 1;
                         const retryDelay = Math.min(
@@ -10409,6 +10495,60 @@ function getHighVoltageFeatureBbox(feature) {
     return [minLon, minLat, maxLon, maxLat];
 }
 
+function getHighVoltageAggregationBand(feature) {
+    const tension = String(feature?.properties?.tension || '').toLowerCase();
+    if (tension.includes('400')) return '400';
+    if (tension.includes('225')) return '225';
+    if (tension.includes('90')) return '90';
+    if (tension.includes('63')) return '63';
+    return 'autres';
+}
+
+function appendHighVoltageGeometryLines(geometry, target) {
+    if (!geometry || !target) return;
+    const type = String(geometry.type || '');
+    const coordinates = geometry.coordinates;
+
+    if (type === 'LineString' && Array.isArray(coordinates) && coordinates.length >= 2) {
+        target.push(coordinates);
+        return;
+    }
+    if (type === 'MultiLineString' && Array.isArray(coordinates)) {
+        coordinates.forEach(line => {
+            if (Array.isArray(line) && line.length >= 2) target.push(line);
+        });
+        return;
+    }
+    if (type === 'GeometryCollection' && Array.isArray(geometry.geometries)) {
+        geometry.geometries.forEach(child => appendHighVoltageGeometryLines(child, target));
+    }
+}
+
+function buildHighVoltageAggregatedRenderGeojson(features) {
+    const groups = new Map();
+
+    for (const feature of features || []) {
+        const band = getHighVoltageAggregationBand(feature);
+        if (!groups.has(band)) groups.set(band, []);
+        appendHighVoltageGeometryLines(feature?.geometry, groups.get(band));
+    }
+
+    const order = ['400', '225', '90', '63', 'autres'];
+    return {
+        type: 'FeatureCollection',
+        features: order
+            .filter(band => groups.get(band)?.length)
+            .map(band => ({
+                type: 'Feature',
+                properties: { tension: band, __npfHtGroup: band },
+                geometry: {
+                    type: 'MultiLineString',
+                    coordinates: groups.get(band)
+                }
+            }))
+    };
+}
+
 function clearRenderedHighVoltageLines() {
     try {
         if (highVoltageLinesRenderedGeoJsonLayer && highVoltageLinesLayer) {
@@ -10458,10 +10598,10 @@ async function refreshVisibleHighVoltageLines(source = 'refresh') {
         return;
     }
 
-    highVoltageLinesRenderedGeoJsonLayer = L.geoJSON({
-        type: 'FeatureCollection',
-        features: visibleFeatures
-    }, {
+    const renderGeojson = buildHighVoltageAggregatedRenderGeojson(visibleFeatures);
+    if (!renderGeojson.features.length) return;
+
+    highVoltageLinesRenderedGeoJsonLayer = L.geoJSON(renderGeojson, {
         style: getHighVoltageLineStyle,
         pane: 'highVoltageLinesPane',
         renderer: highVoltageLinesRenderer || undefined,
