@@ -1,3 +1,52 @@
+VERSION TEST v16.41 — CORRECTION BLOCAGE MAJ + VALIDATION DE LIVRAISON RENFORCÉE
+Date : 04/09/2026
+Base : TEST v16.40
+
+OBJECTIF
+- Corriger le blocage de la PWA restée en v16.39 après publication de la v16.40.
+- Conserver intégralement le traitement anti-plantage HT/Routes et le recentrage des icônes terrains de v16.40.
+- Empêcher qu’une future livraison contienne à nouveau une référence active à l’ancienne version.
+
+1. CAUSE EXACTE DU BLOCAGE v16.40
+- `index.html` annonçait bien APP_VERSION v16.40, ainsi que style.css et manifest.json.
+- En revanche, la balise de chargement finale pointait encore vers `script.js?appv=v16.39`.
+- Le Service Worker vérifie volontairement la présence de `script.js?appv=<version courante>` avant d’accepter l’installation atomique.
+- La v16.40 était donc refusée et la PWA restait logiquement sous le contrôle de la v16.39.
+
+2. CORRECTION v16.41
+- Référence finale de Script corrigée vers `script.js?appv=v16.41`.
+- Index, Manifest, Script, Style et Service Worker alignés sur v16.41.
+- Nouveau `SW_VERSION` afin de forcer une nouvelle tentative d’installation propre, sans recycler le worker v16.40 ayant échoué.
+
+3. VALIDATION DE LIVRAISON RENFORCÉE
+- Contrôle bloquant de toutes les références actives avant livraison :
+  - APP_VERSION ;
+  - `script.js?appv=` ;
+  - `style.css?appv=` ;
+  - `manifest.json?appv=` ;
+  - NPF_SCRIPT_BUILD_VERSION ;
+  - NPF_STYLE_BUILD_VERSION ;
+  - SW APP_VERSION / SW_VERSION ;
+  - `manifest.start_url`.
+- Toute référence active à une ancienne version dans les fichiers version-sensibles invalide désormais la livraison.
+
+4. ÉLÉMENTS CONSERVÉS DE v16.40
+- Lignes HT limitées au viewport + marge afin de réduire la pression mémoire Leaflet/WebKit.
+- Rafraîchissement HT sur pan/zoom et libération du rendu à la désactivation.
+- DIAG Routes / HT avec total HT et tronçons HT rendus.
+- Recentrage des nouvelles icônes terrains et orientation de piste.
+- Optimisations SIA précédentes inchangées.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES EFFECTUÉS
+- `node --check` Script et SW.
+- Manifest JSON parsé.
+- Contrôle explicite des références de version dans Index / Script / Style / Manifest / SW.
+- Vérification du marqueur Style v16.41.
+- Vérification de `script.js?appv=v16.41` dans l’Index.
+- sia.js comparé bit-à-bit avec v16.40.
+
+
 VERSION TEST v16.40 — ANTI-PLANTAGE HT / ROUTES + RECENTRAGE ICÔNES TERRAINS
 Date : 03/09/2026
 Base : TEST v16.39
