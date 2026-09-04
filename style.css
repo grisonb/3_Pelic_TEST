@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.41 */
+/* NPF_STYLE_BUILD_VERSION: v16.42 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17947,7 +17947,6 @@ body.npf-waypoint-search-open {
     display: flex !important;
     align-items: center;
     justify-content: center;
-    margin: 0 !important;
     padding: 0 !important;
     border: none !important;
     background: transparent !important;
@@ -17969,4 +17968,13 @@ body.npf-waypoint-search-open {
     width: 100%;
     height: 100%;
     overflow: visible;
+}
+
+
+/* ==========================================================================
+   v16.42 — TERRAIN DIVICON : LAISSER LEAFLET APPLIQUER iconAnchor
+   ========================================================================== */
+.terrain-airport-marker-icon {
+    /* Ne jamais surcharger margin-left / margin-top : Leaflet les calcule. */
+    transform-origin: center center;
 }
