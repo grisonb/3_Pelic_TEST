@@ -1,3 +1,49 @@
+VERSION TEST v16.45 — PRIORITÉ ABSOLUE AUX TUILES OFFLINE NPF
+Date : 04/09/2026
+Base : TEST v16.44
+
+OBJECTIF
+- Donner la priorité au réaffichage rapide des tuiles de la carte NPF après pan/zoom.
+- Empêcher Routes, HT et SIA de concurrencer inutilement IndexedDB tant que le viewport raster n'est pas revenu.
+- Éviter les vagues de lectures de tuiles dupliquées provoquées par les redraw de secours.
+
+1. FILE DE LECTURE TUILES NPF
+- Concurrence IndexedDB NPF portée de 3 à 5 lectures simultanées maintenant que Routes et HT sont bornées au viewport.
+- File maximale réduite de 96 à 64 demandes pour limiter les lectures périphériques inutiles.
+- Ordonnancement FIFO : Leaflet demande déjà les tuiles du centre vers l'extérieur ; NPF conserve désormais cet ordre au lieu de l'inverser.
+- Les demandes de l'ancienne vue sont annulées dès le début d'un PAN comme lors d'un ZOOM.
+- Déduplication des lectures identiques au sein d'une même génération de vue : une même tuile ne déclenche plus plusieurs lectures IndexedDB parallèles.
+
+2. SUPPRESSION DES REDRAW CONCURRENTS
+- Le redraw de secours du fond de carte n'est plus lancé lorsqu'une lecture NPF est déjà active ou en file.
+- Il n'intervient que si la carte est réellement vide ET qu'aucune lecture IndexedDB n'est en cours.
+- Objectif : éviter une seconde/troisième vague de demandes pendant que la première est encore en train de charger.
+
+3. ROUTES / HT APRÈS LE RASTER VISIBLE
+- Les recalculs Routes et HT attendent maintenant que les tuiles réellement visibles du viewport soient revenues.
+- Ils peuvent démarrer avant la fin des tuiles de marge hors écran, mais jamais avant le retour de la carte visible.
+- Si la vue change pendant l'attente, le rendu secondaire est annulé immédiatement.
+
+4. SIA APRÈS LES TUILES NPF
+- Le délai maximal d'attente SIA sur carte NPF est augmenté afin d'éviter qu'un rafraîchissement SIA démarre alors que le viewport raster est encore vide.
+- Le filet de sécurité reste présent : une tuile réellement absente ne bloque pas le SIA indéfiniment.
+
+5. ÉLÉMENTS INCHANGÉS
+- Filtrage Routes au viewport et agrégation Canvas v16.43-v16.44 conservés.
+- HT limitées au viewport conservées.
+- Icônes terrains validées inchangées.
+- Bases IndexedDB et packs Offline strictement préservés.
+- sia.js strictement inchangé.
+
+6. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.45 Index / Manifest / Script / Style / SW.
+- Vérification de script.js?appv=v16.45 dans l'Index.
+- Vérification du marqueur NPF_STYLE_BUILD_VERSION v16.45.
+- sia.js comparé bit-à-bit avec v16.44.
+
+
 VERSION TEST v16.44 — MISE À JOUR PWA ALLÉGÉE + ROUTES CANVAS AGRÉGÉES
 Date : 04/09/2026
 Base : TEST v16.43
