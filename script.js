@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.45';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.46';
 
 
 /*
@@ -203,6 +203,9 @@ function getNpfStartupDiagnosticOverlaySnapshot() {
         tilesVisible: typeof countVisibleLoadedBaseTiles === 'function' ? countVisibleLoadedBaseTiles() : 0,
         npfReadsActive: Number(directOfflineNpfActiveReads || 0),
         npfReadsQueued: Number(directOfflineNpfReadQueue?.length || 0),
+        npfReadsAborted: Number(directOfflineNpfAbortedReadCount || 0),
+        npfTileRetries: Number(directOfflineNpfTileRetryCount || 0),
+        npfViewEpoch: Number(directOfflineTileViewPriorityEpoch || 0),
         tileBlobCache: Number(directOfflineTileBlobCache?.size || 0),
         runwayLayers: Number(npfRunwayMapLayer?.getLayers?.().length || 0),
         siaLayers: Number(siaLayerGroup?.getLayers?.().length || 0)
@@ -251,6 +254,9 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         visibleTileCount: layers.tilesVisible,
         npfReadsActive: layers.npfReadsActive,
         npfReadsQueued: layers.npfReadsQueued,
+        npfReadsAborted: layers.npfReadsAborted,
+        npfTileRetries: layers.npfTileRetries,
+        npfViewEpoch: layers.npfViewEpoch,
         tileBlobCacheSize: layers.tileBlobCache,
         runwayLayerCount: layers.runwayLayers,
         siaLayerCount: layers.siaLayers
@@ -292,6 +298,8 @@ function buildNpfStartupDiagnosticExportText() {
         + runtime.visibleTileCount + ' visibles | '
         + runtime.npfReadsActive + ' lectures actives / '
         + runtime.npfReadsQueued + ' en file | '
+        + runtime.npfReadsAborted + ' interrompues / '
+        + runtime.npfTileRetries + ' reprises | '
         + runtime.tileBlobCacheSize + ' blobs cache | '
         + runtime.runwayLayerCount + ' couches pistes | '
         + runtime.siaLayerCount + ' couches SIA'
@@ -505,6 +513,8 @@ function renderNpfStartupDiagnosticPanel() {
                 <span>HT rendues : <b>${runtime.highVoltageRenderedFeatureCount}</b></span>
                 <span>Tuiles : <b>${runtime.retainedTileCount}</b> Leaflet / <b>${runtime.tileDomCount}</b> DOM</span>
                 <span>Lectures NPF : <b>${runtime.npfReadsActive}</b> actives / <b>${runtime.npfReadsQueued}</b> file</span>
+                <span>NPF interrompues/reprises : <b>${runtime.npfReadsAborted}</b> / <b>${runtime.npfTileRetries}</b></span>
+                <span>Priorité viewport : <b>${runtime.npfViewEpoch}</b></span>
                 <span>Cache tuiles : <b>${runtime.tileBlobCacheSize}</b></span>
             </div>
             <div class="npf-startup-diag-page2-grid">
@@ -6650,9 +6660,14 @@ function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
         offlineTilesMode
         && typeof isNpfOfflinePackSelection === 'function'
         && isNpfOfflinePackSelection()
-        && typeof resetPendingDirectOfflineNpfReads === 'function'
     ) {
-        resetPendingDirectOfflineNpfReads();
+        /*
+         * v16.46 — ne plus invalider les cinq transactions IndexedDB déjà
+         * actives à chaque pan/zoom. On augmente seulement la priorité des
+         * nouvelles demandes du viewport ; les anciennes lectures terminent
+         * normalement et peuvent encore alimenter le cache mémoire.
+         */
+        try { markDirectOfflineNpfViewportPriority(reason); } catch (_) {}
         try { trimDirectOfflineTileBlobCache(32); } catch (_) {}
     }
 }
@@ -7583,16 +7598,33 @@ let directOfflineLastRecoveryReason = '';
  */
 const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 5;
 const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 64;
+const DIRECT_OFFLINE_TILE_ABORTED = Symbol('direct-offline-tile-aborted');
 let directOfflineNpfActiveReads = 0;
 const directOfflineNpfReadQueue = [];
 const directOfflineNpfInflightReads = new Map();
 let directOfflineTileReadGeneration = 0;
+let directOfflineTileViewPriorityEpoch = 0;
+let directOfflineNpfAbortedReadCount = 0;
+let directOfflineNpfTileRetryCount = 0;
+const directOfflineTileLookupHints = new Map();
+const DIRECT_OFFLINE_TILE_LOOKUP_HINT_MAX = 256;
+
+function markDirectOfflineNpfViewportPriority(reason = 'view-change') {
+    directOfflineTileViewPriorityEpoch += 1;
+    return directOfflineTileViewPriorityEpoch;
+}
 
 function resetPendingDirectOfflineNpfReads() {
+    /*
+     * Reset DUR : réservé aux changements de source/base et aux récupérations
+     * IndexedDB. Les gestes de carte n'appellent plus cette fonction en v16.46.
+     */
     directOfflineTileReadGeneration += 1;
+    directOfflineTileViewPriorityEpoch += 1;
     while (directOfflineNpfReadQueue.length) {
         const pending = directOfflineNpfReadQueue.shift();
-        try { pending.resolve(null); } catch (_) {}
+        directOfflineNpfAbortedReadCount += 1;
+        try { pending.resolve(DIRECT_OFFLINE_TILE_ABORTED); } catch (_) {}
     }
 }
 
@@ -7612,7 +7644,27 @@ function runNextDirectOfflineNpfRead() {
         directOfflineNpfActiveReads < DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS
         && directOfflineNpfReadQueue.length
     ) {
-        const item = directOfflineNpfReadQueue.shift();
+        /*
+         * v16.46 — priorité au viewport le plus récent sans annuler les
+         * transactions déjà actives. Parmi les demandes de même priorité,
+         * l'ordre FIFO de Leaflet (centre -> extérieur) est conservé.
+         */
+        let bestEpoch = -Infinity;
+        for (const queued of directOfflineNpfReadQueue) {
+            bestEpoch = Math.max(bestEpoch, Number(queued?.viewEpoch) || 0);
+        }
+        let itemIndex = directOfflineNpfReadQueue.findIndex(
+            queued => (Number(queued?.viewEpoch) || 0) === bestEpoch
+        );
+        if (itemIndex < 0) itemIndex = 0;
+        const item = directOfflineNpfReadQueue.splice(itemIndex, 1)[0];
+
+        if (item?.hardGeneration !== directOfflineTileReadGeneration) {
+            directOfflineNpfAbortedReadCount += 1;
+            try { item.resolve(DIRECT_OFFLINE_TILE_ABORTED); } catch (_) {}
+            continue;
+        }
+
         directOfflineNpfActiveReads += 1;
         Promise.resolve()
             .then(item.task)
@@ -7624,18 +7676,37 @@ function runNextDirectOfflineNpfRead() {
     }
 }
 
-function enqueueDirectOfflineNpfRead(task) {
+function enqueueDirectOfflineNpfRead(task, options = {}) {
     return new Promise((resolve, reject) => {
-        /*
-         * v16.45 — Leaflet construit sa file de tuiles du centre vers
-         * l'extérieur. Conserver cet ordre FIFO donne donc la priorité aux
-         * tuiles réellement utiles au centre du viewport. Les anciennes vues
-         * sont déjà invalidées au début de chaque pan/zoom.
-         */
-        directOfflineNpfReadQueue.push({ task, resolve, reject });
+        const item = {
+            task,
+            resolve,
+            reject,
+            hardGeneration: Number.isFinite(Number(options.hardGeneration))
+                ? Number(options.hardGeneration)
+                : directOfflineTileReadGeneration,
+            viewEpoch: Number.isFinite(Number(options.viewEpoch))
+                ? Number(options.viewEpoch)
+                : directOfflineTileViewPriorityEpoch
+        };
+        directOfflineNpfReadQueue.push(item);
+
         while (directOfflineNpfReadQueue.length > DIRECT_OFFLINE_NPF_MAX_QUEUED_READS) {
-            const stale = directOfflineNpfReadQueue.pop();
-            try { stale?.resolve?.(null); } catch (_) {}
+            let lowestEpoch = Infinity;
+            for (const queued of directOfflineNpfReadQueue) {
+                lowestEpoch = Math.min(lowestEpoch, Number(queued?.viewEpoch) || 0);
+            }
+            let staleIndex = -1;
+            for (let i = directOfflineNpfReadQueue.length - 1; i >= 0; i -= 1) {
+                if ((Number(directOfflineNpfReadQueue[i]?.viewEpoch) || 0) === lowestEpoch) {
+                    staleIndex = i;
+                    break;
+                }
+            }
+            if (staleIndex < 0) staleIndex = directOfflineNpfReadQueue.length - 1;
+            const stale = directOfflineNpfReadQueue.splice(staleIndex, 1)[0];
+            directOfflineNpfAbortedReadCount += 1;
+            try { stale?.resolve?.(DIRECT_OFFLINE_TILE_ABORTED); } catch (_) {}
         }
         runNextDirectOfflineNpfRead();
     });
@@ -7693,7 +7764,13 @@ function getDirectOfflineTileUrlCandidates(coords) {
         addPrefix(normalizeOfflineTileHostPrefixForDirectRead(alias, { legacy: true }));
     });
     if (!prefixes.length) addPrefix('a');
-    ['a', 'ign', 'oaci'].forEach(addPrefix);
+    const strictNpfIsolatedLookup = (
+        isNpfOfflinePackSelection()
+        && activeOfflineSelectionUsesCompleteIsolatedStorage()
+    );
+    if (!strictNpfIsolatedLookup) {
+        ['a', 'ign', 'oaci'].forEach(addPrefix);
+    }
 
     const urls = [];
     const addUrl = value => {
@@ -7753,6 +7830,71 @@ function getDirectOfflineDatabaseCandidates() {
     }
     if (!skipLegacyCommonDb || !names.length) addName(OFFLINE_DB_NAME);
     return names;
+}
+
+function getDirectOfflineTileSelectionSignature() {
+    return (Array.isArray(activeOfflinePacks) ? activeOfflinePacks : [])
+        .map(name => (
+            typeof normalizeOfflinePackName === 'function'
+                ? normalizeOfflinePackName(name)
+                : String(name || '').trim()
+        ))
+        .filter(Boolean)
+        .sort((a, b) => String(a).localeCompare(String(b), 'fr', { numeric: true }))
+        .join('|');
+}
+
+function getDirectOfflineTileLookupHintKey(coords, bucketSize = 16) {
+    const safeBucket = Math.max(4, Number(bucketSize) || 16);
+    return [
+        getDirectOfflineTileSelectionSignature(),
+        Number(coords?.z) || 0,
+        Math.floor((Number(coords?.x) || 0) / safeBucket),
+        Math.floor((Number(coords?.y) || 0) / safeBucket)
+    ].join('|');
+}
+
+function getDirectOfflineTileUrlTemplate(tileUrl) {
+    const match = String(tileUrl || '').match(/^(https:\/\/[^/]+)\/\d+\/\d+\/\d+\.(png|jpe?g)(?:\?.*)?$/i);
+    if (!match) return null;
+    return { origin: match[1], extension: match[2].toLowerCase() };
+}
+
+function buildDirectOfflineTileUrlFromTemplate(template, coords) {
+    if (!template?.origin || !template?.extension) return '';
+    return `${template.origin}/${coords.z}/${coords.x}/${coords.y}.${template.extension}`;
+}
+
+function rememberDirectOfflineTileLookupHint(coords, dbName, tileUrl) {
+    const key = getDirectOfflineTileLookupHintKey(coords);
+    const template = getDirectOfflineTileUrlTemplate(tileUrl);
+    directOfflineTileLookupHints.delete(key);
+    directOfflineTileLookupHints.set(key, {
+        dbName: String(dbName || ''),
+        template
+    });
+    while (directOfflineTileLookupHints.size > DIRECT_OFFLINE_TILE_LOOKUP_HINT_MAX) {
+        const oldestKey = directOfflineTileLookupHints.keys().next().value;
+        directOfflineTileLookupHints.delete(oldestKey);
+    }
+}
+
+function getDirectOfflineTileLookupHint(coords) {
+    return directOfflineTileLookupHints.get(getDirectOfflineTileLookupHintKey(coords)) || null;
+}
+
+function promoteDirectOfflineLookupCandidate(list, preferred) {
+    const safeList = Array.isArray(list) ? [...list] : [];
+    const clean = String(preferred || '').trim();
+    if (!clean) return safeList;
+    const index = safeList.indexOf(clean);
+    if (index > 0) {
+        safeList.splice(index, 1);
+        safeList.unshift(clean);
+    } else if (index < 0) {
+        safeList.unshift(clean);
+    }
+    return safeList;
 }
 
 function openDirectOfflineTileDatabase(dbName) {
@@ -8088,6 +8230,7 @@ async function recoverDirectOfflineTileReader(reason = 'read-error') {
         closeDirectOfflineDatabaseConnectionsForStartupRetry();
         directOfflineTileBlobCache.clear();
         directOfflineTileMissCache.clear();
+        directOfflineTileLookupHints.clear();
         directOfflineTileMissCount = 0;
 
         await new Promise(resolve => setTimeout(resolve, 180));
@@ -8189,6 +8332,10 @@ window.getNpfTilePerformanceStatus = function getNpfTilePerformanceStatus() {
         activeReads: directOfflineNpfActiveReads,
         queuedReads: directOfflineNpfReadQueue.length,
         maxConcurrentReads: DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS,
+        viewPriorityEpoch: directOfflineTileViewPriorityEpoch,
+        abortedReads: directOfflineNpfAbortedReadCount,
+        tileRetries: directOfflineNpfTileRetryCount,
+        lookupHints: directOfflineTileLookupHints.size,
         blobCacheSize: directOfflineTileBlobCache.size,
         blobCacheMax: getDirectOfflineTileBlobCacheLimit(),
         tileHits: directOfflineTileHitCount,
@@ -8223,8 +8370,16 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
         directOfflineTileMissCache.delete(cacheKey);
     }
 
-    const dbNames = getDirectOfflineDatabaseCandidates();
-    const tileUrls = getDirectOfflineTileUrlCandidates(coords);
+    const lookupHint = getDirectOfflineTileLookupHint(coords);
+    let dbNames = getDirectOfflineDatabaseCandidates();
+    let tileUrls = getDirectOfflineTileUrlCandidates(coords);
+    if (lookupHint?.dbName) {
+        dbNames = promoteDirectOfflineLookupCandidate(dbNames, lookupHint.dbName);
+    }
+    const hintedTileUrl = buildDirectOfflineTileUrlFromTemplate(lookupHint?.template, coords);
+    if (hintedTileUrl) {
+        tileUrls = promoteDirectOfflineLookupCandidate(tileUrls, hintedTileUrl);
+    }
     let hadRecoverableTechnicalError = false;
 
     for (const dbName of dbNames) {
@@ -8269,6 +8424,7 @@ async function findDirectOfflineTileBlobUnqueued(coords) {
                     });
 
                 rememberDirectOfflineTileBlob(cacheKey, blob);
+                rememberDirectOfflineTileLookupHint(coords, dbName, tileUrl);
                 resetDirectOfflineReadErrorCounter();
                 directOfflineTileHitCount += 1;
 
@@ -8318,9 +8474,10 @@ async function findDirectOfflineTileBlob(coords) {
         return findDirectOfflineTileBlobUnqueued(coords);
     }
 
-    const generation = directOfflineTileReadGeneration;
+    const hardGeneration = directOfflineTileReadGeneration;
+    const viewEpoch = directOfflineTileViewPriorityEpoch;
     const inflightKey = [
-        generation,
+        hardGeneration,
         coords?.z,
         coords?.x,
         coords?.y,
@@ -8331,10 +8488,17 @@ async function findDirectOfflineTileBlob(coords) {
     if (existing) return existing;
 
     const pending = enqueueDirectOfflineNpfRead(async () => {
-        if (generation !== directOfflineTileReadGeneration) return null;
+        if (hardGeneration !== directOfflineTileReadGeneration) {
+            directOfflineNpfAbortedReadCount += 1;
+            return DIRECT_OFFLINE_TILE_ABORTED;
+        }
         const blob = await findDirectOfflineTileBlobUnqueued(coords);
-        return generation === directOfflineTileReadGeneration ? blob : null;
-    });
+        if (hardGeneration !== directOfflineTileReadGeneration) {
+            directOfflineNpfAbortedReadCount += 1;
+            return DIRECT_OFFLINE_TILE_ABORTED;
+        }
+        return blob;
+    }, { hardGeneration, viewEpoch });
 
     directOfflineNpfInflightReads.set(inflightKey, pending);
     pending.finally(() => {
@@ -8383,35 +8547,65 @@ function buildDirectOfflineLeafletLayer(options = {}) {
                 finish(null);
             };
 
-            findDirectOfflineTileBlob(coords).then(blob => {
-                if (tile.__npfDisposed) {
+            tile.__npfReadRetryCount = 0;
+
+            const requestTileBlob = () => {
+                if (tile.__npfDisposed || tile.__npfDone) {
                     finish(null);
                     return;
                 }
-                if (!blob) {
+
+                findDirectOfflineTileBlob(coords).then(blob => {
+                    if (tile.__npfDisposed) {
+                        finish(null);
+                        return;
+                    }
+
+                    if (blob === DIRECT_OFFLINE_TILE_ABORTED) {
+                        /*
+                         * Une annulation n'est pas une absence. Si Leaflet a
+                         * conservé cette tuile dans le viewport, la redemander
+                         * dans la génération courante jusqu'à ce qu'elle soit
+                         * servie ou réellement déchargée.
+                         */
+                        tile.__npfReadRetryCount += 1;
+                        directOfflineNpfTileRetryCount += 1;
+                        const retryDelay = Math.min(
+                            450,
+                            45 + tile.__npfReadRetryCount * 45
+                        );
+                        setTimeout(requestTileBlob, retryDelay);
+                        return;
+                    }
+
+                    if (!blob) {
+                        tile.onload = () => finish(null);
+                        tile.onerror = error => finish(error || new Error('Tuile absente'));
+                        tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
+                        return;
+                    }
+
+                    const blobUrl = URL.createObjectURL(blob);
+                    tile.__npfBlobUrl = blobUrl;
                     tile.onload = () => finish(null);
-                    tile.onerror = error => finish(error || new Error('Tuile absente'));
+                    tile.onerror = error => finish(error || new Error('Décodage tuile impossible'));
+                    if (tile.__npfDisposed) {
+                        finish(null);
+                        return;
+                    }
+                    tile.src = blobUrl;
+                }).catch(error => {
+                    if (tile.__npfDisposed) {
+                        finish(null);
+                        return;
+                    }
+                    tile.onload = () => finish(null);
+                    tile.onerror = () => finish(error);
                     tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
-                    return;
-                }
-                const blobUrl = URL.createObjectURL(blob);
-                tile.__npfBlobUrl = blobUrl;
-                tile.onload = () => finish(null);
-                tile.onerror = error => finish(error || new Error('Décodage tuile impossible'));
-                if (tile.__npfDisposed) {
-                    finish(null);
-                    return;
-                }
-                tile.src = blobUrl;
-            }).catch(error => {
-                if (tile.__npfDisposed) {
-                    finish(null);
-                    return;
-                }
-                tile.onload = () => finish(null);
-                tile.onerror = () => finish(error);
-                tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
-            });
+                });
+            };
+
+            requestTileBlob();
             return tile;
         }
     });
@@ -31812,6 +32006,7 @@ async function forceQuickOfflineMapGroupReload(groupName, packNames) {
         closeDirectOfflineDatabaseConnectionsForStartupRetry();
         directOfflineTileBlobCache.clear();
         directOfflineTileMissCache.clear();
+        directOfflineTileLookupHints.clear();
         directOfflineTileHitCount = 0;
         directOfflineTileMissCount = 0;
         directOfflineConsecutiveReadErrors = 0;
@@ -31876,6 +32071,7 @@ async function selectQuickOfflineMapGroup(groupName) {
     closeDirectOfflineDatabaseConnectionsForStartupRetry();
     directOfflineTileBlobCache.clear();
     directOfflineTileMissCache.clear();
+    directOfflineTileLookupHints.clear();
 
     if (isAlreadyActive) return forceQuickOfflineMapGroupReload(groupName, packNames);
 
