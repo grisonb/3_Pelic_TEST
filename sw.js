@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-42_zoom_memory_guard_icon_anchor';
-const APP_VERSION = 'v16.42';
+const SW_VERSION = 'sw-v16-43_road_viewport_tile_priority';
+const APP_VERSION = 'v16.43';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
