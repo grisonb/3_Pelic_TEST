@@ -1,3 +1,53 @@
+VERSION TEST v16.44 — MISE À JOUR PWA ALLÉGÉE + ROUTES CANVAS AGRÉGÉES
+Date : 04/09/2026
+Base : TEST v16.43
+
+OBJECTIF
+- Supprimer la surcharge du premier lancement après une mise à jour en allégeant fortement l'installation du Service Worker.
+- Améliorer encore le chargement du calque Routes sans modifier son contenu fonctionnel A / N / D / M / T ni les cartes Offline.
+- Conserver les corrections v16.42-v16.43 : tuiles bornées, HT au viewport, icônes terrains validées.
+
+1. MISE À JOUR PWA — INSTALLATION SERVICE WORKER ALLÉGÉE
+- L'installation du nouveau SW ne travaille plus sur `sia.js` : la révision SIA 15.69 reste dans son cache indépendant et est servie à la demande.
+- Suppression pendant `install` de la recopie de toutes les grosses ressources métier `APP_DATA_URLS`. Elles restent dans le cache stable existant et sont gérées à la demande par le fetch handler.
+- Les quatre fichiers sensibles à la version (Index / Script / Style / Manifest) sont validés en parallèle à chaque tentative de propagation GitHub, au lieu d'être traités séquentiellement.
+- Les bibliothèques statiques du shell (Leaflet, SunCalc, JSZip) sont d'abord recopiées depuis le cache existant ; elles ne sont téléchargées que si elles sont réellement absentes.
+- Les bases IndexedDB de cartes Offline ne sont jamais supprimées ni modifiées par cette mise à jour.
+
+2. DÉCLENCHEMENT DE LA RECHERCHE DE MISE À JOUR
+- Lorsqu'un Service Worker contrôle déjà la PWA, la vérification de mise à jour n'est plus déclenchée pendant le démarrage critique.
+- La page attend l'événement `npf-startup-core-ready`, puis laisse encore quelques secondes au SIA / fond de carte avant de lancer `registration.update()`.
+- Premier lancement sans contrôleur SW : enregistrement immédiat conservé pour permettre l'installation initiale.
+- Le rechargement reste unique via `controllerchange`. Aucun bouton MAJ n'est réintroduit.
+- Le DIAG conserve les événements de transition et ajoute les étapes remontées par le nouveau SW pendant son installation.
+
+3. ROUTES — RENDU CANVAS AGRÉGÉ
+- Le filtrage viewport de v16.43 est conservé.
+- Les segments filtrés restent disponibles individuellement pour les cartouches et le diagnostic, mais le rendu graphique n'instancie plus une Polyline Leaflet par segment.
+- Les géométries visibles sont regroupées par classe routière (A / N / D / M / T) en MultiLineString avant création des deux Canvas (entourage + trait).
+- Pour une partie visible, le nombre d'objets Leaflet de rendu passe donc de plusieurs milliers à quelques groupes de classe, sans changement de couleur ni d'épaisseur.
+- La marge de rendu est resserrée afin d'éviter de préparer inutilement des milliers de segments hors écran.
+- Le filtrage cède plus souvent la main à Safari afin d'éviter les longues séquences CPU.
+
+4. PRIORITÉ AUX TUILES OFFLINE
+- Avant une reconstruction routière après zoom/pan, les routes attendent maintenant que la file de lectures de tuiles NPF soit réellement vide, avec un délai maximum augmenté.
+- Si les tuiles mettent du temps à arriver, elles sont donc prioritaires sur la reconstruction des routes.
+
+5. ÉLÉMENTS INCHANGÉS
+- Icônes terrains v16.42 validées : inchangées.
+- HT limitée au viewport : inchangée.
+- Base SIA / `sia.js` strictement inchangée.
+- Cartes Offline et bases IndexedDB strictement conservées.
+
+6. CONTRÔLES
+- `node --check` Script et SW.
+- Manifest JSON parsé.
+- Cohérence v16.44 Index / Manifest / Script / Style / SW.
+- Vérification de toutes les références actives `appv=v16.44`.
+- Vérification que le SW n'effectue plus le préchargement SIA / APP_DATA pendant `install`.
+- `sia.js` comparé bit-à-bit avec v16.43.
+
+
 VERSION TEST v16.43 — ROUTES LIMITÉES AU VIEWPORT / PRIORITÉ AUX TUILES OFFLINE
 Date : 04/09/2026
 Base : TEST v16.42
