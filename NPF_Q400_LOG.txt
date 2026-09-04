@@ -1,3 +1,48 @@
+VERSION TEST v16.40 — ANTI-PLANTAGE HT / ROUTES + RECENTRAGE ICÔNES TERRAINS
+Date : 03/09/2026
+Base : TEST v16.39
+
+OBJECTIF
+- Traiter la cause la plus probable des ralentissements finissant par un plantage, observée avec Routes ON et Lignes HT ON.
+- Conserver Routes et HT utilisables, mais réduire fortement la charge Leaflet en ne rendant plus en permanence l’intégralité des lignes HT.
+- Corriger le décalage visuel des nouvelles icônes terrains par rapport à leur position réelle.
+
+1. ANTI-PLANTAGE — LIGNES HT
+- Le chargement HT conserve désormais le GeoJSON en mémoire, mais ne crée plus immédiatement 13 287 objets Leaflet.
+- Les lignes HT rendues sur la carte sont maintenant limitées à la zone visible + marge de sécurité.
+- À chaque déplacement/zoom, NPF remplace proprement les tronçons HT visibles au lieu de conserver toute la France en rendu actif.
+- À la désactivation du calque HT, les géométries rendues et les minuteries associées sont immédiatement libérées.
+- Objectif : réduire la pression mémoire Canvas/Leaflet sur iPad, qui était le suspect principal du couple ralentissement puis crash.
+
+2. DIAGNOSTIC HT / ROUTES AMÉLIORÉ
+- Le DIAG conserve l’état ON/OFF de Routes et Lignes HT.
+- Il affiche désormais aussi le nombre de tronçons HT actuellement rendus à l’écran, en plus du nombre total connu.
+- Cela permet de distinguer clairement :
+  - base HT chargée ;
+  - volume réellement affiché ;
+  - contexte Routes + HT au moment d’un ralentissement.
+
+3. RECENTRAGE DES ICÔNES TERRAINS
+- Correction du conteneur CSS des nouvelles icônes terrains.
+- Suppression du `width:auto` / `height:auto` qui pouvait perturber le centrage réel du `divIcon` Leaflet.
+- Le symbole est désormais centré dans une boîte de taille fixe pilotée par Leaflet ; l’ancre reste alignée sur le centre géographique du terrain.
+- Icônes PÉLIC utilisables et aérodromes non sélectionnables conservent leur logique graphique et l’orientation de piste.
+
+4. ÉLÉMENTS INCHANGÉS
+- Mécanisme de mise à jour PWA v16.36 à v16.39 inchangé.
+- Optimisations SIA v16.31 à v16.37 conservées.
+- Icônes terrains v16.38 conservées dans leur dessin général.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES
+- Cohérence v16.40 Index / Manifest / Script / Style / SW.
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Vérification du marqueur `NPF_STYLE_BUILD_VERSION: v16.40`.
+- Vérification du DIAG : état Routes / HT + total HT + HT rendues.
+- sia.js comparé bit-à-bit avec v16.39.
+
+
 VERSION TEST v16.39 — CORRECTION INSTALLATION PWA / MARQUEUR STYLE
 Date : 03/09/2026
 Base : TEST v16.38
