@@ -1,3 +1,58 @@
+VERSION TEST v16.43 — ROUTES LIMITÉES AU VIEWPORT / PRIORITÉ AUX TUILES OFFLINE
+Date : 04/09/2026
+Base : TEST v16.42
+
+OBJECTIF
+- Corriger la charge anormale du calque routier mise en évidence par les DIAG v16.42 : jusqu’à 45 811 segments Leaflet actifs pour seulement deux parties routières.
+- Donner la priorité au chargement des tuiles Offline avant la reconstruction du calque Routes.
+- Conserver les gains v16.42 sur les tuiles, les pistes, les lignes HT et le centrage des icônes terrains.
+
+1. ROUTES — FILTRAGE AU NIVEAU DU SEGMENT
+- Les 53 parties du pack routier restent intégralement stockées dans le cache Offline.
+- Après sélection des parties géographiques utiles, NPF ne crée désormais dans Leaflet que les segments qui intersectent le viewport courant + une marge de sécurité.
+- Les classes restent identiques : zoom 11 = A ; zoom >= 12 = A / N / D / M / T.
+- Aucun segment n’est supprimé des données Offline : la réduction concerne uniquement le rendu Leaflet simultané.
+
+2. INDEX ROUTIER EN MÉMOIRE BORNÉ
+- Lorsqu’une partie routière devient utile, ses géométries sont indexées une seule fois avec une emprise minimale par segment.
+- Cet index source est réutilisé tant que la partie reste autour du viewport afin d’éviter de reparcourir/reparser le fichier à chaque petit déplacement.
+- Les index de parties devenues hors zone sont libérés pour ne pas conserver progressivement toute la France en mémoire.
+- Au retour au zoom 10 ou inférieur, où le calque routier n’est pas affiché, les index source routiers sont également libérés immédiatement.
+- Le filtrage des gros fichiers est découpé en lots avec restitution périodique à WebKit.
+
+3. PAN / ZOOM — COUVERTURE AVEC MARGE
+- Le rendu routier utilise une zone légèrement plus grande que l’écran.
+- Tant que le nouveau viewport reste à l’intérieur de cette couverture, les géométries existantes sont simplement déplacées par Leaflet : aucune reconstruction des segments.
+- Une nouvelle reconstruction intervient seulement lorsque le viewport sort de cette marge, lors d’un changement de niveau routier ou d’une activation explicite.
+- Dès `movestart` / `zoomstart`, tout rendu Routes ou HT encore en cours est invalidé immédiatement : un ancien rendu ne peut plus terminer après que l’utilisateur est déjà revenu à un autre niveau de zoom.
+
+4. PRIORITÉ AUX TUILES OFFLINE
+- Avant une reconstruction lourde du calque Routes, NPF laisse d’abord se vider la file de lectures des tuiles NPF Offline.
+- Cette attente est asynchrone et annulable : elle ne bloque pas l’interface et un nouveau geste rend immédiatement le travail précédent obsolète.
+- Objectif : éviter le cas observé en v16.42 avec Routes ON où des dizaines de lectures de tuiles restaient en file pendant la création de dizaines de milliers de segments routiers.
+
+5. DIAG ROUTES
+- Le DIAG conserve le nombre de segments réellement rendus.
+- Ajout du nombre de segments source actuellement indexés autour de la vue.
+- Les instantanés MÉMOIRE CARTE permettent donc de comparer directement « source indexée » et « rendu Leaflet ».
+
+6. ÉLÉMENTS INCHANGÉS
+- Gestion tuiles NPF v16.42 inchangée : keepBuffer réduit, file IndexedDB bornée, cache blobs borné et nettoyage après zoom.
+- Pistes limitées au viewport v16.42 inchangées.
+- Lignes HT limitées au viewport v16.40-v16.42 inchangées.
+- Centrage et dessin des icônes terrains v16.42 inchangés et validés.
+- Aucune suppression des bases Offline / IndexedDB.
+- sia.js strictement inchangé.
+
+7. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence stricte v16.43 Index / Manifest / Script / Style / SW.
+- Vérification de script.js?appv=v16.43, style.css?appv=v16.43 et manifest.json?appv=v16.43 dans l’Index.
+- Vérification NPF_SCRIPT_BUILD_VERSION, NPF_STYLE_BUILD_VERSION et APP_VERSION du SW.
+- sia.js comparé bit-à-bit avec v16.42.
+
+
 VERSION TEST v16.42 — ANTI-CRASH ZOOM NPF + CENTRAGE RÉEL DES ICÔNES + DIAG MÉMOIRE
 Date : 04/09/2026
 Base : TEST v16.41
