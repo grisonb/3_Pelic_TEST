@@ -1,3 +1,66 @@
+VERSION TEST v16.42 — ANTI-CRASH ZOOM NPF + CENTRAGE RÉEL DES ICÔNES + DIAG MÉMOIRE
+Date : 04/09/2026
+Base : TEST v16.41
+
+OBJECTIF
+- Corriger le décalage persistant des nouvelles icônes terrains sur la carte OACI.
+- Réduire les accumulations temporaires de tuiles, lectures IndexedDB et géométries Leaflet lors de zooms avant/arrière répétés sur la carte NPF.
+- Élargir le diagnostic pour mesurer ce qui reste réellement en mémoire/rendu après chaque zoom.
+
+1. CENTRAGE RÉEL DES ICÔNES TERRAINS
+- Cause identifiée : le CSS v16.40/v16.41 imposait `margin: 0 !important` sur le `divIcon` terrain.
+- Leaflet centre un `divIcon` avec des marges négatives calculées depuis `iconAnchor`; cette règle CSS annulait donc le centrage géographique.
+- Suppression de cette surcharge : l’ancre Leaflet redevient effective et le centre du pictogramme correspond à la latitude/longitude du terrain.
+- Dessin, inversion de couleurs, ergots et orientation de piste restent inchangés.
+
+2. CARTE NPF — RÉDUCTION DE PRESSION MÉMOIRE SUR ZOOMS RÉPÉTÉS
+- `keepBuffer` de la couche tuiles NPF réduit de 6 à 2; les autres cartes offline conservent un tampon plus large.
+- Cache mémoire de blobs NPF réduit et borné dynamiquement afin d’éviter de conserver des centaines de tuiles compressées de niveaux de zoom précédents.
+- Concurrence IndexedDB NPF réduite de 5 à 3 lectures simultanées.
+- File de lectures NPF bornée : les anciennes demandes hors champ sont abandonnées au lieu de pouvoir s’accumuler pendant des gestes rapides.
+- Au `zoomstart`, les lectures devenues obsolètes sont annulées et le cache mémoire NPF est fortement raboté.
+- Au `zoomend`, Leaflet est explicitement invité à élaguer les anciennes tuiles et un second nettoyage léger est effectué après stabilisation.
+- Lorsqu’une tuile est retirée avant la fin de sa lecture/décodage, sa future réponse est ignorée et son image/blob est libéré au lieu d’être décodé hors écran.
+
+3. PISTES / TERRAINS — RENDU LIMITÉ AU VIEWPORT
+- Le calque des pistes NPF ne recrée plus toutes les pistes de France à chaque zoom >= 12.
+- Seules les pistes intersectant la zone visible + marge sont créées dans Leaflet.
+- Le rendu est rafraîchi aussi après déplacement de carte et dédupliqué par signature pour éviter les reconstructions inutiles.
+- Les données de piste restent intégralement disponibles : seule la quantité de géométrie Leaflet simultanément rendue est réduite.
+
+4. LIGNES HT / ROUTES
+- Rendu HT limité au viewport de v16.40 conservé.
+- Tout nouveau geste carte annule également un rafraîchissement HT devenu obsolète.
+- Le DIAG compte maintenant le nombre réel de segments routiers rendus, et non seulement le nombre de groupes GeoJSON.
+
+5. DIAG MÉMOIRE / ZOOM
+- Après chaque zoom stabilisé, ajout d’un instantané `MÉMOIRE CARTE` avec :
+  - tuiles Leaflet retenues ;
+  - tuiles DOM ;
+  - tuiles visibles chargées ;
+  - lectures NPF actives / en file ;
+  - taille du cache blobs ;
+  - segments routes rendus ;
+  - tronçons HT rendus ;
+  - couches pistes rendues ;
+  - couches SIA présentes.
+- L’export principal affiche également ces compteurs de manière compacte.
+
+6. DONNÉES / FONCTIONS CONSERVÉES
+- Aucun effacement de `OfflineTilesDB_v13_70_clean` ni des bases de packs Offline.
+- Aucun changement du mécanisme de mise à jour PWA.
+- Optimisations SIA existantes conservées.
+- `sia.js` strictement inchangé.
+
+7. CONTRÔLES
+- `node --check` Script et SW.
+- Manifest JSON parsé.
+- Cohérence stricte v16.42 Index / Manifest / Script / Style / SW.
+- Vérification explicite de `script.js?appv=v16.42`, `style.css?appv=v16.42`, `manifest.json?appv=v16.42`.
+- Vérification du marqueur `NPF_STYLE_BUILD_VERSION: v16.42`.
+- `sia.js` comparé bit-à-bit avec v16.41.
+
+
 VERSION TEST v16.41 — CORRECTION BLOCAGE MAJ + VALIDATION DE LIVRAISON RENFORCÉE
 Date : 04/09/2026
 Base : TEST v16.40
