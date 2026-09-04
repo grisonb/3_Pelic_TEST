@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.46';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.47';
 
 
 /*
@@ -2478,7 +2478,7 @@ const existingAirportCodesForAdditionalDisplay = new Set(
         .filter(Boolean)
 );
 
-const additionalAerodromes = piafMetropolitanAerodromesData
+const piafMetropolitanAerodromes = piafMetropolitanAerodromesData
     .trim()
     .split('\n')
     .map(line => {
@@ -2496,8 +2496,48 @@ const additionalAerodromes = piafMetropolitanAerodromesData
         && airport.name
         && Number.isFinite(airport.lat)
         && Number.isFinite(airport.lon)
-        && !existingAirportCodesForAdditionalDisplay.has(airport.oaci)
     ));
+
+const piafMetropolitanAerodromeByOaci = new Map(
+    piafMetropolitanAerodromes.map(airport => [airport.oaci, airport])
+);
+
+function calculateAirportPositionDeltaNm(lat1, lon1, lat2, lon2) {
+    const toRadians = value => Number(value) * Math.PI / 180;
+    const dLat = toRadians(Number(lat2) - Number(lat1));
+    const dLon = toRadians(Number(lon2) - Number(lon1));
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2))
+        * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+    return (6371 * c) / 1.852;
+}
+
+/*
+ * v16.47 — les positions `otherAirports` historiques sont parfois très
+ * arrondies (ex. LFBG). PIAF devient la référence quand le code OACI pointe
+ * vers une position cohérente avec l'ancien terrain. Un écart > 12 NM est
+ * volontairement ignoré : il signale probablement une ancienne incohérence
+ * code/nom et ne doit pas déplacer silencieusement le symbole à l'autre bout
+ * de la France. Les pélicandromes permanents ne sont pas concernés.
+ */
+const OTHER_AIRPORT_PIAF_MAX_CORRECTION_NM = 12;
+otherAirports.forEach(airport => {
+    const reference = piafMetropolitanAerodromeByOaci.get(
+        String(airport?.oaci || '').trim().toUpperCase()
+    );
+    if (!reference) return;
+    const deltaNm = calculateAirportPositionDeltaNm(
+        airport.lat, airport.lon, reference.lat, reference.lon
+    );
+    if (!Number.isFinite(deltaNm) || deltaNm > OTHER_AIRPORT_PIAF_MAX_CORRECTION_NM) return;
+    airport.lat = reference.lat;
+    airport.lon = reference.lon;
+    airport.__npfPositionReference = 'PIAF';
+});
+
+const additionalAerodromes = piafMetropolitanAerodromes
+    .filter(airport => !existingAirportCodesForAdditionalDisplay.has(airport.oaci));
 
 
 /*
@@ -6668,7 +6708,7 @@ function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
          * normalement et peuvent encore alimenter le cache mémoire.
          */
         try { markDirectOfflineNpfViewportPriority(reason); } catch (_) {}
-        try { trimDirectOfflineTileBlobCache(32); } catch (_) {}
+        try { trimDirectOfflineTileBlobCache(96); } catch (_) {}
     }
 }
 
@@ -6792,7 +6832,7 @@ function releaseStaleOfflineTileResources(reason = 'zoomend') {
          * Les blobs sont un cache d'appoint, pas les données Offline elles-mêmes.
          * Les réduire ne touche jamais IndexedDB ni les packs installés.
          */
-        trimDirectOfflineTileBlobCache(64);
+        trimDirectOfflineTileBlobCache(128);
         while (directOfflineTileMissCache.size > 160) {
             const oldestKey = directOfflineTileMissCache.keys().next().value;
             directOfflineTileMissCache.delete(oldestKey);
@@ -7565,7 +7605,7 @@ function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
  * applicatif et comme chemin de compatibilité secondaire.
  */
 const DIRECT_OFFLINE_TILE_CACHE_MAX = 256;
-const DIRECT_OFFLINE_NPF_TILE_CACHE_MAX = 128;
+const DIRECT_OFFLINE_NPF_TILE_CACHE_MAX = 160;
 const DIRECT_OFFLINE_TILE_MISS_CACHE_MAX = 512;
 const DIRECT_OFFLINE_TILE_MISS_CACHE_TTL_MS = 30000;
 const directOfflineTileBlobCache = new Map();
@@ -7597,7 +7637,7 @@ let directOfflineLastRecoveryReason = '';
  * concurrence uniquement pour le groupe NPF ; OACI conserve son chemin rapide.
  */
 const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 5;
-const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 64;
+const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 160;
 const DIRECT_OFFLINE_TILE_ABORTED = Symbol('direct-offline-tile-aborted');
 let directOfflineNpfActiveReads = 0;
 const directOfflineNpfReadQueue = [];
@@ -7608,6 +7648,8 @@ let directOfflineNpfAbortedReadCount = 0;
 let directOfflineNpfTileRetryCount = 0;
 const directOfflineTileLookupHints = new Map();
 const DIRECT_OFFLINE_TILE_LOOKUP_HINT_MAX = 256;
+const DIRECT_OFFLINE_TILE_LOOKUP_PARENT_ZOOM = 8;
+let directOfflineNpfLastSuccessfulLookup = null;
 
 function markDirectOfflineNpfViewportPriority(reason = 'view-change') {
     directOfflineTileViewPriorityEpoch += 1;
@@ -7691,23 +7733,15 @@ function enqueueDirectOfflineNpfRead(task, options = {}) {
         };
         directOfflineNpfReadQueue.push(item);
 
-        while (directOfflineNpfReadQueue.length > DIRECT_OFFLINE_NPF_MAX_QUEUED_READS) {
-            let lowestEpoch = Infinity;
-            for (const queued of directOfflineNpfReadQueue) {
-                lowestEpoch = Math.min(lowestEpoch, Number(queued?.viewEpoch) || 0);
-            }
-            let staleIndex = -1;
-            for (let i = directOfflineNpfReadQueue.length - 1; i >= 0; i -= 1) {
-                if ((Number(directOfflineNpfReadQueue[i]?.viewEpoch) || 0) === lowestEpoch) {
-                    staleIndex = i;
-                    break;
-                }
-            }
-            if (staleIndex < 0) staleIndex = directOfflineNpfReadQueue.length - 1;
-            const stale = directOfflineNpfReadQueue.splice(staleIndex, 1)[0];
-            directOfflineNpfAbortedReadCount += 1;
-            try { stale?.resolve?.(DIRECT_OFFLINE_TILE_ABORTED); } catch (_) {}
-        }
+        /*
+         * v16.47 — ne plus supprimer une tuile valide parce que la file a
+         * momentanément grandi pendant plusieurs zooms rapides. L'ordonnanceur
+         * sélectionne déjà l'epoch de viewport le plus récent en premier ; les
+         * anciennes demandes attendent donc sans bloquer les nouvelles et
+         * alimentent ensuite le cache si elles sont encore utiles.
+         * DIRECT_OFFLINE_NPF_MAX_QUEUED_READS devient une cible de diagnostic,
+         * pas un seuil destructif.
+         */
         runNextDirectOfflineNpfRead();
     });
 }
@@ -7844,13 +7878,18 @@ function getDirectOfflineTileSelectionSignature() {
         .join('|');
 }
 
-function getDirectOfflineTileLookupHintKey(coords, bucketSize = 16) {
-    const safeBucket = Math.max(4, Number(bucketSize) || 16);
+function getDirectOfflineTileLookupHintKey(coords) {
+    const z = Math.max(0, Number(coords?.z) || 0);
+    const x = Math.max(0, Number(coords?.x) || 0);
+    const y = Math.max(0, Number(coords?.y) || 0);
+    const parentZoom = Math.min(z, DIRECT_OFFLINE_TILE_LOOKUP_PARENT_ZOOM);
+    const divisor = Math.pow(2, Math.max(0, z - parentZoom));
+
     return [
         getDirectOfflineTileSelectionSignature(),
-        Number(coords?.z) || 0,
-        Math.floor((Number(coords?.x) || 0) / safeBucket),
-        Math.floor((Number(coords?.y) || 0) / safeBucket)
+        parentZoom,
+        Math.floor(x / divisor),
+        Math.floor(y / divisor)
     ].join('|');
 }
 
@@ -7868,11 +7907,15 @@ function buildDirectOfflineTileUrlFromTemplate(template, coords) {
 function rememberDirectOfflineTileLookupHint(coords, dbName, tileUrl) {
     const key = getDirectOfflineTileLookupHintKey(coords);
     const template = getDirectOfflineTileUrlTemplate(tileUrl);
-    directOfflineTileLookupHints.delete(key);
-    directOfflineTileLookupHints.set(key, {
+    const hint = {
         dbName: String(dbName || ''),
         template
-    });
+    };
+    directOfflineTileLookupHints.delete(key);
+    directOfflineTileLookupHints.set(key, hint);
+    if (isNpfOfflinePackSelection() && hint.dbName) {
+        directOfflineNpfLastSuccessfulLookup = hint;
+    }
     while (directOfflineTileLookupHints.size > DIRECT_OFFLINE_TILE_LOOKUP_HINT_MAX) {
         const oldestKey = directOfflineTileLookupHints.keys().next().value;
         directOfflineTileLookupHints.delete(oldestKey);
@@ -7880,7 +7923,14 @@ function rememberDirectOfflineTileLookupHint(coords, dbName, tileUrl) {
 }
 
 function getDirectOfflineTileLookupHint(coords) {
-    return directOfflineTileLookupHints.get(getDirectOfflineTileLookupHintKey(coords)) || null;
+    const spatialHint = directOfflineTileLookupHints.get(
+        getDirectOfflineTileLookupHintKey(coords)
+    );
+    if (spatialHint) return spatialHint;
+    if (isNpfOfflinePackSelection() && directOfflineNpfLastSuccessfulLookup?.dbName) {
+        return directOfflineNpfLastSuccessfulLookup;
+    }
+    return null;
 }
 
 function promoteDirectOfflineLookupCandidate(list, preferred) {
@@ -8231,6 +8281,7 @@ async function recoverDirectOfflineTileReader(reason = 'read-error') {
         directOfflineTileBlobCache.clear();
         directOfflineTileMissCache.clear();
         directOfflineTileLookupHints.clear();
+        directOfflineNpfLastSuccessfulLookup = null;
         directOfflineTileMissCount = 0;
 
         await new Promise(resolve => setTimeout(resolve, 180));
@@ -8620,7 +8671,13 @@ function buildDirectOfflineLeafletLayer(options = {}) {
 
 function setupBaseTileLayer() {
     if (!map) return;
-    resetPendingDirectOfflineNpfReads();
+    /*
+     * v16.47 — une reconstruction visuelle de GridLayer n'est pas un changement
+     * de source. Ne pas invalider ici les lectures IndexedDB déjà engagées :
+     * la nouvelle couche peut réutiliser les mêmes promesses inflight/cache.
+     * Les vrais changements de carte et récupérations appellent explicitement
+     * resetPendingDirectOfflineNpfReads() avant d'arriver ici.
+     */
     if (baseTileLayer) {
         map.removeLayer(baseTileLayer);
     }
@@ -19676,6 +19733,10 @@ async function fetchVacManifest(timeoutMs = 12000) {
 }
 
 function getVacAvailableEntries(manifest) {
+    /*
+     * v16.47 — aucune restriction PÉLIC : toutes les VAC publiées dans le
+     * manifest peuvent être téléchargées et utilisées hors ligne.
+     */
     return Object.entries(manifest?.airports || {})
         .map(([oaci, entry]) => ({
             oaci: normalizeVacOaci(oaci),
@@ -23332,10 +23393,23 @@ function getTerrainAirportIconHeading(airport) {
     return 90;
 }
 
+function getTerrainAirportIconSvgRotation(airport) {
+    /*
+     * Le rectangle SVG est horizontal à 0°, tandis que le relèvement aviation
+     * est mesuré depuis le Nord. La conversion exacte est donc cap - 90°.
+     */
+    const heading = getTerrainAirportIconHeading(airport);
+    if (!Number.isFinite(heading)) return 0;
+    let rotation = heading - 90;
+    while (rotation <= -180) rotation += 360;
+    while (rotation > 180) rotation -= 360;
+    return rotation;
+}
+
 function buildTerrainAirportSymbolHtml(airport, options = {}) {
     const inverted = !!options.inverted;
     const showCardinalTabs = options.showCardinalTabs !== false;
-    const heading = getTerrainAirportIconHeading(airport);
+    const heading = getTerrainAirportIconSvgRotation(airport);
     const mainColor = '#3358d4';
     const fillColor = inverted ? '#ffffff' : mainColor;
     const strokeColor = inverted ? mainColor : '#ffffff';
@@ -23355,7 +23429,7 @@ function buildTerrainAirportSymbolHtml(airport, options = {}) {
                 ${tabsSvg}
                 <circle cx="32" cy="32" r="20.5" fill="${fillColor}" stroke="${ringColor}" stroke-width="4"/>
                 ${!inverted ? '<circle cx="32" cy="32" r="20.5" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.95"/>' : ''}
-                <g transform="rotate(${Number.isFinite(heading) ? heading.toFixed(1) : '90.0'} 32 32)">
+                <g transform="rotate(${Number.isFinite(heading) ? heading.toFixed(1) : '0.0'} 32 32)">
                     <rect x="15" y="27.6" width="34" height="8.8" rx="4.4" fill="${runwayColor}"/>
                 </g>
             </svg>
@@ -25938,7 +26012,7 @@ function drawPermanentAirportMarkers() {
             zIndexOffset: 1700
         }).addTo(permanentAirportLayer);
 
-        const popupHtml = `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
+        const popupHtml = `<div class="airport-popup additional-aerodrome-popup"><b>${escapeHtml(airport.oaci)}</b><br>${escapeHtml(airport.name)}${buildVacButtonHtml(airport.oaci)}${buildAirportAddWpButtonHtml(airport.oaci)}</div>`;
         addAirportTouchHitbox(airport, popupHtml);
     });
 
@@ -32007,6 +32081,7 @@ async function forceQuickOfflineMapGroupReload(groupName, packNames) {
         directOfflineTileBlobCache.clear();
         directOfflineTileMissCache.clear();
         directOfflineTileLookupHints.clear();
+        directOfflineNpfLastSuccessfulLookup = null;
         directOfflineTileHitCount = 0;
         directOfflineTileMissCount = 0;
         directOfflineConsecutiveReadErrors = 0;
@@ -32072,6 +32147,7 @@ async function selectQuickOfflineMapGroup(groupName) {
     directOfflineTileBlobCache.clear();
     directOfflineTileMissCache.clear();
     directOfflineTileLookupHints.clear();
+        directOfflineNpfLastSuccessfulLookup = null;
 
     if (isAlreadyActive) return forceQuickOfflineMapGroupReload(groupName, packNames);
 
