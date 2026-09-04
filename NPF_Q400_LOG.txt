@@ -1,3 +1,60 @@
+VERSION TEST v16.47 — TUILES NPF STABLES + POSITIONS/ORIENTATIONS TERRAINS + VAC HORS PÉLIC
+Date : 04/09/2026
+Base : TEST v16.46
+
+OBJECTIF
+- Supprimer le cycle de lectures interrompues/reprises qui ralentit encore les tuiles NPF.
+- Accélérer les changements de zoom en réutilisant mieux les tuiles déjà lues et le routage vers la bonne base IndexedDB.
+- Corriger de manière générale les positions approximatives des terrains `otherAirports` à partir de la référence PIAF lorsqu'elle est cohérente avec le terrain existant.
+- Corriger l'orientation exacte de la piste dans les pictogrammes terrains.
+- Permettre l'accès aux VAC téléchargées pour les aérodromes non sélectionnables comme PÉLIC.
+
+1. TUILES NPF — SUPPRESSION DU THRASHING
+- `setupBaseTileLayer()` n'invalide plus automatiquement toutes les lectures NPF lors d'une simple reconstruction de couche.
+- Les changements de pan/zoom continuent de donner priorité au viewport récent, mais les lectures déjà lancées ne sont plus jetées puis redemandées en boucle.
+- La file NPF n'abandonne plus des demandes valides uniquement parce qu'elle dépasse un seuil : les demandes du viewport le plus récent passent devant les anciennes.
+- Le retry `DIRECT_OFFLINE_TILE_ABORTED` reste réservé aux vrais resets durs (changement de carte / récupération IndexedDB), et non aux gestes ordinaires.
+- Cache blobs NPF conservé plus largement entre deux zooms afin d'éviter de relire immédiatement les mêmes tuiles.
+
+2. ROUTAGE INDEXEDDB DES TUILES NPF
+- Les indices de routage base/format sont maintenant partagés entre niveaux de zoom via une cellule géographique parent commune.
+- La dernière base NPF ayant fourni une tuile est utilisée comme premier candidat lorsque la zone ne possède pas encore d'indice spatial.
+- En cas de changement de région, le fallback complet reste conservé et le nouvel emplacement met immédiatement à jour l'indice.
+- Aucun changement des bases `OfflineTilesDB_v13_70_clean` ni des bases de packs installées.
+
+3. POSITION DES TERRAINS — CORRECTION GÉNÉRALE
+- La base PIAF embarquée devient la référence de position pour les terrains de `otherAirports` lorsque l'écart avec l'ancienne position reste cohérent (<= 12 NM).
+- Cela corrige notamment LFBG/Cognac sans hardcoder uniquement ce terrain et améliore les autres anciennes coordonnées approximatives.
+- Les incohérences majeures de code/nom sont volontairement exclues de cette correction automatique afin de ne pas déplacer un terrain vers un aérodrome totalement différent.
+- Les pélicandromes permanents, dont certaines positions ont été réglées opérationnellement, ne sont pas écrasés.
+
+4. ORIENTATION EXACTE DES PISTES DANS LES ICÔNES
+- L'azimut réel continue d'être calculé depuis les coordonnées des deux seuils de la piste principale.
+- Correction du repère SVG : `rotation = relèvement géographique - 90°`.
+- Il ne s'agit pas d'une approximation par QFU : l'orientation reste calculée avec les coordonnées réelles des seuils.
+- Correction globale, notamment visible sur LFBH/La Rochelle.
+
+5. VAC DES AÉRODROMES NON PÉLIC
+- Les popups des `additionalAerodromes` affichent maintenant le bouton VAC lorsqu'une VAC de cet OACI est installée localement (ou qu'un fallback en ligne existe).
+- Le téléchargement VAC reste piloté par le manifest VAC et n'est pas filtré sur le statut PÉLIC : toute VAC disponible dans le dépôt peut donc être stockée hors ligne.
+- Le terrain reste non sélectionnable comme PÉLIC ; seul l'accès documentaire VAC est ajouté.
+
+6. ÉLÉMENTS CONSERVÉS
+- Priorité des tuiles sur Routes/HT conservée.
+- Routes filtrées au viewport et agrégées Canvas conservées.
+- HT filtrées au viewport conservées.
+- Icônes terrains centrées validées conservées.
+- `sia.js` strictement inchangé.
+
+7. CONTRÔLES
+- node --check Script et SW.
+- Scripts inline de l'Index contrôlés.
+- Manifest JSON parsé.
+- Cohérence v16.47 Index / Manifest / Script / Style / SW.
+- Vérification de la référence `script.js?appv=v16.47`.
+- Vérification que `sia.js` est bit-à-bit identique à v16.46.
+
+
 VERSION TEST v16.46 — LECTURE TUILES NPF : FIN DES ANNULATIONS BLOQUANTES + ROUTAGE RAPIDE INDEXEDDB
 Date : 04/09/2026
 Base : TEST v16.45
