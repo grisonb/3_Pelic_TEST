@@ -1,3 +1,56 @@
+VERSION TEST v16.46 — LECTURE TUILES NPF : FIN DES ANNULATIONS BLOQUANTES + ROUTAGE RAPIDE INDEXEDDB
+Date : 04/09/2026
+Base : TEST v16.45
+
+OBJECTIF
+- Corriger les tuiles Offline qui pouvaient rester blanches définitivement après un pan/zoom.
+- Accélérer le retour des tuiles NPF même avec Routes et Lignes HT désactivées.
+- Ne pas augmenter agressivement la pression mémoire : priorité à la qualité de la file IndexedDB plutôt qu'à davantage de lectures simultanées.
+
+1. CORRECTION DES LECTURES ANNULÉES
+- Une lecture abandonnée n'est plus assimilée à une tuile réellement absente.
+- Introduction d'un état interne distinct `ABORTED` pour les lectures invalidées par un vrai reset de la carte / de la base.
+- Une tuile encore présente à l'écran et interrompue est automatiquement redemandée au lieu de rester sur un placeholder transparent.
+- Les tuiles réellement absentes continuent seules d'alimenter le cache MISS.
+
+2. PAN / ZOOM : PLUS D'INVALIDATION DES LECTURES DÉJÀ ACTIVES
+- v16.45 invalidait toute la génération de lecture au début d'un pan ou d'un zoom.
+- Les cinq transactions IndexedDB déjà actives continuaient pourtant jusqu'à leur terme mais leur résultat était jeté ; elles occupaient donc les cinq slots pendant que les nouvelles tuiles attendaient.
+- v16.46 ne détruit plus ces lectures lors d'un geste.
+- Un nouveau viewport reçoit seulement une priorité de file supérieure ; les lectures déjà actives peuvent terminer et leur résultat reste utilisable/cacheable.
+- Les anciennes demandes en file sont servies après les tuiles du viewport courant, sans bloquer les nouvelles.
+
+3. FILE DE LECTURE NPF PRIORITAIRE
+- Les demandes de la vue la plus récente sont choisies avant celles des vues précédentes.
+- En cas de dépassement de la file, une demande ancienne/faible priorité est supprimée en premier ; elle est marquée ABORTED, jamais MISS.
+- Concurrence maintenue à 5 lectures simultanées pour ne pas réintroduire de pression mémoire excessive sur iPad.
+
+4. ROUTAGE INDEXEDDB / URL ACCÉLÉRÉ
+- Mémorisation du couple base IndexedDB + format d'URL ayant réellement fourni une tuile pour une zone donnée.
+- Les tuiles voisines essayent ce chemin en premier au lieu de reparcourir systématiquement tous les candidats.
+- Pour une sélection NPF moderne en stockage isolé, suppression des hosts de secours OSM/IGN/OACI inutiles dans la recherche directe.
+- Les chemins de compatibilité historiques restent conservés lorsque la sélection n'est pas reconnue comme stockage isolé complet.
+
+5. DIAGNOSTIC
+- Ajout des compteurs de lectures NPF interrompues/reprises et de l'époque de priorité du viewport.
+- Les compteurs existants tuiles visibles / lectures actives / file restent conservés.
+
+6. ÉLÉMENTS INCHANGÉS
+- Priorité raster avant Routes/HT v16.45 conservée.
+- Optimisations Routes v16.43-v16.44 conservées.
+- HT limitées au viewport conservées.
+- Icônes terrains validées inchangées.
+- Bases IndexedDB et packs Offline jamais supprimés ni migrés.
+- sia.js strictement inchangé.
+
+7. CONTRÔLES
+- node --check Script et SW.
+- Manifest JSON parsé.
+- Cohérence complète v16.46 Index / Manifest / Script / Style / SW.
+- Vérification des références script.js/style.css/manifest.json en v16.46.
+- sia.js comparé bit-à-bit avec v16.45.
+
+
 VERSION TEST v16.45 — PRIORITÉ ABSOLUE AUX TUILES OFFLINE NPF
 Date : 04/09/2026
 Base : TEST v16.44
