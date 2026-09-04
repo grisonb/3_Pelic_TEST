@@ -1,4 +1,4 @@
-/* NPF_STYLE_BUILD_VERSION: v16.39 */
+/* NPF_STYLE_BUILD_VERSION: v16.40 */
 /* v14.83 — nettoyage des références techniques et limitation des cartouches routiers. */
 /* v14.81 — recherche phonétique nationale élargie aux fragments sur deux lettres. */
 /* v14.80 — Brive conservé uniquement sous LFSL. */
@@ -17944,8 +17944,9 @@ body.npf-waypoint-search-open {
    ========================================================================== */
 
 .terrain-airport-marker-icon {
-    width: auto !important;
-    height: auto !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
@@ -17959,6 +17960,7 @@ body.npf-waypoint-search-open {
     display: block;
     width: 100%;
     height: 100%;
+    transform: translate3d(0, 0, 0);
     filter: drop-shadow(0 1px 3px rgba(0,0,0,.28));
 }
 
