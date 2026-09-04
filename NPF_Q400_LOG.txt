@@ -1,3 +1,42 @@
+VERSION TEST v16.50 — DIAGNOSTIC PÉRIMÈTRE VAC COMPLET
+Date : 04/09/2026
+Base : TEST v16.49
+
+OBJECTIF
+- Rendre immédiatement visible la différence entre les VAC réellement téléchargées et le périmètre du dépôt NPF-Q400-VAC.
+- Vérifier que le dépôt VAC couvre tous les aérodromes OACI affichés sur la carte NPF, y compris les terrains non sélectionnables comme PÉLIC.
+- Ne modifier ni le moteur de tuiles, ni Routes, ni Lignes HT, ni les données SIA.
+
+1. VAC — PÉRIMÈTRE DU DÉPÔT
+- NPF calcule désormais le nombre d'aérodromes OACI réellement affichés à partir des listes PÉLIC, autres aérodromes et de la référence PIAF embarquée.
+- Le manifest VAC mémorise séparément le nombre total de terrains qu'il contient, le nombre de VAC disponibles et le nombre de terrains sans VAC publiée.
+- Le système de synchronisation reste entièrement automatique : dès que le manifest NPF-Q400-VAC sera étendu, les nouvelles VAC disponibles seront téléchargées automatiquement sans autre modification de la PWA.
+
+2. GESTION DES CARTES VAC
+- Le statut VAC affiche maintenant « Périmètre dépôt : X / Y terrains NPF ».
+- Lorsque le dépôt ne couvre pas encore tous les terrains affichés, le nombre « À ajouter au manifest » est indiqué explicitement.
+- Le compteur « Téléchargées / disponibles » reste inchangé et continue de refléter uniquement les PDF réellement publiés par le dépôt.
+
+3. DIAGNOSTIC
+- Ajout d'une ligne VAC dans l'export DIAG : nombre téléchargé, nombre disponible dans le dépôt, nombre de terrains présents dans le manifest, nombre total d'aérodromes OACI affichés par NPF et nombre de terrains sans VAC publiée.
+- Cette ligne permettra de confirmer immédiatement que l'extension du dépôt VAC a bien été prise en compte.
+
+4. ÉLÉMENTS INCHANGÉS
+- Tuiles NPF : logique v16.49 conservée.
+- Routes et Lignes HT : logique v16.49 conservée.
+- Positions et orientations de pistes : inchangées.
+- Synchronisation VAC automatique v16.48/v16.49 conservée.
+- sia.js strictement inchangé.
+
+5. CONTRÔLES
+- node --check Script et SW.
+- Scripts inline de l'Index contrôlés.
+- Manifest JSON parsé.
+- Cohérence v16.50 Index / Manifest / Script / Style / SW.
+- Recherche des références actives v16.49 dans les marqueurs de version.
+- sia.js comparé bit-à-bit avec v16.49.
+
+
 VERSION TEST v16.49 — FILE TUILES NETTOYÉE + LIGNES HT REGROUPÉES
 Date : 04/09/2026
 Base : TEST v16.48
