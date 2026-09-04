@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.47';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.48';
 
 
 /*
@@ -1581,6 +1581,11 @@ const VAC_LEGACY_DOLE_LFSJ_SHA256 = '17c83cb0e4f607e336962e05bb593d6d80543275814
 let vacDb = null;
 let vacSyncInProgress = false;
 let pendingVacUpdateManifest = null;
+let vacAutomaticSyncTimer = null;
+let vacAutomaticSyncSequence = 0;
+let vacAutomaticSyncLastAttemptAt = 0;
+const VAC_AUTO_SYNC_RETRY_DELAY_MS = 12000;
+const VAC_AUTO_SYNC_ONLINE_DELAY_MS = 5000;
 let vacInstalledOaciSet = new Set(
     (() => {
         try {
@@ -4583,18 +4588,24 @@ async function initializeApp() {
     });
 
     /*
-     * VAC : contrôle différé et non bloquant.
+     * v16.48 — VAC : synchronisation entièrement automatique et non bloquante.
+     * Le contrôle est lancé après le cœur de démarrage, puis attend lui-même
+     * que les tuiles NPF visibles soient au repos avant tout téléchargement.
      */
     setTimeout(() => {
         reconcileVacInstalledIndexFromDb()
             .then(() => {
                 refreshUI();
-                return checkVacUpdatesAtStartup();
+                return checkVacUpdatesAtStartup({ source: 'startup' });
             })
             .catch(error => {
-                console.warn('[VAC] Initialisation différée indisponible:', error);
+                console.warn('[VAC] Initialisation automatique différée indisponible:', error);
             });
     }, 2500);
+
+    window.addEventListener('online', () => {
+        scheduleAutomaticVacSync(VAC_AUTO_SYNC_ONLINE_DELAY_MS, 'online');
+    });
 
     /*
      * FdS / GAAR : lecture locale différée, aucun contrôle réseau au démarrage.
@@ -19765,6 +19776,70 @@ function getVacEntriesNeedingDownload(manifest, localRecords = []) {
     });
 }
 
+
+function sleepVacBackground(ms) {
+    return new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
+}
+
+function areNpfTileReadsIdleForVac() {
+    try {
+        return Number(directOfflineNpfActiveReads || 0) === 0
+            && Number(directOfflineNpfReadQueue?.length || 0) === 0;
+    } catch (_) {
+        return true;
+    }
+}
+
+async function waitForVacBackgroundOpportunity(options = {}) {
+    const sequence = Number(options.sequence) || 0;
+    const startedAt = Date.now();
+    const maxWaitMs = Number.isFinite(Number(options.maxWaitMs))
+        ? Math.max(5000, Number(options.maxWaitMs))
+        : 120000;
+
+    while (navigator.onLine) {
+        if (sequence && sequence !== vacAutomaticSyncSequence) return false;
+
+        let tilesReady = true;
+        try {
+            tilesReady = await waitForNpfVisibleBaseTilesReady({
+                maxWaitMs: 2500,
+                pollMs: 100,
+                isCancelled: () => (
+                    !navigator.onLine
+                    || (sequence && sequence !== vacAutomaticSyncSequence)
+                )
+            });
+        } catch (_) {
+            tilesReady = areNpfTileReadsIdleForVac();
+        }
+
+        if (tilesReady && areNpfTileReadsIdleForVac()) {
+            await sleepVacBackground(250);
+            if (areNpfTileReadsIdleForVac()) return true;
+        }
+
+        if (Date.now() - startedAt >= maxWaitMs) {
+            /* La carte reste prioritaire : l'auto-sync sera reprise plus tard. */
+            return false;
+        }
+
+        await sleepVacBackground(500);
+    }
+
+    return false;
+}
+
+function scheduleAutomaticVacSync(delayMs = VAC_AUTO_SYNC_RETRY_DELAY_MS, source = 'scheduled') {
+    clearTimeout(vacAutomaticSyncTimer);
+    vacAutomaticSyncTimer = setTimeout(() => {
+        vacAutomaticSyncTimer = null;
+        checkVacUpdatesAtStartup({ source }).catch(error => {
+            console.info('[VAC] Synchronisation automatique différée:', error?.message || error);
+        });
+    }, Math.max(0, Number(delayMs) || 0));
+}
+
 async function sha256HexFromArrayBuffer(buffer) {
     if (!globalThis.crypto?.subtle?.digest) {
         throw new Error('Vérification SHA-256 indisponible sur cet appareil');
@@ -19890,9 +19965,7 @@ async function displayVacManagementStatus() {
     }
 
     if (downloadButton) {
-        downloadButton.textContent = count
-            ? 'Mettre à jour les Cartes VAC'
-            : 'Télécharger les Cartes VAC';
+        downloadButton.textContent = 'Synchroniser maintenant';
         downloadButton.disabled = vacSyncInProgress;
     }
     if (deleteButton) {
@@ -19905,6 +19978,9 @@ async function syncVacFromManifest(manifest, options = {}) {
     if (vacSyncInProgress) return false;
     vacSyncInProgress = true;
 
+    const silent = !!options.silent;
+    const background = !!options.background;
+    const sequence = Number(options.sequence) || 0;
     const downloadButton = document.getElementById('vac-download-update-button');
     const deleteButton = document.getElementById('vac-delete-all-button');
     if (downloadButton) downloadButton.disabled = true;
@@ -19919,7 +19995,7 @@ async function syncVacFromManifest(manifest, options = {}) {
         if (!targets.length) {
             await displayVacManagementStatus();
             hideVacDownloadProgress();
-            if (options.showNoChangesAlert) {
+            if (options.showNoChangesAlert && !silent) {
                 alert('Les cartes VAC téléchargées sont déjà à jour.');
             }
             return true;
@@ -19928,14 +20004,35 @@ async function syncVacFromManifest(manifest, options = {}) {
         let completed = 0;
         let stored = 0;
         const failures = [];
+        let pausedForMap = false;
 
-        setVacDownloadProgress(0, targets.length, `Préparation de ${targets.length} VAC…`);
+        setVacDownloadProgress(0, targets.length, `Synchronisation automatique de ${targets.length} VAC…`);
 
         for (const entry of targets) {
+            if (!navigator.onLine) {
+                failures.push('connexion interrompue');
+                break;
+            }
+            if (sequence && sequence !== vacAutomaticSyncSequence) {
+                pausedForMap = true;
+                break;
+            }
+
+            if (background) {
+                const opportunity = await waitForVacBackgroundOpportunity({
+                    sequence,
+                    maxWaitMs: 120000
+                });
+                if (!opportunity) {
+                    pausedForMap = true;
+                    break;
+                }
+            }
+
             setVacDownloadProgress(
                 completed,
                 targets.length,
-                `Téléchargement ${completed + 1} / ${targets.length} — ${entry.oaci}`
+                `VAC ${completed + 1} / ${targets.length} — ${entry.oaci}`
             );
 
             try {
@@ -19965,19 +20062,30 @@ async function syncVacFromManifest(manifest, options = {}) {
                 if (error?.name === 'QuotaExceededError') {
                     break;
                 }
+                if (!navigator.onLine) {
+                    break;
+                }
             }
 
             completed += 1;
             setVacDownloadProgress(
                 completed,
                 targets.length,
-                `${completed} / ${targets.length} VAC traitées`
+                `${completed} / ${targets.length} VAC synchronisées`
             );
+
+            if (background) {
+                await sleepVacBackground(80);
+            }
         }
 
         await reconcileVacInstalledIndexFromDb();
 
-        if (!failures.length && completed === targets.length) {
+        const fullyCompleted = !failures.length
+            && !pausedForMap
+            && completed === targets.length;
+
+        if (fullyCompleted) {
             try {
                 localStorage.setItem(VAC_LAST_SUCCESSFUL_SYNC_KEY, String(Date.now()));
             } catch (_) {}
@@ -19986,18 +20094,38 @@ async function syncVacFromManifest(manifest, options = {}) {
         await displayVacManagementStatus();
         refreshUI();
 
-        if (failures.length) {
-            alert(
-                `${stored} carte(s) VAC mise(s) à jour.\n`
-                + `${failures.length} échec(s) : ${failures.slice(0, 8).join(', ')}`
-                + (failures.length > 8 ? '…' : '')
-                + '\n\nLes anciennes VAC locales ont été conservées lorsqu’elles existaient.'
+        if (pausedForMap || (!navigator.onLine && completed < targets.length)) {
+            console.info(
+                `[VAC] Synchronisation automatique suspendue après ${completed}/${targets.length}; reprise programmée.`
             );
-            hideVacDownloadProgress(1800);
+            hideVacDownloadProgress(800);
+            scheduleAutomaticVacSync(VAC_AUTO_SYNC_RETRY_DELAY_MS, 'resume');
             return false;
         }
 
-        alert(`${stored} carte(s) VAC téléchargée(s) et vérifiée(s) pour utilisation hors ligne.`);
+        if (failures.length) {
+            console.warn(
+                `[VAC] ${stored} VAC mise(s) à jour, ${failures.length} échec(s).`,
+                failures.slice(0, 12)
+            );
+            if (!silent) {
+                alert(
+                    `${stored} carte(s) VAC mise(s) à jour.\n`
+                    + `${failures.length} échec(s) : ${failures.slice(0, 8).join(', ')}`
+                    + (failures.length > 8 ? '…' : '')
+                    + '\n\nLes anciennes VAC locales ont été conservées lorsqu’elles existaient.'
+                );
+            }
+            hideVacDownloadProgress(1800);
+            if (background) scheduleAutomaticVacSync(VAC_AUTO_SYNC_RETRY_DELAY_MS, 'retry-failures');
+            return false;
+        }
+
+        if (!silent) {
+            alert(`${stored} carte(s) VAC téléchargée(s) et vérifiée(s) pour utilisation hors ligne.`);
+        } else if (stored) {
+            console.info(`[VAC] Synchronisation automatique terminée : ${stored} VAC mise(s) à jour.`);
+        }
         hideVacDownloadProgress(1200);
         return true;
     } finally {
@@ -20016,39 +20144,18 @@ async function handleVacDownloadUpdateClick() {
         manifest = await fetchVacManifest();
     } catch (error) {
         if (!navigator.onLine) {
-            alert('Connexion Internet nécessaire pour télécharger ou mettre à jour les cartes VAC.');
+            alert('Connexion Internet nécessaire pour synchroniser les cartes VAC.');
         } else {
             alert(`Impossible de récupérer la liste des cartes VAC : ${error.message || error}`);
         }
         return;
     }
 
-    const localRecords = await getAllVacRecords();
-    const availableEntries = getVacAvailableEntries(manifest);
-    const targets = getVacEntriesNeedingDownload(manifest, localRecords);
-
-    if (!localRecords.length) {
-        const totalSize = Number(manifest?.stats?.totalSizeBytes)
-            || availableEntries.reduce((sum, entry) => sum + (Number(entry.size) || 0), 0);
-        const confirmed = confirm(
-            `Télécharger les ${availableEntries.length} cartes VAC disponibles `
-            + `(${formatVacBytes(totalSize)}) pour utilisation hors ligne ?`
-        );
-        if (!confirmed) return;
-    } else if (!targets.length) {
-        await displayVacManagementStatus();
-        alert('Les cartes VAC téléchargées sont déjà à jour.');
-        return;
-    } else {
-        const confirmed = confirm(
-            `${targets.length} carte(s) VAC nouvelle(s) ou modifiée(s) sont disponibles.\n\n`
-            + 'Les télécharger maintenant ?'
-        );
-        if (!confirmed) return;
-    }
-
     await syncVacFromManifest(manifest, {
-        source: localRecords.length ? 'manual-update' : 'initial-download'
+        source: 'manual-sync',
+        showNoChangesAlert: true,
+        silent: false,
+        background: false
     });
 }
 
@@ -20183,6 +20290,51 @@ async function migrateDoleVacReferenceIfNeeded(manifest, localRecords = []) {
     return { changed: true, records };
 }
 
+async function ensureVacAvailableForOaci(oaci) {
+    const safeOaci = normalizeVacOaci(oaci);
+    if (!safeOaci) return null;
+
+    let record = await getVacRecord(safeOaci);
+    if (record && record.blob instanceof Blob) return record;
+
+    if (vacSyncInProgress) {
+        for (let i = 0; i < 40; i += 1) {
+            await sleepVacBackground(250);
+            record = await getVacRecord(safeOaci);
+            if (record && record.blob instanceof Blob) return record;
+            if (!vacSyncInProgress) break;
+        }
+    }
+
+    if (!navigator.onLine) return null;
+
+    const manifest = await fetchVacManifest(9000);
+    const entry = getVacAvailableEntries(manifest)
+        .find(candidate => candidate.oaci === safeOaci);
+    if (!entry) return null;
+
+    /* Priorité absolue à la carte avant un téléchargement VAC à la demande. */
+    await waitForVacBackgroundOpportunity({ maxWaitMs: 30000 });
+
+    const validated = await downloadAndValidateVacEntry(entry);
+    await putVacRecord({
+        oaci: safeOaci,
+        filename: `${safeOaci}.pdf`,
+        blob: validated.blob,
+        size: validated.size,
+        sha256: validated.sha256,
+        cycle: String(entry.cycle || manifest.sourceCycle || ''),
+        updatedAt: Date.now(),
+        source: String(entry.source || 'SIA'),
+        sourceUrl: validated.sourceUrl
+    });
+
+    await reconcileVacInstalledIndexFromDb();
+    displayVacManagementStatus().catch(() => {});
+    refreshUI();
+    return getVacRecord(safeOaci);
+}
+
 async function openVacPdf(oaci) {
     const safeOaci = normalizeVacOaci(oaci);
     if (!safeOaci) return false;
@@ -20190,7 +20342,15 @@ async function openVacPdf(oaci) {
     const openedWindow = window.open('', '_blank');
 
     try {
-        const record = await getVacRecord(safeOaci);
+        let record = await getVacRecord(safeOaci);
+        if (!record || !(record.blob instanceof Blob)) {
+            try {
+                record = await ensureVacAvailableForOaci(safeOaci);
+            } catch (error) {
+                console.warn(`[VAC] Téléchargement à la demande ${safeOaci} impossible:`, error);
+            }
+        }
+
         if (!record || !(record.blob instanceof Blob)) {
             const onlineFallbackUrl = VAC_ONLINE_FALLBACK_URLS[safeOaci] || '';
             if (onlineFallbackUrl && navigator.onLine) {
@@ -20205,7 +20365,12 @@ async function openVacPdf(oaci) {
             try {
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
             } catch (_) {}
-            alert(`Aucune carte VAC hors ligne disponible pour ${safeOaci}.`);
+
+            if (navigator.onLine) {
+                alert(`Aucune carte VAC publiée dans le pack NPF-Q400-VAC pour ${safeOaci}.`);
+            } else {
+                alert(`VAC ${safeOaci} non encore disponible hors ligne. La synchronisation reprendra automatiquement dès qu'Internet sera disponible.`);
+            }
             return false;
         }
 
@@ -20231,12 +20396,9 @@ function buildVacButtonHtml(oaci) {
     if (!safeOaci) return '';
 
     const hasLocalVac = vacInstalledOaciSet.has(safeOaci);
-    const hasOnlineFallback = Boolean(VAC_ONLINE_FALLBACK_URLS[safeOaci] && navigator.onLine);
-    if (!hasLocalVac && !hasOnlineFallback) return '';
-
     const title = hasLocalVac
         ? `VAC ${safeOaci} hors ligne`
-        : `VAC ${safeOaci} — ouverture SIA en ligne`;
+        : `VAC ${safeOaci} — synchronisation automatique`;
     return `<div class="popup-buttons popup-vac-buttons"><button type="button" class="vac-btn" title="${title}" onclick="window.openVacPdf('${safeOaci}')">VAC</button></div>`;
 }
 
@@ -20266,37 +20428,72 @@ function showVacUpdatePrompt(manifest, updateCount) {
     return true;
 }
 
-async function checkVacUpdatesAtStartup() {
-    /*
-     * Aucun popup de téléchargement initial : l'utilisateur choisit lui-même
-     * de télécharger les VAC depuis Gestion des Cartes.
-     */
-    const localRecords = await getAllVacRecords();
-    if (!localRecords.length) return false;
+async function checkVacUpdatesAtStartup(options = {}) {
+    const source = String(options.source || 'startup');
     if (!navigator.onLine) return false;
+    if (vacSyncInProgress) return false;
+
+    const now = Date.now();
+    if (source !== 'startup' && now - vacAutomaticSyncLastAttemptAt < 2500) {
+        return false;
+    }
+    vacAutomaticSyncLastAttemptAt = now;
+
+    const sequence = ++vacAutomaticSyncSequence;
+
+    /*
+     * v16.48 — synchronisation automatique générale.
+     * Aucune confirmation : toutes les VAC publiées et absentes/modifiées sont
+     * récupérées en arrière-plan. La carte NPF garde la priorité absolue.
+     */
+    const mapReady = await waitForVacBackgroundOpportunity({
+        sequence,
+        maxWaitMs: 120000
+    });
+    if (!mapReady) {
+        if (sequence === vacAutomaticSyncSequence && navigator.onLine) {
+            scheduleAutomaticVacSync(VAC_AUTO_SYNC_RETRY_DELAY_MS, 'map-busy');
+        }
+        return false;
+    }
 
     let manifest;
     try {
         manifest = await fetchVacManifest(9000);
     } catch (error) {
-        console.info('[VAC] Contrôle de mise à jour ignoré:', error.message || error);
+        console.info('[VAC] Manifest automatique indisponible:', error.message || error);
+        if (navigator.onLine) {
+            scheduleAutomaticVacSync(VAC_AUTO_SYNC_RETRY_DELAY_MS, 'manifest-retry');
+        }
         return false;
     }
 
-    let recordsForComparison = localRecords;
+    let localRecords = await getAllVacRecords();
     try {
         const migration = await migrateDoleVacReferenceIfNeeded(manifest, localRecords);
         if (migration && Array.isArray(migration.records)) {
-            recordsForComparison = migration.records;
+            localRecords = migration.records;
         }
     } catch (error) {
         console.info('[VAC] Migration Dole ignorée:', error.message || error);
     }
 
-    const targets = getVacEntriesNeedingDownload(manifest, recordsForComparison);
-    if (!targets.length) return false;
+    const targets = getVacEntriesNeedingDownload(manifest, localRecords);
+    if (!targets.length) {
+        try {
+            localStorage.setItem(VAC_LAST_SUCCESSFUL_SYNC_KEY, String(Date.now()));
+        } catch (_) {}
+        await displayVacManagementStatus();
+        return true;
+    }
 
-    return showVacUpdatePrompt(manifest, targets.length);
+    console.info(`[VAC] Synchronisation automatique ${source}: ${targets.length} VAC à traiter.`);
+    return syncVacFromManifest(manifest, {
+        source: `auto-${source}`,
+        silent: true,
+        background: true,
+        sequence
+    });
 }
 
 window.openVacPdf = openVacPdf;
