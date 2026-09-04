@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-44_light_install_road_aggregate';
-const APP_VERSION = 'v16.44';
+const SW_VERSION = 'sw-v16-45_tile_priority';
+const APP_VERSION = 'v16.45';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
