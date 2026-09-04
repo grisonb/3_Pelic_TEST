@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.49';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.50';
 
 
 /*
@@ -261,7 +261,14 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         npfViewEpoch: layers.npfViewEpoch,
         tileBlobCacheSize: layers.tileBlobCache,
         runwayLayerCount: layers.runwayLayers,
-        siaLayerCount: layers.siaLayers
+        siaLayerCount: layers.siaLayers,
+        vacInstalledCount: Number(vacInstalledOaciSet?.size || 0),
+        vacAvailableCount: Math.max(0, Number(localStorage.getItem(VAC_EXPECTED_COUNT_KEY)) || 0),
+        vacManifestAirportCount: Math.max(0, Number(localStorage.getItem(VAC_REMOTE_AIRPORT_COUNT_KEY)) || 0),
+        vacManifestUnavailableCount: Math.max(0, Number(localStorage.getItem(VAC_REMOTE_UNAVAILABLE_COUNT_KEY)) || 0),
+        vacDisplayedAirportCount: typeof getNpfDisplayedAirportOaciCountForVac === 'function'
+            ? getNpfDisplayedAirportOaciCountForVac()
+            : 0
     };
 }
 
@@ -306,6 +313,16 @@ function buildNpfStartupDiagnosticExportText() {
         + runtime.tileBlobCacheSize + ' blobs cache | '
         + runtime.runwayLayerCount + ' couches pistes | '
         + runtime.siaLayerCount + ' couches SIA'
+    );
+    lines.push(
+        'VAC : '
+        + runtime.vacInstalledCount + ' téléchargées / '
+        + runtime.vacAvailableCount + ' disponibles dans le dépôt | '
+        + runtime.vacManifestAirportCount + ' terrains dans le manifest / '
+        + runtime.vacDisplayedAirportCount + ' aérodromes OACI affichés dans NPF'
+        + (runtime.vacManifestUnavailableCount
+            ? ' | ' + runtime.vacManifestUnavailableCount + ' sans VAC publiée'
+            : '')
     );
     lines.push('');
     lines.push('ÉTAPES');
@@ -1558,6 +1575,8 @@ const VAC_REPOSITORY_BASE_URL = 'https://grisonb.github.io/NPF-Q400-VAC/';
 const VAC_MANIFEST_URL = `${VAC_REPOSITORY_BASE_URL}manifest.json`;
 const VAC_INSTALLED_CODES_KEY = 'npfVacInstalledCodesV1';
 const VAC_EXPECTED_COUNT_KEY = 'npfVacExpectedCountV1';
+const VAC_REMOTE_AIRPORT_COUNT_KEY = 'npfVacRemoteAirportCountV1';
+const VAC_REMOTE_UNAVAILABLE_COUNT_KEY = 'npfVacRemoteUnavailableCountV1';
 const VAC_REMOTE_CYCLE_KEY = 'npfVacRemoteCycleV1';
 const VAC_REMOTE_TOTAL_SIZE_KEY = 'npfVacRemoteTotalSizeV1';
 const VAC_LAST_SUCCESSFUL_SYNC_KEY = 'npfVacLastSuccessfulSyncV1';
@@ -19759,6 +19778,27 @@ function normalizeVacOaci(oaci) {
     return String(oaci || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+/*
+ * v16.50 — périmètre VAC attendu : tous les aérodromes OACI réellement
+ * affichés par NPF, et non plus seulement les terrains PÉLIC/sélectionnables.
+ * La référence PIAF embarquée contient la liste la plus large de la carte.
+ */
+function getNpfDisplayedAirportOaciSetForVac() {
+    const codes = new Set();
+    const append = airport => {
+        const oaci = normalizeVacOaci(airport?.oaci);
+        if (/^LF[A-Z0-9]{2}$/.test(oaci)) codes.add(oaci);
+    };
+    try { (pelicanAirports || []).forEach(append); } catch (_) {}
+    try { (otherAirports || []).forEach(append); } catch (_) {}
+    try { (piafMetropolitanAerodromes || []).forEach(append); } catch (_) {}
+    return codes;
+}
+
+function getNpfDisplayedAirportOaciCountForVac() {
+    return getNpfDisplayedAirportOaciSetForVac().size;
+}
+
 function formatVacBytes(bytes) {
     const value = Number(bytes) || 0;
     if (value <= 0) return '0 Mo';
@@ -19770,13 +19810,19 @@ function formatVacBytes(bytes) {
 
 function persistVacManifestSummary(manifest) {
     try {
-        const availableEntries = Object.values(manifest?.airports || {})
+        const airportEntries = Object.values(manifest?.airports || {}).filter(Boolean);
+        const availableEntries = airportEntries
             .filter(entry => entry && entry.available && entry.file);
         const expected = Number(manifest?.stats?.availableVac) || availableEntries.length;
+        const remoteAirportCount = airportEntries.length;
+        const remoteUnavailableCount = Number(manifest?.stats?.unavailableVac)
+            || Math.max(0, remoteAirportCount - expected);
         const totalSize = Number(manifest?.stats?.totalSizeBytes)
             || availableEntries.reduce((sum, entry) => sum + (Number(entry.size) || 0), 0);
 
         localStorage.setItem(VAC_EXPECTED_COUNT_KEY, String(expected));
+        localStorage.setItem(VAC_REMOTE_AIRPORT_COUNT_KEY, String(remoteAirportCount));
+        localStorage.setItem(VAC_REMOTE_UNAVAILABLE_COUNT_KEY, String(remoteUnavailableCount));
         localStorage.setItem(VAC_REMOTE_CYCLE_KEY, String(manifest?.sourceCycle || ''));
         localStorage.setItem(VAC_REMOTE_TOTAL_SIZE_KEY, String(totalSize));
     } catch (_) {}
@@ -20079,6 +20125,11 @@ async function displayVacManagementStatus() {
     const count = records.length;
     const totalSize = records.reduce((sum, record) => sum + (Number(record.size) || Number(record.blob?.size) || 0), 0);
     const expected = Math.max(0, Number(localStorage.getItem(VAC_EXPECTED_COUNT_KEY)) || 0);
+    const remoteAirportCount = Math.max(0, Number(localStorage.getItem(VAC_REMOTE_AIRPORT_COUNT_KEY)) || 0);
+    const displayedAirportCount = getNpfDisplayedAirportOaciCountForVac();
+    const manifestGap = remoteAirportCount && displayedAirportCount
+        ? Math.max(0, displayedAirportCount - remoteAirportCount)
+        : 0;
     const cycle = localStorage.getItem(VAC_REMOTE_CYCLE_KEY)
         || records.find(record => record.cycle)?.cycle
         || '';
@@ -20097,6 +20148,10 @@ async function displayVacManagementStatus() {
         const pieces = [
             `Téléchargées : ${count}${expected ? ` / ${expected}` : ''}`,
             missing !== null ? `Non téléchargées : ${missing}` : '',
+            remoteAirportCount && displayedAirportCount
+                ? `Périmètre dépôt : ${remoteAirportCount} / ${displayedAirportCount} terrains NPF`
+                : '',
+            manifestGap ? `À ajouter au manifest : ${manifestGap}` : '',
             cycle ? `Cycle SIA : ${cycle}` : '',
             `Stockage : ${formatVacBytes(totalSize)}`,
             lastSync ? `Dernière mise à jour : ${lastSync}` : ''
