@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.39';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.40';
 
 
 /*
@@ -158,7 +158,8 @@ function getNpfStartupDiagnosticOverlaySnapshot() {
         routesRenderedLabels: Number(roadOverlayLabelsLayer?.getLayers?.().length || 0),
         ht: showHighVoltageLinesLayer ? 'ON' : 'OFF',
         htLoaded: hasLoadedHighVoltageLines ? 'OUI' : 'NON',
-        htSegments: Number(highVoltageLinesFeatureCount || 0)
+        htSegments: Number(highVoltageLinesFeatureCount || 0),
+        htRenderedSegments: Number(highVoltageLinesRenderedFeatureCount || 0)
     };
 }
 
@@ -195,7 +196,8 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         roadOverlayRenderedLabels: layers.routesRenderedLabels,
         highVoltageSelected: layers.ht,
         highVoltageLoaded: layers.htLoaded,
-        highVoltageFeatureCount: layers.htSegments
+        highVoltageFeatureCount: layers.htSegments,
+        highVoltageRenderedFeatureCount: layers.htRenderedSegments
     };
 }
 
@@ -222,7 +224,8 @@ function buildNpfStartupDiagnosticExportText() {
         + runtime.roadOverlayRenderedLines + ' calques routes / '
         + runtime.roadOverlayRenderedLabels + ' cartouches | '
         + 'HT chargées ' + runtime.highVoltageLoaded + ' | '
-        + runtime.highVoltageFeatureCount + ' tronçons HT'
+        + runtime.highVoltageFeatureCount + ' tronçons HT connus | '
+        + runtime.highVoltageRenderedFeatureCount + ' tronçons HT rendus'
     );
     lines.push('');
     lines.push('ÉTAPES');
@@ -430,6 +433,7 @@ function renderNpfStartupDiagnosticPanel() {
                 <span>Lignes HT : <b>${escapeNpfStartupDiagnosticHtml(runtime.highVoltageSelected)}</b></span>
                 <span>HT chargées : <b>${escapeNpfStartupDiagnosticHtml(runtime.highVoltageLoaded)}</b></span>
                 <span>Tronçons HT : <b>${runtime.highVoltageFeatureCount}</b></span>
+                <span>HT rendues : <b>${runtime.highVoltageRenderedFeatureCount}</b></span>
             </div>
             <div class="npf-startup-diag-page2-grid">
                 <div class="npf-startup-diag-page2-table">${table}</div>
@@ -1354,6 +1358,14 @@ let departmentsPolygonData = [];
 let departmentsLayerLoadPromise = null;
 let highVoltageLinesLayer = null;
 let highVoltageLinesRenderer = null;
+let highVoltageLinesData = null;
+let highVoltageLinesIndexedFeatures = [];
+let highVoltageLinesRenderedGeoJsonLayer = null;
+let highVoltageLinesRenderedFeatureCount = 0;
+let highVoltageLinesRefreshTimer = null;
+let highVoltageLinesRefreshToken = 0;
+const HIGH_VOLTAGE_LINES_VIEWPORT_PAD = 0.22;
+const HIGH_VOLTAGE_LINES_MAP_CHANGE_DELAY_MS = 160;
 
 /* v14.49 — calque routier vectoriel offline A / N / D / M / T. */
 let roadOverlayLayer = null;
@@ -6441,6 +6453,9 @@ function initMap() {
         if (showRoadOverlayLayer) {
             scheduleRoadOverlayRefresh('map-change');
         }
+        if (showHighVoltageLinesLayer && hasLoadedHighVoltageLines) {
+            scheduleHighVoltageLinesRefresh('map-change');
+        }
     });
 
     map.on('click', handleGaarMapClick);
@@ -9780,6 +9795,103 @@ async function fetchHighVoltageLinesGeojson() {
     return await response.json();
 }
 
+function getHighVoltageFeatureBbox(feature) {
+    const geometry = feature?.geometry;
+    const coordinates = geometry?.coordinates;
+    if (!Array.isArray(coordinates)) return null;
+
+    let minLon = Infinity;
+    let minLat = Infinity;
+    let maxLon = -Infinity;
+    let maxLat = -Infinity;
+
+    const visit = (node) => {
+        if (!Array.isArray(node) || !node.length) return;
+        if (typeof node[0] === 'number' && typeof node[1] === 'number') {
+            const lon = Number(node[0]);
+            const lat = Number(node[1]);
+            if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+            if (lon < minLon) minLon = lon;
+            if (lon > maxLon) maxLon = lon;
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+            return;
+        }
+        node.forEach(visit);
+    };
+
+    visit(coordinates);
+
+    if (![minLon, minLat, maxLon, maxLat].every(Number.isFinite)) return null;
+    return [minLon, minLat, maxLon, maxLat];
+}
+
+function clearRenderedHighVoltageLines() {
+    try {
+        if (highVoltageLinesRenderedGeoJsonLayer && highVoltageLinesLayer) {
+            highVoltageLinesLayer.removeLayer(highVoltageLinesRenderedGeoJsonLayer);
+        }
+    } catch (_) {}
+    try { highVoltageLinesLayer?.clearLayers?.(); } catch (_) {}
+    try { highVoltageLinesRenderer?._redraw?.(); } catch (_) {}
+    highVoltageLinesRenderedGeoJsonLayer = null;
+    highVoltageLinesRenderedFeatureCount = 0;
+}
+
+async function refreshVisibleHighVoltageLines(source = 'refresh') {
+    if (!map || !highVoltageLinesLayer || !showHighVoltageLinesLayer || !hasLoadedHighVoltageLines) return;
+
+    const token = ++highVoltageLinesRefreshToken;
+    const bounds = map.getBounds().pad(HIGH_VOLTAGE_LINES_VIEWPORT_PAD);
+    const visibleFeatures = [];
+
+    for (const feature of highVoltageLinesIndexedFeatures) {
+        if (feature?.__npfBbox && !roadOverlayBboxIntersectsBounds(feature.__npfBbox, bounds)) continue;
+        visibleFeatures.push(feature);
+    }
+
+    if (token !== highVoltageLinesRefreshToken || !showHighVoltageLinesLayer) return;
+
+    clearRenderedHighVoltageLines();
+
+    if (!visibleFeatures.length) {
+        if (source !== 'map-change') {
+            recordNpfStartupDiagnosticOverlaySnapshot(`lignes-ht visible=0 · ${source}`);
+        }
+        return;
+    }
+
+    highVoltageLinesRenderedGeoJsonLayer = L.geoJSON({
+        type: 'FeatureCollection',
+        features: visibleFeatures
+    }, {
+        style: getHighVoltageLineStyle,
+        pane: 'highVoltageLinesPane',
+        renderer: highVoltageLinesRenderer || undefined,
+        interactive: false,
+        filter: feature => !!feature?.geometry
+    });
+
+    if (token !== highVoltageLinesRefreshToken || !showHighVoltageLinesLayer) return;
+
+    highVoltageLinesRenderedGeoJsonLayer.addTo(highVoltageLinesLayer);
+    highVoltageLinesRenderedFeatureCount = visibleFeatures.length;
+
+    if (source !== 'map-change') {
+        recordNpfStartupDiagnosticOverlaySnapshot(`lignes-ht rendu ${source}`);
+    }
+}
+
+function scheduleHighVoltageLinesRefresh(source = 'scheduled') {
+    clearTimeout(highVoltageLinesRefreshTimer);
+    highVoltageLinesRefreshTimer = setTimeout(() => {
+        highVoltageLinesRefreshTimer = null;
+        refreshVisibleHighVoltageLines(source).catch(error => {
+            console.warn('Actualisation des lignes HT impossible:', source, error);
+        });
+    }, source === 'map-change' ? HIGH_VOLTAGE_LINES_MAP_CHANGE_DELAY_MS : 80);
+}
+
 async function loadHighVoltageLinesLayerData() {
     if (!map || !highVoltageLinesLayer) return;
     if (hasLoadedHighVoltageLines) return;
@@ -9789,20 +9901,20 @@ async function loadHighVoltageLinesLayerData() {
 
     try {
         const geojson = await fetchHighVoltageLinesGeojson();
-        const featuresCount = Array.isArray(geojson?.features) ? geojson.features.length : 0;
-        highVoltageLinesFeatureCount = featuresCount;
-
-        const geoJsonLayer = L.geoJSON(geojson, {
-            style: getHighVoltageLineStyle,
-            pane: 'highVoltageLinesPane',
-            renderer: highVoltageLinesRenderer || undefined,
-            interactive: false,
-            filter: feature => !!feature?.geometry
-        });
-
-        geoJsonLayer.addTo(highVoltageLinesLayer);
+        const sourceFeatures = Array.isArray(geojson?.features) ? geojson.features : [];
+        highVoltageLinesFeatureCount = sourceFeatures.length;
+        highVoltageLinesData = {
+            type: 'FeatureCollection',
+            features: sourceFeatures
+        };
+        highVoltageLinesIndexedFeatures = sourceFeatures
+            .filter(feature => !!feature?.geometry)
+            .map(feature => {
+                feature.__npfBbox = getHighVoltageFeatureBbox(feature);
+                return feature;
+            });
         hasLoadedHighVoltageLines = true;
-        console.log(`Lignes HT chargées: ${featuresCount} tronçons`);
+        console.log(`Lignes HT chargées: ${highVoltageLinesFeatureCount} tronçons`);
     } finally {
         isHighVoltageLinesLoading = false;
         refreshHighVoltageLinesButtonState();
@@ -9849,8 +9961,15 @@ async function toggleHighVoltageLinesLayer(forceState = null, options = {}) {
         if (highVoltageLinesLayer && !map.hasLayer(highVoltageLinesLayer)) {
             highVoltageLinesLayer.addTo(map);
         }
-    } else if (highVoltageLinesLayer && map.hasLayer(highVoltageLinesLayer)) {
-        map.removeLayer(highVoltageLinesLayer);
+        scheduleHighVoltageLinesRefresh(options.source || 'toggle');
+    } else {
+        highVoltageLinesRefreshToken += 1;
+        clearTimeout(highVoltageLinesRefreshTimer);
+        highVoltageLinesRefreshTimer = null;
+        clearRenderedHighVoltageLines();
+        if (highVoltageLinesLayer && map.hasLayer(highVoltageLinesLayer)) {
+            map.removeLayer(highVoltageLinesLayer);
+        }
     }
 
     localStorage.setItem(HIGH_VOLTAGE_LINES_LAYER_KEY, String(showHighVoltageLinesLayer));
@@ -22540,7 +22659,8 @@ function buildTerrainAirportSymbolHtml(airport, options = {}) {
 function buildTerrainAirportMapIcon(airport, options = {}) {
     const showCardinalTabs = options.showCardinalTabs !== false;
     const size = Number(options.size) || (showCardinalTabs ? 30 : 22);
-    const anchor = Math.round(size / 2);
+    const anchorX = Number.isFinite(Number(options.anchorX)) ? Number(options.anchorX) : size / 2;
+    const anchorY = Number.isFinite(Number(options.anchorY)) ? Number(options.anchorY) : size / 2;
     const className = [
         'terrain-airport-marker-icon',
         options.inverted ? 'terrain-airport-marker-icon-inverted' : 'terrain-airport-marker-icon-selectable'
@@ -22550,8 +22670,8 @@ function buildTerrainAirportMapIcon(airport, options = {}) {
         className,
         html: buildTerrainAirportSymbolHtml(airport, options),
         iconSize: [size, size],
-        iconAnchor: [anchor, anchor],
-        popupAnchor: [0, -anchor]
+        iconAnchor: [anchorX, anchorY],
+        popupAnchor: [0, -Math.round(anchorY)]
     });
 }
 
