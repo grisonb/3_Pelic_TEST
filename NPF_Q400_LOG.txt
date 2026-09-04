@@ -1,3 +1,51 @@
+VERSION TEST v16.48 — SYNCHRONISATION VAC 100 % AUTOMATIQUE
+Date : 04/09/2026
+Base : TEST v16.47
+
+OBJECTIF
+- Supprimer toute intervention manuelle pour obtenir et maintenir les cartes VAC hors ligne.
+- Télécharger automatiquement toutes les VAC publiées dans le dépôt NPF-Q400-VAC, y compris celles des aérodromes non sélectionnables comme PÉLIC.
+- Conserver la priorité absolue aux tuiles NPF : la synchronisation VAC attend que la carte soit revenue au repos avant chaque téléchargement.
+
+1. SYNCHRONISATION VAC AUTOMATIQUE
+- Au démarrage, après l'initialisation principale, NPF récupère silencieusement le manifest VAC dès qu'Internet est disponible.
+- Toutes les VAC absentes ou dont le SHA-256 a changé sont téléchargées automatiquement, sans confirmation et sans popup de mise à jour.
+- Les VAC déjà à jour ne sont jamais retéléchargées.
+- Si la connexion Internet revient après un démarrage hors ligne, une nouvelle synchronisation est automatiquement programmée.
+- Les anciennes VAC locales restent conservées tant que leur remplacement n'a pas été téléchargé et validé.
+
+2. PRIORITÉ AUX TUILES NPF
+- Avant chaque PDF VAC téléchargé en arrière-plan, NPF attend que les tuiles visibles NPF soient chargées et que la file IndexedDB soit au repos.
+- Si l'utilisateur déplace ou zoome la carte pendant la synchronisation, le téléchargement VAC suivant est différé jusqu'au retour au calme.
+- Les téléchargements restent séquentiels afin de ne pas mettre en concurrence plusieurs PDF avec la carte.
+
+3. BOUTON VAC SUR TOUS LES AÉRODROMES
+- Le bouton VAC est désormais affiché pour tout aérodrome possédant un code OACI, qu'il soit PÉLIC, sélectionnable PÉLIC ou non-PÉLIC.
+- Si la VAC est déjà locale : ouverture immédiate hors ligne.
+- Si elle manque localement et qu'Internet est disponible : NPF tente automatiquement de récupérer uniquement cette VAC depuis le manifest, la vérifie, la stocke puis l'ouvre.
+- Si le dépôt NPF-Q400-VAC ne publie pas de VAC pour cet OACI, un message clair l'indique.
+
+4. GESTION DES CARTES VAC
+- La section Cartes VAC indique maintenant que la synchronisation est automatique.
+- Le bouton manuel reste uniquement comme secours sous le libellé « Synchroniser maintenant » et ne demande plus de confirmation.
+- Le bouton de suppression générale reste disponible.
+
+5. ÉLÉMENTS INCHANGÉS
+- Correctifs tuiles, position terrains et orientation exacte des pistes de v16.47 conservés.
+- Routes / Lignes HT inchangées.
+- Aucun changement des bases IndexedDB de cartes Offline.
+- sia.js strictement inchangé.
+
+6. CONTRÔLES
+- node --check Script et SW.
+- Scripts inline de l'Index contrôlés.
+- Manifest JSON parsé.
+- Cohérence v16.48 Index / Manifest / Script / Style / SW.
+- Vérification de script.js?appv=v16.48 dans l'Index.
+- Vérification de la synchronisation VAC automatique sans popup de confirmation.
+- sia.js comparé bit-à-bit avec v16.47.
+
+
 VERSION TEST v16.47 — TUILES NPF STABLES + POSITIONS/ORIENTATIONS TERRAINS + VAC HORS PÉLIC
 Date : 04/09/2026
 Base : TEST v16.46
