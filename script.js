@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.44';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.45';
 
 
 /*
@@ -1480,7 +1480,7 @@ const ROAD_OVERLAY_FEATURE_PAD_TIER_2 = 0.12;
 const ROAD_OVERLAY_FILTER_YIELD_EVERY = 1200;
 const ROAD_OVERLAY_TILE_PRIORITY_QUEUE_LIMIT = 0;
 const ROAD_OVERLAY_TILE_PRIORITY_ACTIVE_LIMIT = 0;
-const ROAD_OVERLAY_TILE_PRIORITY_MAX_WAIT_MS = 6000;
+const ROAD_OVERLAY_TILE_PRIORITY_MAX_WAIT_MS = 7000;
 
 let areDepartmentsVisible = false;
 let hasLoadedDepartments = false;
@@ -6328,6 +6328,7 @@ function initMap() {
     }).setView([46.6, 2.2], 5.5);
 
     map.on('movestart', () => {
+        beginBaseMapZoomStabilityGuard('movestart');
         beginMapVisualRenderGuard('movestart');
         if (showRoadOverlayLayer) {
             roadOverlayRefreshToken += 1;
@@ -6695,6 +6696,74 @@ function countVisibleLoadedBaseTiles() {
     }
 }
 
+async function waitForNpfVisibleBaseTilesReady(options = {}) {
+    const isCancelled = typeof options.isCancelled === 'function'
+        ? options.isCancelled
+        : () => false;
+    const maxWaitMs = Number.isFinite(Number(options.maxWaitMs))
+        ? Math.max(0, Number(options.maxWaitMs))
+        : 7000;
+    const pollMs = Number.isFinite(Number(options.pollMs))
+        ? Math.max(40, Number(options.pollMs))
+        : 80;
+
+    if (
+        !offlineTilesMode
+        || typeof isNpfOfflinePackSelection !== 'function'
+        || !isNpfOfflinePackSelection()
+        || !map
+        || !baseTileLayer
+    ) {
+        return true;
+    }
+
+    const startedAt = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now();
+    let stablePasses = 0;
+
+    while (true) {
+        if (isCancelled()) return false;
+
+        const state = typeof getVisibleBaseTileLoadStateForSia === 'function'
+            ? getVisibleBaseTileLoadStateForSia()
+            : {
+                total: getNpfRetainedBaseTileCount(),
+                loaded: countVisibleLoadedBaseTiles(),
+                tileZoomReady: true
+            };
+
+        const visibleReady = state.total > 0
+            && state.loaded >= state.total
+            && state.tileZoomReady;
+
+        if (visibleReady) {
+            stablePasses += 1;
+            if (stablePasses >= 2) {
+                await new Promise(resolve => {
+                    if (typeof requestAnimationFrame === 'function') {
+                        requestAnimationFrame(() => resolve());
+                    } else {
+                        setTimeout(resolve, 0);
+                    }
+                });
+                return !isCancelled();
+            }
+        } else {
+            stablePasses = 0;
+        }
+
+        const now = (typeof performance !== 'undefined' && performance.now)
+            ? performance.now()
+            : Date.now();
+        if (now - startedAt >= maxWaitMs) {
+            return false;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, pollMs));
+    }
+}
+
 let npfOfflineZoomCleanupToken = 0;
 let npfZoomMemoryDiagTimer = null;
 
@@ -6788,9 +6857,20 @@ function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
 
                 const visibleLoaded = countVisibleLoadedBaseTiles({ currentLevelOnly: true });
 
+                const npfTileReadsBusy = !!(
+                    offlineTilesMode
+                    && typeof isNpfOfflinePackSelection === 'function'
+                    && isNpfOfflinePackSelection()
+                    && (
+                        Number(directOfflineNpfActiveReads || 0) > 0
+                        || Number(directOfflineNpfReadQueue?.length || 0) > 0
+                    )
+                );
+
                 if (
                     pass.rescueRedraw
                     && visibleLoaded === 0
+                    && !npfTileReadsBusy
                     && typeof baseTileLayer.redraw === 'function'
                 ) {
                     /*
@@ -7501,10 +7581,11 @@ let directOfflineLastRecoveryReason = '';
  * rafale de transactions parallèles au premier affichage. On limite donc la
  * concurrence uniquement pour le groupe NPF ; OACI conserve son chemin rapide.
  */
-const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 3;
-const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 96;
+const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 5;
+const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 64;
 let directOfflineNpfActiveReads = 0;
 const directOfflineNpfReadQueue = [];
+const directOfflineNpfInflightReads = new Map();
 let directOfflineTileReadGeneration = 0;
 
 function resetPendingDirectOfflineNpfReads() {
@@ -7546,13 +7627,12 @@ function runNextDirectOfflineNpfRead() {
 function enqueueDirectOfflineNpfRead(task) {
     return new Promise((resolve, reject) => {
         /*
-         * v15.37 — priorité à la vue courante.
-         * Lors d'un déplacement rapide, les dernières demandes correspondent
-         * généralement aux tuiles de la nouvelle emprise. Les placer en tête
-         * évite qu'une longue file de tuiles devenues hors champ retarde
-         * l'affichage de la zone que l'utilisateur regarde maintenant.
+         * v16.45 — Leaflet construit sa file de tuiles du centre vers
+         * l'extérieur. Conserver cet ordre FIFO donne donc la priorité aux
+         * tuiles réellement utiles au centre du viewport. Les anciennes vues
+         * sont déjà invalidées au début de chaque pan/zoom.
          */
-        directOfflineNpfReadQueue.unshift({ task, resolve, reject });
+        directOfflineNpfReadQueue.push({ task, resolve, reject });
         while (directOfflineNpfReadQueue.length > DIRECT_OFFLINE_NPF_MAX_QUEUED_READS) {
             const stale = directOfflineNpfReadQueue.pop();
             try { stale?.resolve?.(null); } catch (_) {}
@@ -8237,12 +8317,33 @@ async function findDirectOfflineTileBlob(coords) {
     if (!isNpfOfflinePackSelection()) {
         return findDirectOfflineTileBlobUnqueued(coords);
     }
+
     const generation = directOfflineTileReadGeneration;
-    return enqueueDirectOfflineNpfRead(async () => {
+    const inflightKey = [
+        generation,
+        coords?.z,
+        coords?.x,
+        coords?.y,
+        ...(Array.isArray(activeOfflinePacks) ? activeOfflinePacks : [])
+    ].join('|');
+
+    const existing = directOfflineNpfInflightReads.get(inflightKey);
+    if (existing) return existing;
+
+    const pending = enqueueDirectOfflineNpfRead(async () => {
         if (generation !== directOfflineTileReadGeneration) return null;
         const blob = await findDirectOfflineTileBlobUnqueued(coords);
         return generation === directOfflineTileReadGeneration ? blob : null;
     });
+
+    directOfflineNpfInflightReads.set(inflightKey, pending);
+    pending.finally(() => {
+        if (directOfflineNpfInflightReads.get(inflightKey) === pending) {
+            directOfflineNpfInflightReads.delete(inflightKey);
+        }
+    });
+
+    return pending;
 }
 
 function buildDirectOfflineLeafletLayer(options = {}) {
@@ -10062,6 +10163,20 @@ async function refreshVisibleHighVoltageLines(source = 'refresh') {
     if (!map || !highVoltageLinesLayer || !showHighVoltageLinesLayer || !hasLoadedHighVoltageLines) return;
 
     const token = ++highVoltageLinesRefreshToken;
+    const tilesReady = await waitForNpfVisibleBaseTilesReady({
+        maxWaitMs: 7000,
+        isCancelled: () => (
+            token !== highVoltageLinesRefreshToken
+            || !showHighVoltageLinesLayer
+        )
+    });
+    if (!tilesReady) {
+        if (token === highVoltageLinesRefreshToken && showHighVoltageLinesLayer) {
+            scheduleHighVoltageLinesRefresh('tile-priority-retry');
+        }
+        return;
+    }
+
     const bounds = map.getBounds().pad(HIGH_VOLTAGE_LINES_VIEWPORT_PAD);
     const visibleFeatures = [];
 
@@ -11610,31 +11725,14 @@ async function loadRoadOverlayPart(part, token, tier, renderBounds) {
 }
 
 async function waitForRoadOverlayOfflineTiles(token) {
-    if (!offlineTilesMode || !isNpfOfflinePackSelection?.()) return true;
-
-    const start = typeof performance !== 'undefined' && performance.now
-        ? performance.now()
-        : Date.now();
-
-    while (true) {
-        if (token !== roadOverlayRefreshToken || !showRoadOverlayLayer) return false;
-
-        const active = Number(directOfflineNpfActiveReads || 0);
-        const queued = Number(directOfflineNpfReadQueue?.length || 0);
-        if (
-            active <= ROAD_OVERLAY_TILE_PRIORITY_ACTIVE_LIMIT
-            && queued <= ROAD_OVERLAY_TILE_PRIORITY_QUEUE_LIMIT
-        ) {
-            return true;
-        }
-
-        const now = typeof performance !== 'undefined' && performance.now
-            ? performance.now()
-            : Date.now();
-        if (now - start >= ROAD_OVERLAY_TILE_PRIORITY_MAX_WAIT_MS) return true;
-
-        await new Promise(resolve => setTimeout(resolve, 120));
-    }
+    return waitForNpfVisibleBaseTilesReady({
+        maxWaitMs: ROAD_OVERLAY_TILE_PRIORITY_MAX_WAIT_MS,
+        pollMs: 80,
+        isCancelled: () => (
+            token !== roadOverlayRefreshToken
+            || !showRoadOverlayLayer
+        )
+    });
 }
 
 function rebuildRoadOverlayLabels() {
@@ -11755,7 +11853,12 @@ async function refreshRoadOverlayVisibleParts(source = 'refresh') {
 
         if (featureSelectionChanged) {
             const tilesReady = await waitForRoadOverlayOfflineTiles(token);
-            if (!tilesReady) return;
+            if (!tilesReady) {
+                if (token === roadOverlayRefreshToken && showRoadOverlayLayer) {
+                    scheduleRoadOverlayRefresh('tile-priority-retry');
+                }
+                return;
+            }
             if (
                 token !== roadOverlayRefreshToken
                 || !showRoadOverlayLayer
@@ -40541,7 +40644,7 @@ async function waitForBaseMapBeforeSiaRefresh(reason, refreshGeneration) {
         && typeof isNpfOfflinePackSelection === 'function'
         && isNpfOfflinePackSelection()
     );
-    const maxWaitMs = directNpfOffline ? 2400 : 1000;
+    const maxWaitMs = directNpfOffline ? 6500 : 1000;
     const pollMs = directNpfOffline ? 90 : 70;
     const startedAt = (typeof performance !== 'undefined' && performance.now)
         ? performance.now()
