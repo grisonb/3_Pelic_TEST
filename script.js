@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.41';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.42';
 
 
 /*
@@ -145,6 +145,32 @@ function escapeNpfStartupDiagnosticHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+function getNpfRenderedRoadFeatureCount() {
+    let count = 0;
+    try {
+        loadedRoadOverlayParts?.forEach?.(record => {
+            count += Number(record?.geojson?.features?.length || 0);
+        });
+    } catch (_) {}
+    return count;
+}
+
+function getNpfRetainedBaseTileCount() {
+    try {
+        return Number(Object.keys(baseTileLayer?._tiles || {}).length || 0);
+    } catch (_) {
+        return 0;
+    }
+}
+
+function getNpfBaseTileDomCount() {
+    try {
+        return Number(baseTileLayer?.getContainer?.()?.querySelectorAll?.('.leaflet-tile')?.length || 0);
+    } catch (_) {
+        return 0;
+    }
+}
+
 function getNpfStartupDiagnosticOverlaySnapshot() {
     let roadOverlayInstalledParts = 0;
     try {
@@ -155,11 +181,20 @@ function getNpfStartupDiagnosticOverlaySnapshot() {
         routes: showRoadOverlayLayer ? 'ON' : 'OFF',
         routesInstalledParts: roadOverlayInstalledParts,
         routesRenderedLines: Number(roadOverlayLineLayer?.getLayers?.().length || 0),
+        routesRenderedSegments: getNpfRenderedRoadFeatureCount(),
         routesRenderedLabels: Number(roadOverlayLabelsLayer?.getLayers?.().length || 0),
         ht: showHighVoltageLinesLayer ? 'ON' : 'OFF',
         htLoaded: hasLoadedHighVoltageLines ? 'OUI' : 'NON',
         htSegments: Number(highVoltageLinesFeatureCount || 0),
-        htRenderedSegments: Number(highVoltageLinesRenderedFeatureCount || 0)
+        htRenderedSegments: Number(highVoltageLinesRenderedFeatureCount || 0),
+        tilesRetained: getNpfRetainedBaseTileCount(),
+        tilesDom: getNpfBaseTileDomCount(),
+        tilesVisible: typeof countVisibleLoadedBaseTiles === 'function' ? countVisibleLoadedBaseTiles() : 0,
+        npfReadsActive: Number(directOfflineNpfActiveReads || 0),
+        npfReadsQueued: Number(directOfflineNpfReadQueue?.length || 0),
+        tileBlobCache: Number(directOfflineTileBlobCache?.size || 0),
+        runwayLayers: Number(npfRunwayMapLayer?.getLayers?.().length || 0),
+        siaLayers: Number(siaLayerGroup?.getLayers?.().length || 0)
     };
 }
 
@@ -193,11 +228,20 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         roadOverlaySelected: layers.routes,
         roadOverlayInstalledParts: layers.routesInstalledParts,
         roadOverlayRenderedLines: layers.routesRenderedLines,
+        roadOverlayRenderedSegments: layers.routesRenderedSegments,
         roadOverlayRenderedLabels: layers.routesRenderedLabels,
         highVoltageSelected: layers.ht,
         highVoltageLoaded: layers.htLoaded,
         highVoltageFeatureCount: layers.htSegments,
-        highVoltageRenderedFeatureCount: layers.htRenderedSegments
+        highVoltageRenderedFeatureCount: layers.htRenderedSegments,
+        retainedTileCount: layers.tilesRetained,
+        tileDomCount: layers.tilesDom,
+        visibleTileCount: layers.tilesVisible,
+        npfReadsActive: layers.npfReadsActive,
+        npfReadsQueued: layers.npfReadsQueued,
+        tileBlobCacheSize: layers.tileBlobCache,
+        runwayLayerCount: layers.runwayLayers,
+        siaLayerCount: layers.siaLayers
     };
 }
 
@@ -221,11 +265,23 @@ function buildNpfStartupDiagnosticExportText() {
     lines.push(
         'Détail couches : '
         + runtime.roadOverlayInstalledParts + ' parties routes installées | '
-        + runtime.roadOverlayRenderedLines + ' calques routes / '
+        + runtime.roadOverlayRenderedLines + ' groupes routes / '
+        + runtime.roadOverlayRenderedSegments + ' segments / '
         + runtime.roadOverlayRenderedLabels + ' cartouches | '
         + 'HT chargées ' + runtime.highVoltageLoaded + ' | '
         + runtime.highVoltageFeatureCount + ' tronçons HT connus | '
         + runtime.highVoltageRenderedFeatureCount + ' tronçons HT rendus'
+    );
+    lines.push(
+        'Mémoire carte : '
+        + runtime.retainedTileCount + ' tuiles Leaflet | '
+        + runtime.tileDomCount + ' tuiles DOM | '
+        + runtime.visibleTileCount + ' visibles | '
+        + runtime.npfReadsActive + ' lectures actives / '
+        + runtime.npfReadsQueued + ' en file | '
+        + runtime.tileBlobCacheSize + ' blobs cache | '
+        + runtime.runwayLayerCount + ' couches pistes | '
+        + runtime.siaLayerCount + ' couches SIA'
     );
     lines.push('');
     lines.push('ÉTAPES');
@@ -429,11 +485,14 @@ function renderNpfStartupDiagnosticPanel() {
             <div class="npf-startup-diag-meta npf-startup-diag-meta-compact">
                 <span>Routes : <b>${escapeNpfStartupDiagnosticHtml(runtime.roadOverlaySelected)}</b></span>
                 <span>Routes installées : <b>${runtime.roadOverlayInstalledParts}</b></span>
-                <span>Routes rendues : <b>${runtime.roadOverlayRenderedLines}</b> / labels <b>${runtime.roadOverlayRenderedLabels}</b></span>
+                <span>Routes : <b>${runtime.roadOverlayRenderedSegments}</b> segments / <b>${runtime.roadOverlayRenderedLabels}</b> labels</span>
                 <span>Lignes HT : <b>${escapeNpfStartupDiagnosticHtml(runtime.highVoltageSelected)}</b></span>
                 <span>HT chargées : <b>${escapeNpfStartupDiagnosticHtml(runtime.highVoltageLoaded)}</b></span>
                 <span>Tronçons HT : <b>${runtime.highVoltageFeatureCount}</b></span>
                 <span>HT rendues : <b>${runtime.highVoltageRenderedFeatureCount}</b></span>
+                <span>Tuiles : <b>${runtime.retainedTileCount}</b> Leaflet / <b>${runtime.tileDomCount}</b> DOM</span>
+                <span>Lectures NPF : <b>${runtime.npfReadsActive}</b> actives / <b>${runtime.npfReadsQueued}</b> file</span>
+                <span>Cache tuiles : <b>${runtime.tileBlobCacheSize}</b></span>
             </div>
             <div class="npf-startup-diag-page2-grid">
                 <div class="npf-startup-diag-page2-table">${table}</div>
@@ -1791,8 +1850,9 @@ const ONLINE_MAX_NATIVE_ZOOM = 18;
 const OFFLINE_FALLBACK_NATIVE_ZOOM = 14;
 const OFFLINE_HARD_MAX_NATIVE_ZOOM = 13;
 // v13.58 — iPad : démarrage offline séquencé, sans scan IndexedDB lourd au lancement.
-// Buffer augmenté modérément pour réduire les flashes blancs furtifs sur la carte NPF sans revenir au keepBuffer 32.
-const OFFLINE_TILE_KEEP_BUFFER = 6;
+// v16.42 — mémoire iPad : petit tampon NPF pour éviter l'accumulation de niveaux de zoom décodés.
+const OFFLINE_TILE_KEEP_BUFFER = 4;
+const NPF_OFFLINE_TILE_KEEP_BUFFER = 2;
 const OFFLINE_TILE_UPDATE_INTERVAL_MS = 80;
 // Tuile neutre opaque : évite l'effet page blanche si une tuile manque brièvement.
 const OFFLINE_TILE_PLACEHOLDER_DATA_URL = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22256%22%20height%3D%22256%22%3E%3Crect%20width%3D%22256%22%20height%3D%22256%22%20fill%3D%22%23d8e2e8%22/%3E%3C/svg%3E';
@@ -6255,6 +6315,7 @@ function initMap() {
     map.on('zoomend', enforceOfflineZoomLimit);
     map.on('zoomend', () => {
         scheduleBaseMapStabilityRefresh('zoomend');
+        scheduleNpfOfflineZoomCleanup('zoomend');
         scheduleTrafficVisualResumeAfterMapInteraction('zoomend');
     });
     map.on('moveend', () => {
@@ -6432,7 +6493,8 @@ function initMap() {
     if (!npfStartupCorePriorityActive) {
         drawNpfRunwayMapLayer();
     }
-    map.on('zoomend', drawNpfRunwayMapLayer);
+    map.on('zoomend', () => scheduleNpfRunwayMapRefresh('zoomend'));
+    map.on('moveend', () => scheduleNpfRunwayMapRefresh('moveend'));
 
     applyPelicanVisualScale();
     map.on('zoomend', applyPelicanVisualScale);
@@ -6499,6 +6561,9 @@ function beginMapVisualRenderGuard(reason = 'map-start') {
     clearTimeout(roadOverlayRefreshTimer);
     roadOverlayRefreshTimer = null;
     roadOverlayRefreshToken += 1;
+    clearTimeout(highVoltageLinesRefreshTimer);
+    highVoltageLinesRefreshTimer = null;
+    highVoltageLinesRefreshToken += 1;
 
     /*
      * v15.82 — un nouveau geste invalide aussi bien le refresh SIA différé
@@ -6549,6 +6614,7 @@ function beginBaseMapZoomStabilityGuard(reason = 'zoomstart') {
         && typeof resetPendingDirectOfflineNpfReads === 'function'
     ) {
         resetPendingDirectOfflineNpfReads();
+        try { trimDirectOfflineTileBlobCache(32); } catch (_) {}
     }
 }
 
@@ -6589,6 +6655,64 @@ function countVisibleLoadedBaseTiles() {
     } catch (_) {
         return 0;
     }
+}
+
+let npfOfflineZoomCleanupToken = 0;
+let npfZoomMemoryDiagTimer = null;
+
+function releaseStaleOfflineTileResources(reason = 'zoomend') {
+    if (!offlineTilesMode || !baseTileLayer) return;
+
+    try { baseTileLayer._pruneTiles?.(); } catch (_) {}
+
+    if (isNpfOfflinePackSelection()) {
+        /*
+         * Les blobs sont un cache d'appoint, pas les données Offline elles-mêmes.
+         * Les réduire ne touche jamais IndexedDB ni les packs installés.
+         */
+        trimDirectOfflineTileBlobCache(64);
+        while (directOfflineTileMissCache.size > 160) {
+            const oldestKey = directOfflineTileMissCache.keys().next().value;
+            directOfflineTileMissCache.delete(oldestKey);
+        }
+    }
+}
+
+function recordNpfZoomMemorySnapshot(reason = 'zoomend') {
+    const snapshot = getNpfStartupDiagnosticOverlaySnapshot();
+    npfDiagSiaInteraction(
+        'MÉMOIRE CARTE',
+        `raison=${reason} · zoom=${map?.getZoom?.() ?? '—'}`,
+        {
+            tilesLeaflet: snapshot.tilesRetained,
+            tilesDom: snapshot.tilesDom,
+            tilesVisible: snapshot.tilesVisible,
+            readsActive: snapshot.npfReadsActive,
+            readsQueued: snapshot.npfReadsQueued,
+            blobCache: snapshot.tileBlobCache,
+            routesSegments: snapshot.routesRenderedSegments,
+            htRendus: snapshot.htRenderedSegments,
+            pistesLayers: snapshot.runwayLayers,
+            siaLayers: snapshot.siaLayers
+        }
+    );
+}
+
+function scheduleNpfOfflineZoomCleanup(reason = 'zoomend') {
+    const token = ++npfOfflineZoomCleanupToken;
+    clearTimeout(npfZoomMemoryDiagTimer);
+
+    setTimeout(() => {
+        if (token !== npfOfflineZoomCleanupToken) return;
+        releaseStaleOfflineTileResources(reason + '-120ms');
+    }, 120);
+
+    npfZoomMemoryDiagTimer = setTimeout(() => {
+        if (token !== npfOfflineZoomCleanupToken) return;
+        npfZoomMemoryDiagTimer = null;
+        releaseStaleOfflineTileResources(reason + '-520ms');
+        recordNpfZoomMemorySnapshot(reason);
+    }, 520);
 }
 
 function scheduleBaseMapStabilityRefresh(reason = 'map-stability') {
@@ -7306,7 +7430,8 @@ function rebuildBaseTileLayerAfterOfflineSwitch(reason = 'offline-switch') {
  * les bases IndexedDB existantes. Le service worker reste utilisé pour le cache
  * applicatif et comme chemin de compatibilité secondaire.
  */
-const DIRECT_OFFLINE_TILE_CACHE_MAX = 384;
+const DIRECT_OFFLINE_TILE_CACHE_MAX = 256;
+const DIRECT_OFFLINE_NPF_TILE_CACHE_MAX = 128;
 const DIRECT_OFFLINE_TILE_MISS_CACHE_MAX = 512;
 const DIRECT_OFFLINE_TILE_MISS_CACHE_TTL_MS = 30000;
 const directOfflineTileBlobCache = new Map();
@@ -7337,7 +7462,8 @@ let directOfflineLastRecoveryReason = '';
  * rafale de transactions parallèles au premier affichage. On limite donc la
  * concurrence uniquement pour le groupe NPF ; OACI conserve son chemin rapide.
  */
-const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 5;
+const DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS = 3;
+const DIRECT_OFFLINE_NPF_MAX_QUEUED_READS = 96;
 let directOfflineNpfActiveReads = 0;
 const directOfflineNpfReadQueue = [];
 let directOfflineTileReadGeneration = 0;
@@ -7388,6 +7514,10 @@ function enqueueDirectOfflineNpfRead(task) {
          * l'affichage de la zone que l'utilisateur regarde maintenant.
          */
         directOfflineNpfReadQueue.unshift({ task, resolve, reject });
+        while (directOfflineNpfReadQueue.length > DIRECT_OFFLINE_NPF_MAX_QUEUED_READS) {
+            const stale = directOfflineNpfReadQueue.pop();
+            try { stale?.resolve?.(null); } catch (_) {}
+        }
         runNextDirectOfflineNpfRead();
     });
 }
@@ -7739,14 +7869,25 @@ function readDirectOfflineTileRecord(db, tileUrl, options = {}) {
     });
 }
 
+function getDirectOfflineTileBlobCacheLimit() {
+    return isNpfOfflinePackSelection()
+        ? DIRECT_OFFLINE_NPF_TILE_CACHE_MAX
+        : DIRECT_OFFLINE_TILE_CACHE_MAX;
+}
+
+function trimDirectOfflineTileBlobCache(maxEntries = getDirectOfflineTileBlobCacheLimit()) {
+    const safeMax = Math.max(0, Number(maxEntries) || 0);
+    while (directOfflineTileBlobCache.size > safeMax) {
+        const oldestKey = directOfflineTileBlobCache.keys().next().value;
+        directOfflineTileBlobCache.delete(oldestKey);
+    }
+}
+
 function rememberDirectOfflineTileBlob(cacheKey, blob) {
     if (!blob) return;
     directOfflineTileBlobCache.delete(cacheKey);
     directOfflineTileBlobCache.set(cacheKey, blob);
-    while (directOfflineTileBlobCache.size > DIRECT_OFFLINE_TILE_CACHE_MAX) {
-        const oldestKey = directOfflineTileBlobCache.keys().next().value;
-        directOfflineTileBlobCache.delete(oldestKey);
-    }
+    trimDirectOfflineTileBlobCache();
 }
 
 function rememberDirectOfflineTileMiss(cacheKey) {
@@ -7930,7 +8071,7 @@ window.getNpfTilePerformanceStatus = function getNpfTilePerformanceStatus() {
         queuedReads: directOfflineNpfReadQueue.length,
         maxConcurrentReads: DIRECT_OFFLINE_NPF_MAX_CONCURRENT_READS,
         blobCacheSize: directOfflineTileBlobCache.size,
-        blobCacheMax: DIRECT_OFFLINE_TILE_CACHE_MAX,
+        blobCacheMax: getDirectOfflineTileBlobCacheLimit(),
         tileHits: directOfflineTileHitCount,
         tileMisses: directOfflineTileMissCount,
         visibleLoadedTiles: countVisibleLoadedBaseTiles()
@@ -8074,33 +8215,73 @@ function buildDirectOfflineLeafletLayer(options = {}) {
             tile.decoding = 'async';
             tile.style.width = '100%';
             tile.style.height = '100%';
+            tile.__npfDisposed = false;
+            tile.__npfDone = false;
+            tile.__npfBlobUrl = '';
+
+            const revokeBlobUrl = () => {
+                const blobUrl = String(tile.__npfBlobUrl || '');
+                tile.__npfBlobUrl = '';
+                if (blobUrl) {
+                    try { URL.revokeObjectURL(blobUrl); } catch (_) {}
+                }
+            };
+            const finish = (error = null) => {
+                if (tile.__npfDone) return;
+                tile.__npfDone = true;
+                revokeBlobUrl();
+                try { done(error, tile); } catch (_) {}
+            };
+            tile.__npfFinish = finish;
+            tile.__npfDispose = () => {
+                if (tile.__npfDisposed) return;
+                tile.__npfDisposed = true;
+                tile.onload = null;
+                tile.onerror = null;
+                revokeBlobUrl();
+                try { tile.removeAttribute('src'); } catch (_) {}
+                finish(null);
+            };
 
             findDirectOfflineTileBlob(coords).then(blob => {
+                if (tile.__npfDisposed) {
+                    finish(null);
+                    return;
+                }
                 if (!blob) {
-                    tile.onload = () => done(null, tile);
-                    tile.onerror = error => done(error || new Error('Tuile absente'), tile);
+                    tile.onload = () => finish(null);
+                    tile.onerror = error => finish(error || new Error('Tuile absente'));
                     tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
                     return;
                 }
                 const blobUrl = URL.createObjectURL(blob);
-                tile.onload = () => {
-                    try { URL.revokeObjectURL(blobUrl); } catch (_) {}
-                    done(null, tile);
-                };
-                tile.onerror = error => {
-                    try { URL.revokeObjectURL(blobUrl); } catch (_) {}
-                    done(error || new Error('Décodage tuile impossible'), tile);
-                };
+                tile.__npfBlobUrl = blobUrl;
+                tile.onload = () => finish(null);
+                tile.onerror = error => finish(error || new Error('Décodage tuile impossible'));
+                if (tile.__npfDisposed) {
+                    finish(null);
+                    return;
+                }
                 tile.src = blobUrl;
             }).catch(error => {
-                tile.onload = () => done(null, tile);
-                tile.onerror = () => done(error, tile);
+                if (tile.__npfDisposed) {
+                    finish(null);
+                    return;
+                }
+                tile.onload = () => finish(null);
+                tile.onerror = () => finish(error);
                 tile.src = OFFLINE_TILE_PLACEHOLDER_DATA_URL;
             });
             return tile;
         }
     });
-    return new DirectOfflineGridLayer(options);
+
+    const layer = new DirectOfflineGridLayer(options);
+    layer.on('tileunload', event => {
+        const tile = event?.tile;
+        try { tile?.__npfDispose?.(); } catch (_) {}
+    });
+    return layer;
 }
 
 function setupBaseTileLayer() {
@@ -8168,7 +8349,7 @@ function setupBaseTileLayer() {
         minZoom: effectiveMinZoom,
         maxZoom: effectiveMaxZoom,
         attribution: '© OpenStreetMap',
-        keepBuffer: OFFLINE_TILE_KEEP_BUFFER,
+        keepBuffer: isNpfDirectOfflineLayer ? NPF_OFFLINE_TILE_KEEP_BUFFER : OFFLINE_TILE_KEEP_BUFFER,
         updateWhenZooming: false,
 
         /*
@@ -24180,71 +24361,102 @@ window.npfWaypointDeleteRoute = deleteWholeNpfWaypointRoute;
 window.npfWaypointDisableGoto = disableNpfWaypointGoto;
 
 
-function drawNpfRunwayMapLayer() {
+let npfRunwayLastRenderSignature = '';
+let npfRunwayRefreshTimer = null;
+
+function getNpfRunwayViewportBounds() {
+    try {
+        return map?.getBounds?.()?.pad?.(0.28) || null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function npfRunwayIntersectsBounds(runway, bounds) {
+    if (!runway || !bounds) return true;
+    const minLat = Math.min(Number(runway.leLat), Number(runway.heLat));
+    const maxLat = Math.max(Number(runway.leLat), Number(runway.heLat));
+    const minLon = Math.min(Number(runway.leLon), Number(runway.heLon));
+    const maxLon = Math.max(Number(runway.leLon), Number(runway.heLon));
+    if (![minLat, maxLat, minLon, maxLon].every(Number.isFinite)) return false;
+    return !(
+        maxLon < bounds.getWest()
+        || minLon > bounds.getEast()
+        || maxLat < bounds.getSouth()
+        || minLat > bounds.getNorth()
+    );
+}
+
+function drawNpfRunwayMapLayer(force = false) {
     if (!npfRunwayMapLayer || !map) return;
-    npfRunwayMapLayer.clearLayers();
 
-    /*
-     * v14.78 — toutes les pistes concernées restent visibles à partir du niveau
-     * 1 NM de la carte NPF, correspondant au zoom Leaflet 12 déjà utilisé
-     * pour les routes nationales et départementales.
-     */
     const zoom = Number(map.getZoom());
-    if (!Number.isFinite(zoom) || zoom < NPF_RUNWAY_MIN_ZOOM) return;
+    if (!Number.isFinite(zoom) || zoom < NPF_RUNWAY_MIN_ZOOM) {
+        if (npfRunwayMapLayer.getLayers?.().length) npfRunwayMapLayer.clearLayers();
+        npfRunwayLastRenderSignature = `off|${zoom}`;
+        return;
+    }
 
-    const drawRunwayCollection = (runwaysByOaci) => {
+    const bounds = getNpfRunwayViewportBounds();
+    const visibleRunways = [];
+
+    const collectRunways = (runwaysByOaci) => {
         runwaysByOaci.forEach(runways => {
             runways.forEach(runway => {
-                const endpoints = [
-                    [runway.leLat, runway.leLon],
-                    [runway.heLat, runway.heLon]
-                ];
-
-                /* Fin entourage blanc pour garder le trait lisible sur toute carte. */
-                L.polyline(endpoints, {
-                    color: '#ffffff',
-                    weight: 5,
-                    opacity: 0.96,
-                    lineCap: 'butt',
-                    lineJoin: 'miter',
-                    interactive: false,
-                    pane: 'npfRunwaysPane',
-                    renderer: npfRunwayRenderer || undefined
-                }).addTo(npfRunwayMapLayer);
-
-                L.polyline(endpoints, {
-                    color: '#111111',
-                    weight: 2.4,
-                    opacity: 1,
-                    lineCap: 'butt',
-                    lineJoin: 'miter',
-                    interactive: false,
-                    pane: 'npfRunwaysPane',
-                    renderer: npfRunwayRenderer || undefined
-                }).addTo(npfRunwayMapLayer);
+                if (npfRunwayIntersectsBounds(runway, bounds)) visibleRunways.push(runway);
             });
         });
     };
 
-    /* 340 pistes complémentaires de la v14.76. */
-    drawRunwayCollection(additionalAerodromeRunwaysByOaci);
+    collectRunways(additionalAerodromeRunwaysByOaci);
+    collectRunways(declaredPelicanRunwaysByOaci);
+    collectRunways(otherAirportRunwaysByOaci);
 
-    /* Pistes des 27 pélicandromes permanents ajoutées en v14.77. */
-    drawRunwayCollection(declaredPelicanRunwaysByOaci);
+    const signature = visibleRunways
+        .map(runway => `${runway.oaci}:${runway.ident}:${Number(runway.leLat).toFixed(4)}:${Number(runway.leLon).toFixed(4)}`)
+        .sort()
+        .join('|');
 
-    /*
-     * v14.80 — les pistes des 96 terrains encore présents dans `otherAirports`
-     * sont toujours intégrées au fond cartographique à partir du zoom 1 NM.
-     * La v14.78 les
-     * filtrait à tort avec `customPelicanAirports`, ce qui rendait invisibles
-     * LFBO, LFBT, LFBF, LFMQ, LFMN et les autres terrains tant qu’ils
-     * n’étaient pas activés manuellement comme PÉLIC dans le stockage local.
-     *
-     * Le statut PÉLIC continue uniquement à modifier le rond / symbole et les
-     * fonctions opérationnelles ; il ne conditionne plus la présence de la
-     * géométrie de piste sur la carte.
-     */
-    drawRunwayCollection(otherAirportRunwaysByOaci);
+    if (!force && signature === npfRunwayLastRenderSignature) return;
+    npfRunwayLastRenderSignature = signature;
+    npfRunwayMapLayer.clearLayers();
+
+    visibleRunways.forEach(runway => {
+        const endpoints = [
+            [runway.leLat, runway.leLon],
+            [runway.heLat, runway.heLon]
+        ];
+
+        L.polyline(endpoints, {
+            color: '#ffffff',
+            weight: 5,
+            opacity: 0.96,
+            lineCap: 'butt',
+            lineJoin: 'miter',
+            interactive: false,
+            pane: 'npfRunwaysPane',
+            renderer: npfRunwayRenderer || undefined
+        }).addTo(npfRunwayMapLayer);
+
+        L.polyline(endpoints, {
+            color: '#111111',
+            weight: 2.4,
+            opacity: 1,
+            lineCap: 'butt',
+            lineJoin: 'miter',
+            interactive: false,
+            pane: 'npfRunwaysPane',
+            renderer: npfRunwayRenderer || undefined
+        }).addTo(npfRunwayMapLayer);
+    });
+}
+
+function scheduleNpfRunwayMapRefresh(source = 'map-change') {
+    clearTimeout(npfRunwayRefreshTimer);
+    npfRunwayRefreshTimer = setTimeout(() => {
+        npfRunwayRefreshTimer = null;
+        drawNpfRunwayMapLayer(false);
+    }, source === 'zoomend' ? 90 : 180);
 }
 
 
