@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-39_style_marker_fix';
-const APP_VERSION = 'v16.39';
+const SW_VERSION = 'sw-v16-40_ht_visible_only_icon_center';
+const APP_VERSION = 'v16.40';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
