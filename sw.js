@@ -1,5 +1,5 @@
-const SW_VERSION = 'sw-v16-50_vac_scope_diag';
-const APP_VERSION = 'v16.50';
+const SW_VERSION = 'sw-v16-51_diag_gps_layers_search';
+const APP_VERSION = 'v16.51';
 const SIA_DATA_REVISION = '15.69';
 const SIA_DATA_URL = './sia.js';
 const SIA_DATA_CACHE = `npf-q400-sia-data-${SIA_DATA_REVISION}`;
