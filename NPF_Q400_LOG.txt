@@ -1,3 +1,64 @@
+VERSION TEST v16.51 — DIAG VOL + RECHERCHE FRANCE + SUIVI GPS FLUIDE
+Date : 06/09/2026
+Base : TEST v16.50
+
+OBJECTIF
+- Rendre le DIAG exploitable après un problème survenu plusieurs dizaines de minutes auparavant, avec une charge minimale.
+- Étendre réellement la recherche des villages, hameaux et lieux-dits à toute la France métropolitaine via la base locale nationale existante.
+- Supprimer les reconstructions inutiles provoquées par le recentrage GPS automatique, responsables des lenteurs et du clignotement HT / Zones.
+- Empêcher l’icône avion d’être masquée par les bandeaux supérieurs lors du suivi, notamment en route vers le sud.
+
+1. DIAG — SESSION DE VOL, FAIBLE CHARGE
+- Surveillance des blocages JavaScript maintenue pendant toute la session à 1 Hz.
+- Conservation des 20 plus gros blocages au lieu d’un journal brut très bavard.
+- Les mouvements carte sont agrégés par origine : suivi GPS automatique, geste manuel, autre, zoom.
+- Ajout des compteurs GPS : nombre de positions, intervalle moyen/max, précision moyenne/max, nombre de recentrages et déplacement maximal du centre.
+- Ajout des maxima tuiles : file, lectures actives, écran sans tuile, interruptions et reprises.
+- Ajout des compteurs de reconstruction SIA / HT / Routes et durées maximales SIA.
+- Les événements routiniers rapides ne remplissent plus le journal ; seuls les événements lents, changements importants et anomalies sont conservés.
+- Sauvegarde groupée du DIAG toutes les 30 s et au passage en arrière-plan, dans une seule petite entrée locale.
+- Une session récente peut être restaurée après rechargement pendant 6 h.
+- Le DIAG mesure le coût de ses propres écritures (nombre, durée max, durée totale).
+
+2. RECHERCHE COMMUNES / LOCALITÉS — FRANCE MÉTROPOLITAINE
+- La base locale de 179 402 villages, hameaux et lieux-dits reste la source nationale hors ligne.
+- Chaque localité est maintenant indexée sous son nom ET sous son rattachement communal.
+- Une saisie composée « lieu-dit + commune » est donc reconnue sans ajouter d’alias manuel spécifique.
+- Exemple attendu : « Lapradelle », « Lapradelle-Puilaurens » et « Puilaurens » convergent vers les résultats correspondants du département 11 lorsque la localité est présente dans la base nationale.
+- La logique s’applique à toutes les localités métropolitaines de la base, pas uniquement à Lapradelle.
+- Le DIAG indique désormais le nombre de localités chargées, rattachées à une commune et sans rattachement.
+
+3. SUIVI GPS — PRIORITÉ TUILES
+- Un recentrage GPS automatique n’est plus traité comme un pan manuel complet.
+- Il n’invalide plus à chaque seconde les rendus Routes / HT / SIA ni la priorité IndexedDB.
+- La file de tuiles n’est plus purgée à chaque position GPS ; la protection de taille maximale reste active.
+- Les gestes manuels et changements de zoom conservent les protections et purges existantes.
+
+4. LIGNES HT — FIN DU CLIGNOTEMENT
+- Le rendu HT mémorise maintenant sa zone de couverture tampon.
+- Tant que le suivi GPS reste à l’intérieur de cette couverture, aucun recalcul n’est lancé.
+- Quand un recalcul devient nécessaire, le nouveau calque est ajouté avant le retrait de l’ancien.
+- Il n’y a donc plus de phase volontairement vide entre deux rendus.
+
+5. ZONES SIA — CONSERVATION DU RENDU EN SUIVI
+- Si le déplacement automatique GPS reste dans la couverture SIA déjà dessinée, les zones et décorations sont conservées telles quelles.
+- Les décorations ne sont plus supprimées/recréées à chaque position GPS.
+- Un recalcul complet n’est demandé qu’en sortie du tampon, changement de zoom ou changement de filtres.
+
+6. ROUTES / COUCHES ANNEXES
+- Le calque routier utilise sa couverture existante pour ignorer les recentrages GPS qui ne nécessitent aucun nouveau secteur.
+- Le rafraîchissement des pistes et du calque Communes est également évité lors des petits recentrages GPS automatiques.
+
+7. AVION — ZONE VISIBLE RÉELLE
+- Le calcul de position anticipée tient maintenant compte des bandeaux réellement visibles : Route WP, commune/feu, BINGO et bandeau de commune survolée.
+- Une marge supplémentaire correspondant à la taille de l’icône avion est conservée.
+- L’avion reste donc entièrement visible en cap sud/nord tout en gardant de la carte devant la trajectoire.
+
+8. NON-RÉGRESSION
+- sia.js inchangé bit pour bit.
+- Aucun effacement des cartes Offline ni des bases IndexedDB.
+- VAC, Routes, HT, SIA, WP, PÉLIC, Feu et mise à jour PWA conservés.
+
 VERSION TEST v16.50 — DIAGNOSTIC PÉRIMÈTRE VAC COMPLET
 Date : 04/09/2026
 Base : TEST v16.49
