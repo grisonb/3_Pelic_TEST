@@ -1,4 +1,4 @@
-const NPF_SCRIPT_BUILD_VERSION = 'v16.50';
+const NPF_SCRIPT_BUILD_VERSION = 'v16.51';
 
 
 /*
@@ -19,10 +19,50 @@ const NPF_STARTUP_DIAGNOSTIC = (() => {
         longTasks: [],
         siaInteractions: [],
         monitorStartedAt: now(),
+        monitorStartedWallAt: Date.now(),
         monitorStoppedAt: null,
         eventLoopMonitorSupported: true,
-        longTaskObserverSupported: false
+        longTaskObserverSupported: false,
+        mapMotionSummary: {
+            gpsFollow: { count: 0, slow: 0, totalMs: 0, maxMs: 0, maxGapMs: 0, maxEvents: 0 },
+            manual: { count: 0, slow: 0, totalMs: 0, maxMs: 0, maxGapMs: 0, maxEvents: 0 },
+            other: { count: 0, slow: 0, totalMs: 0, maxMs: 0, maxGapMs: 0, maxEvents: 0 },
+            zoom: { count: 0, slow: 0, totalMs: 0, maxMs: 0 }
+        },
+        gpsSummary: {
+            positions: 0, lastPositionAt: 0, intervalCount: 0, intervalTotalMs: 0, maxIntervalMs: 0,
+            accuracyCount: 0, accuracyTotalM: 0, maxAccuracyM: 0,
+            recenterCount: 0, gpsFollowRecenterCount: 0, lastRecenterAt: 0,
+            recenterIntervalCount: 0, recenterIntervalTotalMs: 0, maxRecenterIntervalMs: 0,
+            maxCenterShiftM: 0
+        },
+        layerSummary: {
+            siaRefreshCount: 0, siaSlowCount: 0, siaMaxMs: 0, siaMaxPointsMs: 0, siaMaxDecorMs: 0,
+            htRenderCount: 0, htMaxRendered: 0,
+            roadRenderCount: 0, roadMaxRendered: 0,
+            tileQueueMax: 0, tileActiveMax: 0, tileBlankSnapshots: 0,
+            tileAbortedMax: 0, tileRetriesMax: 0
+        },
+        restoredSession: null,
+        persistCount: 0,
+        persistMaxMs: 0,
+        persistTotalMs: 0
     };
+
+    const DIAG_PERSIST_KEY = 'npfDiagSessionV3';
+    const DIAG_PERSIST_INTERVAL_MS = 30000;
+    const DIAG_PERSIST_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+    try {
+        const previous = JSON.parse(localStorage.getItem(DIAG_PERSIST_KEY) || 'null');
+        if (
+            previous
+            && previous.build === NPF_SCRIPT_BUILD_VERSION
+            && Number(previous.savedAt) >= Date.now() - DIAG_PERSIST_MAX_AGE_MS
+        ) {
+            state.restoredSession = previous;
+        }
+    } catch (_) {}
 
     const refreshOpenPanel = () => {
         try {
@@ -52,45 +92,225 @@ const NPF_STARTUP_DIAGNOSTIC = (() => {
 
     const has = key => state.markIndex[String(key || '')] !== undefined;
 
+    const updateLayerSummary = (kind, detail, metrics) => {
+        const safeMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+        const summary = state.layerSummary;
+
+        if (Number.isFinite(Number(safeMetrics.npfReadsQueued))) {
+            summary.tileQueueMax = Math.max(summary.tileQueueMax, Number(safeMetrics.npfReadsQueued));
+        }
+        if (Number.isFinite(Number(safeMetrics.npfReadsActive))) {
+            summary.tileActiveMax = Math.max(summary.tileActiveMax, Number(safeMetrics.npfReadsActive));
+        }
+        if (Number.isFinite(Number(safeMetrics.npfReadsAborted))) {
+            summary.tileAbortedMax = Math.max(summary.tileAbortedMax, Number(safeMetrics.npfReadsAborted));
+        }
+        if (Number.isFinite(Number(safeMetrics.npfTileRetries))) {
+            summary.tileRetriesMax = Math.max(summary.tileRetriesMax, Number(safeMetrics.npfTileRetries));
+        }
+        if (Number.isFinite(Number(safeMetrics.tilesVisible)) && Number(safeMetrics.tilesVisible) === 0) {
+            summary.tileBlankSnapshots += 1;
+        }
+
+        if (kind === 'SIA RAFRAÎCHISSEMENT') {
+            const totalMs = Math.max(0, Number(safeMetrics.totalMs) || 0);
+            summary.siaRefreshCount += 1;
+            if (totalMs >= 120) summary.siaSlowCount += 1;
+            summary.siaMaxMs = Math.max(summary.siaMaxMs, totalMs);
+            summary.siaMaxPointsMs = Math.max(summary.siaMaxPointsMs, Math.max(0, Number(safeMetrics.pointsMs) || 0));
+            summary.siaMaxDecorMs = Math.max(summary.siaMaxDecorMs, Math.max(0, Number(safeMetrics.touchDecorMs) || Number(safeMetrics.decorationsMs) || 0));
+        }
+
+        if (kind === 'Couches carte') {
+            const safeDetail = String(detail || '');
+            if (safeDetail.includes('lignes-ht rendu')) {
+                summary.htRenderCount += 1;
+                summary.htMaxRendered = Math.max(summary.htMaxRendered, Math.max(0, Number(safeMetrics.htRenderedSegments) || 0));
+            }
+            if (safeDetail.includes('routes viewport')) {
+                summary.roadRenderCount += 1;
+                summary.roadMaxRendered = Math.max(summary.roadMaxRendered, Math.max(0, Number(safeMetrics.routesRenderedSegments) || 0));
+            }
+        }
+    };
+
+    const shouldRetainInteraction = (kind, detail, metrics) => {
+        const safeMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+        if (kind === 'SIA RAFRAÎCHISSEMENT') {
+            const totalMs = Math.max(0, Number(safeMetrics.totalMs) || 0);
+            const safeDetail = String(detail || '');
+            return totalMs >= 120
+                || safeDetail.includes('profile-show-map-zones')
+                || safeDetail.includes('profile-hide-map-zones')
+                || safeDetail.includes('startup');
+        }
+        if (kind === 'Couches carte') {
+            const safeDetail = String(detail || '');
+            return safeDetail.includes('tile-priority-retry')
+                || safeDetail.includes(' ON')
+                || safeDetail.includes(' OFF')
+                || Number(safeMetrics.tilesVisible) === 0
+                || Number(safeMetrics.npfReadsQueued) >= 12;
+        }
+        return true;
+    };
+
     const addSiaInteraction = (kind, detail = '', metrics = null) => {
+        const safeKind = String(kind || 'SIA');
+        const safeDetail = detail == null ? '' : String(detail);
+        const safeMetrics = metrics && typeof metrics === 'object' ? { ...metrics } : null;
+        updateLayerSummary(safeKind, safeDetail, safeMetrics);
+
+        if (!shouldRetainInteraction(safeKind, safeDetail, safeMetrics)) {
+            return null;
+        }
+
         const entry = {
             t: now(),
-            kind: String(kind || 'SIA'),
-            detail: detail == null ? '' : String(detail),
-            metrics: metrics && typeof metrics === 'object' ? { ...metrics } : null
+            at: Date.now(),
+            kind: safeKind,
+            detail: safeDetail,
+            metrics: safeMetrics
         };
         state.siaInteractions.push(entry);
-        if (state.siaInteractions.length > 80) {
-            state.siaInteractions.splice(0, state.siaInteractions.length - 80);
+        if (state.siaInteractions.length > 100) {
+            state.siaInteractions.splice(0, state.siaInteractions.length - 100);
         }
         refreshOpenPanel();
         return entry;
     };
 
+    const recordMapMotion = (source, metrics = null) => {
+        const safeMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+        const safeSource = source === 'gps-follow' ? 'gpsFollow' : (source === 'manual' ? 'manual' : 'other');
+        const bucket = state.mapMotionSummary[safeSource];
+        const durationMs = Math.max(0, Number(safeMetrics.dureeMs) || 0);
+        const avgGapMs = Math.max(0, Number(safeMetrics.gapMoyMs) || 0);
+        const maxGapMs = Math.max(0, Number(safeMetrics.gapMaxMs) || 0);
+        const moveEvents = Math.max(0, Number(safeMetrics.moveEvents) || 0);
+        const slow = maxGapMs >= 80 || avgGapMs >= 35 || durationMs >= 1800;
+
+        bucket.count += 1;
+        bucket.totalMs += durationMs;
+        bucket.maxMs = Math.max(bucket.maxMs, durationMs);
+        bucket.maxGapMs = Math.max(bucket.maxGapMs, maxGapMs);
+        bucket.maxEvents = Math.max(bucket.maxEvents, moveEvents);
+        if (slow) bucket.slow += 1;
+
+        if (slow) {
+            return addSiaInteraction(
+                'PAN CARTE LENT',
+                `source=${source || 'autre'}`,
+                { ...safeMetrics }
+            );
+        }
+        refreshOpenPanel();
+        return null;
+    };
+
+    const recordZoom = (metrics = null) => {
+        const safeMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+        const durationMs = Math.max(0, Number(safeMetrics.dureeMs) || 0);
+        const bucket = state.mapMotionSummary.zoom;
+        bucket.count += 1;
+        bucket.totalMs += durationMs;
+        bucket.maxMs = Math.max(bucket.maxMs, durationMs);
+        if (durationMs >= 120) {
+            bucket.slow += 1;
+            return addSiaInteraction('ZOOM CARTE LENT', '', { ...safeMetrics });
+        }
+        refreshOpenPanel();
+        return null;
+    };
+
+    const recordGpsPosition = (coords, timestampMs = Date.now()) => {
+        const summary = state.gpsSummary;
+        const at = Number(timestampMs) || Date.now();
+        summary.positions += 1;
+        if (summary.lastPositionAt > 0 && at > summary.lastPositionAt) {
+            const delta = at - summary.lastPositionAt;
+            summary.intervalCount += 1;
+            summary.intervalTotalMs += delta;
+            summary.maxIntervalMs = Math.max(summary.maxIntervalMs, delta);
+        }
+        summary.lastPositionAt = at;
+
+        const accuracy = Number(coords?.accuracy);
+        if (Number.isFinite(accuracy) && accuracy >= 0) {
+            summary.accuracyCount += 1;
+            summary.accuracyTotalM += accuracy;
+            summary.maxAccuracyM = Math.max(summary.maxAccuracyM, accuracy);
+        }
+    };
+
+    const recordGpsRecenter = (reason = '', centerShiftM = 0) => {
+        const summary = state.gpsSummary;
+        const at = Date.now();
+        summary.recenterCount += 1;
+        if (String(reason || '') === 'gps-update') summary.gpsFollowRecenterCount += 1;
+        if (summary.lastRecenterAt > 0 && at > summary.lastRecenterAt) {
+            const delta = at - summary.lastRecenterAt;
+            summary.recenterIntervalCount += 1;
+            summary.recenterIntervalTotalMs += delta;
+            summary.maxRecenterIntervalMs = Math.max(summary.maxRecenterIntervalMs, delta);
+        }
+        summary.lastRecenterAt = at;
+        const shift = Math.max(0, Number(centerShiftM) || 0);
+        summary.maxCenterShiftM = Math.max(summary.maxCenterShiftM, shift);
+    };
+
+    const buildPersistedSnapshot = () => ({
+        build: NPF_SCRIPT_BUILD_VERSION,
+        savedAt: Date.now(),
+        sessionStartedAt: state.monitorStartedWallAt,
+        mapMotionSummary: state.mapMotionSummary,
+        gpsSummary: state.gpsSummary,
+        layerSummary: state.layerSummary,
+        interactions: state.siaInteractions.slice(-80),
+        stalls: state.stalls.slice(0, 20),
+        longTasks: state.longTasks.slice(0, 20)
+    });
+
+    const persist = () => {
+        const started = now();
+        try {
+            localStorage.setItem(DIAG_PERSIST_KEY, JSON.stringify(buildPersistedSnapshot()));
+            state.persistCount += 1;
+            const duration = Math.max(0, now() - started);
+            state.persistTotalMs += duration;
+            state.persistMaxMs = Math.max(state.persistMaxMs, duration);
+        } catch (_) {}
+    };
+
     mark('script_eval', 'Script NPF exécuté');
+
+    try {
+        setInterval(persist, DIAG_PERSIST_INTERVAL_MS);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') persist();
+        }, { passive: true });
+        window.addEventListener('pagehide', persist, { passive: true });
+    } catch (_) {}
 
     /* Mesure indépendante des API LongTask, absentes de certaines versions Safari. */
     try {
-        const intervalMs = 250;
-        const stopAfterMs = 120000;
+        /*
+         * Surveillance pendant toute la session, mais à 1 Hz seulement : charge
+         * négligeable en vol et conservation des plus gros blocages, même après
+         * plusieurs heures d'utilisation.
+         */
+        const intervalMs = 1000;
         let expected = now() + intervalMs;
-        const timer = setInterval(() => {
+        setInterval(() => {
             const current = now();
             const drift = Math.max(0, current - expected);
             if (drift >= 120) {
-                state.stalls.push({
-                    t: current,
-                    delay: drift
-                });
-                if (state.stalls.length > 40) state.stalls.shift();
+                state.stalls.push({ t: current, at: Date.now(), delay: drift });
+                state.stalls.sort((a, b) => b.delay - a.delay);
+                if (state.stalls.length > 20) state.stalls.length = 20;
                 refreshOpenPanel();
             }
             expected = current + intervalMs;
-            if (current - state.monitorStartedAt >= stopAfterMs) {
-                clearInterval(timer);
-                state.monitorStoppedAt = current;
-                refreshOpenPanel();
-            }
         }, intervalMs);
     } catch (_) {
         state.eventLoopMonitorSupported = false;
@@ -109,20 +329,20 @@ const NPF_STARTUP_DIAGNOSTIC = (() => {
                             duration: Number(entry.duration) || 0
                         });
                     });
-                    if (state.longTasks.length > 40) {
-                        state.longTasks.splice(0, state.longTasks.length - 40);
-                    }
+                    state.longTasks.sort((a, b) => b.duration - a.duration);
+                    if (state.longTasks.length > 20) state.longTasks.length = 20;
                     refreshOpenPanel();
                 });
                 observer.observe({ entryTypes: ['longtask'] });
-                setTimeout(() => {
-                    try { observer.disconnect(); } catch (_) {}
-                }, 120000);
             }
         }
     } catch (_) {}
 
-    return { state, mark, has, now, addSiaInteraction };
+    return {
+        state, mark, has, now, addSiaInteraction,
+        recordMapMotion, recordZoom, recordGpsPosition, recordGpsRecenter,
+        persist
+    };
 })();
 
 window.NPF_STARTUP_DIAGNOSTIC = NPF_STARTUP_DIAGNOSTIC;
@@ -134,6 +354,21 @@ function npfStartupDiagHasMark(key) {
 }
 function npfDiagSiaInteraction(kind, detail = '', metrics = null) {
     return NPF_STARTUP_DIAGNOSTIC.addSiaInteraction(kind, detail, metrics);
+}
+function npfDiagMapMotion(source, metrics = null) {
+    return NPF_STARTUP_DIAGNOSTIC.recordMapMotion(source, metrics);
+}
+function npfDiagZoom(metrics = null) {
+    return NPF_STARTUP_DIAGNOSTIC.recordZoom(metrics);
+}
+function npfDiagGpsPosition(coords, timestampMs = Date.now()) {
+    return NPF_STARTUP_DIAGNOSTIC.recordGpsPosition(coords, timestampMs);
+}
+function npfDiagGpsRecenter(reason = '', centerShiftM = 0) {
+    return NPF_STARTUP_DIAGNOSTIC.recordGpsRecenter(reason, centerShiftM);
+}
+function npfDiagPersist() {
+    try { return NPF_STARTUP_DIAGNOSTIC.persist(); } catch (_) { return null; }
 }
 
 function escapeNpfStartupDiagnosticHtml(value) {
@@ -268,7 +503,23 @@ function getNpfStartupDiagnosticRuntimeInfo() {
         vacManifestUnavailableCount: Math.max(0, Number(localStorage.getItem(VAC_REMOTE_UNAVAILABLE_COUNT_KEY)) || 0),
         vacDisplayedAirportCount: typeof getNpfDisplayedAirportOaciCountForVac === 'function'
             ? getNpfDisplayedAirportOaciCountForVac()
-            : 0
+            : 0,
+        communeCount: Array.isArray(allCommunes) ? allCommunes.length : 0,
+        communeAliasCount: Array.isArray(communeAliases) ? communeAliases.length : 0,
+        communeAliasSource: String(communeAliasesLoadSource || '—'),
+        localityTotalCount: Math.max(0, Number(namedPlacesOfflineIndex?.total_count) || 0),
+        localityLoadedCount: Math.max(0, Number(namedPlacesOfflineLoadedCount) || 0),
+        localityLinkedCount: Math.max(0, Number(namedPlacesOfflineLinkedCount) || 0),
+        localityOrphanCount: Math.max(0, Number(namedPlacesOfflineOrphanCount) || 0),
+        localityCachedShards: Number(namedPlacesOfflineShardCache?.size || 0),
+        localityLoadError: String(namedPlacesOfflineLoadError || ''),
+        diagMapMotion: NPF_STARTUP_DIAGNOSTIC.state.mapMotionSummary,
+        diagGps: NPF_STARTUP_DIAGNOSTIC.state.gpsSummary,
+        diagLayers: NPF_STARTUP_DIAGNOSTIC.state.layerSummary,
+        diagPersistCount: Number(NPF_STARTUP_DIAGNOSTIC.state.persistCount || 0),
+        diagPersistMaxMs: Number(NPF_STARTUP_DIAGNOSTIC.state.persistMaxMs || 0),
+        diagPersistTotalMs: Number(NPF_STARTUP_DIAGNOSTIC.state.persistTotalMs || 0),
+        diagRestoredSession: NPF_STARTUP_DIAGNOSTIC.state.restoredSession || null
     };
 }
 
@@ -324,6 +575,61 @@ function buildNpfStartupDiagnosticExportText() {
             ? ' | ' + runtime.vacManifestUnavailableCount + ' sans VAC publiée'
             : '')
     );
+    lines.push(
+        'Recherche France : '
+        + runtime.communeCount + ' communes | '
+        + runtime.communeAliasCount + ' alias (' + runtime.communeAliasSource + ') | '
+        + (runtime.localityTotalCount
+            ? runtime.localityTotalCount + ' localités indexées'
+            : 'base localités non ouverte')
+        + (runtime.localityLoadedCount ? ' | ' + runtime.localityLoadedCount + ' localités chargées' : '')
+        + (runtime.localityLoadedCount ? ' | rattachées ' + runtime.localityLinkedCount + ' / sans commune ' + runtime.localityOrphanCount : '')
+        + (runtime.localityLoadError ? ' | erreur=' + runtime.localityLoadError : '')
+    );
+
+    const motion = runtime.diagMapMotion || {};
+    const gpsDiag = runtime.diagGps || {};
+    const layerDiag = runtime.diagLayers || {};
+    const fmtAvg = (total, count) => count > 0 ? Math.round(total / count) : 0;
+    lines.push(
+        'Suivi GPS : '
+        + (gpsDiag.positions || 0) + ' positions | '
+        + (gpsDiag.gpsFollowRecenterCount || 0) + ' recentrages auto | '
+        + 'intervalle GPS moy ' + fmtAvg(gpsDiag.intervalTotalMs || 0, gpsDiag.intervalCount || 0) + ' ms / max ' + Math.round(gpsDiag.maxIntervalMs || 0) + ' ms | '
+        + 'précision moy ' + fmtAvg(gpsDiag.accuracyTotalM || 0, gpsDiag.accuracyCount || 0) + ' m / max ' + Math.round(gpsDiag.maxAccuracyM || 0) + ' m | '
+        + 'déplacement centre max ' + Math.round(gpsDiag.maxCenterShiftM || 0) + ' m'
+    );
+    lines.push(
+        'Mouvements carte : GPS auto '
+        + (motion.gpsFollow?.count || 0) + ' (' + (motion.gpsFollow?.slow || 0) + ' lents, gap max ' + Math.round(motion.gpsFollow?.maxGapMs || 0) + ' ms) | '
+        + 'manuels ' + (motion.manual?.count || 0) + ' (' + (motion.manual?.slow || 0) + ' lents, gap max ' + Math.round(motion.manual?.maxGapMs || 0) + ' ms) | '
+        + 'zooms ' + (motion.zoom?.count || 0) + ' (' + (motion.zoom?.slow || 0) + ' lents)'
+    );
+    lines.push(
+        'Synthèse performance : '
+        + 'file tuiles max ' + Math.round(layerDiag.tileQueueMax || 0) + ' | '
+        + 'lectures actives max ' + Math.round(layerDiag.tileActiveMax || 0) + ' | '
+        + 'snapshots écran sans tuile ' + Math.round(layerDiag.tileBlankSnapshots || 0) + ' | '
+        + 'interrompues max ' + Math.round(layerDiag.tileAbortedMax || 0) + ' / reprises max ' + Math.round(layerDiag.tileRetriesMax || 0) + ' | '
+        + 'SIA ' + Math.round(layerDiag.siaRefreshCount || 0) + ' refresh (' + Math.round(layerDiag.siaSlowCount || 0) + ' lents, max ' + Math.round(layerDiag.siaMaxMs || 0) + ' ms) | '
+        + 'HT ' + Math.round(layerDiag.htRenderCount || 0) + ' rendus | Routes ' + Math.round(layerDiag.roadRenderCount || 0) + ' rendus'
+    );
+    lines.push(
+        'Charge DIAG : '
+        + Math.round(runtime.diagPersistCount || 0) + ' écritures groupées | '
+        + 'écriture max ' + Math.round(runtime.diagPersistMaxMs || 0) + ' ms | '
+        + 'temps total ' + Math.round(runtime.diagPersistTotalMs || 0) + ' ms'
+    );
+    const restoredDiag = runtime.diagRestoredSession;
+    if (restoredDiag) {
+        lines.push(
+            'DIAG restauré après rechargement : sauvegarde '
+            + new Date(Number(restoredDiag.savedAt) || Date.now()).toLocaleTimeString('fr-FR')
+            + ' | session début '
+            + new Date(Number(restoredDiag.sessionStartedAt) || Date.now()).toLocaleTimeString('fr-FR')
+            + ' | ' + Number(restoredDiag?.interactions?.length || 0) + ' événements conservés'
+        );
+    }
     lines.push('');
     lines.push('ÉTAPES');
     lines.push('Étape | Depuis ouverture | Delta | Détail');
@@ -341,9 +647,9 @@ function buildNpfStartupDiagnosticExportText() {
 
     const siaInteractions = Array.isArray(diag.siaInteractions) ? diag.siaInteractions.slice() : [];
     lines.push('');
-    lines.push('DIAGNOSTIC SIA / FLUIDITÉ CARTE');
+    lines.push('ÉVÉNEMENTS LENTS / CHANGEMENTS DE COUCHES');
     if (!siaInteractions.length) {
-        lines.push('Aucune interaction SIA enregistrée.');
+        lines.push('Aucun événement lent ou changement de couche retenu.');
     } else {
         siaInteractions.forEach(item => {
             const metrics = item.metrics && typeof item.metrics === 'object'
@@ -351,13 +657,58 @@ function buildNpfStartupDiagnosticExportText() {
                     .map(([key, value]) => `${key}=${value}`)
                     .join(' | ')
                 : '';
+            const eventClock = Number(item.at)
+                ? new Date(Number(item.at)).toLocaleTimeString('fr-FR')
+                : '—';
             lines.push(
-                '+ ' + (item.t / 1000).toFixed(2) + ' s | '
+                eventClock + ' | + ' + (item.t / 1000).toFixed(2) + ' s | '
                 + item.kind
                 + (item.detail ? ' | ' + item.detail : '')
                 + (metrics ? ' | ' + metrics : '')
             );
         });
+    }
+
+    const restoredSession = runtime.diagRestoredSession;
+    if (restoredSession) {
+        lines.push('');
+        lines.push('SESSION DIAG RESTAURÉE AVANT RECHARGEMENT');
+        lines.push(
+            'Début : ' + new Date(Number(restoredSession.sessionStartedAt) || Date.now()).toLocaleString('fr-FR')
+            + ' | sauvegarde : ' + new Date(Number(restoredSession.savedAt) || Date.now()).toLocaleString('fr-FR')
+        );
+        const restoredInteractions = Array.isArray(restoredSession.interactions)
+            ? restoredSession.interactions.slice(-80)
+            : [];
+        if (!restoredInteractions.length) {
+            lines.push('Aucun événement détaillé conservé avant le rechargement.');
+        } else {
+            restoredInteractions.forEach(item => {
+                const metrics = item?.metrics && typeof item.metrics === 'object'
+                    ? Object.entries(item.metrics).map(([key, value]) => `${key}=${value}`).join(' | ')
+                    : '';
+                const eventClock = Number(item?.at)
+                    ? new Date(Number(item.at)).toLocaleTimeString('fr-FR')
+                    : '—';
+                lines.push(
+                    eventClock + ' | ' + String(item?.kind || 'événement')
+                    + (item?.detail ? ' | ' + item.detail : '')
+                    + (metrics ? ' | ' + metrics : '')
+                );
+            });
+        }
+        const restoredStalls = Array.isArray(restoredSession.stalls)
+            ? restoredSession.stalls.slice(0, 20)
+            : [];
+        if (restoredStalls.length) {
+            lines.push('Blocages JS restaurés :');
+            restoredStalls.forEach(item => {
+                const eventClock = Number(item?.at)
+                    ? new Date(Number(item.at)).toLocaleTimeString('fr-FR')
+                    : '—';
+                lines.push(eventClock + ' | ≈ ' + Math.round(Number(item?.delay) || 0) + ' ms');
+            });
+        }
     }
 
     /* v16.36 — événements de mise à jour PWA conservés brièvement entre deux rechargements. */
@@ -411,6 +762,7 @@ function buildNpfStartupDiagnosticExportText() {
 }
 
 async function exportNpfStartupDiagnostic() {
+    try { npfDiagPersist(); } catch (_) {}
     const text = buildNpfStartupDiagnosticExportText();
     const date = new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -536,6 +888,10 @@ function renderNpfStartupDiagnosticPanel() {
                 <span>NPF interrompues/reprises : <b>${runtime.npfReadsAborted}</b> / <b>${runtime.npfTileRetries}</b></span>
                 <span>Priorité viewport : <b>${runtime.npfViewEpoch}</b></span>
                 <span>Cache tuiles : <b>${runtime.tileBlobCacheSize}</b></span>
+                <span>GPS auto : <b>${runtime.diagMapMotion?.gpsFollow?.count || 0}</b> pans / <b>${runtime.diagMapMotion?.gpsFollow?.slow || 0}</b> lents</span>
+                <span>File tuiles max : <b>${runtime.diagLayers?.tileQueueMax || 0}</b></span>
+                <span>SIA : <b>${runtime.diagLayers?.siaRefreshCount || 0}</b> refresh / max <b>${Math.round(runtime.diagLayers?.siaMaxMs || 0)} ms</b></span>
+                <span>Recherche : <b>${runtime.communeCount}</b> communes / <b>${runtime.communeAliasCount}</b> alias (${escapeNpfStartupDiagnosticHtml(runtime.communeAliasSource)})</span>
             </div>
             <div class="npf-startup-diag-page2-grid">
                 <div class="npf-startup-diag-page2-table">${table}</div>
@@ -1403,6 +1759,7 @@ let siaPointTouchRenderer = null;
 let npfRunwayMapLayer = null;
 let npfRunwayRenderer = null;
 let communeAliases = [];
+let communeAliasesLoadSource = 'non-charge';
 let communesByCodeInsee = new Map();
 
 /*
@@ -1428,6 +1785,8 @@ let namedPlacesOfflineIndex = null;
 let namedPlacesOfflineLoadPromise = null;
 let namedPlacesOfflineLoadError = '';
 let namedPlacesOfflineLoadedCount = 0;
+let namedPlacesOfflineLinkedCount = 0;
+let namedPlacesOfflineOrphanCount = 0;
 let namedPlacesOfflineShardIdsByPrefix = new Map();
 const namedPlacesOfflineShardCache = new Map();
 const namedPlacesOfflineShardPromises = new Map();
@@ -1451,6 +1810,14 @@ let centerGpsButtonSuppressClickUntil = 0;
 const CENTER_GPS_FOLLOW_RECENTER_DELAY_MS = 10000;
 const CENTER_GPS_BUTTON_LONG_PRESS_MS = 650;
 const CENTER_GPS_BUTTON_MOVE_TOLERANCE_PX = 14;
+function isNpfGpsFollowProgrammaticPan() {
+    return !!(
+        centerGpsFollowActive
+        && centerGpsFollowProgrammaticMove
+        && !centerGpsFollowUserGestureActive
+        && (Date.now() - Number(centerGpsFollowLastUserGestureAt || 0)) > 180
+    );
+}
 let ownGpsVectorLayer = null, ownGpsVectorMarkers = [];
 let userToTargetLayer = null, lftwRouteLayer = null, fireHistoryLayer = null;
 let showLftwRoute = true;
@@ -1464,6 +1831,7 @@ let highVoltageLinesData = null;
 let highVoltageLinesIndexedFeatures = [];
 let highVoltageLinesRenderedGeoJsonLayer = null;
 let highVoltageLinesRenderedFeatureCount = 0;
+let highVoltageLinesRenderedBounds = null;
 let highVoltageLinesRefreshTimer = null;
 let highVoltageLinesRefreshToken = 0;
 const HIGH_VOLTAGE_LINES_VIEWPORT_PAD = 0.22;
@@ -4899,20 +5267,27 @@ async function loadCommunesAliases() {
     try {
         const response = await fetchWithTimeout('./communes_aliases.json', { cache: 'no-cache' }, 5000);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return storeAliases(await response.json());
+        const aliases = storeAliases(await response.json());
+        communeAliasesLoadSource = 'fichier-reseau';
+        return aliases;
     } catch (_) {
         try {
             const cachedData = localStorage.getItem(COMMUNES_ALIASES_CACHE_KEY);
             if (cachedData) {
-                return parseAliasPayload(JSON.parse(cachedData));
+                const aliases = parseAliasPayload(JSON.parse(cachedData));
+                communeAliasesLoadSource = 'cache-local';
+                return aliases;
             }
         } catch (_) {}
 
         try {
             const fallbackResponse = await fetchWithTimeout('./communes_aliases.json', { cache: 'force-cache' }, 3000);
             if (!fallbackResponse.ok) throw new Error(`HTTP ${fallbackResponse.status}`);
-            return storeAliases(await fallbackResponse.json());
+            const aliases = storeAliases(await fallbackResponse.json());
+            communeAliasesLoadSource = 'cache-http';
+            return aliases;
         } catch (_) {
+            communeAliasesLoadSource = 'indisponible';
             console.warn('Alias communes indisponibles: recherche principale conservée.');
             return [];
         }
@@ -5164,12 +5539,27 @@ function buildOfflineNamedPlaceCandidate(record) {
         return null;
     }
 
-    const searchParts = normalizedName
-        .split(' ')
-        .filter(Boolean);
     const commune = communesByCodeInsee.get(
         String(record.i || '').trim()
     );
+    const municipalityNormalized = simplifyString(
+        municipality || commune?.nom_standard || ''
+    );
+    /*
+     * v16.51 — recherche France entière : un lieu-dit est indexé à la fois
+     * sous son nom et sous son rattachement communal. Une saisie composée du
+     * type « lieu-dit + commune » retrouve donc le même point sans alias manuel.
+     */
+    const searchParts = Array.from(new Set([
+        ...normalizedName.split(' ').filter(Boolean),
+        ...municipalityNormalized.split(' ').filter(Boolean)
+    ]));
+    const combinedCompact = [normalizedName, municipalityNormalized]
+        .filter(Boolean)
+        .join(' ')
+        .split(' ')
+        .filter(Boolean)
+        .join('');
 
     return {
         nom_standard: name,
@@ -5178,7 +5568,7 @@ function buildOfflineNamedPlaceCandidate(record) {
             normalizedName.replace(/\s+/g, '-'),
         normalized_name: normalizedName,
         search_parts: searchParts,
-        search_compact: searchParts.join(''),
+        search_compact: combinedCompact || searchParts.join(''),
         soundex_parts:
             searchParts.map(part => soundex(part)),
         latitude_mairie: latitude,
@@ -5200,7 +5590,8 @@ function buildOfflineNamedPlaceCandidate(record) {
             'village, hameau ou lieu-dit',
         locality_source:
             'Base Adresse Nationale — base locale NPF',
-        locality_offline: true
+        locality_offline: true,
+        locality_linked_commune: !!commune
     };
 }
 
@@ -5329,6 +5720,8 @@ async function loadNamedPlacesOfflineDatabase({
         namedPlacesOfflineShardCache.clear();
         namedPlacesOfflineShardPromises.clear();
         namedPlacesOfflineLoadedCount = 0;
+        namedPlacesOfflineLinkedCount = 0;
+        namedPlacesOfflineOrphanCount = 0;
     }
 
     if (!namedPlacesOfflineArchive) {
@@ -5442,6 +5835,8 @@ async function loadNamedPlacesOfflineDatabase({
                 records
             );
             namedPlacesOfflineLoadedCount += records.length;
+            namedPlacesOfflineLinkedCount += records.filter(item => item.locality_linked_commune).length;
+            namedPlacesOfflineOrphanCount += records.filter(item => !item.locality_linked_commune).length;
 
             while (
                 namedPlacesOfflineShardCache.size
@@ -6411,15 +6806,18 @@ function initMap() {
     }).setView([46.6, 2.2], 5.5);
 
     map.on('movestart', () => {
-        beginBaseMapZoomStabilityGuard('movestart');
-        beginMapVisualRenderGuard('movestart');
-        if (showRoadOverlayLayer) {
-            roadOverlayRefreshToken += 1;
-            clearTimeout(roadOverlayRefreshTimer);
-        }
-        if (showHighVoltageLinesLayer) {
-            highVoltageLinesRefreshToken += 1;
-            clearTimeout(highVoltageLinesRefreshTimer);
+        const gpsFollowPan = isNpfGpsFollowProgrammaticPan();
+        if (!gpsFollowPan) {
+            beginBaseMapZoomStabilityGuard('movestart');
+            beginMapVisualRenderGuard('movestart');
+            if (showRoadOverlayLayer) {
+                roadOverlayRefreshToken += 1;
+                clearTimeout(roadOverlayRefreshTimer);
+            }
+            if (showHighVoltageLinesLayer) {
+                highVoltageLinesRefreshToken += 1;
+                clearTimeout(highVoltageLinesRefreshTimer);
+            }
         }
     });
     map.on('zoomstart', () => {
@@ -6442,6 +6840,14 @@ function initMap() {
         scheduleTrafficVisualResumeAfterMapInteraction('zoomend');
     });
     map.on('moveend', () => {
+        if (isNpfGpsFollowProgrammaticPan()) {
+            /*
+             * v16.51 — un recentrage GPS ne change pas de priorité à chaque
+             * seconde et ne purge pas les lectures IDB encore utiles. La limite
+             * dure de file reste active dans enqueueDirectOfflineNpfRead().
+             */
+            return;
+        }
         try { pruneDirectOfflineNpfQueueForCurrentView('moveend'); } catch (_) {}
         scheduleTrafficVisualResumeAfterMapInteraction('moveend');
     });
@@ -6618,7 +7024,7 @@ function initMap() {
         drawNpfRunwayMapLayer();
     }
     map.on('zoomend', () => scheduleNpfRunwayMapRefresh('zoomend'));
-    map.on('moveend', () => scheduleNpfRunwayMapRefresh('moveend'));
+    map.on('moveend', () => { if (!isNpfGpsFollowProgrammaticPan()) scheduleNpfRunwayMapRefresh('moveend'); });
 
     applyPelicanVisualScale();
     map.on('zoomend', applyPelicanVisualScale);
@@ -6635,12 +7041,17 @@ function initMap() {
         scheduleStartupAuxiliaryLayers();
     }
 
-    map.on('moveend zoomend', () => {
+    map.on('moveend zoomend', event => {
+        const gpsFollowPan = event?.type === 'moveend' && isNpfGpsFollowProgrammaticPan();
         if (showRoadOverlayLayer) {
-            scheduleRoadOverlayRefresh('map-change');
+            if (!gpsFollowPan || !isRoadOverlayCoverageValidForCurrentView()) {
+                scheduleRoadOverlayRefresh(gpsFollowPan ? 'gps-follow-edge' : 'map-change');
+            }
         }
         if (showHighVoltageLinesLayer && hasLoadedHighVoltageLines) {
-            scheduleHighVoltageLinesRefresh('map-change');
+            if (!gpsFollowPan || !isHighVoltageCoverageValidForCurrentView()) {
+                scheduleHighVoltageLinesRefresh(gpsFollowPan ? 'gps-follow-edge' : 'map-change');
+            }
         }
     });
 
@@ -9117,7 +9528,7 @@ function setupEventListeners() {
         if (map && map._communesZoomStyleBound !== true) {
             map._communesZoomStyleBound = true;
  // v16.02 — recalcul Communes différé après stabilisation de la vue pour ne pas concurrencer SS / GLR / SIA.
-            map.on('zoomend moveend', () => scheduleCommunesLayerAppearanceRefresh(260));
+            map.on('zoomend moveend', event => { if (event?.type !== 'moveend' || !isNpfGpsFollowProgrammaticPan()) scheduleCommunesLayerAppearanceRefresh(260); });
         }
     }
 
@@ -10578,6 +10989,16 @@ function clearRenderedHighVoltageLines() {
     try { highVoltageLinesRenderer?._redraw?.(); } catch (_) {}
     highVoltageLinesRenderedGeoJsonLayer = null;
     highVoltageLinesRenderedFeatureCount = 0;
+    highVoltageLinesRenderedBounds = null;
+}
+
+function isHighVoltageCoverageValidForCurrentView() {
+    if (!map || !highVoltageLinesRenderedBounds || !highVoltageLinesRenderedGeoJsonLayer) return false;
+    try {
+        return roadOverlayBoundsContainBounds(highVoltageLinesRenderedBounds, map.getBounds());
+    } catch (_) {
+        return false;
+    }
 }
 
 async function refreshVisibleHighVoltageLines(source = 'refresh') {
@@ -10608,9 +11029,13 @@ async function refreshVisibleHighVoltageLines(source = 'refresh') {
 
     if (token !== highVoltageLinesRefreshToken || !showHighVoltageLinesLayer) return;
 
-    clearRenderedHighVoltageLines();
+    const previousLayer = highVoltageLinesRenderedGeoJsonLayer;
 
     if (!visibleFeatures.length) {
+        highVoltageLinesRenderedGeoJsonLayer = null;
+        highVoltageLinesRenderedFeatureCount = 0;
+        highVoltageLinesRenderedBounds = L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast());
+        try { if (previousLayer) highVoltageLinesLayer.removeLayer(previousLayer); } catch (_) {}
         if (source !== 'map-change') {
             recordNpfStartupDiagnosticOverlaySnapshot(`lignes-ht visible=0 · ${source}`);
         }
@@ -10620,7 +11045,7 @@ async function refreshVisibleHighVoltageLines(source = 'refresh') {
     const renderGeojson = buildHighVoltageAggregatedRenderGeojson(visibleFeatures);
     if (!renderGeojson.features.length) return;
 
-    highVoltageLinesRenderedGeoJsonLayer = L.geoJSON(renderGeojson, {
+    const replacementLayer = L.geoJSON(renderGeojson, {
         style: getHighVoltageLineStyle,
         pane: 'highVoltageLinesPane',
         renderer: highVoltageLinesRenderer || undefined,
@@ -10630,8 +11055,12 @@ async function refreshVisibleHighVoltageLines(source = 'refresh') {
 
     if (token !== highVoltageLinesRefreshToken || !showHighVoltageLinesLayer) return;
 
-    highVoltageLinesRenderedGeoJsonLayer.addTo(highVoltageLinesLayer);
+    /* Nouveau rendu d'abord, ancien rendu ensuite : aucun trou visuel. */
+    replacementLayer.addTo(highVoltageLinesLayer);
+    highVoltageLinesRenderedGeoJsonLayer = replacementLayer;
     highVoltageLinesRenderedFeatureCount = visibleFeatures.length;
+    highVoltageLinesRenderedBounds = L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast());
+    try { if (previousLayer && previousLayer !== replacementLayer) highVoltageLinesLayer.removeLayer(previousLayer); } catch (_) {}
 
     if (source !== 'map-change') {
         recordNpfStartupDiagnosticOverlaySnapshot(`lignes-ht rendu ${source}`);
@@ -12006,6 +12435,15 @@ function cloneRoadOverlayBounds(bounds) {
         return L.latLngBounds(bounds.getSouthWest(), bounds.getNorthEast());
     } catch (_) {
         return null;
+    }
+}
+
+function isRoadOverlayCoverageValidForCurrentView() {
+    if (!map || !roadOverlayRenderedBounds || roadOverlayLoadedZoomTier !== getRoadOverlayZoomTier()) return false;
+    try {
+        return roadOverlayBoundsContainBounds(roadOverlayRenderedBounds, map.getBounds());
+    } catch (_) {
+        return false;
     }
 }
 
@@ -28143,6 +28581,45 @@ function getCenterGpsFollowVisibleMapRect(width, height) {
     }
 }
 
+function getCenterGpsFollowOverlayVerticalInsets(visible) {
+    const result = { top: 0, bottom: 0 };
+    try {
+        const container = map?.getContainer?.();
+        if (!container) return result;
+        const mapRect = container.getBoundingClientRect();
+        const selectors = [
+            '#npf-waypoint-route-banner',
+            '#commune-info-display',
+            '#bingo-map-display',
+            '#nearest-commune-display'
+        ];
+        const visibleTopAbs = mapRect.top + visible.top;
+        const visibleBottomAbs = visibleTopAbs + visible.height;
+        const visibleLeftAbs = mapRect.left + visible.left;
+        const visibleRightAbs = visibleLeftAbs + visible.width;
+
+        selectors.forEach(selector => {
+            const element = document.querySelector(selector);
+            if (!element) return;
+            const style = window.getComputedStyle(element);
+            if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || 1) <= 0.01) return;
+            const rect = element.getBoundingClientRect();
+            if (rect.width < 80 || rect.height < 18) return;
+            if (rect.right <= visibleLeftAbs || rect.left >= visibleRightAbs) return;
+            const overlapWidth = Math.max(0, Math.min(rect.right, visibleRightAbs) - Math.max(rect.left, visibleLeftAbs));
+            if (overlapWidth < Math.min(180, visible.width * 0.22)) return;
+
+            if (rect.top <= visibleTopAbs + visible.height * 0.42) {
+                result.top = Math.max(result.top, rect.bottom - visibleTopAbs);
+            }
+            if (rect.bottom >= visibleBottomAbs - visible.height * 0.32) {
+                result.bottom = Math.max(result.bottom, visibleBottomAbs - rect.top);
+            }
+        });
+    } catch (_) {}
+    return result;
+}
+
 function getCenterGpsFollowMapCenter(pos, zoom) {
     if (!map || !pos || !centerGpsFollowActive) return pos;
 
@@ -28183,13 +28660,23 @@ function getCenterGpsFollowMapCenter(pos, zoom) {
             visible.width / 2,
             Math.max(CENTER_GPS_FOLLOW_MIN_SIDE_MARGIN_PX, visible.width * CENTER_GPS_FOLLOW_SAFE_MARGIN_RIGHT_RATIO)
         );
+        const overlayInsets = getCenterGpsFollowOverlayVerticalInsets(visible);
+        const aircraftClearancePx = 54;
         const topMargin = Math.min(
             visible.height / 2,
-            Math.max(CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX, visible.height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO)
+            Math.max(
+                CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX,
+                visible.height * CENTER_GPS_FOLLOW_SAFE_MARGIN_TOP_RATIO,
+                Number(overlayInsets.top || 0) + aircraftClearancePx
+            )
         );
         const bottomMargin = Math.min(
             visible.height / 2,
-            Math.max(CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX, visible.height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO)
+            Math.max(
+                CENTER_GPS_FOLLOW_MIN_VERTICAL_MARGIN_PX,
+                visible.height * CENTER_GPS_FOLLOW_SAFE_MARGIN_BOTTOM_RATIO,
+                Number(overlayInsets.bottom || 0) + aircraftClearancePx
+            )
         );
 
         const safeLeft = visible.left + sideMargin;
@@ -28253,6 +28740,15 @@ function recenterMapOnKnownGpsPosition(reason = 'manual') {
         centerGpsFollowLastUserGestureAt = Date.now();
         centerGpsFollowPausedUntil = Date.now() + CENTER_GPS_FOLLOW_RECENTER_DELAY_MS;
     }
+
+    let npfDiagCenterShiftM = 0;
+    try {
+        const currentCenter = map.getCenter?.();
+        if (currentCenter && typeof map.distance === 'function') {
+            npfDiagCenterShiftM = Number(map.distance(currentCenter, L.latLng(mapCenter.lat, mapCenter.lng))) || 0;
+        }
+    } catch (_) {}
+    try { npfDiagGpsRecenter(reason, npfDiagCenterShiftM); } catch (_) {}
 
     centerGpsFollowProgrammaticMove = true;
     try {
@@ -29225,6 +29721,7 @@ function updateUserPosition(pos) {
         ? `${Math.round(simulationAltitudeFt)} ft`
         : (shouldShowOwnGpsAltitude() ? formatGpsAltitudeFtFromCoords(pos.coords) : '');
     const gpsTimestampMs = Number(pos.timestamp) || Date.now();
+    try { npfDiagGpsPosition(pos.coords, gpsTimestampMs); } catch (_) {}
     const estimatedMotion = isSimulationPosition ? { heading: null, speed: null } : estimateMotionFromLastPosition(latitude, longitude, gpsTimestampMs);
     const rawHeading = Number(pos.coords.heading);
     const rawSpeed = Number(pos.coords.speed);
@@ -40068,10 +40565,14 @@ function scheduleSiaCoverageRefresh(reason = 'moveend') {
         && siaBoundsFullyContains(siaRenderedCoverageBounds, currentBounds)
     ) {
         /*
-         * Les géométries, hitboxes et points sont déjà dans le tampon de rendu.
-         * Pendant le pan, Leaflet les déplace nativement. Après relâchement, ne
-         * reconstruire que les décorations et seulement après un court repos.
+         * v16.51 — en suivi GPS, conserver intégralement le rendu tant que le
+         * viewport reste dans le tampon. Les décorations ne sont plus supprimées
+         * puis recréées à chaque position : disparition du clignotement SIA.
          */
+        if (reason === 'gps-follow') {
+            scheduleSiaProfileRefresh('sia-gps-follow-contained');
+            return;
+        }
         scheduleSiaMoveDecorationRefresh('moveend-contained');
         scheduleSiaProfileRefresh('sia-moveend-contained');
         return;
@@ -42603,17 +43104,28 @@ function initializeSiaSystem() {
         let npfDiagZoomStartedAt = 0;
 
         map.on('movestart', () => {
-            clearTimeout(siaMoveDecorationRefreshTimer);
-            siaMoveDecorationRefreshTimer = null;
-            /* Annule immédiatement une construction progressive encore en cours. */
-            siaDecorationProgressiveRun += 1;
+            const gpsFollowPan = isNpfGpsFollowProgrammaticPan();
+            if (!gpsFollowPan) {
+                clearTimeout(siaMoveDecorationRefreshTimer);
+                siaMoveDecorationRefreshTimer = null;
+                /*
+                 * Un geste utilisateur / zoom invalide la construction en cours.
+                 * En revanche, un recentrage GPS garde le calque et sa construction
+                 * progressive : sinon le suivi à 1 Hz peut interrompre le rendu sans
+                 * jamais lui laisser le temps de terminer.
+                 */
+                siaDecorationProgressiveRun += 1;
+            }
             const now = NPF_STARTUP_DIAGNOSTIC.now();
             npfDiagMoveSample = {
                 startedAt: now,
                 lastAt: now,
                 events: 0,
                 gapTotal: 0,
-                maxGap: 0
+                maxGap: 0,
+                source: gpsFollowPan
+                    ? 'gps-follow'
+                    : (centerGpsFollowUserGestureActive ? 'manual' : 'autre')
             };
         });
         map.on('move', () => {
@@ -42635,14 +43147,15 @@ function initializeSiaSystem() {
             if (sample) {
                 const now = NPF_STARTUP_DIAGNOSTIC.now();
                 const avgGap = sample.events > 0 ? sample.gapTotal / sample.events : 0;
-                npfDiagSiaInteraction(
-                    'PAN CARTE',
-                    `zones=${siaMapAirspacesVisible ? 'AFFICHÉES' : 'MASQUÉES'} · zoom=${map.getZoom()} · zonesVisibles=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0}`,
+                npfDiagMapMotion(
+                    sample.source || (isNpfGpsFollowProgrammaticPan() ? 'gps-follow' : 'autre'),
                     {
                         dureeMs: Math.round(now - sample.startedAt),
                         moveEvents: sample.events,
                         gapMoyMs: Math.round(avgGap),
-                        gapMaxMs: Math.round(sample.maxGap)
+                        gapMaxMs: Math.round(sample.maxGap),
+                        zoom: map.getZoom(),
+                        zonesVisibles: Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0
                     }
                 );
             } else if (consumeSiaStartupPassiveMoveendGuard()) {
@@ -42657,7 +43170,7 @@ function initializeSiaSystem() {
                 );
                 return;
             }
-            scheduleSiaCoverageRefresh('moveend');
+            scheduleSiaCoverageRefresh(sample?.source === 'gps-follow' ? 'gps-follow' : 'moveend');
         });
         map.on('zoomstart', () => {
             npfDiagZoomStartedAt = NPF_STARTUP_DIAGNOSTIC.now();
@@ -42665,11 +43178,11 @@ function initializeSiaSystem() {
         map.on('zoomend', () => {
             const now = NPF_STARTUP_DIAGNOSTIC.now();
             if (npfDiagZoomStartedAt > 0) {
-                npfDiagSiaInteraction(
-                    'ZOOM CARTE',
-                    `zones=${siaMapAirspacesVisible ? 'AFFICHÉES' : 'MASQUÉES'} · zoom=${map.getZoom()} · zonesVisibles=${Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0}`,
-                    { dureeMs: Math.round(now - npfDiagZoomStartedAt) }
-                );
+                npfDiagZoom({
+                    dureeMs: Math.round(now - npfDiagZoomStartedAt),
+                    zoom: map.getZoom(),
+                    zonesVisibles: Array.isArray(siaRenderedAirspaceFeatures) ? siaRenderedAirspaceFeatures.length : 0
+                });
                 npfDiagZoomStartedAt = 0;
             }
             scheduleSiaLayerRefresh('zoomend');
